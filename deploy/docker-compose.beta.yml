@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: vita/api:${IMAGE_TAG:-beta}
+    restart: unless-stopped
+    environment:
+      TOVIDEO_ENV: "${TOVIDEO_ENV:-beta}"
+      TOVIDEO_HTTP_ADDR: ":8080"
+      TOVIDEO_DB_DSN: "${TOVIDEO_DB_DSN:?set TOVIDEO_DB_DSN in .env.beta}"
+      TOVIDEO_REDIS_URL: "${TOVIDEO_REDIS_URL:?set TOVIDEO_REDIS_URL in .env.beta}"
+      TOVIDEO_JWT_SECRET: "${TOVIDEO_JWT_SECRET:?set TOVIDEO_JWT_SECRET in .env.beta}"
+      TOVIDEO_MOCK_GENERATION: "${TOVIDEO_MOCK_GENERATION:-false}"
+      TOVIDEO_AUTO_MIGRATE: "${TOVIDEO_AUTO_MIGRATE:-true}"
+      TOVIDEO_STORAGE_PROVIDER: "${TOVIDEO_STORAGE_PROVIDER:-cos}"
+    ports:
+      - "${BIND_HOST:-127.0.0.1}:${SERVER_PORT:-8080}:8080"
+    networks:
+      - vita-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-T", "5", "-O", "/dev/null", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  admin:
+    build:
+      context: ../admin
+      dockerfile: Dockerfile
+    image: vita/admin:${IMAGE_TAG:-beta}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${ADMIN_BIND_HOST:-127.0.0.1}:${ADMIN_PORT:-8157}:80"
+    networks:
+      - vita-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  webapp:
+    build:
+      context: ..
+      dockerfile: webapp/Dockerfile
+      args:
+        TOVIDEO_API_URL: "${WEBAPP_API_URL:-http://api:8080}"
+        TOVIDEO_ENV: "${WEBAPP_ENV:-staging}"
+    image: vita/webapp:${IMAGE_TAG:-beta}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      TOVIDEO_API_URL: "${WEBAPP_API_URL:-http://api:8080}"
+      TOVIDEO_ENV: "${WEBAPP_ENV:-staging}"
+    ports:
+      - "${WEBAPP_BIND_HOST:-127.0.0.1}:${WEBAPP_PORT:-3000}:3000"
+    networks:
+      - vita-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+networks:
+  vita-net:
+    driver: bridge

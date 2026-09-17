@@ -1,0 +1,48 @@
+{
+  "name": "vita-webapp",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm dev",
+    "build": "pnpm build",
+    "start": "next start",
+    "lint": "eslint && pnpm check:typography",
+    "typecheck": "pnpm typecheck",
+    "test": "pnpm test",
+    "gen:api": "node scripts/openapi2ts.mjs",
+    "install": "pnpm install"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@hookform/resolvers": "^5.7.1",
+    "@radix-ui/react-avatar": "^1.2.6",
+    "@radix-ui/react-dialog": "^1.1.23",
+    "@tanstack/react-query": "^5.101.4",
+    "axios": "^1.19.0",
+    "clsx": "^2.1.1",
+    "hls.js": "^1.6.16",
+    "lucide-react": "^1.28.0",
+    "motion": "^12.43.0",
+    "next": "16.3.0",
+    "next-intl": "^4.13.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-hook-form": "^7.84.0",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.6.0",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.0",
+    "openapi-typescript": "^7.13.0",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^3.2.4"
+  },
+  "packageManager": "pnpm@10.33.0"
+}

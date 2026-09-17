@@ -1,0 +1,39 @@
+{
+  "name": "vita-site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Vita \u2014 AI Companion product website",
+  "scripts": {
+    "dev": "pnpm dev",
+    "build": "pnpm build",
+    "preview": "vite preview",
+    "typecheck": "pnpm typecheck",
+    "lint": "oxlint .",
+    "deploy": "pnpm build && wrangler deploy",
+    "install": "pnpm install"
+  },
+  "dependencies": {
+    "@radix-ui/react-accordion": "^1.2.12",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.17.0",
+    "motion": "^12.40.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router": "^7.17.0",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.2.16",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "oxlint": "^1.78.0",
+    "tailwindcss": "^4.3.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.0.16"
+  },
+  "packageManager": "pnpm@11.0.9"
+}

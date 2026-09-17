@@ -1,0 +1,194 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: vita/api:dev
+    container_name: vita-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rustfs:
+        condition: service_started
+    environment:
+      TOVIDEO_ENV: "${TOVIDEO_ENV:-dev}"
+      TOVIDEO_HTTP_ADDR: ":8080"
+      TOVIDEO_DB_DSN: "postgres://${POSTGRES_USER:-tovideo}:${POSTGRES_PASSWORD:-tovideo_dev_password}@postgres:5432/${POSTGRES_DB:-vita}?sslmode=disable"
+      TOVIDEO_REDIS_URL: "redis://redis:6379/0"
+      TOVIDEO_JWT_SECRET: "${TOVIDEO_JWT_SECRET:-dev-secret-change-me-32-characters-min}"
+      TOVIDEO_MOCK_GENERATION: "${TOVIDEO_MOCK_GENERATION:-true}"
+      TOVIDEO_AUTO_MIGRATE: "${TOVIDEO_AUTO_MIGRATE:-true}"
+      TOVIDEO_STORAGE_PROVIDER: "${TOVIDEO_STORAGE_PROVIDER:-s3}"
+      TOVIDEO_S3_BUCKET: "${TOVIDEO_S3_BUCKET:-vita-media}"
+      TOVIDEO_S3_ENDPOINT: "${TOVIDEO_S3_ENDPOINT:-http://rustfs:9000}"
+      TOVIDEO_S3_ACCESS_KEY: "${RUSTFS_ACCESS_KEY:-vita_rustfs}"
+      TOVIDEO_S3_SECRET_KEY: "${RUSTFS_SECRET_KEY:-vita_rustfs_secret}"
+      TOVIDEO_ADMIN_EMAILS: "${TOVIDEO_ADMIN_EMAILS:-}"
+      TOVIDEO_EMAIL_VERIFICATION: "${TOVIDEO_EMAIL_VERIFICATION:-false}"
+      TOVIDEO_STRIPE_SECRET_KEY: "${TOVIDEO_STRIPE_SECRET_KEY:-}"
+      TOVIDEO_FCM_CREDENTIALS_JSON: "${TOVIDEO_FCM_CREDENTIALS_JSON:-}"
+    ports:
+      - "${BIND_HOST:-127.0.0.1}:${SERVER_PORT:-8080}:8080"
+    networks:
+      - vita-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-T", "5", "-O", "/dev/null", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  admin:
+    build:
+      context: ../admin
+      dockerfile: Dockerfile
+    image: vita/admin:dev
+    container_name: vita-admin
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${ADMIN_BIND_HOST:-127.0.0.1}:${ADMIN_PORT:-8157}:80"
+    networks:
+      - vita-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  webapp:
+    build:
+      context: ..
+      dockerfile: webapp/Dockerfile
+    image: vita/webapp:dev
+    container_name: vita-webapp
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      TOVIDEO_API_URL: "${WEBAPP_API_URL:-http://api:8080}"
+      TOVIDEO_ENV: "${WEBAPP_ENV:-staging}"
+    ports:
+      - "${WEBAPP_BIND_HOST:-127.0.0.1}:${WEBAPP_PORT:-3000}:3000"
+    networks:
+      - vita-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  postgres:
+    image: postgres:18-alpine
+    container_name: vita-postgres
+    restart: unless-stopped
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      POSTGRES_USER: "${POSTGRES_USER:-tovideo}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+      POSTGRES_DB: "${POSTGRES_DB:-vita}"
+      TZ: "${TZ:-UTC}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_BIND_HOST:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - vita-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tovideo} -d ${POSTGRES_DB:-vita}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:8-alpine
+    container_name: vita-redis
+    restart: unless-stopped
+    command: >
+      sh -c '
+        redis-server
+        --save 60 1
+        --appendonly yes
+        --appendfsync everysec
+        ${REDIS_PASSWORD:+--requirepass "$REDIS_PASSWORD"}'
+    environment:
+      TZ: "${TZ:-UTC}"
+      REDISCLI_AUTH: "${REDIS_PASSWORD:-}"
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_BIND_HOST:-127.0.0.1}:${REDIS_PORT:-6379}:6379"
+    networks:
+      - vita-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: vita-rustfs
+    restart: unless-stopped
+    environment:
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_ACCESS_KEY: "${RUSTFS_ACCESS_KEY:-vita_rustfs}"
+      RUSTFS_SECRET_KEY: "${RUSTFS_SECRET_KEY:-vita_rustfs_secret}"
+      RUSTFS_VOLUMES: "/data"
+      TZ: "${TZ:-UTC}"
+    volumes:
+      - rustfs_data:/data
+    ports:
+      - "${RUSTFS_BIND_HOST:-127.0.0.1}:${RUSTFS_API_PORT:-59000}:9000"
+      - "${RUSTFS_BIND_HOST:-127.0.0.1}:${RUSTFS_CONSOLE_PORT:-59001}:9001"
+    networks:
+      - vita-net
+
+  rustfs-init:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    container_name: vita-rustfs-init
+    restart: "no"
+    depends_on:
+      rustfs:
+        condition: service_started
+    environment:
+      RUSTFS_ACCESS_KEY: "${RUSTFS_ACCESS_KEY:-vita_rustfs}"
+      RUSTFS_SECRET_KEY: "${RUSTFS_SECRET_KEY:-vita_rustfs_secret}"
+      BUCKET: "${TOVIDEO_S3_BUCKET:-vita-media}"
+      PROTECTED_BUCKET: "${TOVIDEO_S3_PROTECTED_BUCKET:-vita-clean}"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until mc alias set rfs "http://rustfs:9000" "$$RUSTFS_ACCESS_KEY" "$$RUSTFS_SECRET_KEY" >/dev/null 2>&1; do
+          echo "waiting for rustfs..."; sleep 2;
+        done
+        mc mb --ignore-existing "rfs/$$BUCKET"
+        mc mb --ignore-existing "rfs/$$PROTECTED_BUCKET"
+        mc anonymous set download "rfs/$$BUCKET" || true
+        echo "rustfs ready"
+    networks:
+      - vita-net
+
+volumes:
+  postgres_data:
+  redis_data:
+  rustfs_data:
+
+networks:
+  vita-net:
+    driver: bridge
