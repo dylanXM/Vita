@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -8,13 +11,28 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/redis/go-redis/v9"
 
 	"vita/internal/db"
-	"vita/internal/storage"
 )
 
 const jwtSecret = "dev-secret-change-me-32-characters-min"
+const codeLength = 6
+const codeTTL = 5 * time.Minute
+
+var rdb *redis.Client
+
+func InitRedis(redisURL string) {
+	var err error
+	rdb = redis.NewClient(&redis.Options{
+		Addr:     redisURL,
+		Password: "",
+		DB:       0,
+	})
+	if err != nil {
+		fmt.Printf("Warning: Redis connection failed: %v\n", err)
+	}
+}
 
 type HealthResponse struct {
 	Status  string `json:"status"`
@@ -25,14 +43,86 @@ func Health(c *gin.Context) {
 	c.JSON(http.StatusOK, HealthResponse{Status: "ok", Version: "0.1.0"})
 }
 
+// --- Verification Code ---
+
+type SendCodeRequest struct {
+	Email string `json:"email" binding:"required,email"`
+	Purpose string `json:"purpose"`
+}
+
+type SendCodeResponse struct {
+	Message string `json:"message"`
+}
+
+func SendCode(c *gin.Context) {
+	var req SendCodeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Check if user exists (for login), or create new user (for register)
+	var userID, userRole string
+	err := db.Get().QueryRow(`SELECT id, COALESCE(role_id, 'user') FROM users WHERE email = $1`, req.Email).Scan(&userID, &userRole)
+	if err != nil {
+		// User doesn't exist, auto-register as user
+		userID = uuid.New().String()
+		_, err = db.Get().Exec(`INSERT INTO users (id, email, role_id) VALUES ($1, $2, 'user')`, userID, req.Email)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
+			return
+		}
+		userRole = "user"
+	}
+
+	// Generate verification code
+	code := generateCode()
+	expiresAt := time.Now().Add(codeTTL)
+
+	// Store code in Redis with expiration
+	ctx := context.Background()
+	codeData := map[string]string{
+		"email":   req.Email,
+		"user_id": userID,
+		"role":    userRole,
+		"purpose": req.Purpose,
+	}
+	codeJSON, _ := json.Marshal(codeData)
+	err = rdb.Set(ctx, "vcode:"+code, string(codeJSON), codeTTL).Err()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store verification code"})
+		return
+	}
+
+	// Also store in DB for backup
+	codeID := uuid.New().String()
+	_, err = db.Get().Exec(`INSERT INTO verification_codes (id, email, code, purpose, expires_at) VALUES ($1, $2, $3, $4, $4)`,
+		codeID, req.Email, code, req.Purpose, expiresAt)
+	if err != nil {
+		// Non-fatal, Redis is the primary store
+	}
+
+	// Log the code (in production, send via email/SMS)
+	fmt.Printf("[SMS/EMAIL] Verification code for %s: %s (expires in %v)\n", req.Email, code, codeTTL)
+
+	c.JSON(http.StatusOK, SendCodeResponse{Message: "Verification code sent"})
+}
+
+func generateCode() string {
+	bytes := make([]byte, 3)
+	rand.Read(bytes)
+	return fmt.Sprintf("%06d", int32(bytes[0])<<16|int32(bytes[1])<<8|int32(bytes[2]))
+}
+
+// --- Auth Routes ---
+
 type RegisterRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
+	Email string `json:"email" binding:"required,email"`
 }
 
 type RegisterResponse struct {
 	UserID string `json:"user_id"`
-	Token  string `json:"token"`
+	Token   string `json:"token"`
 }
 
 func Register(c *gin.Context) {
@@ -41,19 +131,23 @@ func Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	userID := uuid.New().String()
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), 14)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
-		return
-	}
-	query := `INSERT INTO users (id, email, password_hash) VALUES ($1, $2, $3)`
-	_, err = db.Get().Exec(query, userID, req.Email, passwordHash)
-	if err != nil {
+
+	// Check if user exists
+	var exists bool
+	err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`, req.Email).Scan(&exists)
+	if err != nil || exists {
 		c.JSON(http.StatusConflict, gin.H{"error": "email already exists"})
 		return
 	}
-	token, err := generateToken(uuid.MustParse(userID))
+
+	userID := uuid.New().String()
+	_, err = db.Get().Exec(`INSERT INTO users (id, email, role_id) VALUES ($1, $2, 'user')`, userID, req.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
+		return
+	}
+
+	token, err := generateToken(uuid.MustParse(userID), "user")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return
@@ -62,13 +156,14 @@ func Register(c *gin.Context) {
 }
 
 type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
+	Email string `json:"email" binding:"required,email"`
+	Code    string `json:"code" binding:"required,len=6"`
 }
 
 type LoginResponse struct {
-	UserID string `json:"user_id"`
-	Token  string `json:"token"`
+	UserID  string `json:"user_id"`
+	Token   string `json:"token"`
+	Role    string `json:"role"`
 }
 
 func Login(c *gin.Context) {
@@ -77,31 +172,262 @@ func Login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	var userID, passwordHash string
-	err := db.Get().QueryRow(`SELECT id, password_hash FROM users WHERE email = $1`, req.Email).Scan(&userID, &passwordHash)
+
+	// Verify code from Redis
+	ctx := context.Background()
+	codeDataJSON, err := rdb.Get(ctx, "vcode:"+req.Code).Result()
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired verification code"})
 		return
 	}
-	if !bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)) != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+
+	var codeData map[string]string
+	if err := json.Unmarshal([]byte(codeDataJSON), &codeData); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid verification code"})
 		return
 	}
-	token, err := generateToken(uuid.MustParse(userID))
+
+	// Verify email matches
+	if codeData["email"] != req.Email {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "verification code does not match this email"})
+		return
+	}
+
+	// Mark code as used (delete from Redis)
+	rdb.Del(ctx, "vcode:"+req.Code)
+
+	// Mark as used in DB
+	_, _ = db.Get().Exec(`UPDATE verification_codes SET used = true WHERE code = $1 AND email = $2`, req.Code, req.Email)
+
+	userID := codeData["user_id"]
+	userRole := codeData["role"]
+
+	// Get user ID if we only have email
+	if userID == "" {
+		err = db.Get().QueryRow(`SELECT id FROM users WHERE email = $1`, req.Email).Scan(&userID)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+			return
+		}
+	}
+
+	token, err := generateToken(func() uuid.UUID { u, _ := uuid.Parse(userID); return u }(), userRole)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return
 	}
-	c.JSON(http.StatusOK, LoginResponse{UserID: userID, Token: token})
+
+	c.JSON(http.StatusOK, LoginResponse{UserID: userID, Token: token, Role: userRole})
+}
+
+// AdminLogin - admin login with email + code (must have admin role)
+type AdminLoginRequest struct {
+	Email string `json:"email" binding:"required,email"`
+	Code    string `json:"code" binding:"required,len=6"`
+}
+
+type AdminLoginResponse struct {
+	UserID string `json:"user_id"`
+	Token  string `json:"token"`
+}
+
+func AdminLogin(c *gin.Context) {
+	var req AdminLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Same verification flow as Login but checks admin role
+	ctx := context.Background()
+	codeDataJSON, err := rdb.Get(ctx, "vcode:"+req.Code).Result()
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired verification code"})
+		return
+	}
+
+	var codeData map[string]string
+	if err := json.Unmarshal([]byte(codeDataJSON), &codeData); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid verification code"})
+		return
+	}
+
+	if codeData["email"] != req.Email {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "verification code does not match this email"})
+		return
+	}
+
+	rdb.Del(ctx, "vcode:"+req.Code)
+	_, _ = db.Get().Exec(`UPDATE verification_codes SET used = true WHERE code = $1 AND email = $2`, req.Code, req.Email)
+
+	userID := codeData["user_id"]
+	if userID == "" {
+		err = db.Get().QueryRow(`SELECT id FROM users WHERE email = $1`, req.Email).Scan(&userID)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+			return
+		}
+	}
+
+	// Check if user has admin role
+	var role string
+	err = db.Get().QueryRow(`SELECT role_id FROM users WHERE id = $1`, userID).Scan(&role)
+	if err != nil || role != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "admin access required"})
+		return
+	}
+
+	token, err := generateToken(func() uuid.UUID { u, _ := uuid.Parse(userID); return u }(), "admin")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, AdminLoginResponse{UserID: userID, Token: token})
+}
+
+// AppLogin - login endpoint for mobile app
+type AppLoginRequest struct {
+	Email string `json:"email" binding:"required,email"`
+	Code    string `json:"code" binding:"required,len=6"`
+}
+
+type AppLoginResponse struct {
+	UserID string `json:"user_id"`
+	Token  string `json:"token"`
+	Role   string `json:"role"`
+}
+
+func AppLogin(c *gin.Context) {
+	// Same as Login but returns app-specific response
+	var req AppLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx := context.Background()
+	codeDataJSON, err := rdb.Get(ctx, "vcode:"+req.Code).Result()
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired verification code"})
+		return
+	}
+
+	var codeData map[string]string
+	if err := json.Unmarshal([]byte(codeDataJSON), &codeData); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid verification code"})
+		return
+	}
+
+	if codeData["email"] != req.Email {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "verification code does not match this email"})
+		return
+	}
+
+	rdb.Del(ctx, "vcode:"+req.Code)
+	_, _ = db.Get().Exec(`UPDATE verification_codes SET used = true WHERE code = $1 AND email = $2`, req.Code, req.Email)
+
+	userID := codeData["user_id"]
+	if userID == "" {
+		err = db.Get().QueryRow(`SELECT id FROM users WHERE email = $1`, req.Email).Scan(&userID)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+			return
+		}
+	}
+
+	var role string
+	err = db.Get().QueryRow(`SELECT role_id FROM users WHERE id = $1`, userID).Scan(&role)
+	if err != nil {
+		role = "user"
+	}
+
+	token, err := generateToken(func() uuid.UUID { u, _ := uuid.Parse(userID); return u }(), role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, AppLoginResponse{UserID: userID, Token: token, Role: role})
+}
+
+// WebappLogin - login endpoint for web app
+type WebappLoginRequest struct {
+	Email string `json:"email" binding:"required,email"`
+	Code    string `json:"code" binding:"required,len=6"`
+}
+
+type WebappLoginResponse struct {
+	UserID string `json:"user_id"`
+	Token  string `json:"token"`
+	Role   string `json:"role"`
+}
+
+func WebappLogin(c *gin.Context) {
+	var req WebappLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx := context.Background()
+	codeDataJSON, err := rdb.Get(ctx, "vcode:"+req.Code).Result()
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired verification code"})
+		return
+	}
+
+	var codeData map[string]string
+	if err := json.Unmarshal([]byte(codeDataJSON), &codeData); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid verification code"})
+		return
+	}
+
+	if codeData["email"] != req.Email {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "verification code does not match this email"})
+		return
+	}
+
+	rdb.Del(ctx, "vcode:"+req.Code)
+	_, _ = db.Get().Exec(`UPDATE verification_codes SET used = true WHERE code = $1 AND email = $2`, req.Code, req.Email)
+
+	userID := codeData["user_id"]
+	if userID == "" {
+		err = db.Get().QueryRow(`SELECT id FROM users WHERE email = $1`, req.Email).Scan(&userID)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+			return
+		}
+	}
+
+	var role string
+	err = db.Get().QueryRow(`SELECT role_id FROM users WHERE id = $1`, userID).Scan(&role)
+	if err != nil {
+		role = "user"
+	}
+
+	token, err := generateToken(func() uuid.UUID { u, _ := uuid.Parse(userID); return u }(), role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, WebappLoginResponse{UserID: userID, Token: token, Role: role})
+}
+
+type LogoutResponse struct {
+	Message string `json:"message"`
 }
 
 func Logout(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
+	c.JSON(http.StatusOK, LogoutResponse{Message: "logged out"})
 }
 
 func RefreshToken(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"token": "new_token_placeholder"})
 }
+
+// --- Companion Routes ---
 
 type Companion struct {
 	ID              string    `json:"id"`
@@ -253,8 +579,16 @@ func GetTodayLife(c *gin.Context) {
 	defer rows.Close()
 	var events []map[string]interface{}
 	for rows.Next() {
-		var m map[string]interface{}
-		rows.Scan(&m["id"], &m["event_type"], &m["title"], &m["description"], &m["location"], &m["start_time"], &m["end_time"], &m["emotion"], &m["importance"])
+		var id, eventType, title, description, location string
+		var startTime, endTime time.Time
+		var emotion, importance int
+		rows.Scan(&id, &eventType, &title, &description, &location, &startTime, &endTime, &emotion, &importance)
+		m := map[string]interface{}{
+			"id": id, "event_type": eventType, "title": title,
+			"description": description, "location": location,
+			"start_time": startTime, "end_time": endTime,
+			"emotion": emotion, "importance": importance,
+		}
 		events = append(events, m)
 	}
 	c.JSON(http.StatusOK, events)
@@ -276,10 +610,28 @@ func GenerateMedia(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"job_id": uuid.New().String(), "status": "queued"})
 }
 
-func generateToken(userID uuid.UUID) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id": userID.String(),
-		"exp":     time.Now().Add(24 * time.Hour).Unix(),
-	})
+// --- Token Generation ---
+
+type Claims struct {
+	UserID string `json:"user_id"`
+	Role   string `json:"role"`
+	jwt.RegisteredClaims
+}
+
+func parseUUID(s string) uuid.UUID {
+	u, _ := uuid.Parse(s)
+	return u
+}
+
+func generateToken(userID uuid.UUID, role string) (string, error) {
+	claims := Claims{
+		UserID: userID.String(),
+		Role:   role,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(jwtSecret))
 }

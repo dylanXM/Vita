@@ -16,7 +16,7 @@ services:
       TOVIDEO_AUTO_MIGRATE: "${TOVIDEO_AUTO_MIGRATE:-true}"
       TOVIDEO_STORAGE_PROVIDER: "${TOVIDEO_STORAGE_PROVIDER:-cos}"
     ports:
-      - "${BIND_HOST:-127.0.0.1}:${SERVER_PORT:-8080}:8080"
+      - "${BIND_HOST:-127.0.0.1}:${SERVER_PORT:-8260}:8080"
     networks:
       - vita-net
     healthcheck:
@@ -36,7 +36,7 @@ services:
       api:
         condition: service_healthy
     ports:
-      - "${ADMIN_BIND_HOST:-127.0.0.1}:${ADMIN_PORT:-8157}:80"
+      - "${ADMIN_BIND_HOST:-127.0.0.1}:${ADMIN_PORT:-8261}:80"
     networks:
       - vita-net
     healthcheck:
@@ -62,7 +62,7 @@ services:
       TOVIDEO_API_URL: "${WEBAPP_API_URL:-http://api:8080}"
       TOVIDEO_ENV: "${WEBAPP_ENV:-staging}"
     ports:
-      - "${WEBAPP_BIND_HOST:-127.0.0.1}:${WEBAPP_PORT:-3000}:3000"
+      - "${WEBAPP_BIND_HOST:-127.0.0.1}:${WEBAPP_PORT:-8263}:3000"
     networks:
       - vita-net
     healthcheck:

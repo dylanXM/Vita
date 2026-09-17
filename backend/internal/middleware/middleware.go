@@ -2,11 +2,14 @@ package middleware
 
 import (
 	"fmt"
-	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
+
+const jwtSecret = "dev-secret-change-me-32-characters-min"
 
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -33,12 +36,47 @@ func AuthMiddleware() gin.HandlerFunc {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			c.Set("user_id", "")
+			c.Set("user_role", "")
 			c.Next()
 			return
 		}
-		c.Set("user_id", "")
+
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+		if tokenString == authHeader {
+			c.Set("user_id", "")
+			c.Set("user_role", "")
+			c.Next()
+			return
+		}
+
+		token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+			return []byte(jwtSecret), nil
+		})
+		if err != nil || !token.Valid {
+			c.Set("user_id", "")
+			c.Set("user_role", "")
+			c.Next()
+			return
+		}
+
+		claims, ok := token.Claims.(*Claims)
+		if !ok {
+			c.Set("user_id", "")
+			c.Set("user_role", "")
+			c.Next()
+			return
+		}
+
+		c.Set("user_id", claims.UserID)
+		c.Set("user_role", claims.Role)
 		c.Next()
 	}
+}
+
+type Claims struct {
+	UserID string `json:"user_id"`
+	Role   string `json:"role"`
+	jwt.RegisteredClaims
 }
 
 func RateLimit(next gin.HandlerFunc) gin.HandlerFunc {

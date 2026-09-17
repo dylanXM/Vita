@@ -124,27 +124,32 @@ backend-init: init-backend
 backend-install: install-backend
 
 # --- Infra (Postgres + Redis via Docker) ---
+COMPOSE_DEV = docker compose -p vita
+
 infra-up:
-	@cd deploy && [ -f .env ] || cp .env.example .env && docker compose -f docker-compose.dev-infra.yml up -d && echo "✅ Postgres + Redis started"
+	@cd deploy && [ -f .env ] || cp .env.example .env && $(COMPOSE_DEV) -f docker-compose.dev-infra.yml up -d && echo "✅ Postgres + Redis started"
 
 infra-down:
-	@cd deploy && docker compose -f docker-compose.dev-infra.yml down && echo "✅ Postgres + Redis stopped"
+	@cd deploy && $(COMPOSE_DEV) -f docker-compose.dev-infra.yml down && echo "✅ Postgres + Redis stopped"
 
 db-psql:
-	cd deploy && docker compose -f docker-compose.dev-infra.yml exec postgres psql -U $${POSTGRES_USER:-tovideo} -d $${POSTGRES_DB:-vita}
+	cd deploy && $(COMPOSE_DEV) -f docker-compose.dev-infra.yml exec postgres psql -U $${POSTGRES_USER:-tovideo} -d $${POSTGRES_DB:-vita}
 
 redis-cli:
-	cd deploy && docker compose -f docker-compose.dev-infra.yml exec redis redis-cli
+	cd deploy && $(COMPOSE_DEV) -f docker-compose.dev-infra.yml exec redis redis-cli
 
 dev: infra-up be-run   ## start infra then run the API on the host (normal local loop)
 
 # --- Backend dev (host mode, Docker infra) ---
 DEV_ENV = set -a; [ -f deploy/.env ] && . deploy/.env; set +a; \
-	export TOVIDEO_DB_DSN="postgres://$${POSTGRES_USER:-tovideo}:$${POSTGRES_PASSWORD:-tovideo_dev_password}@127.0.0.1:$${POSTGRES_PORT:-5433}/$${POSTGRES_DB:-vita}?sslmode=disable"; \
-	export TOVIDEO_REDIS_URL="redis://127.0.0.1:$${REDIS_PORT:-6380}/0"; \
+	export TOVIDEO_DB_DSN="host=localhost port=5433 user=tovideo password=$${POSTGRES_PASSWORD:-tovideo_dev_password} dbname=vita sslmode=disable"; \
+	export TOVIDEO_REDIS_URL="redis://localhost:$${REDIS_PORT:-6380}/0"; \
 	export TOVIDEO_JWT_SECRET="$${TOVIDEO_JWT_SECRET:-dev-secret-change-me-32-characters-min}"; \
 	export TOVIDEO_HTTP_ADDR=":$${SERVER_PORT:-8080}"; \
 	export TOVIDEO_AUTO_MIGRATE="true"; \
+	export TOVIDEO_MOCK_GENERATION="false"; \
+	export TOVIDEO_TEMPLATE_STAGES="$${TOVIDEO_TEMPLATE_STAGES:-released,beta,preview}"; \
+	export TOVIDEO_MODEL_STAGES="$${TOVIDEO_MODEL_STAGES:-released,beta,preview}";
 	export TOVIDEO_MOCK_GENERATION="false"; \
 	export TOVIDEO_TEMPLATE_STAGES="$${TOVIDEO_TEMPLATE_STAGES:-released,beta,preview}"; \
 	export TOVIDEO_MODEL_STAGES="$${TOVIDEO_MODEL_STAGES:-released,beta,preview}";
@@ -186,34 +191,34 @@ backend-check: be-test
 
 # --- Docker full stack ---
 up:
-	@cd deploy && [ -f .env ] || cp .env.example .env && docker compose -f docker-compose.dev.yml up --build -d && echo "✅ Full stack deployed with Docker Compose"
+	@cd deploy && [ -f .env ] || cp .env.example .env && $(COMPOSE_DEV) -f docker-compose.dev.yml up --build -d && echo "✅ Full stack deployed with Docker Compose"
 
 down:
-	@cd deploy && docker compose -f docker-compose.dev.yml down && echo "✅ All services stopped"
+	@cd deploy && $(COMPOSE_DEV) -f docker-compose.dev.yml down && echo "✅ All services stopped"
 
 logs:
-	@cd deploy && docker compose -f docker-compose.dev.yml logs -f api
+	@cd deploy && $(COMPOSE_DEV) -f docker-compose.dev.yml logs -f api
 
 deploy-docker: deploy-docker-dev
 	@echo "✅ Docker one-click deployment complete!"
 
 deploy-docker-dev:
-	@cd deploy && [ -f .env ] || cp .env.example .env && docker compose -f docker-compose.dev.yml up --build -d && echo "✅ Full stack deployed with Docker Compose"
+	@cd deploy && [ -f .env ] || cp .env.example .env && $(COMPOSE_DEV) -f docker-compose.dev.yml up --build -d && echo "✅ Full stack deployed with Docker Compose"
 
 deploy-docker-individual: docker-api docker-admin docker-webapp docker-website deploy-docker-infra
 	@echo "✅ Individual Docker deployment complete!"
 
 docker-api:
-	@cd deploy && docker build -f ../backend/Dockerfile -t vita/backend:dev ../backend && docker run -d --name vita-backend -p 8080:8080 --network vita-net --depends-on vita-postgres --depends-on vita-redis vita/backend:dev && echo "✅ API container deployed"
+	@cd deploy && docker build -f ../backend/Dockerfile -t vita/backend:dev ../backend && docker run -d --name vita-backend -p 8260:8080 --network vita-net --depends-on vita-postgres --depends-on vita-redis vita/backend:dev && echo "✅ API container deployed"
 
 docker-admin:
-	@cd deploy && docker build -f ../admin/Dockerfile -t vita/admin:dev ../admin && docker run -d --name vita-admin -p 8157:80 --network vita-net --depends-on vita-api vita/admin:dev && echo "✅ Admin container deployed"
+	@cd deploy && docker build -f ../admin/Dockerfile -t vita/admin:dev ../admin && docker run -d --name vita-admin -p 8261:80 --network vita-net --depends-on vita-api vita/admin:dev && echo "✅ Admin container deployed"
 
 docker-webapp:
-	@cd deploy && docker build -f ../webapp/Dockerfile -t vita/webapp:dev .. && docker run -d --name vita-webapp -p 3000:3000 --network vita-net --depends-on vita-api vita/webapp:dev && echo "✅ Webapp container deployed"
+	@cd deploy && docker build -f ../webapp/Dockerfile -t vita/webapp:dev .. && docker run -d --name vita-webapp -p 8263:3000 --network vita-net --depends-on vita-api vita/webapp:dev && echo "✅ Webapp container deployed"
 
 docker-website:
-	@cd deploy && docker build -f ../website/Dockerfile -t vita/website:dev . && docker run -d --name vita-website -p 8158:80 --network vita-net vita/website:dev && echo "✅ Website container deployed"
+	@cd deploy && docker build -f ../website/Dockerfile -t vita/website:dev . && docker run -d --name vita-website -p 8262:80 --network vita-net vita/website:dev && echo "✅ Website container deployed"
 
 docker-app:
 	@echo "⚠️  Flutter app uses make app-dev instead of Docker"
@@ -224,11 +229,11 @@ deploy-up: deploy-docker
 deploy-down: down
 deploy-logs: logs
 deploy-build:
-	@cd deploy && docker compose -f docker-compose.dev.yml build && echo "✅ All services built"
+	@cd deploy && $(COMPOSE_DEV) -f docker-compose.dev.yml build && echo "✅ All services built"
 deploy-check:
-	@cd deploy && docker compose -f docker-compose.dev.yml ps && echo "✅ All services checked"
+	@cd deploy && $(COMPOSE_DEV) -f docker-compose.dev.yml ps && echo "✅ All services checked"
 deploy-clean:
-	@cd deploy && docker compose -f docker-compose.dev.yml down -v && echo "✅ Deploy cleaned"
+	@cd deploy && $(COMPOSE_DEV) -f docker-compose.dev.yml down -v && echo "✅ Deploy cleaned"
 
 deploy-beta:
 	@cd deploy && [ -f .env.beta ] || cp .env.beta.example .env.beta && docker compose -p vita-beta -f docker-compose.beta.yml --env-file .env.beta up -d --build && echo "✅ Beta deployment complete!"
@@ -248,7 +253,7 @@ admin-build:
 admin-check:
 	@cd admin && pnpm typecheck
 admin-docker:
-	@cd deploy && docker build -f ../admin/Dockerfile -t vita/admin:dev ../admin && docker run -d --name vita-admin -p 8157:80 --network vita-net --depends-on vita-api vita/admin:dev && echo "✅ Admin container deployed"
+	@cd deploy && docker build -f ../admin/Dockerfile -t vita/admin:dev ../admin && docker run -d --name vita-admin -p 8261:80 --network vita-net --depends-on vita-api vita/admin:dev && echo "✅ Admin container deployed"
 
 # --- Webapp ---
 webapp-init: init-webapp
@@ -260,7 +265,7 @@ webapp-build:
 webapp-check:
 	@cd webapp && pnpm typecheck
 webapp-docker:
-	@cd deploy && docker build -f ../webapp/Dockerfile -t vita/webapp:dev .. && docker run -d --name vita-webapp -p 3000:3000 --network vita-net --depends-on vita-api vita/webapp:dev && echo "✅ Webapp container deployed"
+	@cd deploy && docker build -f ../webapp/Dockerfile -t vita/webapp:dev .. && docker run -d --name vita-webapp -p 8263:3000 --network vita-net --depends-on vita-api vita/webapp:dev && echo "✅ Webapp container deployed"
 
 # --- App ---
 app-init: init-app
@@ -284,7 +289,7 @@ website-build:
 website-check:
 	@cd website && pnpm typecheck
 website-docker:
-	@cd deploy && docker build -f ../website/Dockerfile -t vita/website:dev . && docker run -d --name vita-website -p 8158:80 --network vita-net vita/website:dev && echo "✅ Website container deployed"
+	@cd deploy && docker build -f ../website/Dockerfile -t vita/website:dev . && docker run -d --name vita-website -p 8262:80 --network vita-net vita/website:dev && echo "✅ Website container deployed"
 
 # --- Global ---
 build: backend-build admin-build webapp-build app-build website-build

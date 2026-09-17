@@ -1,26 +1,16 @@
 package db
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
-
-	_ "modernc.org/sqlite"
-	"github.com/lib/pq"
+	_ "github.com/lib/pq"
 	"vita/internal/config"
 )
 
 var _db *sql.DB
 
 func Open(cfg *config.Config) (*sql.DB, error) {
-	var db *sql.DB
-	var err error
-
-	if cfg.DBDriver == "sqlite" {
-		db, err = sql.Open("sqlite", cfg.DBDSN)
-	} else {
-		db, err = sql.Open("postgres", cfg.DBDSN)
-	}
+	db, err := sql.Open("postgres", cfg.DBDSN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -43,17 +33,43 @@ func Open(cfg *config.Config) (*sql.DB, error) {
 	return db, nil
 }
 
+func Close() {
+	if _db != nil {
+		_db.Close()
+	}
+}
+
+func Get() *sql.DB {
+	return _db
+}
+
 func migrate(db *sql.DB) error {
-	// Create essential tables for Vita AI Companion
 	queries := []string{
+		`CREATE TABLE IF NOT EXISTS roles (
+			id TEXT PRIMARY KEY,
+			name TEXT UNIQUE NOT NULL,
+			description TEXT,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
 		`CREATE TABLE IF NOT EXISTS users (
 			id TEXT PRIMARY KEY,
 			email TEXT UNIQUE NOT NULL,
-			password_hash TEXT,
+			role_id TEXT NOT NULL DEFAULT 'user',
 			timezone TEXT DEFAULT 'UTC',
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
+		`CREATE TABLE IF NOT EXISTS verification_codes (
+			id TEXT PRIMARY KEY,
+			email TEXT NOT NULL,
+			code TEXT NOT NULL,
+			purpose TEXT NOT NULL DEFAULT 'login',
+			expires_at TIMESTAMP NOT NULL,
+			used BOOLEAN DEFAULT false,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_verification_codes_email ON verification_codes(email)`,
+		`CREATE INDEX IF NOT EXISTS idx_verification_codes_expires ON verification_codes(expires_at)`,
 		`CREATE TABLE IF NOT EXISTS companions (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL REFERENCES users(id),
@@ -126,22 +142,15 @@ func migrate(db *sql.DB) error {
 			social_energy INTEGER DEFAULT 50,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
+		`INSERT INTO roles (id, name, description) VALUES ('user', 'user', 'Regular user') ON CONFLICT (id) DO NOTHING`,
+		`INSERT INTO roles (id, name, description) VALUES ('admin', 'admin', 'Administrator') ON CONFLICT (id) DO NOTHING`,
 	}
 
 	for _, q := range queries {
+		fmt.Printf("Executing migration: %s...\n", q[:60])
 		if _, err := db.Exec(q); err != nil {
 			return fmt.Errorf("failed to execute: %w", err)
 		}
 	}
 	return nil
-}
-
-func Close() {
-	if _db != nil {
-		_db.Close()
-	}
-}
-
-func Get() *sql.DB {
-	return _db
 }

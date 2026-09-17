@@ -13,10 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/lib/pq"
-	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
-	"golang.org/x/sync/errgroup"
 
 	"vita/internal/config"
 	"vita/internal/db"
@@ -34,12 +31,8 @@ func main() {
 	}
 	defer dbClient.Close()
 
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     cfg.RedisURL,
-		Password: cfg.RedisPassword,
-		DB:       0,
-	})
-	defer rdb.Close()
+	redisURL := cfg.RedisURL
+	handler.InitRedis(redisURL)
 
 	store := storage.New(cfg)
 	if err := store.Init(); err != nil {
@@ -49,7 +42,6 @@ func main() {
 	engine := gin.Default()
 	engine.Use(middleware.RequestID())
 	engine.Use(middleware.CORS())
-	engine.Use(middleware.RateLimit(rdb))
 	engine.Use(middleware.AuthMiddleware())
 
 	api := engine.Group("/v1")
@@ -57,7 +49,11 @@ func main() {
 		auth := api.Group("/auth")
 		{
 			auth.POST("/register", handler.Register)
+			auth.POST("/send-code", handler.SendCode)
 			auth.POST("/login", handler.Login)
+			auth.POST("/admin/login", handler.AdminLogin)
+			auth.POST("/app/login", handler.AppLogin)
+			auth.POST("/webapp/login", handler.WebappLogin)
 			auth.POST("/logout", handler.Logout)
 			auth.POST("/refresh", handler.RefreshToken)
 		}

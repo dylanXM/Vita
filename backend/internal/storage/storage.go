@@ -2,12 +2,11 @@ package storage
 
 import (
 	"fmt"
-
 	"vita/internal/config"
 )
 
 type Storage struct {
-	cfg     *config.Config
+	cfg         *config.Config
 	initialized bool
 }
 
