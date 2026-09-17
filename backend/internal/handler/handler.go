@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
+	"vita/internal/auth"
 	"vita/internal/db"
 )
 
@@ -220,15 +222,20 @@ func Login(c *gin.Context) {
 	c.JSON(http.StatusOK, LoginResponse{UserID: userID, Token: token, Role: userRole})
 }
 
-// AdminLogin - admin login with email + code (must have admin role)
+// AdminLogin - admin sign-in for the dashboard. Accepts either an
+// email + password (the initial administrator credential, see db.EnsureAdmin)
+// or email + 6-digit verification code (the account-recovery path used by the
+// rest of the API). Both require the admin role.
 type AdminLoginRequest struct {
-	Email string `json:"email" binding:"required,email"`
-	Code    string `json:"code" binding:"required,len=6"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password"`
+	Code     string `json:"code"`
 }
 
 type AdminLoginResponse struct {
 	UserID string `json:"user_id"`
 	Token  string `json:"token"`
+	Role   string `json:"role"`
 }
 
 func AdminLogin(c *gin.Context) {
@@ -238,52 +245,174 @@ func AdminLogin(c *gin.Context) {
 		return
 	}
 
-	// Same verification flow as Login but checks admin role
-	ctx := context.Background()
-	codeDataJSON, err := rdb.Get(ctx, "vcode:"+req.Code).Result()
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired verification code"})
-		return
-	}
-
-	var codeData map[string]string
-	if err := json.Unmarshal([]byte(codeDataJSON), &codeData); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid verification code"})
-		return
-	}
-
-	if codeData["email"] != req.Email {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "verification code does not match this email"})
-		return
-	}
-
-	rdb.Del(ctx, "vcode:"+req.Code)
-	_, _ = db.Get().Exec(`UPDATE verification_codes SET used = true WHERE code = $1 AND email = $2`, req.Code, req.Email)
-
-	userID := codeData["user_id"]
-	if userID == "" {
-		err = db.Get().QueryRow(`SELECT id FROM users WHERE email = $1`, req.Email).Scan(&userID)
+	var userID string
+	switch {
+	case req.Password != "":
+		id, err := userIDByPassword(req.Email, req.Password)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+			// Deliberately one message for both causes so the endpoint does not
+			// reveal whether an email is registered.
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid email or password"})
 			return
 		}
+		userID = id
+	case len(req.Code) == 6:
+		id, err := consumeVerificationCode(req.Email, req.Code)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return
+		}
+		userID = id
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "password or 6-digit verification code is required"})
+		return
 	}
 
 	// Check if user has admin role
 	var role string
-	err = db.Get().QueryRow(`SELECT role_id FROM users WHERE id = $1`, userID).Scan(&role)
+	err := db.Get().QueryRow(`SELECT COALESCE(role_id, 'user') FROM users WHERE id = $1`, userID).Scan(&role)
 	if err != nil || role != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin access required"})
 		return
 	}
 
-	token, err := generateToken(func() uuid.UUID { u, _ := uuid.Parse(userID); return u }(), "admin")
+	token, err := generateToken(parseUUID(userID), "admin")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return
 	}
 
-	c.JSON(http.StatusOK, AdminLoginResponse{UserID: userID, Token: token})
+	c.JSON(http.StatusOK, AdminLoginResponse{UserID: userID, Token: token, Role: "admin"})
+}
+
+// userIDByPassword resolves an account by email and checks its bcrypt hash.
+func userIDByPassword(email, password string) (string, error) {
+	var id, hash string
+	err := db.Get().QueryRow(
+		`SELECT id, COALESCE(password_hash, '') FROM users WHERE email = $1`, email).Scan(&id, &hash)
+	if err != nil {
+		return "", errors.New("invalid email or password")
+	}
+	if !auth.VerifyPassword(hash, password) {
+		return "", errors.New("invalid email or password")
+	}
+	return id, nil
+}
+
+// consumeVerificationCode validates a 6-digit code and returns the user id it
+// was issued for, marking the code used.
+func consumeVerificationCode(email, code string) (string, error) {
+	ctx := context.Background()
+	codeDataJSON, err := rdb.Get(ctx, "vcode:"+code).Result()
+	if err != nil {
+		return "", errors.New("invalid or expired verification code")
+	}
+
+	var codeData map[string]string
+	if err := json.Unmarshal([]byte(codeDataJSON), &codeData); err != nil {
+		return "", errors.New("invalid verification code")
+	}
+
+	if codeData["email"] != email {
+		return "", errors.New("verification code does not match this email")
+	}
+
+	rdb.Del(ctx, "vcode:"+code)
+	_, _ = db.Get().Exec(`UPDATE verification_codes SET used = true WHERE code = $1 AND email = $2`, code, email)
+
+	if userID := codeData["user_id"]; userID != "" {
+		return userID, nil
+	}
+
+	var userID string
+	if err := db.Get().QueryRow(`SELECT id FROM users WHERE email = $1`, email).Scan(&userID); err != nil {
+		return "", errors.New("user not found")
+	}
+	return userID, nil
+}
+
+// --- Current Account ---
+
+type ProfileResponse struct {
+	UserID    string    `json:"user_id"`
+	Email     string    `json:"email"`
+	Role      string    `json:"role"`
+	Timezone  string    `json:"timezone"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// Me returns the account behind the bearer token. The dashboard uses it both to
+// rehydrate a stored session on reload and to confirm the account is an admin.
+func Me(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
+
+	var p ProfileResponse
+	err := db.Get().QueryRow(
+		`SELECT id, email, COALESCE(role_id, 'user'), COALESCE(timezone, 'UTC'), created_at FROM users WHERE id = $1`,
+		userID).Scan(&p.UserID, &p.Email, &p.Role, &p.Timezone, &p.CreatedAt)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "account not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, p)
+}
+
+// --- Admin Stats ---
+
+type AdminStatsResponse struct {
+	TotalUsers         int       `json:"total_users"`
+	AdminUsers         int       `json:"admin_users"`
+	NewUsers7d         int       `json:"new_users_7d"`
+	TotalCompanions    int       `json:"total_companions"`
+	NewCompanions7d    int       `json:"new_companions_7d"`
+	TotalConversations int       `json:"total_conversations"`
+	NewConversations7d int       `json:"new_conversations_7d"`
+	TotalMessages      int       `json:"total_messages"`
+	NewMessages7d      int       `json:"new_messages_7d"`
+	TotalMemories      int       `json:"total_memories"`
+	TotalLifeEvents    int       `json:"total_life_events"`
+	TodayLifeEvents    int       `json:"today_life_events"`
+	GeneratedAt        time.Time `json:"generated_at"`
+}
+
+// AdminStats powers the dashboard tiles. Everything is counted straight from
+// the live tables in one round trip — no cached or estimated figures.
+func AdminStats(c *gin.Context) {
+	var s AdminStatsResponse
+	err := db.Get().QueryRow(`
+		SELECT
+			(SELECT COUNT(*) FROM users),
+			(SELECT COUNT(*) FROM users WHERE role_id = 'admin'),
+			(SELECT COUNT(*) FROM users WHERE created_at >= NOW() - INTERVAL '7 days'),
+			(SELECT COUNT(*) FROM companions),
+			(SELECT COUNT(*) FROM companions WHERE created_at >= NOW() - INTERVAL '7 days'),
+			(SELECT COUNT(*) FROM conversations),
+			(SELECT COUNT(*) FROM conversations WHERE created_at >= NOW() - INTERVAL '7 days'),
+			(SELECT COUNT(*) FROM messages),
+			(SELECT COUNT(*) FROM messages WHERE created_at >= NOW() - INTERVAL '7 days'),
+			(SELECT COUNT(*) FROM memories),
+			(SELECT COUNT(*) FROM life_events),
+			(SELECT COUNT(*) FROM life_events WHERE DATE(start_time) = CURRENT_DATE)
+	`).Scan(
+		&s.TotalUsers, &s.AdminUsers, &s.NewUsers7d,
+		&s.TotalCompanions, &s.NewCompanions7d,
+		&s.TotalConversations, &s.NewConversations7d,
+		&s.TotalMessages, &s.NewMessages7d,
+		&s.TotalMemories,
+		&s.TotalLifeEvents, &s.TodayLifeEvents,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to collect stats"})
+		return
+	}
+
+	s.GeneratedAt = time.Now().UTC()
+	c.JSON(http.StatusOK, s)
 }
 
 // AppLogin - login endpoint for mobile app

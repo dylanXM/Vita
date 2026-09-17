@@ -1,10 +1,51 @@
-import React from 'react'
+import { createBrowserRouter, Navigate, RouterProvider, useRouteError, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { AdminLayout } from "@/layout/AdminLayout";
+import { RequireAuth } from "@/routes/guards";
+import { LoginPage } from "@/pages/LoginPage";
+import { DashboardPage } from "@/pages/DashboardPage";
+import { NotFoundPage } from "@/pages/NotFoundPage";
+import { Button } from "@/components/ui/button";
+
+function RouteError() {
+  const { t } = useTranslation();
+  const err = useRouteError() as { message?: string } | undefined;
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-8 text-center">
+      <h1 className="text-2xl font-bold">{t("common.somethingWrong")}</h1>
+      <p className="max-w-md text-sm text-muted-foreground">
+        {err?.message ?? t("common.failedToLoad")}
+      </p>
+      <div className="flex gap-3">
+        <Button asChild>
+          <Link to="/dashboard">{t("common.backToDashboard")}</Link>
+        </Button>
+        <Button variant="outline" onClick={() => window.location.reload()}>
+          {t("common.refresh")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+const router = createBrowserRouter([
+  { path: "/login", element: <LoginPage /> },
+  {
+    path: "/",
+    element: (
+      <RequireAuth>
+        <AdminLayout />
+      </RequireAuth>
+    ),
+    errorElement: <RouteError />,
+    children: [
+      { index: true, element: <Navigate to="/dashboard" replace /> },
+      { path: "dashboard", element: <DashboardPage /> },
+    ],
+  },
+  { path: "*", element: <NotFoundPage /> },
+]);
 
 export default function App() {
-  return (
-    <div>
-      <h1>Vita Admin</h1>
-      <p>AI Companion Admin Dashboard</p>
-    </div>
-  )
+  return <RouterProvider router={router} />;
 }

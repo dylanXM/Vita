@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -77,6 +78,33 @@ type Claims struct {
 	UserID string `json:"user_id"`
 	Role   string `json:"role"`
 	jwt.RegisteredClaims
+}
+
+// RequireAuth rejects requests with no usable bearer token. AuthMiddleware runs
+// first and records the parsed identity, so this only inspects what it stored.
+func RequireAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.GetString("user_id") == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+			return
+		}
+		c.Next()
+	}
+}
+
+// RequireAdmin rejects requests from anyone who is not an authenticated admin.
+func RequireAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.GetString("user_id") == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+			return
+		}
+		if c.GetString("user_role") != "admin" {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "admin access required"})
+			return
+		}
+		c.Next()
+	}
 }
 
 func RateLimit(next gin.HandlerFunc) gin.HandlerFunc {

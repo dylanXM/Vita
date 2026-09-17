@@ -13,7 +13,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 
 	"vita/internal/config"
 	"vita/internal/db"
@@ -30,6 +29,11 @@ func main() {
 		log.Fatalf("failed to connect database: %v", err)
 	}
 	defer dbClient.Close()
+
+	// Seeding needs the schema, so it runs after Open() has migrated.
+	if err := db.EnsureAdmin(cfg.AdminEmail, cfg.AdminPassword, cfg.AdminEmails); err != nil {
+		log.Fatalf("failed to seed administrator account: %v", err)
+	}
 
 	redisURL := cfg.RedisURL
 	handler.InitRedis(redisURL)
@@ -91,6 +95,15 @@ func main() {
 		}
 
 		api.GET("/health", handler.Health)
+
+		// Current account — used by the admin dashboard to rehydrate a stored
+		// session and to verify the account has the admin role.
+		api.GET("/me", middleware.RequireAuth(), handler.Me)
+
+		admin := api.Group("/admin", middleware.RequireAdmin())
+		{
+			admin.GET("/stats", handler.AdminStats)
+		}
 	}
 
 	srv := &http.Server{
@@ -125,16 +138,6 @@ func init() {
 
 func jwtSecret() []byte {
 	return []byte("dev-secret-change-me-32-characters-min")
-}
-
-func hashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
-	return string(bytes), err
-}
-
-func verifyPassword(hash, password string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	return err == nil
 }
 
 func generateToken(userID uuid.UUID) (string, error) {

@@ -55,6 +55,7 @@ func migrate(db *sql.DB) error {
 			id TEXT PRIMARY KEY,
 			email TEXT UNIQUE NOT NULL,
 			role_id TEXT NOT NULL DEFAULT 'user',
+			password_hash TEXT NOT NULL DEFAULT '',
 			timezone TEXT DEFAULT 'UTC',
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -69,6 +70,7 @@ func migrate(db *sql.DB) error {
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_verification_codes_email ON verification_codes(email)`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT ''`,
 		`CREATE INDEX IF NOT EXISTS idx_verification_codes_expires ON verification_codes(expires_at)`,
 		`CREATE TABLE IF NOT EXISTS companions (
 			id TEXT PRIMARY KEY,

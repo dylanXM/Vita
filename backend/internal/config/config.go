@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -23,6 +24,14 @@ type Config struct {
 	S3AccessKey      string
 	S3SecretKey      string
 	ServerPort       string
+
+	// AdminEmail + AdminPassword seed the initial administrator account on
+	// startup (see db.EnsureAdmin). AdminEmails is the comma-separated
+	// allowlist of accounts that get the admin role without having their
+	// password managed here.
+	AdminEmail    string
+	AdminPassword string
+	AdminEmails   []string
 }
 
 func Load() *Config {
@@ -43,7 +52,21 @@ func Load() *Config {
 		S3AccessKey:     getEnv("TOVIDEO_S3_ACCESS_KEY", "vita_rustfs"),
 		S3SecretKey:     getEnv("TOVIDEO_S3_SECRET_KEY", "vita_rustfs_secret"),
 		ServerPort:      getEnv("SERVER_PORT", "8080"),
+
+		AdminEmail:    getEnv("TOVIDEO_ADMIN_EMAIL", ""),
+		AdminPassword: getEnv("TOVIDEO_ADMIN_PASSWORD", ""),
+		AdminEmails:   splitCSV(getEnv("TOVIDEO_ADMIN_EMAILS", "")),
 	}
+}
+
+func splitCSV(raw string) []string {
+	var out []string
+	for _, part := range strings.Split(raw, ",") {
+		if v := strings.TrimSpace(part); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 func getEnv(key, defaultVal string) string {
