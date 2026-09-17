@@ -19,7 +19,7 @@ require (
 
 require (
 	cloud.google.com/go/firestore v1.15.0 // indirect
-	github.com/IBM/sarama v1.37.0 // indirect
+	github.com/Shopify/sarama v1.37.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.32.0 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.28.0 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.0 // indirect
