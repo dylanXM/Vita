@@ -1,7 +1,7 @@
 FROM node:22-alpine AS deps
 WORKDIR /app/webapp
 RUN corepack enable
-COPY webapp/package.json webapp/pnpm-lock.yaml webapp/pnpm-workspace.yaml ./
+COPY webapp/package.json webapp/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 FROM node:22-alpine AS build

@@ -109,16 +109,16 @@ install-backend:
 	@echo "📥 Installing backend dependencies..." && echo "✅ Backend ready"
 
 install-admin:
-	@echo "📥 Installing admin dependencies (pnpm)..." && echo "✅ Admin dependencies ready"
+	@echo "📥 Installing admin dependencies (pnpm)..." && cd admin && pnpm install && echo "✅ Admin dependencies ready"
 
 install-webapp:
-	@echo "📥 Installing webapp dependencies (pnpm)..." && echo "✅ Webapp dependencies ready"
+	@echo "📥 Installing webapp dependencies (pnpm)..." && cd webapp && pnpm install && echo "✅ Webapp dependencies ready"
 
 install-app:
 	@echo "📥 Installing app dependencies..." && echo "✅ App dependencies ready"
 
 install-website:
-	@echo "📥 Installing website dependencies (pnpm)..." && echo "✅ Website dependencies ready"
+	@echo "📥 Installing website dependencies (pnpm)..." && cd website && pnpm install && echo "✅ Website dependencies ready"
 
 backend-init: init-backend
 backend-install: install-backend
