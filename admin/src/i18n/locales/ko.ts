@@ -31,7 +31,7 @@ const ko = {
     welcome: "다시 오신 것을 환영합니다",
     notAdmin: "이 계정은 관리자가 아닙니다.",
     failed: "로그인 실패",
-    hint: "계정은 TOVIDEO_ADMIN_EMAIL / TOVIDEO_ADMIN_PASSWORD 로 초기화됩니다.",
+    hint: "계정은 VITA_ADMIN_EMAIL / VITA_ADMIN_PASSWORD 로 초기화됩니다.",
   },
 
   dashboard: {

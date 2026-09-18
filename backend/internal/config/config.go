@@ -36,26 +36,26 @@ type Config struct {
 
 func Load() *Config {
 	return &Config{
-		Env:             getEnv("TOVIDEO_ENV", "dev"),
-		HTTPAddr:        getEnv("TOVIDEO_HTTP_ADDR", ":8080"),
-		DBDriver:        getEnv("TOVIDEO_DB_DRIVER", "postgres"),
-		DBDSN:           getEnv("TOVIDEO_DB_DSN", "postgres://tovideo:tovideo_dev_password@127.0.0.1:5433/vita?sslmode=disable"),
-		RedisURL:        getEnv("TOVIDEO_REDIS_URL", "redis://localhost:6380/0"),
+		Env:             getEnv("VITA_ENV", "dev"),
+		HTTPAddr:        getEnv("VITA_HTTP_ADDR", ":8080"),
+		DBDriver:        getEnv("VITA_DB_DRIVER", "postgres"),
+		DBDSN:           getEnv("VITA_DB_DSN", "postgres://tovideo:tovideo_dev_password@127.0.0.1:5433/vita?sslmode=disable"),
+		RedisURL:        getEnv("VITA_REDIS_URL", "redis://localhost:6380/0"),
 		RedisPassword:   getEnv("REDIS_PASSWORD", ""),
-		JWTSecret:       getEnv("TOVIDEO_JWT_SECRET", "dev-secret-change-me-32-characters-min"),
+		JWTSecret:       getEnv("VITA_JWT_SECRET", "dev-secret-change-me-32-characters-min"),
 		JWTTTL:          24 * time.Hour,
-		MockGeneration:  getEnv("TOVIDEO_MOCK_GENERATION", "true") == "true",
-		AutoMigrate:     getEnv("TOVIDEO_AUTO_MIGRATE", "true") == "true",
-		StorageProvider: getEnv("TOVIDEO_STORAGE_PROVIDER", "s3"),
-		S3Bucket:        getEnv("TOVIDEO_S3_BUCKET", "vita-media"),
-		S3Endpoint:      getEnv("TOVIDEO_S3_ENDPOINT", "http://rustfs:9000"),
-		S3AccessKey:     getEnv("TOVIDEO_S3_ACCESS_KEY", "vita_rustfs"),
-		S3SecretKey:     getEnv("TOVIDEO_S3_SECRET_KEY", "vita_rustfs_secret"),
+		MockGeneration:  getEnv("VITA_MOCK_GENERATION", "true") == "true",
+		AutoMigrate:     getEnv("VITA_AUTO_MIGRATE", "true") == "true",
+		StorageProvider: getEnv("VITA_STORAGE_PROVIDER", "s3"),
+		S3Bucket:        getEnv("VITA_S3_BUCKET", "vita-media"),
+		S3Endpoint:      getEnv("VITA_S3_ENDPOINT", "http://rustfs:9000"),
+		S3AccessKey:     getEnv("VITA_S3_ACCESS_KEY", "vita_rustfs"),
+		S3SecretKey:     getEnv("VITA_S3_SECRET_KEY", "vita_rustfs_secret"),
 		ServerPort:      getEnv("SERVER_PORT", "8080"),
 
-		AdminEmail:    getEnv("TOVIDEO_ADMIN_EMAIL", ""),
-		AdminPassword: getEnv("TOVIDEO_ADMIN_PASSWORD", ""),
-		AdminEmails:   splitCSV(getEnv("TOVIDEO_ADMIN_EMAILS", "")),
+		AdminEmail:    getEnv("VITA_ADMIN_EMAIL", ""),
+		AdminPassword: getEnv("VITA_ADMIN_PASSWORD", ""),
+		AdminEmails:   splitCSV(getEnv("VITA_ADMIN_EMAILS", "")),
 	}
 }
 
@@ -78,7 +78,7 @@ func getEnv(key, defaultVal string) string {
 
 func (c *Config) Validate() error {
 	if c.JWTSecret == "" {
-		return fmt.Errorf("TOVIDEO_JWT_SECRET is required")
+		return fmt.Errorf("VITA_JWT_SECRET is required")
 	}
 	return nil
 }

@@ -31,7 +31,7 @@ const es = {
     welcome: "Bienvenido de nuevo",
     notAdmin: "Esta cuenta no es de administrador.",
     failed: "Error al iniciar sesión",
-    hint: "La cuenta se crea desde TOVIDEO_ADMIN_EMAIL / TOVIDEO_ADMIN_PASSWORD.",
+    hint: "La cuenta se crea desde VITA_ADMIN_EMAIL / VITA_ADMIN_PASSWORD.",
   },
 
   dashboard: {

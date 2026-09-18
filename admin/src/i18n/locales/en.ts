@@ -31,7 +31,7 @@ const en = {
     welcome: "Welcome back",
     notAdmin: "This account is not an administrator.",
     failed: "Sign-in failed",
-    hint: "Seeded from TOVIDEO_ADMIN_EMAIL / TOVIDEO_ADMIN_PASSWORD.",
+    hint: "Seeded from VITA_ADMIN_EMAIL / VITA_ADMIN_PASSWORD.",
   },
 
   dashboard: {

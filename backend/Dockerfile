@@ -11,9 +11,9 @@ RUN apk add --no-cache ca-certificates ffmpeg tzdata && adduser -D -u 10001 app
 USER app
 WORKDIR /app
 COPY --from=build /out/server /app/server
-ENV TOVIDEO_GEOIP_DB_PATH=/app/internal/geoip/data/user-country.mmdb
+ENV VITA_GEOIP_DB_PATH=/app/internal/geoip/data/user-country.mmdb
 EXPOSE 8080
-ENV TOVIDEO_HTTP_ADDR=:8080
+ENV VITA_HTTP_ADDR=:8080
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget -qO- http://localhost:8080/health || exit 1
 ENTRYPOINT ["/app/server"]

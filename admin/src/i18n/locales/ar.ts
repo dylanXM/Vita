@@ -31,7 +31,7 @@ const ar = {
     welcome: "مرحبًا بعودتك",
     notAdmin: "هذا الحساب ليس حساب مدير.",
     failed: "فشل تسجيل الدخول",
-    hint: "يُنشأ الحساب من TOVIDEO_ADMIN_EMAIL / TOVIDEO_ADMIN_PASSWORD.",
+    hint: "يُنشأ الحساب من VITA_ADMIN_EMAIL / VITA_ADMIN_PASSWORD.",
   },
 
   dashboard: {

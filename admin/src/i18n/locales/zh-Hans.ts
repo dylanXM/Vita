@@ -31,7 +31,7 @@ const zhHans = {
     welcome: "欢迎回来",
     notAdmin: "该账号不是管理员。",
     failed: "登录失败",
-    hint: "帐号由 TOVIDEO_ADMIN_EMAIL / TOVIDEO_ADMIN_PASSWORD 初始化。",
+    hint: "帐号由 VITA_ADMIN_EMAIL / VITA_ADMIN_PASSWORD 初始化。",
   },
 
   dashboard: {

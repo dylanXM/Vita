@@ -31,7 +31,7 @@ const ja = {
     welcome: "おかえりなさい",
     notAdmin: "このアカウントは管理者ではありません。",
     failed: "サインインに失敗しました",
-    hint: "アカウントは TOVIDEO_ADMIN_EMAIL / TOVIDEO_ADMIN_PASSWORD から初期化されます。",
+    hint: "アカウントは VITA_ADMIN_EMAIL / VITA_ADMIN_PASSWORD から初期化されます。",
   },
 
   dashboard: {

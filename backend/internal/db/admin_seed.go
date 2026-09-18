@@ -68,7 +68,7 @@ func promoteAdmin(email string) error {
 		return fmt.Errorf("promote admin %s: %w", email, err)
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		fmt.Printf("warning: TOVIDEO_ADMIN_EMAILS lists %s but no such account exists yet\n", email)
+		fmt.Printf("warning: VITA_ADMIN_EMAILS lists %s but no such account exists yet\n", email)
 	}
 	return nil
 }

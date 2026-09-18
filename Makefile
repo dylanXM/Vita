@@ -142,27 +142,27 @@ dev: infra-up be-run   ## start infra then run the API on the host (normal local
 
 # --- Backend dev (host mode, Docker infra) ---
 DEV_ENV = set -a; [ -f deploy/.env ] && . deploy/.env; set +a; \
-	export TOVIDEO_DB_DSN="host=localhost port=5433 user=tovideo password=$${POSTGRES_PASSWORD:-tovideo_dev_password} dbname=vita sslmode=disable"; \
-	export TOVIDEO_REDIS_URL="redis://localhost:$${REDIS_PORT:-6380}/0"; \
-	export TOVIDEO_JWT_SECRET="$${TOVIDEO_JWT_SECRET:-dev-secret-change-me-32-characters-min}"; \
-	export TOVIDEO_HTTP_ADDR=":$${SERVER_PORT:-8080}"; \
-	export TOVIDEO_AUTO_MIGRATE="true"; \
-	export TOVIDEO_MOCK_GENERATION="false"; \
-	export TOVIDEO_TEMPLATE_STAGES="$${TOVIDEO_TEMPLATE_STAGES:-released,beta,preview}"; \
-	export TOVIDEO_MODEL_STAGES="$${TOVIDEO_MODEL_STAGES:-released,beta,preview}";
-	export TOVIDEO_MOCK_GENERATION="false"; \
-	export TOVIDEO_TEMPLATE_STAGES="$${TOVIDEO_TEMPLATE_STAGES:-released,beta,preview}"; \
-	export TOVIDEO_MODEL_STAGES="$${TOVIDEO_MODEL_STAGES:-released,beta,preview}";
+	export VITA_DB_DSN="host=localhost port=5433 user=tovideo password=$${POSTGRES_PASSWORD:-tovideo_dev_password} dbname=vita sslmode=disable"; \
+	export VITA_REDIS_URL="redis://localhost:$${REDIS_PORT:-6380}/0"; \
+	export VITA_JWT_SECRET="$${VITA_JWT_SECRET:-dev-secret-change-me-32-characters-min}"; \
+	export VITA_HTTP_ADDR=":$${SERVER_PORT:-8080}"; \
+	export VITA_AUTO_MIGRATE="true"; \
+	export VITA_MOCK_GENERATION="false"; \
+	export VITA_TEMPLATE_STAGES="$${VITA_TEMPLATE_STAGES:-released,beta,preview}"; \
+	export VITA_MODEL_STAGES="$${VITA_MODEL_STAGES:-released,beta,preview}";
+	export VITA_MOCK_GENERATION="false"; \
+	export VITA_TEMPLATE_STAGES="$${VITA_TEMPLATE_STAGES:-released,beta,preview}"; \
+	export VITA_MODEL_STAGES="$${VITA_MODEL_STAGES:-released,beta,preview}";
 
 dev: infra-up be-run   ## start infra then run the API on the host (normal local loop)
 
 dev-mock: infra-up be-mock   ## host-mode: infra-up + be-mock (mock generation)
 
 be-run:            ## run API on host against dockerized Postgres + Redis
-	@$(DEV_ENV) export TOVIDEO_MOCK_GENERATION=false; cd backend && go run ./cmd/server
+	@$(DEV_ENV) export VITA_MOCK_GENERATION=false; cd backend && go run ./cmd/server
 
 be-mock:           ## be-run with offline mock generation
-	@$(DEV_ENV) export TOVIDEO_MOCK_GENERATION=true; cd backend && go run ./cmd/server
+	@$(DEV_ENV) export VITA_MOCK_GENERATION=true; cd backend && go run ./cmd/server
 
 be-build:
 	@cd backend && go build ./...

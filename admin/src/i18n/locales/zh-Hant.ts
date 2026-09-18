@@ -31,7 +31,7 @@ const zhHant = {
     welcome: "歡迎回來",
     notAdmin: "此帳號不是管理員。",
     failed: "登入失敗",
-    hint: "帳號由 TOVIDEO_ADMIN_EMAIL / TOVIDEO_ADMIN_PASSWORD 初始化。",
+    hint: "帳號由 VITA_ADMIN_EMAIL / VITA_ADMIN_PASSWORD 初始化。",
   },
 
   dashboard: {
