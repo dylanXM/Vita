@@ -171,13 +171,17 @@ be-test:           ## unit/integration tests
 	@cd backend && go test ./...
 
 be-gen:            ## regenerate Ent code after editing ent/schema
-	@cd backend && go generate ./ent
+	@if [ -d backend/ent ]; then \
+		cd backend && go generate ./ent; \
+	else \
+		echo "⚠️  backend/ent not found, skip Ent generation"; \
+	fi
 
 be-openapi:        ## regenerate openapi.json
 	@cd backend && go run ./cmd/genopenapi 2>/dev/null || echo "OpenAPI generation skipped"
 
 be-fmt:
-	@cd backend && gofmt -w cmd internal ent/schema
+	@cd backend && if [ -d ent/schema ]; then gofmt -w cmd internal ent/schema; else gofmt -w cmd internal; fi
 
 be-migrate:        ## generate a versioned migration
 	@cd backend && go run ./cmd/migrate $(NAME) 2>/dev/null || echo "Migration generation skipped"

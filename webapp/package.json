@@ -3,14 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm dev",
-    "build": "pnpm build",
+    "dev": "next dev -p 5176",
+    "build": "next build",
     "start": "next start",
-    "lint": "eslint && pnpm check:typography",
-    "typecheck": "pnpm typecheck",
-    "test": "pnpm test",
-    "gen:api": "node scripts/openapi2ts.mjs",
-    "install": "pnpm install"
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "gen:api": "node scripts/openapi2ts.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

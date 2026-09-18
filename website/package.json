@@ -5,13 +5,12 @@
   "type": "module",
   "description": "Vita \u2014 AI Companion product website",
   "scripts": {
-    "dev": "pnpm dev",
-    "build": "pnpm build",
+    "dev": "vite",
+    "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "pnpm typecheck",
+    "typecheck": "tsc --noEmit",
     "lint": "oxlint .",
-    "deploy": "pnpm build && wrangler deploy",
-    "install": "pnpm install"
+    "deploy": "vite build && wrangler deploy"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
