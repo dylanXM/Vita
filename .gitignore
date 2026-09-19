@@ -62,6 +62,8 @@ app/.idea/
 
 # Local caches created by make app-run (isolated HOME)
 app/.home/
+app/.cocoapods-local/
+app/.dart_tool/
 
 # Misc
 tmp/
