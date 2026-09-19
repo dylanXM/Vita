@@ -65,14 +65,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
-import { usersApi } from "@/api/admin";
+import { envApi, usersApi } from "@/api/admin";
 import { errorMessage } from "@/api/client";
-import type { AdminUser, AdminUserInput } from "@/api/types";
+import { ENVIRONMENTS, type AdminUser, type AdminUserInput, type Environment } from "@/api/types";
 import { formatDate } from "@/lib/format";
 
 const PAGE_SIZE = 10;
 
-type Filters = { q: string; role: string; status: "" | "active" | "banned" };
+type Filters = { q: string; role: string; status: "" | "active" | "banned"; env: string };
 
 /** Role + status badges, reused between the table and the detail page. */
 export function RoleBadge({ role }: { role: string }) {
@@ -93,9 +93,30 @@ export function StatusBadge({ banned }: { banned: boolean }) {
   );
 }
 
+// --- Environment badge (dev | beta | prod) -------------------------------
+
+const ENV_VARIANT: Record<Environment, "muted" | "warning" | "success"> = {
+  dev: "muted",
+  beta: "warning",
+  prod: "success",
+};
+
+export function EnvBadge({ env }: { env: string }) {
+  const variant = ENV_VARIANT[env as Environment] ?? "muted";
+  return <Badge variant={variant}>{env}</Badge>;
+}
+
 // --- Create / edit dialog -------------------------------------------------
 
-type FormValues = { email: string; password: string; role: "user" | "admin"; timezone: string };
+// --- Create / edit dialog -------------------------------------------------
+
+type FormValues = {
+  email: string;
+  password: string;
+  role: "user" | "admin";
+  timezone: string;
+  environment: Environment;
+};
 
 export function UserFormDialog({
   open,
@@ -132,20 +153,32 @@ export function UserFormDialog({
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: "", password: "", role: "user", timezone: "UTC" },
+    defaultValues: { email: "", password: "", role: "user", timezone: "UTC", environment: "prod" },
+  });
+
+  // New accounts default to the environment the dashboard's API runs in
+  // (beta admin → beta accounts, prod admin → prod accounts).
+  const serverEnv = useQuery({
+    queryKey: ["admin-environment"],
+    queryFn: ({ signal }) => envApi.get(signal),
   });
 
   // Re-seed the form whenever the dialog targets a different user.
   useEffect(() => {
     if (open) {
+      const fallback = serverEnv.data?.environment ?? "prod";
+      const env = ENVIRONMENTS.includes(user?.environment as Environment)
+        ? (user!.environment as Environment)
+        : fallback;
       reset({
         email: user?.email ?? "",
         password: "",
         role: (user?.role as FormValues["role"]) ?? "user",
         timezone: user?.timezone ?? "UTC",
+        environment: user ? env : fallback,
       });
     }
-  }, [open, user, reset]);
+  }, [open, user, reset, serverEnv.data]);
 
   const mutation = useMutation({
     mutationFn: (values: FormValues) => {
@@ -153,6 +186,7 @@ export function UserFormDialog({
         email: values.email,
         role: values.role,
         timezone: values.timezone || "UTC",
+        environment: values.environment,
       };
       if (values.password) body.password = values.password;
       return editing ? usersApi.update(user!.id, body) : usersApi.create(body);
@@ -218,6 +252,27 @@ export function UserFormDialog({
               <Label>{t("users.timezone")}</Label>
               <Input placeholder="UTC" {...register("timezone")} />
             </div>
+            <div className="space-y-1.5">
+              <Label>{t("users.environment")}</Label>
+              <Controller
+                control={control}
+                name="environment"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ENVIRONMENTS.map((env) => (
+                        <SelectItem key={env} value={env}>
+                          {t(`users.env${env[0].toUpperCase()}${env.slice(1)}`)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -244,6 +299,7 @@ export function UsersPage() {
   const [searchInput, setSearchInput] = useState("");
   const [role, setRole] = useState("");
   const [status, setStatus] = useState<Filters["status"]>("");
+  const [env, setEnv] = useState("");
 
   // Debounce the search box so typing doesn't fire a request per keystroke.
   const [q, setQ] = useState("");
@@ -258,10 +314,16 @@ export function UsersPage() {
   }, [q, role, status]);
 
   const list = useQuery({
-    queryKey: ["admin-users", { page, q, role, status }],
+    queryKey: ["admin-users", { page, q, role, status, env }],
     queryFn: ({ signal }) =>
       usersApi.list(
-        { page, page_size: PAGE_SIZE, q: q || undefined, role: role || undefined, status: status || undefined },
+        {
+          page, page_size: PAGE_SIZE,
+          q: q || undefined,
+          role: role || undefined,
+          status: status || undefined,
+          environment: (env || undefined) as Environment | undefined,
+        },
         signal,
       ),
   });
@@ -384,6 +446,19 @@ export function UsersPage() {
                   <SelectItem value="banned">{t("users.statusBanned")}</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={env === "" ? "all" : env} onValueChange={(v) => setEnv(v === "all" ? "" : v)}>
+                <SelectTrigger className="sm:w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("users.allEnvironments")}</SelectItem>
+                  {ENVIRONMENTS.map((e) => (
+                    <SelectItem key={e} value={e}>
+                      {t(`users.env${e[0].toUpperCase()}${e.slice(1)}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -398,7 +473,7 @@ export function UsersPage() {
             </div>
           ) : !data || data.items.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              {q || role || status ? t("users.noResults") : t("users.empty")}
+              {q || role || status || env ? t("users.noResults") : t("users.empty")}
             </p>
           ) : (
             <Table>
@@ -406,8 +481,9 @@ export function UsersPage() {
                 <TableRow>
                   <TableHead>{t("users.email")}</TableHead>
                   <TableHead>{t("users.role")}</TableHead>
+                  <TableHead>{t("users.environment")}</TableHead>
                   <TableHead>{t("users.status")}</TableHead>
-                  <TableHead>{t("users.createdAt")}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t("users.createdAt")}</TableHead>
                   <TableHead className="text-end">{t("users.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -428,8 +504,9 @@ export function UsersPage() {
                       )}
                     </TableCell>
                     <TableCell><RoleBadge role={u.role} /></TableCell>
+                    <TableCell><EnvBadge env={u.environment} /></TableCell>
                     <TableCell><StatusBadge banned={u.banned} /></TableCell>
-                    <TableCell className="text-muted-foreground">{formatDate(u.created_at)}</TableCell>
+                    <TableCell className="hidden text-muted-foreground lg:table-cell">{formatDate(u.created_at)}</TableCell>
                     <TableCell className="text-end">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

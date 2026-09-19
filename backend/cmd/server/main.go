@@ -24,6 +24,7 @@ import (
 
 func main() {
 	cfg := config.Load()
+	fmt.Printf("vita server starting in environment: %s\n", cfg.Env)
 
 	dbClient, err := db.Open(cfg)
 	if err != nil {
@@ -31,8 +32,11 @@ func main() {
 	}
 	defer dbClient.Close()
 
+	// The stamped environment must be set before any request creates an account.
+	handler.SetEnvironment(cfg.Env)
+
 	// Seeding needs the schema, so it runs after Open() has migrated.
-	if err := db.EnsureAdmin(cfg.AdminEmail, cfg.AdminPassword, cfg.AdminEmails); err != nil {
+	if err := db.EnsureAdmin(cfg.AdminEmail, cfg.AdminPassword, cfg.AdminEmails, cfg.Env); err != nil {
 		log.Fatalf("failed to seed administrator account: %v", err)
 	}
 
@@ -137,6 +141,7 @@ func main() {
 		admin := api.Group("/admin", middleware.RequireAdmin())
 		{
 			admin.GET("/stats", handler.AdminStats)
+			admin.GET("/environment", handler.AdminEnvironment)
 
 			users := admin.Group("/users")
 			{

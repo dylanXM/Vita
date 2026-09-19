@@ -16,6 +16,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"vita/internal/auth"
+	"vita/internal/config"
 	"vita/internal/db"
 	"vita/internal/mail"
 )
@@ -26,6 +27,22 @@ const codeTTL = 5 * time.Minute
 
 var rdb *redis.Client
 
+// envName is the deployment environment this server runs in (VITA_ENV: dev /
+// beta / prod). Accounts created while it is set get stamped with this value
+// so a shared database can separate pre-release accounts from live ones.
+var envName = config.EnvDev
+
+// SetEnvironment records the deployment environment (called from main).
+// Unknown values are rejected with a warning — silently relabelling a
+// mistyped VITA_ENV would stamp accounts with the wrong environment flag.
+func SetEnvironment(env string) {
+	if config.IsValidEnvironment(env) {
+		envName = env
+		return
+	}
+	fmt.Printf("warning: VITA_ENV=%q is not one of dev/beta/prod; accounts will be stamped %q\n", env, envName)
+}
+
 // mailCfg is the SMTP client used to deliver verification codes. A zero
 // value (dev) prints codes to the server log instead.
 var mailCfg = mail.Config{}
@@ -33,6 +50,13 @@ var mailCfg = mail.Config{}
 // InitMailer configures outbound verification-code email (VITA_SMTP_*).
 func InitMailer(cfg mail.Config) {
 	mailCfg = cfg
+}
+
+// currentEnvironment returns the environment stamped onto new accounts. It
+// is always one of dev/beta/prod: envName starts at the default and is only
+// ever replaced with a validated value (see SetEnvironment).
+func currentEnvironment() string {
+	return envName
 }
 
 func InitRedis(redisURL string) {
@@ -80,7 +104,7 @@ func SendCode(c *gin.Context) {
 	if err != nil {
 		// User doesn't exist, auto-register as user
 		userID = uuid.New().String()
-		_, err = db.Get().Exec(`INSERT INTO users (id, email, role_id) VALUES ($1, $2, 'user')`, userID, req.Email)
+		_, err = db.Get().Exec(`INSERT INTO users (id, email, role_id, environment) VALUES ($1, $2, 'user', $3)`, userID, req.Email, currentEnvironment())
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 			return
@@ -157,7 +181,7 @@ func Register(c *gin.Context) {
 	}
 
 	userID := uuid.New().String()
-	_, err = db.Get().Exec(`INSERT INTO users (id, email, role_id) VALUES ($1, $2, 'user')`, userID, req.Email)
+	_, err = db.Get().Exec(`INSERT INTO users (id, email, role_id, environment) VALUES ($1, $2, 'user', $3)`, userID, req.Email, currentEnvironment())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 		return
@@ -348,6 +372,19 @@ func consumeVerificationCode(email, code string) (string, error) {
 		return "", errors.New("user not found")
 	}
 	return userID, nil
+}
+
+// --- Admin Environment ---
+
+type AdminEnvironmentResponse struct {
+	Environment string `json:"environment"`
+}
+
+// AdminEnvironment reports which deployment this API instance is running in.
+// The dashboard shows it in the system card and uses it as the default
+// environment for newly created user accounts.
+func AdminEnvironment(c *gin.Context) {
+	c.JSON(http.StatusOK, AdminEnvironmentResponse{Environment: currentEnvironment()})
 }
 
 // --- Current Account ---
@@ -598,8 +635,8 @@ func AppRegisterVerify(c *gin.Context) {
 
 	userID := uuid.New().String()
 	if _, err := db.Get().Exec(
-		`INSERT INTO users (id, email, role_id, password_hash) VALUES ($1, $2, 'user', $3)`,
-		userID, req.Email, hash); err != nil {
+		`INSERT INTO users (id, email, role_id, password_hash, environment) VALUES ($1, $2, 'user', $3, $4)`,
+		userID, req.Email, hash, currentEnvironment()); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 		return
 	}

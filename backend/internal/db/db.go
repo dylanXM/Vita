@@ -73,6 +73,11 @@ func migrate(db *sql.DB) error {
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT false`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS credits_balance INTEGER NOT NULL DEFAULT 0`,
+		// Environment the account registered on (dev | beta | prod). Beta and
+		// prod share one database, so the flag lives on the row, not per-server.
+		// Existing rows predate the flag — they are live production accounts.
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS environment TEXT NOT NULL DEFAULT 'prod'`,
+		`CREATE INDEX IF NOT EXISTS idx_users_environment ON users(environment)`,
 		`CREATE INDEX IF NOT EXISTS idx_verification_codes_expires ON verification_codes(expires_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at)`,

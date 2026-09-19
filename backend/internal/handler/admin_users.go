@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"vita/internal/auth"
+	"vita/internal/config"
 	"vita/internal/db"
 )
 
@@ -25,13 +26,14 @@ import (
 
 // AdminUser is the admin-facing view of a user account.
 type AdminUser struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	Role      string    `json:"role"`
-	Timezone  string    `json:"timezone"`
-	Banned    bool      `json:"banned"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          string    `json:"id"`
+	Email       string    `json:"email"`
+	Role        string    `json:"role"`
+	Timezone    string    `json:"timezone"`
+	Environment string    `json:"environment"` // dev | beta | prod — where the account registered
+	Banned      bool      `json:"banned"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // AdminUserDetail adds per-account usage counts to the base fields.
@@ -52,7 +54,7 @@ type AdminUserListResponse struct {
 	TotalPages int         `json:"total_pages"`
 }
 
-const adminUserColumns = `id, email, COALESCE(role_id, 'user'), COALESCE(timezone, 'UTC'), COALESCE(banned, false), created_at, updated_at`
+const adminUserColumns = `id, email, COALESCE(role_id, 'user'), COALESCE(timezone, 'UTC'), COALESCE(environment, 'prod'), COALESCE(banned, false), created_at, updated_at`
 
 // rowScanner is satisfied by both *sql.Row and *sql.Rows.
 type rowScanner interface {
@@ -61,7 +63,7 @@ type rowScanner interface {
 
 func scanAdminUser(sc rowScanner) (AdminUser, error) {
 	var u AdminUser
-	err := sc.Scan(&u.ID, &u.Email, &u.Role, &u.Timezone, &u.Banned, &u.CreatedAt, &u.UpdatedAt)
+	err := sc.Scan(&u.ID, &u.Email, &u.Role, &u.Timezone, &u.Environment, &u.Banned, &u.CreatedAt, &u.UpdatedAt)
 	return u, err
 }
 
@@ -80,11 +82,12 @@ var errUserNotFound = errors.New("user not found")
 
 // AdminListUsers returns a page of users. Query parameters:
 //
-//	page      int    (default 1)
-//	page_size int    (default 10, max 100)
-//	q         string (case-insensitive email substring)
-//	role      string ("user" | "admin")
-//	status    string ("active" | "banned")
+//	page         int    (default 1)
+//	page_size    int    (default 10, max 100)
+//	q            string (case-insensitive email substring)
+//	role         string ("user" | "admin")
+//	status       string ("active" | "banned")
+//	environment  string ("dev" | "beta" | "prod")
 func AdminListUsers(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	if page < 1 {
@@ -112,6 +115,14 @@ func AdminListUsers(c *gin.Context) {
 	if status := strings.TrimSpace(c.Query("status")); status == "banned" || status == "active" {
 		args = append(args, status == "banned")
 		conds = append(conds, fmt.Sprintf("banned = $%d", len(args)))
+	}
+	if env := strings.TrimSpace(c.Query("environment")); env != "" {
+		if !config.IsValidEnvironment(env) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "environment must be 'dev', 'beta' or 'prod'"})
+			return
+		}
+		args = append(args, env)
+		conds = append(conds, fmt.Sprintf("environment = $%d", len(args)))
 	}
 
 	where := ""
@@ -189,10 +200,11 @@ func AdminGetUser(c *gin.Context) {
 // --- Create ---
 
 type AdminCreateUserRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password"`
-	Role     string `json:"role"`
-	Timezone string `json:"timezone"`
+	Email       string `json:"email" binding:"required,email"`
+	Password    string `json:"password"`
+	Role        string `json:"role"`
+	Timezone    string `json:"timezone"`
+	Environment string `json:"environment"`
 }
 
 func AdminCreateUser(c *gin.Context) {
@@ -213,6 +225,16 @@ func AdminCreateUser(c *gin.Context) {
 	timezone := strings.TrimSpace(req.Timezone)
 	if timezone == "" {
 		timezone = "UTC"
+	}
+	// Accounts an administrator creates manually inherit the environment of
+	// the deployment they are created in unless one is given explicitly.
+	environment := strings.TrimSpace(req.Environment)
+	if environment == "" {
+		environment = currentEnvironment()
+	}
+	if !config.IsValidEnvironment(environment) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "environment must be 'dev', 'beta' or 'prod'"})
+		return
 	}
 
 	var exists bool
@@ -237,14 +259,14 @@ func AdminCreateUser(c *gin.Context) {
 
 	id := uuid.New().String()
 	if _, err := db.Get().Exec(
-		`INSERT INTO users (id, email, role_id, password_hash, timezone) VALUES ($1, $2, $3, $4, $5)`,
-		id, req.Email, role, passwordHash, timezone); err != nil {
+		`INSERT INTO users (id, email, role_id, password_hash, timezone, environment) VALUES ($1, $2, $3, $4, $5, $6)`,
+		id, req.Email, role, passwordHash, timezone, environment); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 		return
 	}
 
 	c.JSON(http.StatusCreated, AdminUser{
-		ID: id, Email: req.Email, Role: role, Timezone: timezone, Banned: false,
+		ID: id, Email: req.Email, Role: role, Timezone: timezone, Environment: environment, Banned: false,
 		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
 	})
 }
@@ -255,10 +277,11 @@ func AdminCreateUser(c *gin.Context) {
 // empty password string means "keep the current password"; any non-empty value
 // replaces it.
 type AdminUpdateUserRequest struct {
-	Email    *string `json:"email"`
-	Password *string `json:"password"`
-	Role     *string `json:"role"`
-	Timezone *string `json:"timezone"`
+	Email       *string `json:"email"`
+	Password    *string `json:"password"`
+	Role        *string `json:"role"`
+	Timezone    *string `json:"timezone"`
+	Environment *string `json:"environment"`
 }
 
 func AdminUpdateUser(c *gin.Context) {
@@ -274,7 +297,7 @@ func AdminUpdateUser(c *gin.Context) {
 	var curHash string
 	err := db.Get().QueryRow(
 		`SELECT `+adminUserColumns+`, COALESCE(password_hash, '') FROM users WHERE id = $1`, id).
-		Scan(&cur.ID, &cur.Email, &cur.Role, &cur.Timezone, &cur.Banned, &cur.CreatedAt, &cur.UpdatedAt, &curHash)
+		Scan(&cur.ID, &cur.Email, &cur.Role, &cur.Timezone, &cur.Environment, &cur.Banned, &cur.CreatedAt, &cur.UpdatedAt, &curHash)
 	if errors.Is(err, sql.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 		return
@@ -319,6 +342,15 @@ func AdminUpdateUser(c *gin.Context) {
 		newTimezone = strings.TrimSpace(*req.Timezone)
 	}
 
+	newEnvironment := cur.Environment
+	if req.Environment != nil && strings.TrimSpace(*req.Environment) != "" {
+		if !config.IsValidEnvironment(strings.TrimSpace(*req.Environment)) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "environment must be 'dev', 'beta' or 'prod'"})
+			return
+		}
+		newEnvironment = strings.TrimSpace(*req.Environment)
+	}
+
 	newHash := curHash
 	if req.Password != nil && *req.Password != "" {
 		hash, err := auth.HashPassword(*req.Password)
@@ -330,8 +362,8 @@ func AdminUpdateUser(c *gin.Context) {
 	}
 
 	if _, err := db.Get().Exec(
-		`UPDATE users SET email = $1, role_id = $2, timezone = $3, password_hash = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5`,
-		newEmail, newRole, newTimezone, newHash, id); err != nil {
+		`UPDATE users SET email = $1, role_id = $2, timezone = $3, password_hash = $4, environment = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $6`,
+		newEmail, newRole, newTimezone, newHash, newEnvironment, id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user"})
 		return
 	}

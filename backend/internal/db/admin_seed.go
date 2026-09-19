@@ -17,9 +17,9 @@ import (
 //   - extraEmails are promoted to the admin role in place. They keep whatever
 //     credential they already had, which is how an existing verification-code
 //     account is granted dashboard access without inventing a password for it.
-func EnsureAdmin(email, password string, extraEmails []string) error {
+func EnsureAdmin(email, password string, extraEmails []string, env string) error {
 	if email != "" && password != "" {
-		if err := upsertAdminWithPassword(email, password); err != nil {
+		if err := upsertAdminWithPassword(email, password, env); err != nil {
 			return err
 		}
 	}
@@ -35,15 +35,18 @@ func EnsureAdmin(email, password string, extraEmails []string) error {
 	return nil
 }
 
-func upsertAdminWithPassword(email, password string) error {
+// env is stamped onto newly created administrator rows; pre-existing rows
+// keep whatever flag they already carry (the DO UPDATE clause never touches
+// the environment column).
+func upsertAdminWithPassword(email, password, env string) error {
 	hash, err := auth.HashPassword(password)
 	if err != nil {
 		return fmt.Errorf("hash password for %s: %w", email, err)
 	}
 
 	_, err = Get().Exec(`
-		INSERT INTO users (id, email, role_id, password_hash)
-		VALUES ($1, $2, 'admin', $3)
+		INSERT INTO users (id, email, role_id, password_hash, environment)
+		VALUES ($1, $2, 'admin', $3, $4)
 		ON CONFLICT (email) DO UPDATE
 		SET role_id = 'admin',
 		    updated_at = CURRENT_TIMESTAMP,
@@ -51,7 +54,7 @@ func upsertAdminWithPassword(email, password string) error {
 		        WHEN COALESCE(users.password_hash, '') = '' THEN EXCLUDED.password_hash
 		        ELSE users.password_hash
 		    END`,
-		uuid.New().String(), email, hash)
+		uuid.New().String(), email, hash, env)
 	if err != nil {
 		return fmt.Errorf("seed admin %s: %w", email, err)
 	}

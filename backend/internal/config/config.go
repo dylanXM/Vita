@@ -8,6 +8,24 @@ import (
 	"time"
 )
 
+// Deployment environments. Every account is stamped with the environment of
+// the server it registered on, so one shared database (beta and prod point at
+// the same instance) can tell pre-release test accounts apart from live ones.
+const (
+	EnvDev  = "dev"  // local development
+	EnvBeta = "beta" // pre-release; the beta backend runs against the prod database
+	EnvProd = "prod" // production
+)
+
+// IsValidEnvironment reports whether env is one of the three known deployments.
+func IsValidEnvironment(env string) bool {
+	switch env {
+	case EnvDev, EnvBeta, EnvProd:
+		return true
+	}
+	return false
+}
+
 type Config struct {
 	Env             string
 	HTTPAddr        string
@@ -65,7 +83,7 @@ type Config struct {
 
 func Load() *Config {
 	return &Config{
-		Env:             getEnv("VITA_ENV", "dev"),
+		Env:             strings.ToLower(getEnv("VITA_ENV", EnvDev)),
 		HTTPAddr:        getEnv("VITA_HTTP_ADDR", ":8080"),
 		DBDriver:        getEnv("VITA_DB_DRIVER", "postgres"),
 		DBDSN:           getEnv("VITA_DB_DSN", "postgres://tovideo:tovideo_dev_password@127.0.0.1:5433/vita?sslmode=disable"),

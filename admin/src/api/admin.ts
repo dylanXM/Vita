@@ -1,5 +1,6 @@
 import { http } from "./client";
 import type {
+  AdminEnvironment,
   AdminLoginResult,
   AdminStats,
   AdminUser,
@@ -34,6 +35,11 @@ export const usersApi = {
   remove: (id: string) => http.del<{ message: string }>(`/admin/users/${id}`),
   ban: (id: string) => http.post<AdminUser>(`/admin/users/${id}/ban`),
   unban: (id: string) => http.post<AdminUser>(`/admin/users/${id}/unban`),
+};
+
+/** Deployment environment of the API instance (admin-only). */
+export const envApi = {
+  get: (signal?: AbortSignal) => http.get<AdminEnvironment>("/admin/environment", { signal }),
 };
 
 export const healthApi = {
