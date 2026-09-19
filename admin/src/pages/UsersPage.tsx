@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -381,7 +381,12 @@ export function UsersPage() {
                 {data.items.map((u) => (
                   <TableRow key={u.id}>
                     <TableCell className="font-medium">
-                      {u.email}
+                      <Link
+                        to={`/users/${u.id}`}
+                        className="hover:text-primary hover:underline"
+                      >
+                        {u.email}
+                      </Link>
                       {u.role === "admin" && (
                         <Badge variant="outline" className="ms-2 hidden font-normal sm:inline-flex">
                           {t("common.admin")}

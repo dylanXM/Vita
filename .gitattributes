@@ -1,0 +1,266 @@
+# ============================================
+# 全局默认：文本文件自动检测换行，提交时统一为 LF
+# 无论 macOS / Linux / Windows 检出，代码均保持 LF，
+# 从根源上杜绝跨平台换行符差异导致的"大量文件被修改"
+# ============================================
+* text=auto
+
+# ============================================
+# Go
+# ============================================
+*.go     text eol=lf
+*.mod    text eol=lf
+*.sum    text eol=lf
+
+# ============================================
+# Flutter / Dart
+# ============================================
+*.dart   text eol=lf
+
+# ============================================
+# TypeScript / JavaScript / 前端
+# ============================================
+*.js     text eol=lf
+*.mjs    text eol=lf
+*.cjs    text eol=lf
+*.jsx    text eol=lf
+*.ts     text eol=lf
+*.tsx    text eol=lf
+*.vue    text eol=lf
+*.svelte text eol=lf
+*.css    text eol=lf
+*.scss   text eol=lf
+*.sass   text eol=lf
+*.less   text eol=lf
+*.html   text eol=lf
+*.htm    text eol=lf
+*.xml    text eol=lf
+*.svg    text eol=lf
+*.map    text eol=lf
+
+# ============================================
+# iOS / macOS（Swift / Objective-C / Xcode 工程）
+# ============================================
+*.swift  text eol=lf
+*.m      text eol=lf
+*.mm     text eol=lf
+*.h      text eol=lf
+*.hpp    text eol=lf
+*.c      text eol=lf
+*.cc     text eol=lf
+*.cpp    text eol=lf
+*.cxx    text eol=lf
+*.pbxproj text eol=lf
+*.xcconfig text eol=lf
+*.plist  text eol=lf
+*.storyboard text eol=lf
+*.xib    text eol=lf
+*.entitlements text eol=lf
+*.xcworkspacedata text eol=lf
+*.xcscheme text eol=lf
+*.xcsettings text eol=lf
+
+# ============================================
+# Android / Kotlin / Java / Gradle
+# ============================================
+*.kt     text eol=lf
+*.kts    text eol=lf
+*.java   text eol=lf
+*.gradle text eol=lf
+*.properties text eol=lf
+
+# ============================================
+# 其他语言
+# ============================================
+*.cs     text eol=lf
+*.rs     text eol=lf
+*.scala  text eol=lf
+*.php    text eol=lf
+*.rb     text eol=lf
+*.pl     text eol=lf
+*.pm     text eol=lf
+*.lua    text eol=lf
+*.r      text eol=lf
+*.ex     text eol=lf
+*.exs    text eol=lf
+*.erl    text eol=lf
+*.clj    text eol=lf
+*.groovy text eol=lf
+
+# ============================================
+# 构建 / 基础设施
+# ============================================
+Makefile     text eol=lf
+[Gg]nu[Mm]akefile text eol=lf
+Dockerfile   text eol=lf
+*.dockerfile text eol=lf
+*.cmake      text eol=lf
+*.tf         text eol=lf
+*.hcl        text eol=lf
+*.mk         text eol=lf
+*.rc         text eol=lf
+
+# ============================================
+# 脚本（Unix 系强制 LF；Windows 系强制 CRLF）
+# ============================================
+*.sh     text eol=lf
+*.bash   text eol=lf
+*.zsh    text eol=lf
+*.fish   text eol=lf
+*.ps1    text eol=crlf
+*.bat    text eol=crlf
+*.cmd    text eol=crlf
+
+# ============================================
+# 配置文件：强制 LF
+# ============================================
+*.json      text eol=lf
+*.json5     text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+*.toml      text eol=lf
+*.ini       text eol=lf
+*.cfg       text eol=lf
+*.conf      text eol=lf
+*.env       text eol=lf
+*.example   text eol=lf
+*.manifest  text eol=lf
+*.lock      text eol=lf
+*.editorconfig text eol=lf
+*.gitattributes text eol=lf
+*.gitignore text eol=lf
+*.gitmodules text eol=lf
+*.dockerignore text eol=lf
+.gitattributes text eol=lf
+.gitignore      text eol=lf
+.gitmodules     text eol=lf
+.dockerignore   text eol=lf
+.editorconfig   text eol=lf
+
+# ============================================
+# 文档 / 文本数据：强制 LF
+# ============================================
+*.md        text eol=lf
+*.markdown  text eol=lf
+*.txt       text eol=lf
+*.rst       text eol=lf
+*.tex       text eol=lf
+*.adoc      text eol=lf
+*.asciidoc  text eol=lf
+*.csv       text eol=lf
+*.tsv       text eol=lf
+*.sql       text eol=lf
+*.graphql   text eol=lf
+*.proto     text eol=lf
+
+# ============================================
+# 二进制：禁止任何换行转换
+# ============================================
+# 图片
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.bmp   binary
+*.ico   binary
+*.webp  binary
+*.avif  binary
+*.heic  binary
+*.tif   binary
+*.tiff  binary
+*.psd   binary
+*.ai    binary
+*.sketch binary
+*.fig   binary
+
+# 字体
+*.ttf   binary
+*.otf   binary
+*.woff  binary
+*.woff2 binary
+*.eot   binary
+
+# 音视频
+*.mp3   binary
+*.wav   binary
+*.flac  binary
+*.aac   binary
+*.ogg   binary
+*.m4a   binary
+*.mp4   binary
+*.mov   binary
+*.avi   binary
+*.mkv   binary
+*.webm  binary
+*.flv   binary
+*.m4v   binary
+*.wmv   binary
+
+# 压缩包 / 安装包 / 可执行文件 / 构建产物
+*.zip   binary
+*.tar   binary
+*.gz    binary
+*.tgz   binary
+*.bz2   binary
+*.xz    binary
+*.7z    binary
+*.rar   binary
+*.dmg   binary
+*.pkg   binary
+*.deb   binary
+*.rpm   binary
+*.msi   binary
+*.exe   binary
+*.dll   binary
+*.so    binary
+*.dylib binary
+*.a     binary
+*.o     binary
+*.class binary
+*.jar   binary
+*.war   binary
+*.ear   binary
+*.apk   binary
+*.ipa   binary
+*.aab   binary
+*.xcarchive binary
+
+# 办公文档
+*.pdf   binary
+*.doc   binary
+*.docx  binary
+*.xls   binary
+*.xlsx  binary
+*.ppt   binary
+*.pptx  binary
+*.odt   binary
+*.ods   binary
+*.odp   binary
+*.pages binary
+*.numbers binary
+*.key   binary
+
+# 数据库 / 序列化 / 模型
+*.db      binary
+*.sqlite  binary
+*.sqlite3 binary
+*.mdb     binary
+*.parquet binary
+*.h5      binary
+*.hdf5    binary
+*.pkl     binary
+*.pickle  binary
+*.onnx    binary
+*.pt      binary
+*.pth     binary
+*.bin     binary
+*.dat     binary
+*.pb      binary
+*.tflite  binary
+*.keras   binary
+*.caffemodel binary
+
+# 其他
+*.iso    binary
+*.swf    binary
+*.wasm   binary
