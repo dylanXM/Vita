@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useTranslation } from "react-i18next";
@@ -57,7 +57,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Select } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { usersApi } from "@/api/admin";
 import { errorMessage } from "@/api/client";
@@ -119,6 +125,7 @@ export function UserFormDialog({
   );
 
   const {
+    control,
     register,
     handleSubmit,
     reset,
@@ -191,10 +198,21 @@ export function UserFormDialog({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label>{t("users.role")}</Label>
-              <Select {...register("role")}>
-                <option value="user">{t("users.roleUser")}</option>
-                <option value="admin">{t("users.roleAdmin")}</option>
-              </Select>
+              <Controller
+                control={control}
+                name="role"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="user">{t("users.roleUser")}</SelectItem>
+                      <SelectItem value="admin">{t("users.roleAdmin")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>{t("users.timezone")}</Label>
@@ -340,15 +358,31 @@ export function UsersPage() {
               />
             </div>
             <div className="flex gap-3">
-              <Select value={role} onChange={(e) => setRole(e.target.value)} className="sm:w-36">
-                <option value="">{t("users.allRoles")}</option>
-                <option value="user">{t("users.roleUser")}</option>
-                <option value="admin">{t("users.roleAdmin")}</option>
+              <Select
+                value={role === "" ? "all" : role}
+                onValueChange={(v) => setRole(v === "all" ? "" : v)}
+              >
+                <SelectTrigger className="sm:w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("users.allRoles")}</SelectItem>
+                  <SelectItem value="user">{t("users.roleUser")}</SelectItem>
+                  <SelectItem value="admin">{t("users.roleAdmin")}</SelectItem>
+                </SelectContent>
               </Select>
-              <Select value={status} onChange={(e) => setStatus(e.target.value as Filters["status"])} className="sm:w-36">
-                <option value="">{t("users.allStatus")}</option>
-                <option value="active">{t("users.statusActive")}</option>
-                <option value="banned">{t("users.statusBanned")}</option>
+              <Select
+                value={status === "" ? "all" : status}
+                onValueChange={(v) => setStatus(v === "all" ? "" : (v as Filters["status"]))}
+              >
+                <SelectTrigger className="sm:w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("users.allStatus")}</SelectItem>
+                  <SelectItem value="active">{t("users.statusActive")}</SelectItem>
+                  <SelectItem value="banned">{t("users.statusBanned")}</SelectItem>
+                </SelectContent>
               </Select>
             </div>
           </div>
