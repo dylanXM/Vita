@@ -65,8 +65,10 @@ class MemoriesPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final ctrl = MemoriesController.to;
     return Scaffold(
-      backgroundColor: VitaColors.pageBg,
+      backgroundColor: context.vita.pageBg,
+      // Bottom is open so the grid scrolls behind the glass tab bar.
       body: SafeArea(
+        bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -102,6 +104,7 @@ class MemoriesPage extends StatelessWidget {
     }
     if (ctrl.loading.value && ctrl.memories.isEmpty) {
       return ListView.builder(
+        padding: const EdgeInsets.only(bottom: 90),
         itemCount: 4,
         itemBuilder: (_, __) => const VitaSkeletonCard(withAvatar: false),
       );
@@ -114,7 +117,7 @@ class MemoriesPage extends StatelessWidget {
       );
     }
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 90),
       itemCount: ctrl.memories.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, i) {
@@ -125,7 +128,7 @@ class MemoriesPage extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: VitaColors.surface,
+            color: context.vita.surface,
             borderRadius: BorderRadius.circular(VitaRadius.md),
             boxShadow: VitaShadow.card,
           ),
@@ -136,23 +139,23 @@ class MemoriesPage extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: VitaColors.green.withValues(alpha: 0.1),
+                  color: context.vita.green.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.star, size: 17, color: VitaColors.green),
+                child: Icon(Icons.star, size: 17, color: context.vita.green),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(content, style: const TextStyle(fontSize: 15, color: VitaColors.text, height: 1.45)),
+                    Text(content, style: TextStyle(fontSize: 15, color: context.vita.text, height: 1.45)),
                     const SizedBox(height: 6),
                     Text(
                       [type, when != null ? formatDate(DateTime.tryParse(when) ?? DateTime.now()) : null]
                           .where((e) => e != null && e.isNotEmpty)
                           .join(' · '),
-                      style: const TextStyle(fontSize: 12, color: VitaColors.subText),
+                      style: TextStyle(fontSize: 12, color: context.vita.subText),
                     ),
                   ],
                 ),

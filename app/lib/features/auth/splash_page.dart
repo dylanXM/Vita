@@ -37,7 +37,7 @@ class _SplashPageState extends State<SplashPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.vita.surface,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -46,7 +46,7 @@ class _SplashPageState extends State<SplashPage> {
               width: 96,
               height: 96,
               decoration: BoxDecoration(
-                gradient: VitaColors.brandGradient,
+                gradient: context.vita.brandGradient,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(color: Color(0x3307C160), blurRadius: 28, offset: Offset(0, 10)),
@@ -57,12 +57,12 @@ class _SplashPageState extends State<SplashPage> {
             SizedBox(height: 20),
             Text(
               'Vita',
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: VitaColors.text, letterSpacing: 0.5),
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: context.vita.text, letterSpacing: 0.5),
             ),
             SizedBox(height: 6),
             Text(
               'A companion who lives somewhere else',
-              style: TextStyle(fontSize: 13, color: VitaColors.subText),
+              style: TextStyle(fontSize: 13, color: context.vita.subText),
             ),
           ],
         ),

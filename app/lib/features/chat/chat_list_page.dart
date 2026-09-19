@@ -15,18 +15,20 @@ class ChatListPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final ctrl = ChatListController.to;
     return Scaffold(
-      backgroundColor: VitaColors.pageBg,
+      backgroundColor: context.vita.pageBg,
+      // Bottom is open so the list scrolls behind the floating glass tab bar.
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
             VitaTabHeader(
               title: 'Vita',
-              subtitle: 'Your companions',
+              subtitle: 'chat.subtitle'.tr,
               actions: Container(
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: VitaColors.green.withValues(alpha: 0.1),
+                  color: context.vita.green.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: IconButton(
@@ -35,7 +37,7 @@ class ChatListPage extends StatelessWidget {
                     transition: Transition.cupertino,
                     duration: const Duration(milliseconds: 300),
                   ),
-                  icon: const Icon(Icons.person_add_alt_1, color: VitaColors.green, size: 21),
+                  icon: Icon(Icons.person_add_alt_1, color: context.vita.green, size: 21),
                 ),
               ),
             ),
@@ -49,6 +51,7 @@ class ChatListPage extends StatelessWidget {
   Widget _buildBody(ChatListController ctrl) {
     if (ctrl.loading.value && ctrl.companions.isEmpty) {
       return ListView.builder(
+        padding: const EdgeInsets.only(bottom: 90),
         itemCount: 4,
         itemBuilder: (_, __) => const VitaSkeletonCard(),
       );
@@ -61,13 +64,13 @@ class ChatListPage extends StatelessWidget {
       );
     }
     return ListView.separated(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 90),
       itemCount: ctrl.companions.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
         final c = ctrl.companions[i];
         final id = c['id'] as String? ?? '';
-        final name = c['name'] as String? ?? 'Companion';
+        final name = c['name'] as String? ?? 'chat.companion'.tr;
         final subtitle = [
           c['city'] as String?,
           c['occupation'] as String?,
@@ -83,7 +86,7 @@ class ChatListPage extends StatelessWidget {
             margin: const EdgeInsets.symmetric(horizontal: 20),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: VitaColors.surface,
+              color: context.vita.surface,
               borderRadius: BorderRadius.circular(VitaRadius.md),
               boxShadow: VitaShadow.card,
             ),
@@ -95,18 +98,18 @@ class ChatListPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: VitaColors.text)),
+                      Text(name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: context.vita.text)),
                       const SizedBox(height: 3),
                       Text(
-                        subtitle.isEmpty ? 'in a distant city' : subtitle,
-                        style: const TextStyle(fontSize: 13, color: VitaColors.subText),
+                        subtitle.isEmpty ? 'chat.distant'.tr : subtitle,
+                        style: TextStyle(fontSize: 13, color: context.vita.subText),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, size: 20, color: Color(0xFFCCCCCC)),
+                Icon(Icons.chevron_right, size: 20, color: context.vita.chevron),
               ],
             ),
           ),

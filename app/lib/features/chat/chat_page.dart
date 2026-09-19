@@ -50,7 +50,7 @@ class _ChatPageState extends State<ChatPage> {
     final c = widget.companion ?? const <String, dynamic>{};
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: context.vita.surface,
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -71,9 +71,9 @@ class _ChatPageState extends State<ChatPage> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: VitaColors.text)),
+                      Text(widget.name, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: context.vita.text)),
                       if ((c['city'] as String?)?.isNotEmpty == true)
-                        Text(c['city'] as String, style: const TextStyle(fontSize: 13, color: VitaColors.subText)),
+                        Text(c['city'] as String, style: TextStyle(fontSize: 13, color: context.vita.subText)),
                     ],
                   ),
                 ],
@@ -96,11 +96,11 @@ class _ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: VitaColors.pageBg,
+      backgroundColor: context.vita.pageBg,
       appBar: AppBar(
         titleSpacing: 4,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: VitaColors.text),
+          icon: Icon(Icons.arrow_back_ios_new, size: 20, color: context.vita.text),
           onPressed: () => Get.back(),
         ),
         title: Row(
@@ -108,12 +108,12 @@ class _ChatPageState extends State<ChatPage> {
           children: [
             VitaAvatar(name: widget.name, radius: 17),
             const SizedBox(width: 9),
-            Text(widget.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: VitaColors.text)),
+            Text(widget.name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: context.vita.text)),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_horiz, color: VitaColors.subText),
+            icon: Icon(Icons.more_horiz, color: context.vita.subText),
             onPressed: _showCompanionSheet,
           ),
         ],
@@ -183,7 +183,7 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
                   decoration: BoxDecoration(
-                    color: isUser ? VitaColors.bubbleGreen : VitaColors.surface,
+                    color: isUser ? context.vita.bubbleGreen : context.vita.surface,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(14),
                       topRight: const Radius.circular(14),
@@ -194,7 +194,7 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                   child: Text(
                     content,
-                    style: const TextStyle(fontSize: 16, color: VitaColors.text, height: 1.4),
+                    style: TextStyle(fontSize: 16, color: context.vita.text, height: 1.4),
                   ),
                 ),
               ),
@@ -213,7 +213,7 @@ class _ChatPageState extends State<ChatPage> {
 
   Widget _buildInputBar() {
     return Container(
-      color: Colors.white,
+      color: context.vita.surface,
       padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + MediaQuery.of(context).padding.bottom),
       child: Row(
         children: [
@@ -224,12 +224,12 @@ class _ChatPageState extends State<ChatPage> {
               maxLines: 4,
               textInputAction: TextInputAction.send,
               onSubmitted: (_) => _send(),
-              style: const TextStyle(fontSize: 16, color: VitaColors.text, height: 1.4),
+              style: TextStyle(fontSize: 16, color: context.vita.text, height: 1.4),
               decoration: InputDecoration(
                 hintText: 'Message',
-                hintStyle: const TextStyle(color: VitaColors.hint, fontSize: 15),
+                hintStyle: TextStyle(color: context.vita.hint, fontSize: 15),
                 filled: true,
-                fillColor: VitaColors.pageBg,
+                fillColor: context.vita.pageBg,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: BorderSide.none),
                 enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: BorderSide.none),
@@ -243,7 +243,7 @@ class _ChatPageState extends State<ChatPage> {
             child: Container(
               width: 40,
               height: 40,
-              decoration: const BoxDecoration(color: VitaColors.green, shape: BoxShape.circle),
+              decoration: BoxDecoration(color: context.vita.green, shape: BoxShape.circle),
               child: const Icon(Icons.arrow_upward, color: Colors.white, size: 20),
             ),
           ),
@@ -264,16 +264,16 @@ class _SheetInfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: VitaColors.subText),
+        Icon(icon, size: 18, color: context.vita.subText),
         const SizedBox(width: 10),
         SizedBox(
           width: 84,
-          child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: VitaColors.subText)),
+          child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: context.vita.subText)),
         ),
         Expanded(
           child: Text(
             value.isEmpty ? '—' : value,
-            style: const TextStyle(fontSize: 14, color: VitaColors.text),
+            style: TextStyle(fontSize: 14, color: context.vita.text),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),

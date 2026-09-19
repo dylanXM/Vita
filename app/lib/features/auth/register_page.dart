@@ -99,7 +99,7 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.vita.surface,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -109,23 +109,23 @@ class _RegisterPageState extends State<RegisterPage> {
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: VitaColors.text),
+                    icon: Icon(Icons.arrow_back_ios_new, size: 20, color: context.vita.text),
                     onPressed: _back,
                   ),
                 ],
               ),
               if (_step == 1) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Create account',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: VitaColors.text),
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: context.vita.text),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Sign up with your email and a password',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13.5, color: VitaColors.subText),
+                  style: TextStyle(fontSize: 13.5, color: context.vita.subText),
                 ),
                 const SizedBox(height: 36),
                 TextField(
@@ -146,7 +146,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                        color: VitaColors.subText,
+                        color: context.vita.subText,
                         size: 20,
                       ),
                       onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
@@ -172,40 +172,40 @@ class _RegisterPageState extends State<RegisterPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
+                    Text(
                       'Already have an account? ',
-                      style: TextStyle(fontSize: 13.5, color: VitaColors.subText),
+                      style: TextStyle(fontSize: 13.5, color: context.vita.subText),
                     ),
                     TextButton(
                       onPressed: () => Get.back(),
-                      child: const Text(
+                      child: Text(
                         'Login',
-                        style: TextStyle(color: VitaColors.green, fontSize: 13.5, fontWeight: FontWeight.w600),
+                        style: TextStyle(color: context.vita.green, fontSize: 13.5, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ],
                 ),
               ] else ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Verify your email',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: VitaColors.text),
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: context.vita.text),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'We sent a 6-digit code to ${_email.text.trim()}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 13.5, color: VitaColors.subText),
+                  style: TextStyle(fontSize: 13.5, color: context.vita.subText),
                 ),
                 const SizedBox(height: 36),
                 Container(
                   height: 64,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
-                    color: VitaColors.surface,
+                    color: context.vita.surface,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: VitaColors.divider),
+                    border: Border.all(color: context.vita.divider),
                   ),
                   child: TextField(
                     controller: _code,
@@ -214,11 +214,11 @@ class _RegisterPageState extends State<RegisterPage> {
                     maxLength: 6,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     onSubmitted: (_) => _verify(),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 10,
-                      color: VitaColors.text,
+                      color: context.vita.text,
                     ),
                     decoration: const InputDecoration(
                       border: InputBorder.none,
@@ -237,7 +237,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w600,
-                        color: _countdown > 0 ? VitaColors.hint : VitaColors.green,
+                        color: _countdown > 0 ? context.vita.hint : context.vita.green,
                       ),
                     ),
                   ),
@@ -256,10 +256,10 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   "Didn't get the code? Check your spam folder.",
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, color: VitaColors.hint),
+                  style: TextStyle(fontSize: 12, color: context.vita.hint),
                 ),
               ],
             ],

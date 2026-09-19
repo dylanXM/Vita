@@ -25,11 +25,11 @@ class VitaAvatar extends StatelessWidget {
     final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
     return CircleAvatar(
       radius: radius,
-      backgroundColor: background ?? VitaColors.green.withValues(alpha: 0.18),
+      backgroundColor: background ?? context.vita.green.withValues(alpha: 0.18),
       child: Text(
         initial,
         style: TextStyle(
-          color: textColor ?? VitaColors.green,
+          color: textColor ?? context.vita.green,
           fontSize: radius * 0.9,
           fontWeight: FontWeight.w600,
         ),
@@ -60,7 +60,7 @@ class VitaCard extends StatelessWidget {
     return Container(
       margin: margin,
       decoration: BoxDecoration(
-        color: VitaColors.surface,
+        color: context.vita.surface,
         borderRadius: BorderRadius.circular(radius),
         boxShadow: shadow,
       ),
@@ -87,10 +87,10 @@ class VitaTabHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: VitaText.pageTitle),
+                Text(title, style: context.vita.pageTitle),
                 if (subtitle != null) ...[
                   const SizedBox(height: 3),
-                  Text(subtitle!, style: const TextStyle(fontSize: 13, color: VitaColors.subText)),
+                  Text(subtitle!, style: TextStyle(fontSize: 13, color: context.vita.subText)),
                 ],
               ],
             ),
@@ -136,9 +136,9 @@ class VitaCompanionChips extends StatelessWidget {
               curve: Curves.easeOut,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
               decoration: BoxDecoration(
-                color: selected ? VitaColors.green : VitaColors.surface,
+                color: selected ? context.vita.green : context.vita.surface,
                 borderRadius: BorderRadius.circular(VitaRadius.pill),
-                border: Border.all(color: selected ? VitaColors.green : VitaColors.divider),
+                border: Border.all(color: selected ? context.vita.green : context.vita.divider),
                 boxShadow: selected
                     ? const [BoxShadow(color: Color(0x2207C160), blurRadius: 10, offset: Offset(0, 3))]
                     : const [],
@@ -150,7 +150,7 @@ class VitaCompanionChips extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: selected ? Colors.white : VitaColors.text,
+                  color: selected ? Colors.white : context.vita.text,
                 ),
               ),
             ),
@@ -200,7 +200,7 @@ class _VitaSkeletonState extends State<VitaSkeleton> with SingleTickerProviderSt
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
               stops: [t - 0.3, t, t + 0.3].map((s) => s.clamp(0.0, 1.0)).toList(),
-              colors: const [Color(0xFFF2F3F5), Color(0xFFE4E6E9), Color(0xFFF2F3F5)],
+              colors: [context.vita.shimmerA, context.vita.shimmerB, context.vita.shimmerA],
             ),
           ),
         );
@@ -221,7 +221,7 @@ class VitaSkeletonCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: VitaColors.surface,
+        color: context.vita.surface,
         borderRadius: BorderRadius.circular(VitaRadius.md),
         boxShadow: VitaShadow.card,
       ),
@@ -270,13 +270,13 @@ class VitaEmpty extends StatelessWidget {
               width: 96,
               height: 96,
               decoration: BoxDecoration(
-                color: VitaColors.green.withValues(alpha: 0.08),
+                color: context.vita.green.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 44, color: VitaColors.green.withValues(alpha: 0.55)),
+              child: Icon(icon, size: 44, color: context.vita.green.withValues(alpha: 0.55)),
             ),
             const SizedBox(height: 18),
-            Text(title, style: const TextStyle(color: VitaColors.text, fontSize: 16, fontWeight: FontWeight.w600)),
+            Text(title, style: TextStyle(color: context.vita.text, fontSize: 16, fontWeight: FontWeight.w600)),
             if (subtitle != null) ...[
               const SizedBox(height: 6),
               Padding(
@@ -284,7 +284,7 @@ class VitaEmpty extends StatelessWidget {
                 child: Text(
                   subtitle!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: VitaColors.subText, fontSize: 13, height: 1.5),
+                  style: TextStyle(color: context.vita.subText, fontSize: 13, height: 1.5),
                 ),
               ),
             ],
@@ -316,9 +316,9 @@ class VitaListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = iconColor ?? VitaColors.green;
+    final accent = iconColor ?? context.vita.green;
     return Material(
-      color: VitaColors.surface,
+      color: context.vita.surface,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(VitaRadius.md),
@@ -340,10 +340,10 @@ class VitaListTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w500, color: VitaColors.text)),
+                    Text(title, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w500, color: context.vita.text)),
                     if (subtitle != null) ...[
                       const SizedBox(height: 1),
-                      Text(subtitle!, style: const TextStyle(fontSize: 12.5, color: VitaColors.subText)),
+                      Text(subtitle!, style: TextStyle(fontSize: 12.5, color: context.vita.subText)),
                     ],
                   ],
                 ),
@@ -352,7 +352,7 @@ class VitaListTile extends StatelessWidget {
                 const SizedBox(width: 8),
                 trailing!,
               ],
-              const Icon(Icons.chevron_right, size: 20, color: Color(0xFFCCCCCC)),
+              Icon(Icons.chevron_right, size: 20, color: context.vita.chevron),
             ],
           ),
         ),
@@ -375,11 +375,11 @@ class VitaDateChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            color: VitaColors.surface,
+            color: context.vita.surface,
             borderRadius: BorderRadius.circular(VitaRadius.pill),
-            border: Border.all(color: VitaColors.divider),
+            border: Border.all(color: context.vita.divider),
           ),
-          child: Text(label, style: VitaText.caption),
+          child: Text(label, style: context.vita.caption),
         ),
       ),
     );

@@ -51,7 +51,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.vita.surface,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
@@ -64,8 +64,8 @@ class _LoginPageState extends State<LoginPage> {
                 child: Container(
                   width: 88,
                   height: 88,
-                  decoration: const BoxDecoration(
-                    gradient: VitaColors.brandGradient,
+                  decoration: BoxDecoration(
+                    gradient: context.vita.brandGradient,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(color: Color(0x3307C160), blurRadius: 24, offset: Offset(0, 8)),
@@ -75,21 +75,21 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Vita',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w800,
-                  color: VitaColors.text,
+                  color: context.vita.text,
                   letterSpacing: 0.5,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'A companion who lives somewhere else',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: VitaColors.subText),
+                style: TextStyle(fontSize: 14, color: context.vita.subText),
               ),
               const SizedBox(height: 44),
               TextField(
@@ -110,7 +110,7 @@ class _LoginPageState extends State<LoginPage> {
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                      color: VitaColors.subText,
+                      color: context.vita.subText,
                       size: 20,
                     ),
                     onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
@@ -136,7 +136,7 @@ class _LoginPageState extends State<LoginPage> {
                   const Expanded(child: Divider()),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text('or', style: TextStyle(color: VitaColors.subText.withValues(alpha: 0.8), fontSize: 13)),
+                    child: Text('or', style: TextStyle(color: context.vita.subText.withValues(alpha: 0.8), fontSize: 13)),
                   ),
                   const Expanded(child: Divider()),
                 ],
@@ -144,11 +144,11 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 24),
               OutlinedButton.icon(
                 onPressed: _googleLogin,
-                icon: const Icon(Icons.g_mobiledata, color: VitaColors.text, size: 26),
+                icon: Icon(Icons.g_mobiledata, color: context.vita.text, size: 26),
                 label: const Text('Continue with Google'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: VitaColors.text,
-                  side: const BorderSide(color: VitaColors.divider),
+                  foregroundColor: context.vita.text,
+                  side: BorderSide(color: context.vita.divider),
                   minimumSize: const Size.fromHeight(50),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(VitaRadius.pill)),
                 ),
@@ -157,15 +157,15 @@ class _LoginPageState extends State<LoginPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
+                  Text(
                     'No account yet? ',
-                    style: TextStyle(fontSize: 13.5, color: VitaColors.subText),
+                    style: TextStyle(fontSize: 13.5, color: context.vita.subText),
                   ),
                   TextButton(
                     onPressed: () => Get.toNamed('/register'),
-                    child: const Text(
+                    child: Text(
                       'Register',
-                      style: TextStyle(color: VitaColors.green, fontSize: 13.5, fontWeight: FontWeight.w600),
+                      style: TextStyle(color: context.vita.green, fontSize: 13.5, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],
