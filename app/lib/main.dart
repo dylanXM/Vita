@@ -27,14 +27,16 @@ class VitaApp extends StatelessWidget {
       theme: VitaTheme.light,
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
+      transition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 280),
       getPages: [
         GetPage(name: '/', page: () => const SplashPage()),
-        GetPage(name: '/login', page: () => const LoginPage()),
-        GetPage(name: '/register', page: () => const RegisterPage()),
-        GetPage(name: '/shell', page: () => const ShellPage()),
-        GetPage(name: '/companion/create', page: () => const CompanionCreatePage()),
-        GetPage(name: '/subscription', page: () => const SubscriptionPage()),
-        GetPage(name: '/credits', page: () => const CreditsPage()),
+        GetPage(name: '/login', page: () => const LoginPage(), transition: Transition.cupertino),
+        GetPage(name: '/register', page: () => const RegisterPage(), transition: Transition.cupertino),
+        GetPage(name: '/shell', page: () => const ShellPage(), transition: Transition.fadeIn),
+        GetPage(name: '/companion/create', page: () => const CompanionCreatePage(), transition: Transition.cupertino),
+        GetPage(name: '/subscription', page: () => const SubscriptionPage(), transition: Transition.cupertino),
+        GetPage(name: '/credits', page: () => const CreditsPage(), transition: Transition.cupertino),
       ],
     );
   }

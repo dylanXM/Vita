@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../core/theme.dart';
@@ -101,58 +102,58 @@ class _RegisterPageState extends State<RegisterPage> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: VitaColors.text),
+                    icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: VitaColors.text),
                     onPressed: _back,
                   ),
                 ],
               ),
               if (_step == 1) ...[
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 const Text(
                   'Create account',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: VitaColors.text),
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: VitaColors.text),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 const Text(
                   'Sign up with your email and a password',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: VitaColors.subText),
+                  style: TextStyle(fontSize: 13.5, color: VitaColors.subText),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 36),
                 TextField(
                   controller: _email,
                   keyboardType: TextInputType.emailAddress,
                   autocorrect: false,
-                  onChanged: (_) => setState(() {}),
+                  textInputAction: TextInputAction.next,
                   decoration: const InputDecoration(hintText: 'Email'),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 TextField(
                   controller: _password,
                   obscureText: _obscurePassword,
                   autocorrect: false,
                   onSubmitted: (_) => _sendCode(),
-                  onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     hintText: 'Password (at least 6 characters)',
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword ? Icons.visibility_off : Icons.visibility,
                         color: VitaColors.subText,
+                        size: 20,
                       ),
                       onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 28),
                 Obx(
                   () => ElevatedButton(
                     onPressed: (AuthController.to.loading.value || !_emailValid || !_passwordValid)
@@ -173,62 +174,75 @@ class _RegisterPageState extends State<RegisterPage> {
                   children: [
                     const Text(
                       'Already have an account? ',
-                      style: TextStyle(fontSize: 13, color: VitaColors.subText),
+                      style: TextStyle(fontSize: 13.5, color: VitaColors.subText),
                     ),
                     TextButton(
                       onPressed: () => Get.back(),
                       child: const Text(
                         'Login',
-                        style: TextStyle(color: VitaColors.green, fontSize: 13, fontWeight: FontWeight.w600),
+                        style: TextStyle(color: VitaColors.green, fontSize: 13.5, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ],
                 ),
               ] else ...[
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 const Text(
                   'Verify your email',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: VitaColors.text),
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: VitaColors.text),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Text(
                   'We sent a 6-digit code to ${_email.text.trim()}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 14, color: VitaColors.subText),
+                  style: const TextStyle(fontSize: 13.5, color: VitaColors.subText),
                 ),
-                const SizedBox(height: 32),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _code,
-                        keyboardType: TextInputType.number,
-                        maxLength: 6,
-                        onSubmitted: (_) => _verify(),
-                        onChanged: (_) => setState(() {}),
-                        decoration: const InputDecoration(
-                          hintText: '6-digit code',
-                          counterText: '',
-                        ),
+                const SizedBox(height: 36),
+                Container(
+                  height: 64,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: VitaColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: VitaColors.divider),
+                  ),
+                  child: TextField(
+                    controller: _code,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    maxLength: 6,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    onSubmitted: (_) => _verify(),
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 10,
+                      color: VitaColors.text,
+                    ),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      counterText: '',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Center(
+                  child: TextButton(
+                    onPressed: (_countdown > 0 || AuthController.to.loading.value) ? null : _resendCode,
+                    child: Text(
+                      _countdown > 0 ? 'Resend in $_countdown s' : 'Resend code',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: _countdown > 0 ? VitaColors.hint : VitaColors.green,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      height: 48,
-                      child: OutlinedButton(
-                        onPressed: (_countdown > 0 || AuthController.to.loading.value) ? null : _resendCode,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: VitaColors.green,
-                          side: const BorderSide(color: VitaColors.green),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: Text(_countdown > 0 ? '$_countdown s' : 'Send code'),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 28),
                 Obx(
                   () => ElevatedButton(
                     onPressed: (AuthController.to.loading.value || _code.text.length != 6) ? null : _verify,
@@ -240,6 +254,12 @@ class _RegisterPageState extends State<RegisterPage> {
                           )
                         : const Text('Verify and sign in'),
                   ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  "Didn't get the code? Check your spam folder.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: VitaColors.hint),
                 ),
               ],
             ],

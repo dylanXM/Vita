@@ -7,7 +7,7 @@ import '../companion/companion_create_page.dart';
 import 'chat_list_controller.dart';
 import 'chat_page.dart';
 
-/// Chat tab — the conversation list, WeChat-style rows.
+/// Chat tab — the conversation list as modern cards.
 class ChatListPage extends StatelessWidget {
   const ChatListPage({super.key});
 
@@ -15,24 +15,28 @@ class ChatListPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final ctrl = ChatListController.to;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: VitaColors.pageBg,
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-              child: Row(
-                children: [
-                  const Text(
-                    'Vita',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: VitaColors.text),
+            VitaTabHeader(
+              title: 'Vita',
+              subtitle: 'Your companions',
+              actions: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: VitaColors.green.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  onPressed: () => Get.to(
+                    () => const CompanionCreatePage(),
+                    transition: Transition.cupertino,
+                    duration: const Duration(milliseconds: 300),
                   ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Get.to(() => const CompanionCreatePage()),
-                    icon: const Icon(Icons.person_add_alt, color: VitaColors.green),
-                  ),
-                ],
+                  icon: const Icon(Icons.person_add_alt_1, color: VitaColors.green, size: 21),
+                ),
               ),
             ),
             Expanded(child: Obx(() => _buildBody(ctrl))),
@@ -44,7 +48,10 @@ class ChatListPage extends StatelessWidget {
 
   Widget _buildBody(ChatListController ctrl) {
     if (ctrl.loading.value && ctrl.companions.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return ListView.builder(
+        itemCount: 4,
+        itemBuilder: (_, __) => const VitaSkeletonCard(),
+      );
     }
     if (ctrl.companions.isEmpty) {
       return VitaEmpty(
@@ -54,8 +61,9 @@ class ChatListPage extends StatelessWidget {
       );
     }
     return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 4),
       itemCount: ctrl.companions.length,
-      separatorBuilder: (_, __) => const Divider(indent: 76),
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
         final c = ctrl.companions[i];
         final id = c['id'] as String? ?? '';
@@ -64,12 +72,21 @@ class ChatListPage extends StatelessWidget {
           c['city'] as String?,
           c['occupation'] as String?,
         ].where((e) => e != null && e.isNotEmpty).join(' · ');
-        return InkWell(
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () => Get.to(
-            () => ChatPage(companionId: id, name: name),
+            () => ChatPage(companionId: id, name: name, companion: c),
+            transition: Transition.cupertino,
+            duration: const Duration(milliseconds: 300),
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: VitaColors.surface,
+              borderRadius: BorderRadius.circular(VitaRadius.md),
+              boxShadow: VitaShadow.card,
+            ),
             child: Row(
               children: [
                 VitaAvatar(name: name, radius: 26),
@@ -78,8 +95,8 @@ class ChatListPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name, style: const TextStyle(fontSize: 16, color: VitaColors.text)),
-                      const SizedBox(height: 2),
+                      Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: VitaColors.text)),
+                      const SizedBox(height: 3),
                       Text(
                         subtitle.isEmpty ? 'in a distant city' : subtitle,
                         style: const TextStyle(fontSize: 13, color: VitaColors.subText),
@@ -89,6 +106,7 @@ class ChatListPage extends StatelessWidget {
                     ],
                   ),
                 ),
+                const Icon(Icons.chevron_right, size: 20, color: Color(0xFFCCCCCC)),
               ],
             ),
           ),

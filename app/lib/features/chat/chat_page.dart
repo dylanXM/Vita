@@ -5,13 +5,16 @@ import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import 'chat_controller.dart';
 
-/// Chat detail page — message bubbles (user right / companion left) and a
-/// WeChat-style input bar.
+/// Chat detail page — message bubbles (user right / companion left),
+/// date separators and a WeChat-style input bar.
 class ChatPage extends StatefulWidget {
-  const ChatPage({super.key, required this.companionId, required this.name});
+  const ChatPage({super.key, required this.companionId, required this.name, this.companion});
 
   final String companionId;
   final String name;
+
+  /// Full companion profile map (from the list) — shown in the "more" sheet.
+  final Map<String, dynamic>? companion;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -43,12 +46,77 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
+  void _showCompanionSheet() {
+    final c = widget.companion ?? const <String, dynamic>{};
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(color: const Color(0xFFDDDDDD), borderRadius: BorderRadius.circular(2)),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  VitaAvatar(name: widget.name, radius: 30),
+                  const SizedBox(width: 14),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(widget.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: VitaColors.text)),
+                      if ((c['city'] as String?)?.isNotEmpty == true)
+                        Text(c['city'] as String, style: const TextStyle(fontSize: 13, color: VitaColors.subText)),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              _SheetInfoRow(icon: Icons.place_outlined, label: 'City', value: c['city'] as String? ?? ''),
+              const SizedBox(height: 4),
+              _SheetInfoRow(icon: Icons.work_outline, label: 'Occupation', value: c['occupation'] as String? ?? ''),
+              const SizedBox(height: 4),
+              _SheetInfoRow(icon: Icons.favorite_outline, label: 'Interests', value: c['interests'] as String? ?? ''),
+              const SizedBox(height: 4),
+              _SheetInfoRow(icon: Icons.explore, label: 'Relationship', value: (c['relationship_stage'] as String?)?.toUpperCase() ?? ''),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: VitaColors.pageBg,
       appBar: AppBar(
-        title: Text(widget.name),
+        titleSpacing: 4,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: VitaColors.text),
+          onPressed: () => Get.back(),
+        ),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            VitaAvatar(name: widget.name, radius: 17),
+            const SizedBox(width: 9),
+            Text(widget.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: VitaColors.text)),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.more_horiz, color: VitaColors.subText),
+            onPressed: _showCompanionSheet,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -61,7 +129,7 @@ class _ChatPageState extends State<ChatPage> {
 
   Widget _buildMessages(ChatController ctrl) {
     if (ctrl.loading.value && ctrl.messages.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: VitaSkeleton(width: 220, height: 44, radius: 14));
     }
     if (ctrl.messages.isEmpty) {
       return const VitaEmpty(
@@ -70,74 +138,83 @@ class _ChatPageState extends State<ChatPage> {
         subtitle: 'Start the conversation with your companion',
       );
     }
-    return ListView.builder(
-      controller: _scroll,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-      itemCount: ctrl.messages.length,
-      itemBuilder: (context, i) {
-        final m = ctrl.messages[i];
-        final isUser = m['sender_type'] == 'user';
-        final content = m['content'] as String? ?? '';
-        final time = m['created_at'] as String?;
-        final when = time != null ? formatClock(DateTime.tryParse(time) ?? DateTime.now()) : '';
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
+
+    // Flatten messages with date separators and per-group timestamps.
+    final items = <Widget>[];
+    DateTime? prevDate;
+    for (var i = 0; i < ctrl.messages.length; i++) {
+      final m = ctrl.messages[i];
+      final dt = DateTime.tryParse(m['created_at'] as String? ?? '') ?? DateTime.now();
+      if (prevDate == null || !isSameDay(dt, prevDate)) {
+        items.add(VitaDateChip(label: formatDateSeparator(dt)));
+      } else {
+        final prev = ctrl.messages[i - 1];
+        final prevDt = DateTime.tryParse(prev['created_at'] as String? ?? '') ?? dt;
+        final sameSender = prev['sender_type'] == m['sender_type'];
+        final closeInTime = dt.difference(prevDt) < const Duration(minutes: 10);
+        if (!sameSender || !closeInTime) {
+          items.add(Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(formatClock(dt), style: const TextStyle(fontSize: 11, color: Color(0xFF999999))),
+            ),
+          ));
+        }
+      }
+      prevDate = dt;
+
+      final isUser = m['sender_type'] == 'user';
+      final content = m['content'] as String? ?? '';
+      items.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(
             mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               if (!isUser) ...[
-                VitaAvatar(name: widget.name, radius: 18),
-                const SizedBox(width: 8),
+                VitaAvatar(name: widget.name, radius: 20),
+                const SizedBox(width: 10),
               ],
               Flexible(
-                child: Column(
-                  crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.62,
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                      decoration: BoxDecoration(
-                        color: isUser ? VitaColors.bubbleGreen : Colors.white,
-                        borderRadius: BorderRadius.only(
-                          topLeft: const Radius.circular(8),
-                          topRight: const Radius.circular(8),
-                          bottomLeft: Radius.circular(isUser ? 8 : 2),
-                          bottomRight: Radius.circular(isUser ? 2 : 8),
-                        ),
-                        border: isUser ? null : Border.all(color: VitaColors.divider),
-                      ),
-                      child: Text(
-                        content,
-                        style: const TextStyle(fontSize: 16, color: VitaColors.text, height: 1.35),
-                      ),
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.66,
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: isUser ? VitaColors.bubbleGreen : VitaColors.surface,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(14),
+                      topRight: const Radius.circular(14),
+                      bottomLeft: Radius.circular(isUser ? 14 : 4),
+                      bottomRight: Radius.circular(isUser ? 4 : 14),
                     ),
-                    if (when.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 3),
-                        child: Text(when, style: TextStyle(fontSize: 11, color: VitaColors.subText.withValues(alpha: 0.8))),
-                      ),
-                  ],
+                    boxShadow: const [BoxShadow(color: Color(0x08000000), blurRadius: 6, offset: Offset(0, 1))],
+                  ),
+                  child: Text(
+                    content,
+                    style: const TextStyle(fontSize: 16, color: VitaColors.text, height: 1.4),
+                  ),
                 ),
               ),
             ],
           ),
-        );
-      },
+        ),
+      );
+    }
+
+    return ListView(
+      controller: _scroll,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      children: items,
     );
   }
 
   Widget _buildInputBar() {
     return Container(
       color: Colors.white,
-      padding: EdgeInsets.only(
-        left: 12,
-        right: 12,
-        top: 8,
-        bottom: 8 + MediaQuery.of(context).padding.bottom,
-      ),
+      padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + MediaQuery.of(context).padding.bottom),
       child: Row(
         children: [
           Expanded(
@@ -147,23 +224,61 @@ class _ChatPageState extends State<ChatPage> {
               maxLines: 4,
               textInputAction: TextInputAction.send,
               onSubmitted: (_) => _send(),
-              decoration: const InputDecoration(hintText: 'Message'),
+              style: const TextStyle(fontSize: 16, color: VitaColors.text, height: 1.4),
+              decoration: InputDecoration(
+                hintText: 'Message',
+                hintStyle: const TextStyle(color: VitaColors.hint, fontSize: 15),
+                filled: true,
+                fillColor: VitaColors.pageBg,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: BorderSide.none),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: BorderSide.none),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: BorderSide.none),
+              ),
             ),
           ),
           const SizedBox(width: 10),
-          SizedBox(
-            height: 40,
-            child: ElevatedButton(
-              onPressed: _send,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(64, 40),
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-              ),
-              child: const Text('Send'),
+          GestureDetector(
+            onTap: _send,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(color: VitaColors.green, shape: BoxShape.circle),
+              child: const Icon(Icons.arrow_upward, color: Colors.white, size: 20),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SheetInfoRow extends StatelessWidget {
+  const _SheetInfoRow({required this.icon, required this.label, required this.value});
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: VitaColors.subText),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 84,
+          child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: VitaColors.subText)),
+        ),
+        Expanded(
+          child: Text(
+            value.isEmpty ? '—' : value,
+            style: const TextStyle(fontSize: 14, color: VitaColors.text),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }

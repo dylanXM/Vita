@@ -3,10 +3,10 @@ import 'package:get/get.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../../shared/widgets.dart';
 import '../chat/chat_list_controller.dart';
 
-/// Companion creation — single scrollable form (kept simple for MVP; the PRD's
-/// six-step flow can be split later).
+/// Companion creation — a single scrollable form grouped into sections.
 class CompanionCreatePage extends StatefulWidget {
   const CompanionCreatePage({super.key});
 
@@ -60,80 +60,96 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
     }
   }
 
+  Widget _field({required TextEditingController controller, required String hint}) {
+    return TextField(
+      controller: controller,
+      style: const TextStyle(fontSize: 15, color: VitaColors.text),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: VitaColors.hint, fontSize: 14.5),
+        filled: true,
+        fillColor: VitaColors.pageBg,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: VitaColors.green, width: 1.5),
+        ),
+      ),
+    );
+  }
+
+  Widget _chipRow(List<String> options, String selected, ValueChanged<String> onSelected) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: options.map((o) {
+        final is = selected == o;
+        return ChoiceChip(
+          label: Text(o[0].toUpperCase() + o.substring(1)),
+          selected: is,
+          onSelected: (_) => onSelected(o),
+          labelStyle: TextStyle(
+            fontSize: 14,
+            fontWeight: is ? FontWeight.w600 : FontWeight.w400,
+            color: is ? VitaColors.green : VitaColors.text,
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: VitaColors.pageBg,
       appBar: AppBar(title: const Text('New companion')),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'Who would you like to meet?',
-                style: TextStyle(fontSize: 15, color: VitaColors.subText),
-              ),
+              const Text('Who would you like to meet?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: VitaColors.text)),
+              const SizedBox(height: 6),
+              const Text('A few details help her settle in.', style: TextStyle(fontSize: 13, color: VitaColors.subText)),
               const SizedBox(height: 20),
-              TextField(
-                controller: _name,
-                decoration: const InputDecoration(hintText: 'Name'),
+
+              const Text('BASICS', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: VitaColors.subText, letterSpacing: 0.8)),
+              const SizedBox(height: 10),
+              VitaCard(
+                child: Column(
+                  children: [
+                    _field(controller: _name, hint: 'Name'),
+                    const SizedBox(height: 12),
+                    _field(controller: _city, hint: 'City (e.g. Tokyo)'),
+                    const SizedBox(height: 12),
+                    _field(controller: _occupation, hint: 'Occupation'),
+                    const SizedBox(height: 12),
+                    _field(controller: _interests, hint: 'Interests'),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _city,
-                decoration: const InputDecoration(hintText: 'City (e.g. Tokyo)'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _occupation,
-                decoration: const InputDecoration(hintText: 'Occupation'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _interests,
-                decoration: const InputDecoration(hintText: 'Interests'),
-              ),
-              const SizedBox(height: 20),
-              const Text('Relationship', style: TextStyle(fontSize: 14, color: VitaColors.text)),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: _genders.map((g) {
-                  final selected = _gender == g;
-                  return ChoiceChip(
-                    label: Text(g[0].toUpperCase() + g.substring(1)),
-                    selected: selected,
-                    onSelected: (_) => setState(() => _gender = g),
-                    selectedColor: VitaColors.green.withValues(alpha: 0.15),
-                    labelStyle: TextStyle(
-                      color: selected ? VitaColors.green : VitaColors.text,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                    ),
-                  );
-                }).toList(),
+
+              const Text('RELATIONSHIP', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: VitaColors.subText, letterSpacing: 0.8)),
+              const SizedBox(height: 10),
+              VitaCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Who is she to you?', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: VitaColors.text)),
+                    const SizedBox(height: 10),
+                    _chipRow(_genders, _gender, (g) => setState(() => _gender = g)),
+                    const SizedBox(height: 18),
+                    const Text('How close are you?', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: VitaColors.text)),
+                    const SizedBox(height: 10),
+                    _chipRow(_stages, _relationship, (s) => setState(() => _relationship = s)),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              const Text('Stage', style: TextStyle(fontSize: 14, color: VitaColors.text)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: _stages.map((s) {
-                  final selected = _relationship == s;
-                  return ChoiceChip(
-                    label: Text(s[0].toUpperCase() + s.substring(1)),
-                    selected: selected,
-                    onSelected: (_) => setState(() => _relationship = s),
-                    selectedColor: VitaColors.green.withValues(alpha: 0.15),
-                    labelStyle: TextStyle(
-                      color: selected ? VitaColors.green : VitaColors.text,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
               ElevatedButton(
                 onPressed: _busy ? null : _submit,
                 child: _busy

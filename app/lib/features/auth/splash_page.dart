@@ -42,15 +42,27 @@ class _SplashPageState extends State<SplashPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircleAvatar(
-              radius: 36,
-              backgroundColor: VitaColors.green,
-              child: Icon(Icons.favorite, color: Colors.white, size: 34),
+            Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                gradient: VitaColors.brandGradient,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(color: Color(0x3307C160), blurRadius: 28, offset: Offset(0, 10)),
+                ],
+              ),
+              child: Icon(Icons.favorite, color: Colors.white, size: 46),
             ),
-            SizedBox(height: 16),
+            SizedBox(height: 20),
             Text(
               'Vita',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: VitaColors.text),
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: VitaColors.text, letterSpacing: 0.5),
+            ),
+            SizedBox(height: 6),
+            Text(
+              'A companion who lives somewhere else',
+              style: TextStyle(fontSize: 13, color: VitaColors.subText),
             ),
           ],
         ),

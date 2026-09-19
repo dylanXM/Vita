@@ -65,40 +65,24 @@ class LifePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final ctrl = LifeController.to;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: VitaColors.pageBg,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Text(
-                'Life',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: VitaColors.text),
-              ),
+            const VitaTabHeader(
+              title: 'Life',
+              subtitle: 'Her day, moment by moment',
             ),
             Obx(() {
               if (ctrl.companions.isEmpty) return const SizedBox.shrink();
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: ctrl.selectedId.value,
-                    isDense: true,
-                    icon: const Icon(Icons.arrow_drop_down, color: VitaColors.green),
-                    style: const TextStyle(fontSize: 15, color: VitaColors.text, fontWeight: FontWeight.w600),
-                    items: ctrl.companions
-                        .map((c) => DropdownMenuItem(
-                              value: c['id'] as String?,
-                              child: Text('${c['name']} · ${c['city'] ?? ''}'),
-                            ))
-                        .toList(),
-                    onChanged: (v) {
-                      ctrl.selectedId.value = v;
-                      ctrl.loadEvents();
-                    },
-                  ),
-                ),
+              return VitaCompanionChips(
+                companions: ctrl.companions,
+                selectedId: ctrl.selectedId.value,
+                onChanged: (v) {
+                  ctrl.selectedId.value = v;
+                  ctrl.loadEvents();
+                },
               );
             }),
             Expanded(child: Obx(() => _buildBody(ctrl))),
@@ -117,7 +101,10 @@ class LifePage extends StatelessWidget {
       );
     }
     if (ctrl.loading.value && ctrl.events.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return ListView.builder(
+        itemCount: 4,
+        itemBuilder: (_, __) => const VitaSkeletonCard(withAvatar: false),
+      );
     }
     if (ctrl.events.isEmpty) {
       return const VitaEmpty(
@@ -127,7 +114,7 @@ class LifePage extends StatelessWidget {
       );
     }
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
       itemCount: ctrl.events.length,
       itemBuilder: (context, i) {
         final e = ctrl.events[i];
@@ -141,42 +128,57 @@ class LifePage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SizedBox(
-                width: 56,
+                width: 48,
                 child: Column(
                   children: [
-                    Text(when, style: const TextStyle(fontSize: 12, color: VitaColors.subText)),
-                    const SizedBox(height: 4),
-                    const Icon(Icons.circle, size: 10, color: VitaColors.green),
+                    Text(when, textAlign: TextAlign.right, style: const TextStyle(fontSize: 11.5, color: VitaColors.subText)),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(color: VitaColors.green, shape: BoxShape.circle),
+                    ),
                     if (i != ctrl.events.length - 1)
-                      Expanded(child: Container(width: 2, color: VitaColors.divider)),
+                      Expanded(child: Container(width: 2, margin: const EdgeInsets.only(top: 4), color: VitaColors.divider)),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
-                child: Container(
+                child: VitaCard(
                   margin: const EdgeInsets.only(bottom: 14),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: VitaColors.pageBg,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                  padding: const EdgeInsets.all(14),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: VitaColors.text)),
                       if (desc.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(desc, style: const TextStyle(fontSize: 13, color: VitaColors.subText)),
+                        const SizedBox(height: 5),
+                        Text(desc, style: const TextStyle(fontSize: 13, color: VitaColors.subText, height: 1.5)),
                       ],
                       if (loc.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.place_outlined, size: 14, color: VitaColors.subText),
-                            const SizedBox(width: 2),
-                            Text(loc, style: const TextStyle(fontSize: 12, color: VitaColors.subText)),
-                          ],
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: VitaColors.pageBg,
+                            borderRadius: BorderRadius.circular(VitaRadius.pill),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.place_outlined, size: 13, color: VitaColors.subText),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  loc,
+                                  style: const TextStyle(fontSize: 12, color: VitaColors.subText),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ],

@@ -54,62 +54,70 @@ class _LoginPageState extends State<LoginPage> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 32),
-              // Brand mark — simple two-tone circle instead of a logo asset.
+              const SizedBox(height: 16),
+              // Brand mark — gradient circle instead of a logo asset.
               Center(
                 child: Container(
-                  width: 72,
-                  height: 72,
+                  width: 88,
+                  height: 88,
                   decoration: const BoxDecoration(
-                    color: VitaColors.green,
+                    gradient: VitaColors.brandGradient,
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(color: Color(0x3307C160), blurRadius: 24, offset: Offset(0, 8)),
+                    ],
                   ),
-                  child: const Icon(Icons.favorite, color: Colors.white, size: 36),
+                  child: const Icon(Icons.favorite, color: Colors.white, size: 42),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               const Text(
                 'Vita',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: VitaColors.text),
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  color: VitaColors.text,
+                  letterSpacing: 0.5,
+                ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               const Text(
                 'A companion who lives somewhere else',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 14, color: VitaColors.subText),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 44),
               TextField(
                 controller: _email,
                 keyboardType: TextInputType.emailAddress,
                 autocorrect: false,
-                onChanged: (_) => setState(() {}),
+                textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(hintText: 'Email'),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               TextField(
                 controller: _password,
                 obscureText: _obscurePassword,
                 autocorrect: false,
                 onSubmitted: (_) => _login(),
-                onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
                   hintText: 'Password',
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscurePassword ? Icons.visibility_off : Icons.visibility,
                       color: VitaColors.subText,
+                      size: 20,
                     ),
                     onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 28),
               Obx(
                 () => ElevatedButton(
                   onPressed: (AuthController.to.loading.value || !_canSubmit) ? null : _login,
@@ -136,28 +144,28 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 24),
               OutlinedButton.icon(
                 onPressed: _googleLogin,
-                icon: const Icon(Icons.g_mobiledata, color: VitaColors.text, size: 28),
+                icon: const Icon(Icons.g_mobiledata, color: VitaColors.text, size: 26),
                 label: const Text('Continue with Google'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: VitaColors.text,
                   side: const BorderSide(color: VitaColors.divider),
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  minimumSize: const Size.fromHeight(50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(VitaRadius.pill)),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
                     'No account yet? ',
-                    style: TextStyle(fontSize: 13, color: VitaColors.subText),
+                    style: TextStyle(fontSize: 13.5, color: VitaColors.subText),
                   ),
                   TextButton(
                     onPressed: () => Get.toNamed('/register'),
                     child: const Text(
                       'Register',
-                      style: TextStyle(color: VitaColors.green, fontSize: 13, fontWeight: FontWeight.w600),
+                      style: TextStyle(color: VitaColors.green, fontSize: 13.5, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],
