@@ -85,15 +85,15 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
       spacing: 8,
       runSpacing: 8,
       children: options.map((o) {
-        final is = selected == o;
+        final isSelected = selected == o;
         return ChoiceChip(
           label: Text(o[0].toUpperCase() + o.substring(1)),
-          selected: is,
+          selected: isSelected,
           onSelected: (_) => onSelected(o),
           labelStyle: TextStyle(
             fontSize: 14,
-            fontWeight: is ? FontWeight.w600 : FontWeight.w400,
-            color: is ? VitaColors.green : VitaColors.text,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            color: isSelected ? VitaColors.green : VitaColors.text,
           ),
         );
       }).toList(),
