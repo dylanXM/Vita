@@ -5,34 +5,50 @@ import '../../core/api_client.dart';
 import '../../core/constants.dart';
 import '../../core/token_storage.dart';
 
-/// Auth state: email + verification code (auto-registers on first use) and
-/// Google sign-in (self-hosted OIDC — the backend verifies the ID token).
+/// Auth state: email + password login, two-step email registration
+/// (password first, then a 6-digit verification code) and Google sign-in
+/// (self-hosted OIDC — the backend verifies the ID token).
 class AuthController extends GetxController {
   static AuthController get to => Get.find();
 
   final loading = false.obs;
   final profile = Rxn<Map<String, dynamic>>();
 
-  /// Requests a 6-digit login code; the backend auto-creates the account on
-  /// first use, which covers both registration and login.
-  Future<void> sendCode(String email) async {
+  /// Starts registration: the backend checks the email, stores the password
+  /// and emails a 6-digit code (60s resend cooldown).
+  Future<void> register(String email, String password) async {
     loading.value = true;
     try {
       await ApiClient.instance.post(
-        '/v1/auth/send-code',
-        data: {'email': email, 'purpose': 'login'},
+        '/v1/auth/app/register',
+        data: {'email': email, 'password': password},
       );
     } finally {
       loading.value = false;
     }
   }
 
-  Future<void> loginWithCode(String email, String code) async {
+  /// Completes registration with the emailed code; stores the session token.
+  Future<void> verifyRegistration(String email, String code) async {
+    loading.value = true;
+    try {
+      final data = await ApiClient.instance.post(
+        '/v1/auth/app/register/verify',
+        data: {'email': email, 'code': code},
+      );
+      await TokenStorage.write(data['token'] as String);
+      await fetchProfile();
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  Future<void> login(String email, String password) async {
     loading.value = true;
     try {
       final data = await ApiClient.instance.post(
         '/v1/auth/app/login',
-        data: {'email': email, 'code': code},
+        data: {'email': email, 'password': password},
       );
       await TokenStorage.write(data['token'] as String);
       await fetchProfile();

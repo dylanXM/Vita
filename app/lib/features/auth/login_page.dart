@@ -1,14 +1,11 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../core/theme.dart';
 import 'auth_controller.dart';
 
-/// Email + verification code login/registration and Google sign-in.
-/// One flow covers both register and login: requesting a code auto-creates the
-/// account on first use.
+/// Email + password login and Google sign-in. New users are directed to the
+/// two-step registration page (email + password, then a 6-digit code).
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -18,44 +15,24 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _email = TextEditingController();
-  final _code = TextEditingController();
-  Timer? _timer;
-  int _countdown = 0;
+  final _password = TextEditingController();
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _timer?.cancel();
     _email.dispose();
-    _code.dispose();
+    _password.dispose();
     super.dispose();
   }
 
   bool get _emailValid => _email.text.contains('@') && _email.text.length > 4;
 
-  void _sendCode() async {
-    if (!_emailValid) return;
-    try {
-      await AuthController.to.sendCode(_email.text.trim());
-      setState(() => _countdown = 60);
-      _timer?.cancel();
-      _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-        if (_countdown <= 1) {
-          t.cancel();
-          setState(() => _countdown = 0);
-        } else {
-          setState(() => _countdown--);
-        }
-      });
-      Get.snackbar('Check your inbox', 'We sent a login code to ${_email.text.trim()}');
-    } catch (e) {
-      Get.snackbar('Failed to send code', '$e');
-    }
-  }
+  bool get _canSubmit => _emailValid && _password.text.isNotEmpty;
 
   Future<void> _login() async {
-    if (!_emailValid || _code.text.length != 6) return;
+    if (!_canSubmit) return;
     try {
-      await AuthController.to.loginWithCode(_email.text.trim(), _code.text.trim());
+      await AuthController.to.login(_email.text.trim(), _password.text);
       Get.offAllNamed('/shell');
     } catch (e) {
       Get.snackbar('Login failed', '$e');
@@ -115,46 +92,34 @@ class _LoginPageState extends State<LoginPage> {
                 decoration: const InputDecoration(hintText: 'Email'),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _code,
-                      keyboardType: TextInputType.number,
-                      maxLength: 6,
-                      onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(
-                        hintText: '6-digit code',
-                        counterText: '',
-                      ),
+              TextField(
+                controller: _password,
+                obscureText: _obscurePassword,
+                autocorrect: false,
+                onSubmitted: (_) => _login(),
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'Password',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      color: VitaColors.subText,
                     ),
+                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                   ),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    height: 48,
-                    child: OutlinedButton(
-                      onPressed: (_countdown > 0 || !_emailValid) ? null : _sendCode,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: VitaColors.green,
-                        side: const BorderSide(color: VitaColors.green),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: Text(_countdown > 0 ? '$_countdown s' : 'Send code'),
-                    ),
-                  ),
-                ],
+                ),
               ),
               const SizedBox(height: 20),
               Obx(
                 () => ElevatedButton(
-                  onPressed: (AuthController.to.loading.value) ? null : _login,
+                  onPressed: (AuthController.to.loading.value || !_canSubmit) ? null : _login,
                   child: AuthController.to.loading.value
                       ? const SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : const Text('Login / Register'),
+                      : const Text('Login'),
                 ),
               ),
               const SizedBox(height: 24),
@@ -181,11 +146,21 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
-                'No password needed — we email you a code. '
-                'Your first login creates your account.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: VitaColors.subText),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'No account yet? ',
+                    style: TextStyle(fontSize: 13, color: VitaColors.subText),
+                  ),
+                  TextButton(
+                    onPressed: () => Get.toNamed('/register'),
+                    child: const Text(
+                      'Register',
+                      style: TextStyle(color: VitaColors.green, fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

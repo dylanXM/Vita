@@ -38,6 +38,15 @@ type Config struct {
 	// tokens from the mobile app (self-hosted OIDC, no Firebase).
 	GoogleClientID string
 
+	// SMTP settings for outbound verification-code email (VITA_SMTP_*).
+	// Host empty = dev mode, codes are printed to the server log instead.
+	SMTPHost     string
+	SMTPPort     int
+	SMTPUsername string
+	SMTPPassword string
+	SMTPFrom     string
+	SMTPFromName string
+
 	// RevenueCatWebhookSecret verifies the Authorization header on the
 	// RevenueCat webhook (the "Shared Secret" shown in the RC dashboard).
 	RevenueCatWebhookSecret string
@@ -78,6 +87,13 @@ func Load() *Config {
 		AdminEmails:   splitCSV(getEnv("VITA_ADMIN_EMAILS", "")),
 
 		GoogleClientID: getEnv("VITA_GOOGLE_CLIENT_ID", ""),
+
+		SMTPHost:     getEnv("VITA_SMTP_HOST", ""),
+		SMTPPort:     atoiEnv(getEnv("VITA_SMTP_PORT", "465"), 465),
+		SMTPUsername: getEnv("VITA_SMTP_USERNAME", ""),
+		SMTPPassword: getEnv("VITA_SMTP_PASSWORD", ""),
+		SMTPFrom:     getEnv("VITA_SMTP_FROM", ""),
+		SMTPFromName: getEnv("VITA_SMTP_FROM_NAME", "Vita"),
 
 		RevenueCatWebhookSecret: getEnv("VITA_REVENUECAT_WEBHOOK_SECRET", ""),
 

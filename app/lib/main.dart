@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'core/bootstrap.dart';
 import 'core/theme.dart';
 import 'features/auth/login_page.dart';
+import 'features/auth/register_page.dart';
 import 'features/auth/splash_page.dart';
 import 'features/billing/credits_page.dart';
 import 'features/billing/subscription_page.dart';
@@ -29,6 +30,7 @@ class VitaApp extends StatelessWidget {
       getPages: [
         GetPage(name: '/', page: () => const SplashPage()),
         GetPage(name: '/login', page: () => const LoginPage()),
+        GetPage(name: '/register', page: () => const RegisterPage()),
         GetPage(name: '/shell', page: () => const ShellPage()),
         GetPage(name: '/companion/create', page: () => const CompanionCreatePage()),
         GetPage(name: '/subscription', page: () => const SubscriptionPage()),

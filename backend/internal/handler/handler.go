@@ -17,6 +17,7 @@ import (
 
 	"vita/internal/auth"
 	"vita/internal/db"
+	"vita/internal/mail"
 )
 
 const jwtSecret = "dev-secret-change-me-32-characters-min"
@@ -24,6 +25,15 @@ const codeLength = 6
 const codeTTL = 5 * time.Minute
 
 var rdb *redis.Client
+
+// mailCfg is the SMTP client used to deliver verification codes. A zero
+// value (dev) prints codes to the server log instead.
+var mailCfg = mail.Config{}
+
+// InitMailer configures outbound verification-code email (VITA_SMTP_*).
+func InitMailer(cfg mail.Config) {
+	mailCfg = cfg
+}
 
 func InitRedis(redisURL string) {
 	var err error
@@ -105,8 +115,11 @@ func SendCode(c *gin.Context) {
 		// Non-fatal, Redis is the primary store
 	}
 
-	// Log the code (in production, send via email/SMS)
-	fmt.Printf("[SMS/EMAIL] Verification code for %s: %s (expires in %v)\n", req.Email, code, codeTTL)
+	// Send the code by email (dev: printed to the server log)
+	if err := mailCfg.SendVerificationCode(req.Email, code); err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to send verification code"})
+		return
+	}
 
 	c.JSON(http.StatusOK, SendCodeResponse{Message: "Verification code sent"})
 }
@@ -421,10 +434,10 @@ func AdminStats(c *gin.Context) {
 	c.JSON(http.StatusOK, s)
 }
 
-// AppLogin - login endpoint for mobile app
+// AppLogin - login endpoint for mobile app (email + password)
 type AppLoginRequest struct {
-	Email string `json:"email" binding:"required,email"`
-	Code  string `json:"code" binding:"required,len=6"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required"`
 }
 
 type AppLoginResponse struct {
@@ -434,8 +447,119 @@ type AppLoginResponse struct {
 }
 
 func AppLogin(c *gin.Context) {
-	// Same as Login but returns app-specific response
 	var req AppLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var userID, hash, role string
+	err := db.Get().QueryRow(
+		`SELECT id, COALESCE(password_hash, ''), COALESCE(role_id, 'user') FROM users WHERE email = $1`,
+		req.Email).Scan(&userID, &hash, &role)
+	if err != nil || !auth.VerifyPassword(hash, req.Password) {
+		// One message for both causes so the endpoint does not reveal whether
+		// an email is registered.
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid email or password"})
+		return
+	}
+
+	if banned, err := userBanned(userID); err == nil && banned {
+		c.JSON(http.StatusForbidden, gin.H{"error": "account is banned"})
+		return
+	}
+
+	token, err := generateToken(uuid.MustParse(userID), role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, AppLoginResponse{UserID: userID, Token: token, Role: role})
+}
+
+// --- App Registration (email + password + verification code) ---
+
+const registerCooldown = 60 * time.Second
+
+const pendingRegPrefix = "vita:reg:"
+
+type AppRegisterRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=6"`
+}
+
+type AppRegisterVerifyRequest struct {
+	Email string `json:"email" binding:"required,email"`
+	Code  string `json:"code" binding:"required,len=6"`
+}
+
+// AppRegister starts the registration flow: checks the email is free, stores
+// the (hashed) password pending verification and emails a 6-digit code.
+// Resending within 60s is rejected to limit mail abuse.
+func AppRegister(c *gin.Context) {
+	var req AppRegisterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx := context.Background()
+	cooldownKey := "vcode:cooldown:" + req.Email
+	if rdb.Exists(ctx, cooldownKey).Val() > 0 {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "please wait 60 seconds before requesting another code"})
+		return
+	}
+
+	var exists bool
+	err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`, req.Email).Scan(&exists)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check email"})
+		return
+	}
+	if exists {
+		c.JSON(http.StatusConflict, gin.H{"error": "email already registered"})
+		return
+	}
+
+	hash, err := auth.HashPassword(req.Password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register"})
+		return
+	}
+
+	// Remember the password until the code is verified (same window as the code).
+	pendingKey := pendingRegPrefix + req.Email
+	if err := rdb.Set(ctx, pendingKey, hash, codeTTL).Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start registration"})
+		return
+	}
+
+	code := generateCode()
+	codeJSON, _ := json.Marshal(map[string]string{
+		"email":   req.Email,
+		"purpose": "register",
+	})
+	if err := rdb.Set(ctx, "vcode:"+code, string(codeJSON), codeTTL).Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send verification code"})
+		return
+	}
+	rdb.Set(ctx, cooldownKey, "1", registerCooldown)
+
+	if err := mailCfg.SendVerificationCode(req.Email, code); err != nil {
+		// Roll back so the user can retry immediately.
+		rdb.Del(ctx, pendingKey, "vcode:"+code, cooldownKey)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to send verification code"})
+		return
+	}
+
+	c.JSON(http.StatusOK, SendCodeResponse{Message: "Verification code sent"})
+}
+
+// AppRegisterVerify completes registration: validates the 6-digit code, creates
+// the account with the pending password and issues the session token.
+func AppRegisterVerify(c *gin.Context) {
+	var req AppRegisterVerifyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -447,48 +571,52 @@ func AppLogin(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired verification code"})
 		return
 	}
-
 	var codeData map[string]string
-	if err := json.Unmarshal([]byte(codeDataJSON), &codeData); err != nil {
+	if err := json.Unmarshal([]byte(codeDataJSON), &codeData); err != nil ||
+		codeData["email"] != req.Email || codeData["purpose"] != "register" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid verification code"})
 		return
 	}
 
-	if codeData["email"] != req.Email {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "verification code does not match this email"})
+	pendingKey := pendingRegPrefix + req.Email
+	hash, err := rdb.Get(ctx, pendingKey).Result()
+	if err != nil || hash == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "registration expired, please request a new code"})
 		return
 	}
 
-	rdb.Del(ctx, "vcode:"+req.Code)
-	_, _ = db.Get().Exec(`UPDATE verification_codes SET used = true WHERE code = $1 AND email = $2`, req.Code, req.Email)
-
-	userID := codeData["user_id"]
-	if userID == "" {
-		err = db.Get().QueryRow(`SELECT id FROM users WHERE email = $1`, req.Email).Scan(&userID)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
-			return
-		}
-	}
-
-	if banned, err := userBanned(userID); err == nil && banned {
-		c.JSON(http.StatusForbidden, gin.H{"error": "account is banned"})
-		return
-	}
-
-	var role string
-	err = db.Get().QueryRow(`SELECT role_id FROM users WHERE id = $1`, userID).Scan(&role)
+	var exists bool
+	err = db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`, req.Email).Scan(&exists)
 	if err != nil {
-		role = "user"
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
+		return
+	}
+	if exists {
+		c.JSON(http.StatusConflict, gin.H{"error": "email already registered"})
+		return
 	}
 
-	token, err := generateToken(func() uuid.UUID { u, _ := uuid.Parse(userID); return u }(), role)
+	userID := uuid.New().String()
+	if _, err := db.Get().Exec(
+		`INSERT INTO users (id, email, role_id, password_hash) VALUES ($1, $2, 'user', $3)`,
+		userID, req.Email, hash); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
+		return
+	}
+
+	// Consume the code and the pending registration.
+	rdb.Del(ctx, "vcode:"+req.Code, pendingKey, "vcode:cooldown:"+req.Email)
+	_, _ = db.Get().Exec(
+		`INSERT INTO verification_codes (id, email, code, purpose, expires_at, used) VALUES ($1, $2, $3, 'register', $4, true)`,
+		uuid.New().String(), req.Email, req.Code, time.Now().Add(codeTTL))
+
+	token, err := generateToken(uuid.MustParse(userID), "user")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return
 	}
 
-	c.JSON(http.StatusOK, AppLoginResponse{UserID: userID, Token: token, Role: role})
+	c.JSON(http.StatusOK, AppLoginResponse{UserID: userID, Token: token, Role: "user"})
 }
 
 // WebappLogin - login endpoint for web app

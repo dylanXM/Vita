@@ -17,6 +17,7 @@ import (
 	"vita/internal/config"
 	"vita/internal/db"
 	"vita/internal/handler"
+	"vita/internal/mail"
 	"vita/internal/middleware"
 	"vita/internal/storage"
 )
@@ -49,6 +50,16 @@ func main() {
 	})
 	handler.SetGoogleClientID(cfg.GoogleClientID)
 
+	// Verification-code email (dev: codes are printed to the server log).
+	handler.InitMailer(mail.Config{
+		Host:     cfg.SMTPHost,
+		Port:     cfg.SMTPPort,
+		Username: cfg.SMTPUsername,
+		Password: cfg.SMTPPassword,
+		From:     cfg.SMTPFrom,
+		FromName: cfg.SMTPFromName,
+	})
+
 	store := storage.New(cfg)
 	if err := store.Init(); err != nil {
 		log.Fatalf("failed to init storage: %v", err)
@@ -68,6 +79,8 @@ func main() {
 			auth.POST("/login", handler.Login)
 			auth.POST("/admin/login", handler.AdminLogin)
 			auth.POST("/app/login", handler.AppLogin)
+			auth.POST("/app/register", handler.AppRegister)
+			auth.POST("/app/register/verify", handler.AppRegisterVerify)
 			auth.POST("/webapp/login", handler.WebappLogin)
 			auth.POST("/google", handler.GoogleLogin)
 			auth.POST("/logout", handler.Logout)
