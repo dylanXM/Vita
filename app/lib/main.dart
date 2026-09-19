@@ -27,7 +27,7 @@ class VitaApp extends StatelessWidget {
       theme: VitaTheme.light,
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
-      transition: Transition.fadeIn,
+      defaultTransition: Transition.fadeIn,
       transitionDuration: const Duration(milliseconds: 280),
       getPages: [
         GetPage(name: '/', page: () => const SplashPage()),

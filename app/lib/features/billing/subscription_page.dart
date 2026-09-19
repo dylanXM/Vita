@@ -19,11 +19,11 @@ class SubscriptionPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: VitaColors.pageBg,
       appBar: AppBar(title: const Text('Vita Plus & Premium')),
-      body: Obx(() => _buildBody(ctrl)),
+      body: Obx(() => _buildBody(context, ctrl)),
     );
   }
 
-  Widget _buildBody(BillingController ctrl) {
+  Widget _buildBody(BuildContext context, BillingController ctrl) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       children: [
