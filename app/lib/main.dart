@@ -54,7 +54,7 @@ class _VitaAppState extends State<VitaApp> {
       locale: Get.locale,
       fallbackLocale: const Locale('en'),
       supportedLocales: VitaSettingsController.supportedLocales,
-      translations: const VitaTranslations(),
+      translations: VitaTranslations(),
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
       defaultTransition: Transition.fadeIn,

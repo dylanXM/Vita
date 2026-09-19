@@ -183,7 +183,7 @@ class VitaTabBar extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
+            );
           },
         ),
       ),

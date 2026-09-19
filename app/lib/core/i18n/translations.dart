@@ -6,8 +6,8 @@ import 'package:get/get.dart';
 /// area. Use `'key'.tr` or `'key'.trParams({'name': ...})` — placeholders
 /// are written as `@name`.
 class VitaTranslations extends Translations {
-  const VitaTranslations();
-  @override
+  VitaTranslations();
+
   static const Map<String, Map<String, String>> _keys = {
     'en': {
       // Shell tabs.
