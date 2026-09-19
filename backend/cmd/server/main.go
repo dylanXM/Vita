@@ -103,6 +103,17 @@ func main() {
 		admin := api.Group("/admin", middleware.RequireAdmin())
 		{
 			admin.GET("/stats", handler.AdminStats)
+
+			users := admin.Group("/users")
+			{
+				users.GET("/", handler.AdminListUsers)
+				users.POST("/", handler.AdminCreateUser)
+				users.GET("/:id", handler.AdminGetUser)
+				users.PUT("/:id", handler.AdminUpdateUser)
+				users.DELETE("/:id", handler.AdminDeleteUser)
+				users.POST("/:id/ban", func(c *gin.Context) { handler.AdminSetBanned(c, true) })
+				users.POST("/:id/unban", func(c *gin.Context) { handler.AdminSetBanned(c, false) })
+			}
 		}
 	}
 

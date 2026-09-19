@@ -71,7 +71,10 @@ func migrate(db *sql.DB) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_verification_codes_email ON verification_codes(email)`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT false`,
 		`CREATE INDEX IF NOT EXISTS idx_verification_codes_expires ON verification_codes(expires_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
+		`CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at)`,
 		`CREATE TABLE IF NOT EXISTS companions (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL REFERENCES users(id),
@@ -149,7 +152,11 @@ func migrate(db *sql.DB) error {
 	}
 
 	for _, q := range queries {
-		fmt.Printf("Executing migration: %s...\n", q[:60])
+		preview := q
+		if len(preview) > 60 {
+			preview = preview[:60]
+		}
+		fmt.Printf("Executing migration: %s...\n", preview)
 		if _, err := db.Exec(q); err != nil {
 			return fmt.Errorf("failed to execute: %w", err)
 		}

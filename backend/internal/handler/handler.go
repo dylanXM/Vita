@@ -48,7 +48,7 @@ func Health(c *gin.Context) {
 // --- Verification Code ---
 
 type SendCodeRequest struct {
-	Email string `json:"email" binding:"required,email"`
+	Email   string `json:"email" binding:"required,email"`
 	Purpose string `json:"purpose"`
 }
 
@@ -124,7 +124,7 @@ type RegisterRequest struct {
 
 type RegisterResponse struct {
 	UserID string `json:"user_id"`
-	Token   string `json:"token"`
+	Token  string `json:"token"`
 }
 
 func Register(c *gin.Context) {
@@ -159,13 +159,13 @@ func Register(c *gin.Context) {
 
 type LoginRequest struct {
 	Email string `json:"email" binding:"required,email"`
-	Code    string `json:"code" binding:"required,len=6"`
+	Code  string `json:"code" binding:"required,len=6"`
 }
 
 type LoginResponse struct {
-	UserID  string `json:"user_id"`
-	Token   string `json:"token"`
-	Role    string `json:"role"`
+	UserID string `json:"user_id"`
+	Token  string `json:"token"`
+	Role   string `json:"role"`
 }
 
 func Login(c *gin.Context) {
@@ -211,6 +211,11 @@ func Login(c *gin.Context) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
 			return
 		}
+	}
+
+	if banned, err := userBanned(userID); err == nil && banned {
+		c.JSON(http.StatusForbidden, gin.H{"error": "account is banned"})
+		return
 	}
 
 	token, err := generateToken(func() uuid.UUID { u, _ := uuid.Parse(userID); return u }(), userRole)
@@ -418,7 +423,7 @@ func AdminStats(c *gin.Context) {
 // AppLogin - login endpoint for mobile app
 type AppLoginRequest struct {
 	Email string `json:"email" binding:"required,email"`
-	Code    string `json:"code" binding:"required,len=6"`
+	Code  string `json:"code" binding:"required,len=6"`
 }
 
 type AppLoginResponse struct {
@@ -465,6 +470,11 @@ func AppLogin(c *gin.Context) {
 		}
 	}
 
+	if banned, err := userBanned(userID); err == nil && banned {
+		c.JSON(http.StatusForbidden, gin.H{"error": "account is banned"})
+		return
+	}
+
 	var role string
 	err = db.Get().QueryRow(`SELECT role_id FROM users WHERE id = $1`, userID).Scan(&role)
 	if err != nil {
@@ -483,7 +493,7 @@ func AppLogin(c *gin.Context) {
 // WebappLogin - login endpoint for web app
 type WebappLoginRequest struct {
 	Email string `json:"email" binding:"required,email"`
-	Code    string `json:"code" binding:"required,len=6"`
+	Code  string `json:"code" binding:"required,len=6"`
 }
 
 type WebappLoginResponse struct {
@@ -529,6 +539,11 @@ func WebappLogin(c *gin.Context) {
 		}
 	}
 
+	if banned, err := userBanned(userID); err == nil && banned {
+		c.JSON(http.StatusForbidden, gin.H{"error": "account is banned"})
+		return
+	}
+
 	var role string
 	err = db.Get().QueryRow(`SELECT role_id FROM users WHERE id = $1`, userID).Scan(&role)
 	if err != nil {
@@ -559,28 +574,28 @@ func RefreshToken(c *gin.Context) {
 // --- Companion Routes ---
 
 type Companion struct {
-	ID              string    `json:"id"`
-	UserID          string    `json:"user_id"`
-	Name            string    `json:"name"`
-	Gender          string    `json:"gender"`
-	Persona         string    `json:"persona"`
-	Appearance      string    `json:"appearance"`
-	City            string    `json:"city"`
-	Occupation      string    `json:"occupation"`
-	Interests       string    `json:"interests"`
-	RelationshipStage string  `json:"relationship_stage"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID                string    `json:"id"`
+	UserID            string    `json:"user_id"`
+	Name              string    `json:"name"`
+	Gender            string    `json:"gender"`
+	Persona           string    `json:"persona"`
+	Appearance        string    `json:"appearance"`
+	City              string    `json:"city"`
+	Occupation        string    `json:"occupation"`
+	Interests         string    `json:"interests"`
+	RelationshipStage string    `json:"relationship_stage"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 type CreateCompanionRequest struct {
-	Name             string `json:"name" binding:"required"`
-	Gender           string `json:"gender"`
-	Persona          string `json:"persona"`
-	Appearance       string `json:"appearance"`
-	City             string `json:"city"`
-	Occupation       string `json:"occupation"`
-	Interests        string `json:"interests"`
+	Name              string `json:"name" binding:"required"`
+	Gender            string `json:"gender"`
+	Persona           string `json:"persona"`
+	Appearance        string `json:"appearance"`
+	City              string `json:"city"`
+	Occupation        string `json:"occupation"`
+	Interests         string `json:"interests"`
 	RelationshipStage string `json:"relationship_stage"`
 }
 

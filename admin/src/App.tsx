@@ -4,6 +4,8 @@ import { AdminLayout } from "@/layout/AdminLayout";
 import { RequireAuth } from "@/routes/guards";
 import { LoginPage } from "@/pages/LoginPage";
 import { DashboardPage } from "@/pages/DashboardPage";
+import { UsersPage } from "@/pages/UsersPage";
+import { UserDetailPage } from "@/pages/UserDetailPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { Button } from "@/components/ui/button";
 
@@ -41,6 +43,8 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: "dashboard", element: <DashboardPage /> },
+      { path: "users", element: <UsersPage /> },
+      { path: "users/:id", element: <UserDetailPage /> },
     ],
   },
   { path: "*", element: <NotFoundPage /> },

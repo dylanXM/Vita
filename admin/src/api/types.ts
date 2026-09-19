@@ -38,3 +38,48 @@ export interface AdminStats {
   today_life_events: number;
   generated_at: string;
 }
+
+/** A user account as seen by the admin console (`/v1/admin/users`). */
+export interface AdminUser {
+  id: string;
+  email: string;
+  role: string; // "user" | "admin"
+  timezone: string;
+  banned: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** `GET /v1/admin/users/:id` — detail adds per-account usage counts. */
+export interface AdminUserDetail extends AdminUser {
+  companions: number;
+  conversations: number;
+  messages: number;
+  memories: number;
+}
+
+/** `GET /v1/admin/users` — paginated list response. */
+export interface AdminUserList {
+  items: AdminUser[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+/** Query params for the paginated user list. */
+export interface AdminUserListParams {
+  page?: number;
+  page_size?: number;
+  q?: string;
+  role?: string;
+  status?: "active" | "banned";
+}
+
+/** Create/update payload for a user. */
+export interface AdminUserInput {
+  email?: string;
+  password?: string;
+  role?: string;
+  timezone?: string;
+}
