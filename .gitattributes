@@ -3,7 +3,7 @@
 # 无论 macOS / Linux / Windows 检出，代码均保持 LF，
 # 从根源上杜绝跨平台换行符差异导致的"大量文件被修改"
 # ============================================
-* text=auto
+* text=auto eol=lf
 
 # ============================================
 # Go
@@ -92,6 +92,7 @@
 # ============================================
 Makefile     text eol=lf
 [Gg]nu[Mm]akefile text eol=lf
+Podfile      text eol=lf
 Dockerfile   text eol=lf
 *.dockerfile text eol=lf
 *.cmake      text eol=lf

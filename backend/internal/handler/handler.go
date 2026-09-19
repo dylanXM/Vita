@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -711,6 +712,52 @@ func GetMessages(c *gin.Context) {
 		messages = append(messages, m)
 	}
 	c.JSON(http.StatusOK, messages)
+}
+
+// GetOrCreateConversation returns the conversation between the current user and
+// a companion, creating it on first use (required by the mobile chat flow).
+func GetOrCreateConversation(c *gin.Context) {
+	userID := c.GetString("user_id")
+	var req struct {
+		CompanionID string `json:"companion_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var ownerID string
+	if err := db.Get().QueryRow(
+		`SELECT user_id FROM companions WHERE id = $1`, req.CompanionID).Scan(&ownerID); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "companion not found"})
+		return
+	}
+	if ownerID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "companion does not belong to user"})
+		return
+	}
+
+	var conversationID string
+	err := db.Get().QueryRow(
+		`SELECT id FROM conversations WHERE user_id = $1 AND companion_id = $2 LIMIT 1`,
+		userID, req.CompanionID).Scan(&conversationID)
+	if err == nil {
+		c.JSON(http.StatusOK, gin.H{"conversation_id": conversationID})
+		return
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load conversation"})
+		return
+	}
+
+	conversationID = uuid.New().String()
+	if _, err := db.Get().Exec(
+		`INSERT INTO conversations (id, user_id, companion_id) VALUES ($1, $2, $3)`,
+		conversationID, userID, req.CompanionID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create conversation"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"conversation_id": conversationID})
 }
 
 func GetTodayLife(c *gin.Context) {

@@ -283,16 +283,16 @@ webapp-docker:
 app-init: init-app
 app-install: install-app
 app-prepare-dirs:
-	@cd app && mkdir -p build/ios/SourcePackages build/macos/SourcePackages
+	@cd app && mkdir -p build/ios/SourcePackages build/macos/SourcePackages .cocoapods-local .home
 
 app-run:
-	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && flutter run --dart-define-from-file=config/dev.json
+	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" flutter run --dart-define-from-file=config/dev.json
 
 app-run-beta:
-	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && flutter run --dart-define-from-file=config/beta.json
+	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" flutter run --dart-define-from-file=config/beta.json
 
 app-run-prod:
-	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && flutter run --dart-define-from-file=config/prod.json
+	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" flutter run --dart-define-from-file=config/prod.json
 
 app-dev:
 	@$(MAKE) app-run
@@ -304,10 +304,10 @@ app-build-apk:
 	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && flutter build apk --release --dart-define-from-file=config/prod.json
 
 app-build-ios-beta:
-	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && flutter build ios --release --no-codesign --dart-define-from-file=config/beta.json
+	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" flutter build ios --release --no-codesign --dart-define-from-file=config/beta.json
 
 app-build-ios:
-	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && flutter build ios --release --no-codesign --dart-define-from-file=config/prod.json
+	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" flutter build ios --release --no-codesign --dart-define-from-file=config/prod.json
 
 app-check:
 	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && flutter analyze

@@ -38,6 +38,17 @@ func main() {
 	redisURL := cfg.RedisURL
 	handler.InitRedis(redisURL)
 
+	// Billing + Google sign-in configuration (set before any request arrives).
+	handler.InitBilling(handler.BillingConfig{
+		RevenueCatWebhookSecret:    cfg.RevenueCatWebhookSecret,
+		StripeSecretKey:            cfg.StripeSecretKey,
+		StripeWebhookSecret:        cfg.StripeWebhookSecret,
+		StripePricePlus:            cfg.StripePricePlus,
+		StripePricePremium:         cfg.StripePricePremium,
+		SubscriptionCreditsMonthly: cfg.SubscriptionCreditsMonthly,
+	})
+	handler.SetGoogleClientID(cfg.GoogleClientID)
+
 	store := storage.New(cfg)
 	if err := store.Init(); err != nil {
 		log.Fatalf("failed to init storage: %v", err)
@@ -58,6 +69,7 @@ func main() {
 			auth.POST("/admin/login", handler.AdminLogin)
 			auth.POST("/app/login", handler.AppLogin)
 			auth.POST("/webapp/login", handler.WebappLogin)
+			auth.POST("/google", handler.GoogleLogin)
 			auth.POST("/logout", handler.Logout)
 			auth.POST("/refresh", handler.RefreshToken)
 		}
@@ -73,9 +85,18 @@ func main() {
 
 		conversations := api.Group("/conversations")
 		{
+			conversations.POST("/", middleware.RequireAuth(), handler.GetOrCreateConversation)
 			conversations.POST("/:id/messages", handler.SendMessage)
 			conversations.GET("/:id/messages", handler.GetMessages)
 		}
+
+		// Billing — credits, subscriptions and provider webhooks.
+		api.GET("/me/credits", middleware.RequireAuth(), handler.GetCredits)
+		api.POST("/credits/consume", middleware.RequireAuth(), handler.ConsumeCredits)
+		api.GET("/me/subscription", middleware.RequireAuth(), handler.GetMySubscription)
+		api.POST("/stripe/checkout", middleware.RequireAuth(), handler.CreateStripeCheckout)
+		api.POST("/webhooks/revenuecat", handler.RevenueCatWebhook)
+		api.POST("/webhooks/stripe", handler.StripeWebhook)
 
 		life := api.Group("/companions/:id/life")
 		{
