@@ -1,0 +1,5 @@
+{
+  "VITA_ENV": "prod",
+  "VITA_API_BASE_URL": "https://api.vita.ai",
+  "VITA_ENABLE_LOG": "false"
+}

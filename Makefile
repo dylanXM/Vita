@@ -1,4 +1,4 @@
-.PHONY: help init init-backend init-admin init-webapp init-app init-website init-deploy install-deps install-backend install-admin install-webapp install-app install-website dev dev-mock be-run be-mock be-build be-test be-gen be-openapi be-fmt be-migrate be-rehash-migrations infra-up infra-down db-psql redis-cli app-gen app-run up down logs deploy deploy-docker deploy-docker-individual deploy-beta deploy-prod deploy-docker-infra deploy-up deploy-down deploy-logs deploy-build deploy-check deploy-clean clean clean-all backend-docker admin-docker webapp-docker app-docker website-docker docker-api docker-admin docker-webapp docker-website backend-install admin-install webapp-install app-install website-install backend-dev admin-dev webapp-dev app-dev website-dev backend-init admin-init webapp-init app-init website-init backend-build admin-build webapp-build app-build website-build backend-check admin-check webapp-check app-check website-check
+.PHONY: help init init-backend init-admin init-webapp init-app init-website init-deploy install-deps install-backend install-admin install-webapp install-app install-website dev dev-mock be-run be-mock be-build be-test be-gen be-openapi be-fmt be-migrate be-rehash-migrations infra-up infra-down db-psql redis-cli app-gen app-run up down logs deploy deploy-docker deploy-docker-individual deploy-beta deploy-prod deploy-docker-infra deploy-up deploy-down deploy-logs deploy-build deploy-check deploy-clean clean clean-all backend-docker admin-docker webapp-docker app-docker website-docker docker-api docker-admin docker-webapp docker-website backend-install admin-install webapp-install app-install website-install backend-dev admin-dev webapp-dev app-dev website-dev backend-init admin-init webapp-init app-init website-init backend-build admin-build webapp-build website-build backend-check admin-check webapp-check app-check website-check
 
 help:
 	@echo "=== Vita AI Companion ==="
@@ -32,8 +32,14 @@ help:
 	@echo "app:"
 	@echo "  make app-init            初始化项目"
 	@echo "  make app-install         加载依赖"
+	@echo "  make app-run             运行 dev 环境"
+	@echo "  make app-run-beta        运行 beta 环境"
+	@echo "  make app-run-prod        运行 prod 环境"
 	@echo "  make app-dev             运行应用"
-	@echo "  make app-build           构建"
+	@echo "  make app-build-apk-beta  构建 beta APK"
+	@echo "  make app-build-apk       构建 prod APK"
+	@echo "  make app-build-ios-beta  构建 beta iOS（no-codesign）"
+	@echo "  make app-build-ios       构建 prod iOS（no-codesign）"
 	@echo "  make app-check           检查"
 	@echo "  make app-docker          Docker 部署"
 	@echo ""
@@ -272,14 +278,39 @@ webapp-docker:
 	@cd deploy && docker build -f ../webapp/Dockerfile -t vita/webapp:dev .. && docker run -d --name vita-webapp -p 8263:3000 --network vita-net --depends-on vita-api vita/webapp:dev && echo "✅ Webapp container deployed"
 
 # --- App ---
+.PHONY: app-prepare-dirs app-run app-run-beta app-run-prod app-build-apk-beta app-build-apk app-build-ios-beta app-build-ios
+
 app-init: init-app
 app-install: install-app
+app-prepare-dirs:
+	@cd app && mkdir -p build/ios/SourcePackages build/macos/SourcePackages
+
+app-run:
+	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && flutter run --dart-define-from-file=config/dev.json
+
+app-run-beta:
+	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && flutter run --dart-define-from-file=config/beta.json
+
+app-run-prod:
+	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && flutter run --dart-define-from-file=config/prod.json
+
 app-dev:
-	@cd app && flutter run 2>/dev/null || echo "⚠️  Flutter not available"
-app-build:
-	@cd app && flutter build apk 2>/dev/null || echo "⚠️  Flutter not available"
+	@$(MAKE) app-run
+
+app-build-apk-beta:
+	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && flutter build apk --release --dart-define-from-file=config/beta.json
+
+app-build-apk:
+	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && flutter build apk --release --dart-define-from-file=config/prod.json
+
+app-build-ios-beta:
+	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && flutter build ios --release --no-codesign --dart-define-from-file=config/beta.json
+
+app-build-ios:
+	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && flutter build ios --release --no-codesign --dart-define-from-file=config/prod.json
+
 app-check:
-	@cd app && flutter analyze 2>/dev/null || echo "⚠️  Flutter not available"
+	@$(MAKE) app-prepare-dirs && cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; } && flutter analyze
 app-docker:
 	@echo "⚠️  Flutter app uses make app-dev instead of Docker"
 
@@ -296,7 +327,7 @@ website-docker:
 	@cd deploy && docker build -f ../website/Dockerfile -t vita/website:dev . && docker run -d --name vita-website -p 8262:80 --network vita-net vita/website:dev && echo "✅ Website container deployed"
 
 # --- Global ---
-build: backend-build admin-build webapp-build app-build website-build
+build: backend-build admin-build webapp-build app-build-apk website-build
 	@echo "✅ All projects built"
 
 check: backend-check admin-check webapp-check app-check website-check

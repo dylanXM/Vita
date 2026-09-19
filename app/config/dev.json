@@ -1,0 +1,5 @@
+{
+  "VITA_ENV": "dev",
+  "VITA_API_BASE_URL": "http://127.0.0.1:8260",
+  "VITA_ENABLE_LOG": "true"
+}
