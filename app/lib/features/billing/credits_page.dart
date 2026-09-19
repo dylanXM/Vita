@@ -15,13 +15,13 @@ class CreditsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final ctrl = BillingController.to;
     return Scaffold(
-      backgroundColor: VitaColors.pageBg,
+      backgroundColor: context.vita.pageBg,
       appBar: AppBar(title: const Text('Credits')),
-      body: Obx(() => _buildBody(ctrl)),
+      body: Obx(() => _buildBody(context, ctrl)),
     );
   }
 
-  Widget _buildBody(BillingController ctrl) {
+  Widget _buildBody(BuildContext context, BillingController ctrl) {
     final packs = _creditPacks(ctrl);
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
@@ -30,9 +30,9 @@ class CreditsPage extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            gradient: VitaColors.brandGradient,
+            gradient: context.vita.brandGradient,
             borderRadius: BorderRadius.circular(VitaRadius.lg),
-            boxShadow: [BoxShadow(color: VitaColors.green.withValues(alpha: 0.25), blurRadius: 20, offset: const Offset(0, 8))],
+            boxShadow: [BoxShadow(color: context.vita.green.withValues(alpha: 0.25), blurRadius: 20, offset: const Offset(0, 8))],
           ),
           child: Column(
             children: [
@@ -51,7 +51,7 @@ class CreditsPage extends StatelessWidget {
         const SizedBox(height: 24),
 
         // Credit packs.
-        const Text('Buy more', style: VitaText.sectionTitle),
+        Text('Buy more', style: context.vita.sectionTitle),
         const SizedBox(height: 12),
         if (packs.isEmpty)
           const _PacksHint()
@@ -60,12 +60,12 @@ class CreditsPage extends StatelessWidget {
         const SizedBox(height: 24),
 
         // History.
-        const Text('History', style: VitaText.sectionTitle),
+        Text('History', style: context.vita.sectionTitle),
         const SizedBox(height: 12),
         if (ctrl.transactions.isEmpty)
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 20),
-            child: Text('No transactions yet', style: TextStyle(fontSize: 13, color: VitaColors.subText)),
+            child: Text('No transactions yet', style: TextStyle(fontSize: 13, color: context.vita.subText)),
           )
         else
           VitaCard(
@@ -126,14 +126,14 @@ class _PackCard extends StatelessWidget {
               children: [
                 Text(
                   store.title.isNotEmpty ? store.title : package.identifier,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: VitaColors.text),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: context.vita.text),
                 ),
                 if (store.description.isNotEmpty)
                   Text(
                     store.description,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: VitaColors.subText),
+                    style: TextStyle(fontSize: 12, color: context.vita.subText),
                   ),
               ],
             ),
@@ -146,7 +146,7 @@ class _PackCard extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                 decoration: BoxDecoration(
-                  color: VitaColors.green,
+                  color: context.vita.green,
                   borderRadius: BorderRadius.circular(VitaRadius.pill),
                 ),
                 child: Text(
@@ -170,14 +170,14 @@ class _PacksHint extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: VitaColors.surface,
+        color: context.vita.surface,
         borderRadius: BorderRadius.circular(VitaRadius.md),
         boxShadow: VitaShadow.card,
       ),
-      child: const Text(
+      child: Text(
         'Create consumable products named credits_500 / credits_1000 / credits_5000 in '
         'RevenueCat and they will appear here automatically.',
-        style: TextStyle(fontSize: 12, color: VitaColors.subText, height: 1.5),
+        style: TextStyle(fontSize: 12, color: context.vita.subText, height: 1.5),
       ),
     );
   }
@@ -204,12 +204,12 @@ class _TxRow extends StatelessWidget {
               children: [
                 Text(
                   desc.isEmpty ? kind : desc,
-                  style: const TextStyle(fontSize: 14, color: VitaColors.text),
+                  style: TextStyle(fontSize: 14, color: context.vita.text),
                 ),
                 if (when != null)
                   Text(
                     formatDate(DateTime.tryParse(when) ?? DateTime.now()),
-                    style: const TextStyle(fontSize: 12, color: VitaColors.subText),
+                    style: TextStyle(fontSize: 12, color: context.vita.subText),
                   ),
               ],
             ),
@@ -219,7 +219,7 @@ class _TxRow extends StatelessWidget {
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
-              color: amount >= 0 ? VitaColors.green : VitaColors.red,
+              color: amount >= 0 ? context.vita.green : context.vita.red,
             ),
           ),
         ],

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import 'core/bootstrap.dart';
+import 'core/i18n/translations.dart';
+import 'core/settings_controller.dart';
 import 'core/theme.dart';
 import 'features/auth/login_page.dart';
 import 'features/auth/register_page.dart';
@@ -14,17 +16,45 @@ import 'features/shell/shell_page.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   initControllers();
+  // Wait for persisted language/theme preferences before the first frame
+  // so the app boots directly into the user's settings.
+  await VitaSettingsController.to.ready.future;
   runApp(const VitaApp());
 }
 
-class VitaApp extends StatelessWidget {
+class VitaApp extends StatefulWidget {
   const VitaApp({super.key});
+
+  @override
+  State<VitaApp> createState() => _VitaAppState();
+}
+
+class _VitaAppState extends State<VitaApp> {
+  late final VitaSettingsController _settings = VitaSettingsController.to;
+
+  @override
+  void initState() {
+    super.initState();
+    _settings.onPreferenceChanged = () => setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _settings.onPreferenceChanged = null;
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
       title: 'Vita',
       theme: VitaTheme.light,
+      darkTheme: VitaTheme.dark,
+      themeMode: _settings.appliedThemeMode,
+      locale: Get.locale,
+      fallbackLocale: const Locale('en'),
+      supportedLocales: VitaSettingsController.supportedLocales,
+      translations: const VitaTranslations(),
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
       defaultTransition: Transition.fadeIn,

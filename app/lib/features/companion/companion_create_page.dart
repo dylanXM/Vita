@@ -63,18 +63,18 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
   Widget _field({required TextEditingController controller, required String hint}) {
     return TextField(
       controller: controller,
-      style: const TextStyle(fontSize: 15, color: VitaColors.text),
+      style: TextStyle(fontSize: 15, color: context.vita.text),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: VitaColors.hint, fontSize: 14.5),
+        hintStyle: TextStyle(color: context.vita.hint, fontSize: 14.5),
         filled: true,
-        fillColor: VitaColors.pageBg,
+        fillColor: context.vita.pageBg,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: VitaColors.green, width: 1.5),
+          borderSide: BorderSide(color: context.vita.green, width: 1.5),
         ),
       ),
     );
@@ -93,7 +93,7 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
           labelStyle: TextStyle(
             fontSize: 14,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-            color: isSelected ? VitaColors.green : VitaColors.text,
+            color: isSelected ? context.vita.green : context.vita.text,
           ),
         );
       }).toList(),
@@ -103,7 +103,7 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: VitaColors.pageBg,
+      backgroundColor: context.vita.pageBg,
       appBar: AppBar(title: const Text('New companion')),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -111,12 +111,12 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Who would you like to meet?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: VitaColors.text)),
+              Text('Who would you like to meet?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: context.vita.text)),
               const SizedBox(height: 6),
-              const Text('A few details help her settle in.', style: TextStyle(fontSize: 13, color: VitaColors.subText)),
+              Text('A few details help her settle in.', style: TextStyle(fontSize: 13, color: context.vita.subText)),
               const SizedBox(height: 20),
 
-              const Text('BASICS', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: VitaColors.subText, letterSpacing: 0.8)),
+              Text('BASICS', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: context.vita.subText, letterSpacing: 0.8)),
               const SizedBox(height: 10),
               VitaCard(
                 child: Column(
@@ -133,17 +133,17 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
               ),
               const SizedBox(height: 8),
 
-              const Text('RELATIONSHIP', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: VitaColors.subText, letterSpacing: 0.8)),
+              Text('RELATIONSHIP', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: context.vita.subText, letterSpacing: 0.8)),
               const SizedBox(height: 10),
               VitaCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Who is she to you?', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: VitaColors.text)),
+                    Text('Who is she to you?', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: context.vita.text)),
                     const SizedBox(height: 10),
                     _chipRow(_genders, _gender, (g) => setState(() => _gender = g)),
                     const SizedBox(height: 18),
-                    const Text('How close are you?', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: VitaColors.text)),
+                    Text('How close are you?', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: context.vita.text)),
                     const SizedBox(height: 10),
                     _chipRow(_stages, _relationship, (s) => setState(() => _relationship = s)),
                   ],

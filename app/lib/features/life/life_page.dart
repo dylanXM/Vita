@@ -65,8 +65,10 @@ class LifePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final ctrl = LifeController.to;
     return Scaffold(
-      backgroundColor: VitaColors.pageBg,
+      backgroundColor: context.vita.pageBg,
+      // Bottom is open so the timeline scrolls behind the glass tab bar.
       body: SafeArea(
+        bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -102,6 +104,7 @@ class LifePage extends StatelessWidget {
     }
     if (ctrl.loading.value && ctrl.events.isEmpty) {
       return ListView.builder(
+        padding: const EdgeInsets.only(bottom: 90),
         itemCount: 4,
         itemBuilder: (_, __) => const VitaSkeletonCard(withAvatar: false),
       );
@@ -114,7 +117,7 @@ class LifePage extends StatelessWidget {
       );
     }
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 90),
       itemCount: ctrl.events.length,
       itemBuilder: (context, i) {
         final e = ctrl.events[i];
@@ -131,15 +134,15 @@ class LifePage extends StatelessWidget {
                 width: 48,
                 child: Column(
                   children: [
-                    Text(when, textAlign: TextAlign.right, style: const TextStyle(fontSize: 11.5, color: VitaColors.subText)),
+                    Text(when, textAlign: TextAlign.right, style: TextStyle(fontSize: 11.5, color: context.vita.subText)),
                     const SizedBox(height: 6),
                     Container(
                       width: 10,
                       height: 10,
-                      decoration: const BoxDecoration(color: VitaColors.green, shape: BoxShape.circle),
+                      decoration: BoxDecoration(color: context.vita.green, shape: BoxShape.circle),
                     ),
                     if (i != ctrl.events.length - 1)
-                      Expanded(child: Container(width: 2, margin: const EdgeInsets.only(top: 4), color: VitaColors.divider)),
+                      Expanded(child: Container(width: 2, margin: const EdgeInsets.only(top: 4), color: context.vita.divider)),
                   ],
                 ),
               ),
@@ -151,28 +154,28 @@ class LifePage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: VitaColors.text)),
+                      Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: context.vita.text)),
                       if (desc.isNotEmpty) ...[
                         const SizedBox(height: 5),
-                        Text(desc, style: const TextStyle(fontSize: 13, color: VitaColors.subText, height: 1.5)),
+                        Text(desc, style: TextStyle(fontSize: 13, color: context.vita.subText, height: 1.5)),
                       ],
                       if (loc.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                           decoration: BoxDecoration(
-                            color: VitaColors.pageBg,
+                            color: context.vita.pageBg,
                             borderRadius: BorderRadius.circular(VitaRadius.pill),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.place_outlined, size: 13, color: VitaColors.subText),
+                              Icon(Icons.place_outlined, size: 13, color: context.vita.subText),
                               const SizedBox(width: 4),
                               Flexible(
                                 child: Text(
                                   loc,
-                                  style: const TextStyle(fontSize: 12, color: VitaColors.subText),
+                                  style: TextStyle(fontSize: 12, color: context.vita.subText),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
