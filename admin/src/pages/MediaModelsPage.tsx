@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
+import { compatibleMediaModels, normalizeMediaRoutesForSave, selectedMediaModelIDs } from "./media-model-routes";
 
 const groups: Array<{ type: MediaModelType; icon: typeof Image }> = [
   { type: "image", icon: Image },
@@ -25,7 +26,7 @@ export function MediaModelsPage() {
   const [routes, setRoutes] = useState<MediaModelRoute[]>([]);
   useEffect(() => { if (query.data) setRoutes(query.data.routes); }, [query.data]);
   const save = useMutation({
-    mutationFn: () => agentApi.saveMediaRoutes(routes),
+    mutationFn: () => agentApi.saveMediaRoutes(normalizeMediaRoutesForSave(routes)),
     onSuccess: (data) => {
       setRoutes(data.routes);
       toast.success(t("mediaModels.saved"));
@@ -55,8 +56,8 @@ export function MediaModelsPage() {
 
 function RouteEditor({ route, models, onChange }: { route: MediaModelRoute; models: AIModel[]; onChange: (route: MediaModelRoute) => void }) {
   const { t } = useTranslation();
-  const candidates = useMemo(() => models.filter((model) => model.enabled && model.capabilities.includes(route.media_type)), [models, route.media_type]);
-  const selected = new Set([route.primary_model_id, ...route.fallback_model_ids].filter(Boolean));
+  const candidates = useMemo(() => compatibleMediaModels(models, route), [models, route]);
+  const selected = selectedMediaModelIDs(route);
   const modelSelect = (value: string | null, onSelect: (id: string | null) => void) => (
     <select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={value ?? ""} onChange={(event) => onSelect(event.target.value || null)}>
       <option value="">{t("mediaModels.notSelected")}</option>

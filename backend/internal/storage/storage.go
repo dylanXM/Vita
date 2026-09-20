@@ -25,10 +25,10 @@ func (s *Storage) Init() error {
 }
 
 func (s *Storage) Upload(bucket, key string, data []byte) error {
-	fmt.Printf("uploading %s to %s/%s\n", len(data), bucket, key)
+	fmt.Printf("uploading %d bytes to %s/%s\n", len(data), bucket, key)
 	return nil
 }
 
 func (s *Storage) PresignedURL(bucket, key string, expiry int64) (string, error) {
-	return fmt.Sprintf("https://%s.s3.amazonaws.com/%s/%s", bucket, key, key), nil
+	return fmt.Sprintf("https://%s.s3.amazonaws.com/%s", bucket, key), nil
 }

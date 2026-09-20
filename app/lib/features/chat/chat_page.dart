@@ -13,6 +13,7 @@ import '../../shared/widgets.dart';
 import '../life/life_page.dart';
 import '../shell/shell_page.dart';
 import 'chat_controller.dart';
+import 'chat_message_content.dart';
 import 'experience_sheet.dart';
 
 /// Chat detail page — message bubbles (user right / companion left),
@@ -410,7 +411,6 @@ class _ChatPageState extends State<ChatPage> {
       prevDate = dt;
 
       final isUser = m['sender_type'] == 'user';
-      final content = m['content'] as String? ?? '';
       items.add(
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
@@ -444,7 +444,6 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                   child: _ChatMessageBody(
                     message: m,
-                    content: content,
                     companionId: widget.companionId,
                     onPlayVoice: _playVoice,
                   ),
@@ -537,27 +536,24 @@ class _ChatPageState extends State<ChatPage> {
 class _ChatMessageBody extends StatelessWidget {
   const _ChatMessageBody({
     required this.message,
-    required this.content,
     required this.companionId,
     required this.onPlayVoice,
   });
 
   final Map<String, dynamic> message;
-  final String content;
   final String companionId;
   final ValueChanged<String> onPlayVoice;
 
   @override
   Widget build(BuildContext context) {
-    final type = message['message_type'] as String? ?? 'text';
-    final payload = message['payload'] is Map
-        ? Map<String, dynamic>.from(message['payload'] as Map)
-        : const <String, dynamic>{};
-    final mediaURL = message['media_url'] as String? ?? '';
-    final source = message['source'] as String? ?? '';
-    final displayContent = source.startsWith('paid_') ? content.tr : content;
+    final parsed = ChatMessageContent.from(message);
+    final type = parsed.type;
+    final payload = parsed.payload;
+    final mediaURL = parsed.mediaUrl;
+    final displayContent =
+        parsed.contentIsTranslationKey ? parsed.text.tr : parsed.text;
     final children = <Widget>[];
-    if (type == 'voice' && mediaURL.isNotEmpty) {
+    if (parsed.mediaKind == ChatMediaKind.voice) {
       children.add(InkWell(
         onTap: () => onPlayVoice(mediaURL),
         borderRadius: BorderRadius.circular(20),
@@ -571,7 +567,7 @@ class _ChatMessageBody extends StatelessWidget {
           ]),
         ),
       ));
-    } else if (mediaURL.isNotEmpty) {
+    } else if (parsed.mediaKind == ChatMediaKind.image) {
       children.add(ClipRRect(
         borderRadius: BorderRadius.circular(6),
         child: AspectRatio(

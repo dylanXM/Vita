@@ -1720,6 +1720,9 @@ func (s *Service) getOrCreateConversation(ctx context.Context, userID, companion
 }
 
 func (s *Service) recordRun(ctx context.Context, companionID, kind, modelID, status, runError string) {
+	if s.db == nil {
+		return
+	}
 	_, _ = s.db.ExecContext(ctx, `
 		INSERT INTO agent_runs (id, companion_id, kind, model_id, status, error, finished_at)
 		VALUES ($1,NULLIF($2,''),$3,NULLIF($4,''),$5,$6,CURRENT_TIMESTAMP)`,

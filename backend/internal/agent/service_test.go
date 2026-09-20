@@ -1,10 +1,44 @@
 package agent
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestGenerateImageUsesFallbackInConfiguredOrder(t *testing.T) {
+	primaryCalls := 0
+	primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		primaryCalls++
+		http.Error(w, "primary unavailable", http.StatusServiceUnavailable)
+	}))
+	defer primary.Close()
+	backupCalls := 0
+	backup := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		backupCalls++
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": []any{map[string]any{"url": "https://cdn.example/fallback.png"}}})
+	}))
+	defer backup.Close()
+
+	service := &Service{client: NewClient()}
+	url, used, err := service.generateImageWithFallback(context.Background(), "companion", "life_photo", []Model{
+		{ID: "primary", Kind: "openai", BaseURL: primary.URL, ModelName: "primary"},
+		{ID: "backup", Kind: "openai", BaseURL: backup.URL, ModelName: "backup"},
+	}, GenerateImageRequest{Prompt: "ordinary life photo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if url != "https://cdn.example/fallback.png" || used.ID != "backup" {
+		t.Fatalf("url = %q, model = %q", url, used.ID)
+	}
+	if primaryCalls != 1 || backupCalls != 1 {
+		t.Fatalf("calls primary=%d backup=%d", primaryCalls, backupCalls)
+	}
+}
 
 func TestParseLifePlanFromFence(t *testing.T) {
 	events, err := parseLifePlan("```json\n[{\"type\":\"meal\",\"title\":\"Lunch\"}]\n```")
