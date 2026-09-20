@@ -13,6 +13,7 @@ class VitaAvatar extends StatelessWidget {
     this.background,
     this.textColor,
     this.imageUrl,
+    this.borderRadius,
   });
 
   final String name;
@@ -23,6 +24,9 @@ class VitaAvatar extends StatelessWidget {
   final Color? textColor;
   final String? imageUrl;
 
+  /// When non-null, render a rounded-square avatar instead of a circle.
+  final BorderRadius? borderRadius;
+
   @override
   Widget build(BuildContext context) {
     final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
@@ -32,6 +36,29 @@ class VitaAvatar extends StatelessWidget {
         : source.isNotEmpty
             ? NetworkImage(source)
             : null;
+    if (borderRadius != null) {
+      final size = radius * 2;
+      return ClipRRect(
+        borderRadius: borderRadius!,
+        child: Container(
+          width: size,
+          height: size,
+          color: background ?? context.vita.green.withValues(alpha: 0.18),
+          child: image != null
+              ? Image(image: image, fit: BoxFit.cover)
+              : Center(
+                  child: Text(
+                    initial,
+                    style: TextStyle(
+                      color: textColor ?? context.vita.green,
+                      fontSize: radius * 0.9,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+        ),
+      );
+    }
     return CircleAvatar(
       radius: radius,
       backgroundColor: background ?? context.vita.green.withValues(alpha: 0.18),

@@ -200,11 +200,12 @@ class _ContactTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
           child: Row(
             children: [
-              // WeChat-sized avatar: 40pt circle.
+              // WeChat-sized rounded-square avatar: 40x40.
               VitaAvatar(
                 name: name,
                 radius: 20,
                 imageUrl: companion['portrait_url'] as String?,
+                borderRadius: BorderRadius.circular(10),
               ),
               const SizedBox(width: 12),
               Expanded(

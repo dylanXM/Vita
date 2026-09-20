@@ -122,7 +122,8 @@ class ChatListPage extends StatelessWidget {
                 VitaAvatar(
                     name: name,
                     radius: 26,
-                    imageUrl: c['portrait_url'] as String?),
+                    imageUrl: c['portrait_url'] as String?,
+                    borderRadius: BorderRadius.circular(12)),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
