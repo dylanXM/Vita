@@ -18,6 +18,8 @@ yarn-error.log*
 .env.*.local
 backend/.env
 deploy/.env
+deploy/.env.beta
+deploy/.env.prod
 admin/.env
 webapp/.env
 website/.env
