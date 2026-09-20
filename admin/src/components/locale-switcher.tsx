@@ -10,7 +10,7 @@ import {
 import { setLocale, SUPPORTED_LOCALES, LOCALE_LABELS, type SupportedLocale } from "@/i18n";
 import { cn } from "@/lib/utils";
 
-/** Header language picker — eight locales, each labelled in its own language. */
+/** Header language picker — Admin supports English and Simplified Chinese. */
 export function LocaleSwitcher() {
   const { t, i18n } = useTranslation();
   const current = ((i18n.resolvedLanguage || i18n.language) as SupportedLocale) || "en";

@@ -163,6 +163,7 @@ func main() {
 		// Current account — used by the admin dashboard to rehydrate a stored
 		// session and to verify the account has the admin role.
 		api.GET("/me", middleware.RequireAuth(), handler.Me)
+		api.PUT("/me/locale", middleware.RequireAuth(), handler.UpdateMyLocale)
 
 		admin := api.Group("/admin", middleware.RequireAdmin())
 		{

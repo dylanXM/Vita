@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import 'constants.dart';
+import 'supported_locales.dart';
 import 'token_storage.dart';
 
 /// Thin wrapper around Dio: injects the bearer token and turns transport
@@ -47,7 +48,8 @@ class ApiClient {
             _ => 'web',
           };
           options.headers['X-Vita-App-Version'] = vitaAppVersion;
-          options.headers['Accept-Language'] = Get.locale?.languageCode ?? 'en';
+          options.headers['Accept-Language'] =
+              vitaLocaleTag(Get.locale ?? vitaSupportedLocales[1]);
           handler.next(options);
         },
       ),
@@ -67,6 +69,15 @@ class ApiClient {
   Future<dynamic> post(String path, {Map<String, dynamic>? data}) async {
     try {
       final r = await dio.post(path, data: data);
+      return r.data;
+    } on DioException catch (e) {
+      throw _exception(e);
+    }
+  }
+
+  Future<dynamic> put(String path, {Map<String, dynamic>? data}) async {
+    try {
+      final r = await dio.put(path, data: data);
       return r.data;
     } on DioException catch (e) {
       throw _exception(e);

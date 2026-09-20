@@ -72,7 +72,7 @@ class _SplashPageState extends State<SplashPage> {
             ),
             SizedBox(height: 6),
             Text(
-              'A companion who lives somewhere else',
+              'auth.tagline'.tr,
               style: TextStyle(fontSize: 13, color: context.vita.subText),
             ),
           ],

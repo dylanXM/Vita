@@ -79,9 +79,9 @@ class MemoriesPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const VitaTabHeader(
-              title: 'Memories',
-              subtitle: 'Moments you keep together',
+            VitaTabHeader(
+              title: 'memories.title'.tr,
+              subtitle: 'memories.subtitle'.tr,
             ),
             Obx(() {
               if (ctrl.companions.isEmpty) return const SizedBox.shrink();
@@ -103,10 +103,10 @@ class MemoriesPage extends StatelessWidget {
 
   Widget _buildBody(MemoriesController ctrl) {
     if (ctrl.companions.isEmpty) {
-      return const VitaEmpty(
+      return VitaEmpty(
         icon: Icons.star_border,
-        title: 'Create a companion first',
-        subtitle: 'Memories grow out of shared experiences',
+        title: 'memories.createFirst'.tr,
+        subtitle: 'memories.createFirstSub'.tr,
       );
     }
     if (ctrl.loading.value && ctrl.memories.isEmpty) {
@@ -117,10 +117,10 @@ class MemoriesPage extends StatelessWidget {
       );
     }
     if (ctrl.memories.isEmpty) {
-      return const VitaEmpty(
+      return VitaEmpty(
         icon: Icons.star_border,
-        title: 'No memories yet',
-        subtitle: 'Shared moments will appear here over time',
+        title: 'memories.empty'.tr,
+        subtitle: 'memories.emptySub'.tr,
       );
     }
     return ListView.separated(

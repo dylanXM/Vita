@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 import '../core/theme.dart';
 
@@ -452,23 +453,9 @@ String formatClock(DateTime t) {
   return '$h:$m';
 }
 
-/// Formats a timestamp as a short date (Sep 19).
+/// Formats a timestamp without an English-only month abbreviation.
 String formatDate(DateTime t) {
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  return '${months[t.month - 1]} ${t.day}';
+  return '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}';
 }
 
 /// "Today" / "Yesterday" / short date — for chat date separators.
@@ -477,8 +464,8 @@ String formatDateSeparator(DateTime t) {
   final today = DateTime(now.year, now.month, now.day);
   final day = DateTime(t.year, t.month, t.day);
   final diff = today.difference(day).inDays;
-  if (diff == 0) return 'Today';
-  if (diff == 1) return 'Yesterday';
+  if (diff == 0) return 'common.today'.tr;
+  if (diff == 1) return 'common.yesterday'.tr;
   return formatDate(t);
 }
 

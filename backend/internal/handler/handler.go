@@ -20,6 +20,7 @@ import (
 	"vita/internal/auth"
 	"vita/internal/config"
 	"vita/internal/db"
+	"vita/internal/language"
 	"vita/internal/mail"
 )
 
@@ -397,6 +398,7 @@ type ProfileResponse struct {
 	Role       string    `json:"role"`
 	Timezone   string    `json:"timezone"`
 	InviteCode string    `json:"invite_code"`
+	Locale     string    `json:"locale"`
 	CreatedAt  time.Time `json:"created_at"`
 }
 
@@ -411,14 +413,30 @@ func Me(c *gin.Context) {
 
 	var p ProfileResponse
 	err := db.Get().QueryRow(
-		`SELECT id, email, COALESCE(role_id, 'user'), COALESCE(timezone, 'UTC'), invite_code, created_at FROM users WHERE id = $1`,
-		userID).Scan(&p.UserID, &p.Email, &p.Role, &p.Timezone, &p.InviteCode, &p.CreatedAt)
+		`SELECT id, email, COALESCE(role_id, 'user'), COALESCE(timezone, 'UTC'), invite_code, preferred_locale, created_at FROM users WHERE id = $1`,
+		userID).Scan(&p.UserID, &p.Email, &p.Role, &p.Timezone, &p.InviteCode, &p.Locale, &p.CreatedAt)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "account not found"})
 		return
 	}
 
 	c.JSON(http.StatusOK, p)
+}
+
+func UpdateMyLocale(c *gin.Context) {
+	var input struct {
+		Locale string `json:"locale" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "locale is required"})
+		return
+	}
+	locale := language.Normalize(input.Locale)
+	if _, err := db.Get().Exec(`UPDATE users SET preferred_locale=$1,updated_at=CURRENT_TIMESTAMP WHERE id=$2`, locale, c.GetString("user_id")); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update locale"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"locale": locale})
 }
 
 // --- Admin Stats ---
@@ -1024,6 +1042,8 @@ func SendMessage(c *gin.Context) {
 		}
 	}
 	createdAt := time.Now().UTC()
+	appLocale := language.Normalize(c.GetHeader("Accept-Language"))
+	_, _ = db.Get().Exec(`UPDATE users SET preferred_locale=$1,updated_at=CURRENT_TIMESTAMP WHERE id=$2`, appLocale, userID)
 	query := `INSERT INTO messages (id,conversation_id,sender_type,message_type,content,payload,source,delivery_status,created_at) VALUES ($1,$2,'user',$3,$4,'{}'::jsonb,'user','delivered',$5)`
 	_, err := db.Get().Exec(query, msgID, conversationID, req.MessageType, req.Content, createdAt)
 	if err != nil {

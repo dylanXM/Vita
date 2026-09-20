@@ -65,10 +65,10 @@ class _RegisterPageState extends State<RegisterPage> {
       );
       setState(() => _step = 2);
       _startCountdown();
-      Get.snackbar('Check your inbox',
-          'We sent a verification code to ${_email.text.trim()}');
+      Get.snackbar('auth.checkInbox'.tr,
+          'auth.codeSentTo'.trParams({'email': _email.text.trim()}));
     } catch (e) {
-      Get.snackbar('Failed to send code', '$e');
+      Get.snackbar('auth.sendCodeFailed'.tr, '$e');
     }
   }
 
@@ -81,10 +81,10 @@ class _RegisterPageState extends State<RegisterPage> {
         _inviteCode.text,
       );
       _startCountdown();
-      Get.snackbar('Check your inbox',
-          'We sent a verification code to ${_email.text.trim()}');
+      Get.snackbar('auth.checkInbox'.tr,
+          'auth.codeSentTo'.trParams({'email': _email.text.trim()}));
     } catch (e) {
-      Get.snackbar('Failed to send code', '$e');
+      Get.snackbar('auth.sendCodeFailed'.tr, '$e');
     }
   }
 
@@ -96,7 +96,7 @@ class _RegisterPageState extends State<RegisterPage> {
           .verifyRegistration(_email.text.trim(), _code.text.trim());
       Get.offAllNamed('/shell');
     } catch (e) {
-      Get.snackbar('Verification failed', '$e');
+      Get.snackbar('auth.verificationFailed'.tr, '$e');
     }
   }
 
@@ -131,7 +131,7 @@ class _RegisterPageState extends State<RegisterPage> {
               if (_step == 1) ...[
                 const SizedBox(height: 20),
                 Text(
-                  'Create account',
+                  'auth.createAccount'.tr,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                       fontSize: 26,
@@ -140,7 +140,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Sign up with your email and a password',
+                  'auth.signupSubtitle'.tr,
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13.5, color: context.vita.subText),
                 ),
@@ -150,7 +150,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   keyboardType: TextInputType.emailAddress,
                   autocorrect: false,
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(hintText: 'Email'),
+                  decoration: InputDecoration(hintText: 'auth.email'.tr),
                 ),
                 const SizedBox(height: 14),
                 TextField(
@@ -159,7 +159,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   autocorrect: false,
                   onSubmitted: (_) => _sendCode(),
                   decoration: InputDecoration(
-                    hintText: 'Password (at least 6 characters)',
+                    hintText: 'auth.passwordHint'.tr,
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword
@@ -199,7 +199,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: Colors.white),
                           )
-                        : const Text('Get verification code'),
+                        : Text('auth.getCode'.tr),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -207,14 +207,14 @@ class _RegisterPageState extends State<RegisterPage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'Already have an account? ',
+                      'auth.alreadyAccount'.tr,
                       style: TextStyle(
                           fontSize: 13.5, color: context.vita.subText),
                     ),
                     TextButton(
                       onPressed: () => Get.back(),
                       child: Text(
-                        'Login',
+                        'auth.login'.tr,
                         style: TextStyle(
                             color: context.vita.green,
                             fontSize: 13.5,
@@ -226,7 +226,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ] else ...[
                 const SizedBox(height: 20),
                 Text(
-                  'Verify your email',
+                  'auth.verifyEmail'.tr,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                       fontSize: 26,
@@ -235,7 +235,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'We sent a 6-digit code to ${_email.text.trim()}',
+                  'auth.sixDigitSent'.trParams({'email': _email.text.trim()}),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13.5, color: context.vita.subText),
                 ),
@@ -278,8 +278,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             : _resendCode,
                     child: Text(
                       _countdown > 0
-                          ? 'Resend in $_countdown s'
-                          : 'Resend code',
+                          ? 'auth.resendIn'.trParams({'seconds': '$_countdown'})
+                          : 'auth.resendCode'.tr,
                       style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w600,
@@ -304,12 +304,12 @@ class _RegisterPageState extends State<RegisterPage> {
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: Colors.white),
                           )
-                        : const Text('Verify and sign in'),
+                        : Text('auth.verifySignIn'.tr),
                   ),
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  "Didn't get the code? Check your spam folder.",
+                  'auth.spamHint'.tr,
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: context.vita.hint),
                 ),

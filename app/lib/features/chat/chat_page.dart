@@ -141,22 +141,22 @@ class _ChatPageState extends State<ChatPage> {
               const SizedBox(height: 24),
               _SheetInfoRow(
                   icon: Icons.place_outlined,
-                  label: 'City',
+                  label: 'chat.city'.tr,
                   value: c['city'] as String? ?? ''),
               const SizedBox(height: 4),
               _SheetInfoRow(
                   icon: Icons.work_outline,
-                  label: 'Occupation',
+                  label: 'chat.occupation'.tr,
                   value: c['occupation'] as String? ?? ''),
               const SizedBox(height: 4),
               _SheetInfoRow(
                   icon: Icons.favorite_outline,
-                  label: 'Interests',
+                  label: 'chat.interests'.tr,
                   value: c['interests'] as String? ?? ''),
               const SizedBox(height: 4),
               _SheetInfoRow(
                   icon: Icons.explore,
-                  label: 'Relationship',
+                  label: 'chat.relationship'.tr,
                   value: (c['relationship_stage'] as String?)?.toUpperCase() ??
                       ''),
               if (c['is_default'] != true) ...[
@@ -253,10 +253,10 @@ class _ChatPageState extends State<ChatPage> {
           child: VitaSkeleton(width: 220, height: 44, radius: 14));
     }
     if (ctrl.messages.isEmpty) {
-      return const VitaEmpty(
+      return VitaEmpty(
         icon: Icons.chat_bubble_outline,
-        title: 'Say hello',
-        subtitle: 'Start the conversation with your companion',
+        title: 'chat.sayHello'.tr,
+        subtitle: 'chat.sayHelloSub'.tr,
       );
     }
 
@@ -363,7 +363,7 @@ class _ChatPageState extends State<ChatPage> {
               style: TextStyle(
                   fontSize: 16, color: context.vita.text, height: 1.4),
               decoration: InputDecoration(
-                hintText: locked ? 'chat.cannotSend'.tr : 'Message',
+                hintText: locked ? 'chat.cannotSend'.tr : 'chat.message'.tr,
                 hintStyle: TextStyle(color: context.vita.hint, fontSize: 15),
                 filled: true,
                 fillColor: context.vita.surface,

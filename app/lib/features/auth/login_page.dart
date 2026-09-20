@@ -35,7 +35,7 @@ class _LoginPageState extends State<LoginPage> {
       await AuthController.to.login(_email.text.trim(), _password.text);
       Get.offAllNamed('/shell');
     } catch (e) {
-      Get.snackbar('Login failed', '$e');
+      Get.snackbar('auth.loginFailed'.tr, '$e');
     }
   }
 
@@ -44,7 +44,7 @@ class _LoginPageState extends State<LoginPage> {
       await AuthController.to.loginWithGoogle();
       Get.offAllNamed('/shell');
     } catch (e) {
-      Get.snackbar('Google sign-in failed', '$e');
+      Get.snackbar('auth.googleFailed'.tr, '$e');
     }
   }
 
@@ -85,7 +85,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 8),
               Text(
-                'A companion who lives somewhere else',
+                'auth.tagline'.tr,
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 14, color: context.vita.subText),
               ),
@@ -95,7 +95,7 @@ class _LoginPageState extends State<LoginPage> {
                 keyboardType: TextInputType.emailAddress,
                 autocorrect: false,
                 textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(hintText: 'Email'),
+                decoration: InputDecoration(hintText: 'auth.email'.tr),
               ),
               const SizedBox(height: 14),
               TextField(
@@ -104,7 +104,7 @@ class _LoginPageState extends State<LoginPage> {
                 autocorrect: false,
                 onSubmitted: (_) => _login(),
                 decoration: InputDecoration(
-                  hintText: 'Password',
+                  hintText: 'auth.password'.tr,
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscurePassword
@@ -131,7 +131,7 @@ class _LoginPageState extends State<LoginPage> {
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: Colors.white),
                         )
-                      : const Text('Login'),
+                      : Text('auth.login'.tr),
                 ),
               ),
               const SizedBox(height: 24),
@@ -140,7 +140,7 @@ class _LoginPageState extends State<LoginPage> {
                   const Expanded(child: Divider()),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text('or',
+                    child: Text('auth.or'.tr,
                         style: TextStyle(
                             color: context.vita.subText.withValues(alpha: 0.8),
                             fontSize: 13)),
@@ -153,7 +153,7 @@ class _LoginPageState extends State<LoginPage> {
                 onPressed: _googleLogin,
                 icon: Icon(Icons.g_mobiledata,
                     color: context.vita.text, size: 26),
-                label: const Text('Continue with Google'),
+                label: Text('auth.continueGoogle'.tr),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: context.vita.text,
                   side: BorderSide(color: context.vita.divider),
@@ -167,14 +167,14 @@ class _LoginPageState extends State<LoginPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'No account yet? ',
+                    'auth.noAccount'.tr,
                     style:
                         TextStyle(fontSize: 13.5, color: context.vita.subText),
                   ),
                   TextButton(
                     onPressed: () => Get.toNamed('/register'),
                     child: Text(
-                      'Register',
+                      'auth.register'.tr,
                       style: TextStyle(
                           color: context.vita.green,
                           fontSize: 13.5,

@@ -60,8 +60,8 @@ class ChatListPage extends StatelessWidget {
     if (ctrl.companions.isEmpty) {
       return VitaEmpty(
         icon: Icons.favorite_border,
-        title: 'No companion yet',
-        subtitle: 'Create your companion to start the conversation',
+        title: 'chat.empty.title'.tr,
+        subtitle: 'chat.empty.sub'.tr,
       );
     }
     return ListView.separated(

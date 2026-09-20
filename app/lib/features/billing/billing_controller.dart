@@ -94,7 +94,7 @@ class BillingController extends GetxController {
             'package_id': pkg.identifier,
             'product_id': pkg.storeProduct.identifier
           });
-      Get.snackbar('Vita', 'Purchase successful');
+      Get.snackbar('Vita', 'billing.purchaseSuccess'.tr);
     } catch (e) {
       // RevenueCat errors include the user cancelling the sheet; only surface
       // real failures.
@@ -109,7 +109,7 @@ class BillingController extends GetxController {
             'product_id': pkg.storeProduct.identifier
           });
       if (!msg.toLowerCase().contains('cancel')) {
-        Get.snackbar('Purchase failed', msg);
+        Get.snackbar('billing.purchaseFailed'.tr, msg);
       }
     } finally {
       busy.value = false;
@@ -126,10 +126,10 @@ class BillingController extends GetxController {
       await ChatListController.to.load();
       AnalyticsService.to
           .track('purchase_restore_succeeded', category: 'billing');
-      Get.snackbar('Vita', 'Purchases restored');
+      Get.snackbar('Vita', 'billing.restored'.tr);
     } catch (e) {
       AnalyticsService.to.track('purchase_restore_failed', category: 'billing');
-      Get.snackbar('Restore failed', '$e');
+      Get.snackbar('billing.restoreFailed'.tr, '$e');
     } finally {
       busy.value = false;
     }

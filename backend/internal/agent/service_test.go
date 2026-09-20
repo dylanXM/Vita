@@ -52,6 +52,30 @@ func TestSystemBoundaryRejectsManipulation(t *testing.T) {
 	}
 }
 
+func TestResponseLanguagePolicy(t *testing.T) {
+	policy := responseLanguagePolicy("¿Cómo estás?", "zh-Hant")
+	for _, value := range []string{"Spanish (es)", "unsupported, mixed, or ambiguous", "zh-Hant", "¿Cómo estás?"} {
+		if !strings.Contains(policy, value) {
+			t.Fatalf("language policy missing %q", value)
+		}
+	}
+}
+
+func TestDetectSupportedLocale(t *testing.T) {
+	tests := map[string]string{
+		"مرحبا": "ar", "Hola, ¿cómo estás?": "es", "こんにちは": "ja", "안녕하세요": "ko",
+		"Olá, como você está?": "pt", "今天怎么样": "zh-Hans", "今天過得怎麼樣": "zh-Hant", "Привет": "en",
+	}
+	for text, want := range tests {
+		if got := detectSupportedLocale(text, "ja"); got != want {
+			t.Fatalf("detectSupportedLocale(%q) = %q, want %q", text, got, want)
+		}
+	}
+	if got := detectSupportedLocale("", "pt-BR"); got != "pt" {
+		t.Fatalf("empty message fallback = %q", got)
+	}
+}
+
 func TestClassifyMemory(t *testing.T) {
 	kind, importance, keep := classifyMemory("我下周有一个面试")
 	if !keep || kind != "user_plan" || importance != 80 {

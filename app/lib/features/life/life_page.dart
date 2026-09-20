@@ -80,9 +80,9 @@ class LifePage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const VitaTabHeader(
-              title: 'Life',
-              subtitle: 'Her day, moment by moment',
+            VitaTabHeader(
+              title: 'life.title'.tr,
+              subtitle: 'life.subtitle'.tr,
             ),
             Obx(() {
               if (ctrl.companions.isEmpty) return const SizedBox.shrink();
@@ -104,10 +104,10 @@ class LifePage extends StatelessWidget {
 
   Widget _buildBody(LifeController ctrl) {
     if (ctrl.companions.isEmpty) {
-      return const VitaEmpty(
+      return VitaEmpty(
         icon: Icons.photo_library_outlined,
-        title: 'Create a companion first',
-        subtitle: 'Life shows the day of someone who lives somewhere else',
+        title: 'life.createFirst'.tr,
+        subtitle: 'life.createFirstSub'.tr,
       );
     }
     if (ctrl.loading.value && ctrl.events.isEmpty) {
@@ -118,10 +118,10 @@ class LifePage extends StatelessWidget {
       );
     }
     if (ctrl.events.isEmpty) {
-      return const VitaEmpty(
+      return VitaEmpty(
         icon: Icons.schedule,
-        title: 'No life events yet today',
-        subtitle: 'The Life Engine will fill this timeline soon',
+        title: 'life.empty'.tr,
+        subtitle: 'life.emptySub'.tr,
       );
     }
     return ListView.builder(

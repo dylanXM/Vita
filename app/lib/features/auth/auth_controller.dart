@@ -5,6 +5,7 @@ import '../../core/api_client.dart';
 import '../../core/analytics_service.dart';
 import '../../core/constants.dart';
 import '../../core/push_notification_service.dart';
+import '../../core/settings_controller.dart';
 import '../../core/token_storage.dart';
 
 /// Auth state: email + password login, two-step email registration
@@ -122,6 +123,7 @@ class AuthController extends GetxController {
   Future<void> fetchProfile() async {
     profile.value =
         await ApiClient.instance.get('/v1/me') as Map<String, dynamic>?;
+    await VitaSettingsController.to.syncLocale();
   }
 
   String get email => profile.value?['email'] as String? ?? '';

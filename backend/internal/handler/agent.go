@@ -13,6 +13,7 @@ import (
 
 	"vita/internal/agent"
 	"vita/internal/db"
+	"vita/internal/language"
 )
 
 var companionAgent *agent.Service
@@ -364,6 +365,9 @@ func RegisterPushToken(c *gin.Context) {
 		last_seen_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP`,
 		uuid.New().String(), c.GetString("user_id"), input.Token, input.Platform,
 		strings.TrimSpace(input.DeviceID), strings.TrimSpace(input.Locale))
+	if err == nil {
+		_, err = tx.ExecContext(c.Request.Context(), `UPDATE users SET preferred_locale=$1,updated_at=CURRENT_TIMESTAMP WHERE id=$2`, language.Normalize(input.Locale), c.GetString("user_id"))
+	}
 	if err == nil {
 		_, err = tx.ExecContext(c.Request.Context(), `
 			UPDATE notification_outbox SET available_at=CURRENT_TIMESTAMP,last_error=''

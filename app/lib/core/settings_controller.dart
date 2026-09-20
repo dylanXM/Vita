@@ -4,10 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'api_client.dart';
+import 'supported_locales.dart';
+
 /// App-wide user preferences: language and theme.
 ///
 /// Both default to "follow the phone": the language resolves to the device
-/// language (Chinese device → 简体中文, anything else → English) and the
+/// language (one of Vita's eight languages, otherwise English) and the
 /// theme follows the system light/dark mode. Explicit user choices are
 /// persisted and survive relaunches.
 class VitaSettingsController extends GetxController {
@@ -17,7 +20,7 @@ class VitaSettingsController extends GetxController {
   static const _localeKey = 'vita_locale';
 
   /// Languages the app ships.
-  static const List<Locale> supportedLocales = [Locale('en'), Locale('zh')];
+  static const List<Locale> supportedLocales = vitaSupportedLocales;
 
   /// null → follow the phone's appearance (default).
   final Rxn<ThemeMode> themeMode = Rxn<ThemeMode>();
@@ -47,8 +50,7 @@ class VitaSettingsController extends GetxController {
     }
     final lang = prefs.getString(_localeKey);
     if (lang != null) {
-      locale.value =
-          supportedLocales.firstWhereOrNull((l) => l.languageCode == lang);
+      locale.value = vitaLocaleFromTag(lang);
     }
     // GetX resolves .tr through the static Get.locale, so even in
     // "follow system" mode we pin it to a concrete supported locale.
@@ -60,9 +62,7 @@ class VitaSettingsController extends GetxController {
   /// language when following the phone.
   Locale get effectiveLocale {
     if (locale.value != null) return locale.value!;
-    final device = Get.deviceLocale;
-    final lang = (device?.languageCode ?? 'en').toLowerCase();
-    return lang.startsWith('zh') ? const Locale('zh') : const Locale('en');
+    return vitaLocaleForDevice(Get.deviceLocale);
   }
 
   /// The theme mode applied to the app: explicit choice or [ThemeMode.system].
@@ -78,10 +78,22 @@ class VitaSettingsController extends GetxController {
 
   void setLocale(Locale? value) {
     locale.value = value;
-    _persist(_localeKey, value?.languageCode);
+    _persist(_localeKey, value == null ? null : vitaLocaleTag(value));
     // forceAppUpdate() re-runs every `tr` call site with the new locale.
     Get.updateLocale(effectiveLocale);
     _changed();
+    unawaited(syncLocale());
+  }
+
+  Future<void> syncLocale() async {
+    try {
+      await ApiClient.instance.put('/v1/me/locale', data: {
+        'locale': vitaLocaleTag(effectiveLocale),
+      });
+    } catch (_) {
+      // Authentication may not be ready yet. AuthController retries after
+      // every successful login/registration.
+    }
   }
 
   Future<void> _persist(String key, String? value) async {

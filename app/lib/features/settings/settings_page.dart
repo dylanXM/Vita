@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/settings_controller.dart';
+import '../../core/supported_locales.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../auth/auth_controller.dart';
@@ -175,8 +176,19 @@ class SettingsPage extends StatelessWidget {
 /// Current language display name (each language shown in its own language).
 String _langLabel(BuildContext context, Locale? selected) {
   if (selected == null) return 'lang.system'.tr;
-  return selected.languageCode == 'zh' ? 'lang.chinese'.tr : 'lang.english'.tr;
+  return _languageLabelKey(vitaLocaleTag(selected)).tr;
 }
+
+String _languageLabelKey(String tag) => switch (tag) {
+      'ar' => 'lang.arabic',
+      'es' => 'lang.spanish',
+      'ja' => 'lang.japanese',
+      'ko' => 'lang.korean',
+      'pt' => 'lang.portuguese',
+      'zh-Hans' => 'lang.chineseSimplified',
+      'zh-Hant' => 'lang.chineseTraditional',
+      _ => 'lang.english',
+    };
 
 /// Current theme display name.
 String _themeLabel(BuildContext context, ThemeMode? mode) {
@@ -271,7 +283,7 @@ class _OptionRow extends StatelessWidget {
   }
 }
 
-/// Language picker — system default, English, 简体中文.
+/// Language picker — system default plus all eight App languages.
 class LanguagePage extends StatelessWidget {
   const LanguagePage({super.key});
 
@@ -289,22 +301,16 @@ class LanguagePage extends StatelessWidget {
             Get.back();
           },
         ),
-        _Option(
-          labelKey: 'lang.english',
-          selected: settings.locale.value?.languageCode == 'en',
-          onTap: () {
-            settings.setLocale(const Locale('en'));
-            Get.back();
-          },
-        ),
-        _Option(
-          labelKey: 'lang.chinese',
-          selected: settings.locale.value?.languageCode == 'zh',
-          onTap: () {
-            settings.setLocale(const Locale('zh'));
-            Get.back();
-          },
-        ),
+        for (final locale in VitaSettingsController.supportedLocales)
+          _Option(
+            labelKey: _languageLabelKey(vitaLocaleTag(locale)),
+            selected: settings.locale.value != null &&
+                vitaLocaleTag(settings.locale.value!) == vitaLocaleTag(locale),
+            onTap: () {
+              settings.setLocale(locale);
+              Get.back();
+            },
+          ),
       ],
     );
   }

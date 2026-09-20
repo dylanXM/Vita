@@ -17,7 +17,7 @@ class SubscriptionPage extends StatelessWidget {
     final ctrl = BillingController.to;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(title: const Text('Vita Plus & Premium')),
+      appBar: AppBar(title: Text('me.plus.title'.tr)),
       body: Obx(() => _buildBody(context, ctrl)),
     );
   }
@@ -41,7 +41,7 @@ class SubscriptionPage extends StatelessWidget {
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Your plan is active',
+                    'subscription.active'.tr,
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -55,7 +55,7 @@ class SubscriptionPage extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
-              'More life, more memories, more of her.',
+              'subscription.hero'.tr,
               style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -66,7 +66,7 @@ class SubscriptionPage extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
-              'Subscription includes monthly credits for premium images, voice and more.',
+              'subscription.description'.tr,
               style: TextStyle(
                   fontSize: 13, color: context.vita.subText, height: 1.5),
             ),
@@ -94,15 +94,14 @@ class SubscriptionPage extends StatelessWidget {
           child: TextButton.icon(
             onPressed: ctrl.busy.value ? null : ctrl.restorePurchases,
             icon: const Icon(Icons.settings_backup_restore, size: 18),
-            label: const Text('Restore purchases',
-                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+            label: Text('subscription.restore'.tr,
+                style: const TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.w600)),
           ),
         ),
         const SizedBox(height: 16),
         Text(
-          'Subscriptions are billed through the App Store / Google Play and can be '
-          'managed there. Credits included with a subscription are granted each '
-          'billing period.',
+          'subscription.legal'.tr,
           textAlign: TextAlign.center,
           style: TextStyle(
               fontSize: 11.5, color: context.vita.subText, height: 1.5),
@@ -156,8 +155,9 @@ class SubscriptionPage extends StatelessWidget {
                         },
                   child: Text(
                     store.priceString.isEmpty
-                        ? 'Subscribe'
-                        : 'Subscribe · ${store.priceString}',
+                        ? 'subscription.subscribe'.tr
+                        : 'subscription.subscribePrice'
+                            .trParams({'price': store.priceString}),
                   ),
                 ),
               ),
@@ -219,7 +219,7 @@ class _PlanCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      'Recommended',
+                      'subscription.recommended'.tr,
                       style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -260,7 +260,7 @@ class _PlanCard extends StatelessWidget {
                             BorderSide(color: context.vita.green)),
                   ),
                   child: Text(
-                    'Subscribe',
+                    'subscription.subscribe'.tr,
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -291,14 +291,14 @@ class _NotConfiguredCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('RevenueCat not configured',
+          Text('subscription.notConfigured'.tr,
               style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: context.vita.text)),
           SizedBox(height: 4),
           Text(
-            'Build with --dart-define=VITA_REVENUECAT_KEY=... to enable in-app purchases.',
+            'subscription.notConfiguredHint'.tr,
             style: TextStyle(fontSize: 12, color: context.vita.subText),
           ),
         ],
@@ -319,7 +319,11 @@ class _NoOfferingsCard extends StatelessWidget {
         borderRadius: BorderRadius.zero,
       ),
       child: Text(
-        'No products configured in RevenueCat yet (api key: ${revenueCatApiKey.isEmpty ? 'empty' : 'set'}).',
+        'subscription.noProducts'.trParams({
+          'status': revenueCatApiKey.isEmpty
+              ? 'subscription.keyEmpty'.tr
+              : 'subscription.keySet'.tr
+        }),
         style: TextStyle(fontSize: 12, color: context.vita.subText),
       ),
     );

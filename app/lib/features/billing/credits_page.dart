@@ -16,7 +16,7 @@ class CreditsPage extends StatelessWidget {
     final ctrl = BillingController.to;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(title: const Text('Credits')),
+      appBar: AppBar(title: Text('credits.title'.tr)),
       body: Obx(() => _buildBody(context, ctrl)),
     );
   }
@@ -34,7 +34,7 @@ class CreditsPage extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Text('Your balance',
+              Text('credits.balance'.tr,
                   style: TextStyle(
                       fontSize: 13, color: context.vita.subText, height: 1.3)),
               const SizedBox(height: 4),
@@ -48,7 +48,7 @@ class CreditsPage extends StatelessWidget {
                       height: 1.15),
                 ),
               ),
-              Text('credits',
+              Text('credits.unit'.tr,
                   style: TextStyle(
                       fontSize: 13, color: context.vita.subText, height: 1.3)),
             ],
@@ -59,7 +59,8 @@ class CreditsPage extends StatelessWidget {
         // Credit packs.
         Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text('Buy more', style: context.vita.sectionTitle)),
+            child:
+                Text('credits.buyMore'.tr, style: context.vita.sectionTitle)),
         const SizedBox(height: 12),
         if (packs.isEmpty)
           const _PacksHint()
@@ -70,12 +71,13 @@ class CreditsPage extends StatelessWidget {
         // History.
         Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text('History', style: context.vita.sectionTitle)),
+            child:
+                Text('credits.history'.tr, style: context.vita.sectionTitle)),
         const SizedBox(height: 12),
         if (ctrl.transactions.isEmpty)
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-            child: Text('No transactions yet',
+            child: Text('credits.empty'.tr,
                 style: TextStyle(fontSize: 13, color: context.vita.subText)),
           )
         else
@@ -126,7 +128,8 @@ class _PackCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final ctrl = BillingController.to;
     final store = package.storeProduct;
-    final price = store.priceString.isEmpty ? 'Buy' : store.priceString;
+    final price =
+        store.priceString.isEmpty ? 'credits.buy'.tr : store.priceString;
     return VitaCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -193,8 +196,7 @@ class _PacksHint extends StatelessWidget {
         borderRadius: BorderRadius.zero,
       ),
       child: Text(
-        'Create consumable products named credits_500 / credits_1000 / credits_5000 in '
-        'RevenueCat and they will appear here automatically.',
+        'credits.noPacks'.tr,
         style:
             TextStyle(fontSize: 12, color: context.vita.subText, height: 1.5),
       ),
