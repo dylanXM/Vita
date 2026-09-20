@@ -4,4 +4,7 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Dev-only: the local dev API is plain HTTP. Android 9+ blocks cleartext
+         traffic by default, which surfaces as "Cannot reach server". -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

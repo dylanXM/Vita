@@ -165,22 +165,6 @@ class AuthController extends GetxController {
     Get.offAllNamed('/login');
   }
 
-  Future<void> deleteAccount() async {
-    loading.value = true;
-    try {
-      await PushNotificationService.instance.deactivate();
-      await ApiClient.instance.delete('/v1/me');
-      if (Get.isRegistered<BillingController>()) {
-        await BillingController.to.clearUser();
-      }
-      await TokenStorage.clear();
-      profile.value = null;
-      Get.offAllNamed('/login');
-    } finally {
-      loading.value = false;
-    }
-  }
-
   Future<void> _storeSession(dynamic response) async {
     final data = Map<String, dynamic>.from(response as Map);
     final token = data['token'] as String? ?? '';
