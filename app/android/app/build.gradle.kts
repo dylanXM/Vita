@@ -4,6 +4,9 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val vitaApplicationId = System.getenv("VITA_ANDROID_APPLICATION_ID") ?: "com.example.vita"
+val vitaReleaseKeystore = System.getenv("VITA_ANDROID_KEYSTORE")
+
 android {
     namespace = "com.example.vita"
     compileSdk = flutter.compileSdkVersion
@@ -15,8 +18,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.vita"
+        applicationId = vitaApplicationId
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -29,12 +31,40 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            if (!vitaReleaseKeystore.isNullOrBlank()) {
+                storeFile = file(vitaReleaseKeystore)
+            }
+            storePassword = System.getenv("VITA_ANDROID_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("VITA_ANDROID_KEY_ALIAS")
+            keyPassword = System.getenv("VITA_ANDROID_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
+    }
+}
+
+gradle.taskGraph.whenReady {
+    val buildsRelease = allTasks.any { it.name.contains("Release", ignoreCase = true) }
+    val signingValues = listOf(
+        vitaReleaseKeystore,
+        System.getenv("VITA_ANDROID_KEYSTORE_PASSWORD"),
+        System.getenv("VITA_ANDROID_KEY_ALIAS"),
+        System.getenv("VITA_ANDROID_KEY_PASSWORD"),
+    )
+    if (buildsRelease && signingValues.any { it.isNullOrBlank() }) {
+        throw GradleException(
+            "Release signing requires VITA_ANDROID_KEYSTORE, " +
+                "VITA_ANDROID_KEYSTORE_PASSWORD, VITA_ANDROID_KEY_ALIAS and VITA_ANDROID_KEY_PASSWORD",
+        )
+    }
+    if (buildsRelease && vitaApplicationId == "com.example.vita") {
+        throw GradleException("Release builds require VITA_ANDROID_APPLICATION_ID")
     }
 }
 

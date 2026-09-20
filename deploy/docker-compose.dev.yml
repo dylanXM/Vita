@@ -33,7 +33,6 @@ services:
       VITA_S3_ENDPOINT: "${VITA_S3_ENDPOINT:-http://rustfs:9000}"
       VITA_S3_ACCESS_KEY: "${RUSTFS_ACCESS_KEY:-vita_rustfs}"
       VITA_S3_SECRET_KEY: "${RUSTFS_SECRET_KEY:-vita_rustfs_secret}"
-      VITA_REDIS_URL: "redis://redis:6379/0"
       VITA_DB_DRIVER: "postgres"
       VITA_ADMIN_EMAIL: "${VITA_ADMIN_EMAIL:-}"
       VITA_ADMIN_PASSWORD: "${VITA_ADMIN_PASSWORD:-}"
@@ -52,7 +51,7 @@ services:
     networks:
       - vita-net
     healthcheck:
-      test: ["CMD", "wget", "-q", "-T", "5", "-O", "/dev/null", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "-q", "-T", "5", "-O", "/dev/null", "http://localhost:8080/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3

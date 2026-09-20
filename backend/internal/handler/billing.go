@@ -378,13 +378,15 @@ type revenueCatEvent struct {
 
 // RevenueCatWebhook processes RevenueCat server-to-server events.
 func RevenueCatWebhook(c *gin.Context) {
-	if billingCfg.RevenueCatWebhookSecret != "" {
-		auth := c.GetHeader("Authorization")
-		expected := "Bearer " + billingCfg.RevenueCatWebhookSecret
-		if !hmac.Equal([]byte(auth), []byte(expected)) {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid webhook secret"})
-			return
-		}
+	if billingCfg.RevenueCatWebhookSecret == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "revenuecat webhook is not configured"})
+		return
+	}
+	auth := c.GetHeader("Authorization")
+	expected := "Bearer " + billingCfg.RevenueCatWebhookSecret
+	if !hmac.Equal([]byte(auth), []byte(expected)) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid webhook secret"})
+		return
 	}
 
 	var payload revenueCatWebhookPayload
@@ -661,12 +663,14 @@ func StripeWebhook(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read body"})
 		return
 	}
-	if billingCfg.StripeWebhookSecret != "" {
-		sig := c.GetHeader("Stripe-Signature")
-		if !verifyStripeSignature(raw, sig, billingCfg.StripeWebhookSecret) {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid signature"})
-			return
-		}
+	if billingCfg.StripeWebhookSecret == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "stripe webhook is not configured"})
+		return
+	}
+	sig := c.GetHeader("Stripe-Signature")
+	if !verifyStripeSignature(raw, sig, billingCfg.StripeWebhookSecret) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid signature"})
+		return
 	}
 
 	var payload struct {

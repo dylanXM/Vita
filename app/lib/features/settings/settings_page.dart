@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/constants.dart';
 import '../../core/settings_controller.dart';
 import '../../core/supported_locales.dart';
 import '../../core/theme.dart';
@@ -74,6 +76,33 @@ class SettingsPage extends StatelessWidget {
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text('settings.legal'.tr, style: vita.sectionTitle),
+          ),
+          const SizedBox(height: 12),
+          VitaCard(
+            radius: 0,
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              children: [
+                VitaListTile(
+                  icon: Icons.privacy_tip_outlined,
+                  title: 'settings.privacy'.tr,
+                  borderRadius: BorderRadius.zero,
+                  onTap: () => _openLegal(privacyPolicyUrl),
+                ),
+                const Divider(indent: 52, height: 0.5),
+                VitaListTile(
+                  icon: Icons.description_outlined,
+                  title: 'settings.terms'.tr,
+                  borderRadius: BorderRadius.zero,
+                  onTap: () => _openLegal(termsOfServiceUrl),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text('settings.account'.tr, style: vita.sectionTitle),
           ),
           const SizedBox(height: 12),
@@ -81,12 +110,24 @@ class SettingsPage extends StatelessWidget {
           VitaCard(
             radius: 0,
             padding: const EdgeInsets.symmetric(vertical: 4),
-            child: VitaListTile(
-              icon: Icons.logout,
-              title: 'common.signout'.tr,
-              iconColor: vita.red,
-              borderRadius: BorderRadius.zero,
-              onTap: () => _confirmSignOut(context),
+            child: Column(
+              children: [
+                VitaListTile(
+                  icon: Icons.logout,
+                  title: 'common.signout'.tr,
+                  iconColor: vita.red,
+                  borderRadius: BorderRadius.zero,
+                  onTap: () => _confirmSignOut(context),
+                ),
+                const Divider(indent: 52, height: 0.5),
+                VitaListTile(
+                  icon: Icons.person_remove_outlined,
+                  title: 'settings.deleteAccount'.tr,
+                  iconColor: vita.red,
+                  borderRadius: BorderRadius.zero,
+                  onTap: () => _confirmDeleteAccount(context),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 24),
@@ -96,6 +137,63 @@ class SettingsPage extends StatelessWidget {
             style: TextStyle(fontSize: 12, color: vita.subText),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _openLegal(String rawUrl) async {
+    final uri = Uri.tryParse(rawUrl);
+    if (uri == null ||
+        !uri.hasScheme ||
+        !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      Get.snackbar('Vita', 'settings.linkUnavailable'.tr);
+    }
+  }
+
+  void _confirmDeleteAccount(BuildContext context) {
+    final vita = context.vita;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: vita.surface,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('deleteAccount.title'.tr,
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      color: vita.text)),
+              const SizedBox(height: 8),
+              Text('deleteAccount.message'.tr,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: vita.subText)),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: vita.red),
+                  onPressed: () async {
+                    Navigator.of(ctx).pop();
+                    try {
+                      await AuthController.to.deleteAccount();
+                    } catch (_) {
+                      Get.snackbar('Vita', 'deleteAccount.failed'.tr);
+                    }
+                  },
+                  child: Text('deleteAccount.confirm'.tr),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text('common.cancel'.tr,
+                    style: TextStyle(color: vita.subText)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -35,6 +36,8 @@ type Config struct {
 	RedisPassword   string
 	JWTSecret       string
 	JWTTTL          time.Duration
+	JWTRefreshTTL   time.Duration
+	AllowedOrigins  []string
 	MockGeneration  bool
 	AutoMigrate     bool
 	StorageProvider string
@@ -99,7 +102,9 @@ func Load() *Config {
 		RedisURL:        getEnv("VITA_REDIS_URL", "redis://localhost:6380/0"),
 		RedisPassword:   getEnv("REDIS_PASSWORD", ""),
 		JWTSecret:       getEnv("VITA_JWT_SECRET", "dev-secret-change-me-32-characters-min"),
-		JWTTTL:          24 * time.Hour,
+		JWTTTL:          durationEnv(getEnv("VITA_JWT_ACCESS_TTL", "15m"), 15*time.Minute),
+		JWTRefreshTTL:   durationEnv(getEnv("VITA_JWT_REFRESH_TTL", "720h"), 30*24*time.Hour),
+		AllowedOrigins:  splitCSV(getEnv("VITA_ALLOWED_ORIGINS", "http://localhost:8261,http://localhost:8263")),
 		MockGeneration:  getEnv("VITA_MOCK_GENERATION", "true") == "true",
 		AutoMigrate:     getEnv("VITA_AUTO_MIGRATE", "true") == "true",
 		StorageProvider: getEnv("VITA_STORAGE_PROVIDER", "s3"),
@@ -174,8 +179,52 @@ func getEnv(key, defaultVal string) string {
 }
 
 func (c *Config) Validate() error {
-	if c.JWTSecret == "" {
-		return fmt.Errorf("VITA_JWT_SECRET is required")
+	if !IsValidEnvironment(c.Env) {
+		return fmt.Errorf("VITA_ENV must be one of dev, beta or prod")
+	}
+	if len(c.JWTSecret) < 32 {
+		return fmt.Errorf("VITA_JWT_SECRET must contain at least 32 characters")
+	}
+	if c.JWTTTL <= 0 || c.JWTRefreshTTL <= c.JWTTTL {
+		return fmt.Errorf("VITA_JWT_REFRESH_TTL must be greater than VITA_JWT_ACCESS_TTL")
+	}
+	redisURL, err := url.Parse(c.RedisURL)
+	if err != nil || (redisURL.Scheme != "redis" && redisURL.Scheme != "rediss") || redisURL.Host == "" {
+		return fmt.Errorf("VITA_REDIS_URL must be a valid redis:// or rediss:// URL")
+	}
+	if c.Env == EnvBeta || c.Env == EnvProd {
+		for name, value := range map[string]string{
+			"VITA_DB_DSN":           c.DBDSN,
+			"VITA_JWT_SECRET":       c.JWTSecret,
+			"VITA_AGENT_CONFIG_KEY": c.AgentConfigKey,
+		} {
+			if isPlaceholder(value) {
+				return fmt.Errorf("%s must be set to a non-placeholder production value", name)
+			}
+		}
+		if len(c.AgentConfigKey) < 32 {
+			return fmt.Errorf("VITA_AGENT_CONFIG_KEY must contain at least 32 characters")
+		}
+		if c.AgentConfigKey == c.JWTSecret {
+			return fmt.Errorf("VITA_AGENT_CONFIG_KEY must be different from VITA_JWT_SECRET")
+		}
+		if len(c.AllowedOrigins) == 0 {
+			return fmt.Errorf("VITA_ALLOWED_ORIGINS is required outside dev")
+		}
+		for _, origin := range c.AllowedOrigins {
+			parsed, err := url.Parse(origin)
+			if err != nil || parsed.Scheme != "https" || parsed.Host == "" || strings.Contains(origin, "*") {
+				return fmt.Errorf("VITA_ALLOWED_ORIGINS entries must be explicit HTTPS origins")
+			}
+		}
+		if c.SMTPHost == "" || c.SMTPUsername == "" || c.SMTPPassword == "" || c.SMTPFrom == "" {
+			return fmt.Errorf("VITA_SMTP_HOST, VITA_SMTP_USERNAME, VITA_SMTP_PASSWORD and VITA_SMTP_FROM are required outside dev")
+		}
 	}
 	return nil
+}
+
+func isPlaceholder(value string) bool {
+	value = strings.ToLower(strings.TrimSpace(value))
+	return value == "" || strings.Contains(value, "replace-with") || strings.Contains(value, "placeholder") || strings.Contains(value, "user:password@db-host")
 }

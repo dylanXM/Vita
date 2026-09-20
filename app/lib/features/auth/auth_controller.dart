@@ -7,6 +7,7 @@ import '../../core/constants.dart';
 import '../../core/push_notification_service.dart';
 import '../../core/settings_controller.dart';
 import '../../core/token_storage.dart';
+import '../billing/billing_controller.dart';
 
 /// Auth state: email + password login, two-step email registration
 /// (password first, then a 6-digit verification code) and Google sign-in
@@ -53,7 +54,7 @@ class AuthController extends GetxController {
         '/v1/auth/app/register/verify',
         data: {'email': email, 'code': code},
       );
-      await TokenStorage.write(data['token'] as String);
+      await _storeSession(data);
       await fetchProfile();
       AnalyticsService.to.track('auth_register_succeeded', category: 'auth');
       await AnalyticsService.to.flush();
@@ -75,7 +76,7 @@ class AuthController extends GetxController {
         '/v1/auth/app/login',
         data: {'email': email, 'password': password},
       );
-      await TokenStorage.write(data['token'] as String);
+      await _storeSession(data);
       await fetchProfile();
       AnalyticsService.to.track('auth_login_succeeded',
           category: 'auth', properties: {'method': 'password'});
@@ -106,7 +107,7 @@ class AuthController extends GetxController {
         '/v1/auth/google',
         data: {'id_token': idToken},
       );
-      await TokenStorage.write(data['token'] as String);
+      await _storeSession(data);
       await fetchProfile();
       AnalyticsService.to.track('auth_login_succeeded',
           category: 'auth', properties: {'method': 'google'});
@@ -124,6 +125,10 @@ class AuthController extends GetxController {
     profile.value =
         await ApiClient.instance.get('/v1/me') as Map<String, dynamic>?;
     await VitaSettingsController.to.syncLocale();
+    final userID = profile.value?['user_id'] as String? ?? '';
+    if (userID.isNotEmpty && Get.isRegistered<BillingController>()) {
+      await BillingController.to.syncUser(userID);
+    }
   }
 
   String get email => profile.value?['email'] as String? ?? '';
@@ -132,8 +137,42 @@ class AuthController extends GetxController {
     AnalyticsService.to.track('auth_logout', category: 'auth');
     await AnalyticsService.to.flush();
     await PushNotificationService.instance.deactivate();
+    try {
+      await ApiClient.instance.post('/v1/auth/logout');
+    } catch (_) {
+      // Local logout must still complete if the server cannot be reached.
+    }
+    if (Get.isRegistered<BillingController>()) {
+      await BillingController.to.clearUser();
+    }
     await TokenStorage.clear();
     profile.value = null;
     Get.offAllNamed('/login');
+  }
+
+  Future<void> deleteAccount() async {
+    loading.value = true;
+    try {
+      await PushNotificationService.instance.deactivate();
+      await ApiClient.instance.delete('/v1/me');
+      if (Get.isRegistered<BillingController>()) {
+        await BillingController.to.clearUser();
+      }
+      await TokenStorage.clear();
+      profile.value = null;
+      Get.offAllNamed('/login');
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  Future<void> _storeSession(dynamic response) async {
+    final data = Map<String, dynamic>.from(response as Map);
+    final token = data['token'] as String? ?? '';
+    final refreshToken = data['refresh_token'] as String? ?? '';
+    if (token.isEmpty || refreshToken.isEmpty) {
+      throw ApiException('Server did not return a complete session');
+    }
+    await TokenStorage.writeSession(token, refreshToken);
   }
 }

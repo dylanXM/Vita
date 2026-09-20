@@ -11,22 +11,33 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 
 	"vita/internal/agent"
+	"vita/internal/auth"
 	"vita/internal/config"
 	"vita/internal/credits"
 	"vita/internal/db"
 	"vita/internal/handler"
 	"vita/internal/mail"
 	"vita/internal/middleware"
-	"vita/internal/storage"
 )
 
 func main() {
 	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("invalid configuration: %v", err)
+	}
 	fmt.Printf("vita server starting in environment: %s\n", cfg.Env)
+	tokenManager, err := auth.NewTokenManager(cfg.JWTSecret, cfg.JWTTTL, cfg.JWTRefreshTTL)
+	if err != nil {
+		log.Fatalf("failed to initialize authentication: %v", err)
+	}
+	redisClient, err := handler.InitRedis(cfg.RedisURL, cfg.RedisPassword)
+	if err != nil {
+		log.Fatalf("failed to connect Redis: %v", err)
+	}
+	defer redisClient.Close()
+	handler.InitAuth(tokenManager)
 
 	dbClient, err := db.Open(cfg)
 	if err != nil {
@@ -71,9 +82,6 @@ func main() {
 		log.Fatalf("failed to seed administrator account: %v", err)
 	}
 
-	redisURL := cfg.RedisURL
-	handler.InitRedis(redisURL)
-
 	// Billing + Google sign-in configuration (set before any request arrives).
 	handler.InitBilling(handler.BillingConfig{
 		RevenueCatWebhookSecret:    cfg.RevenueCatWebhookSecret,
@@ -95,21 +103,16 @@ func main() {
 		FromName: cfg.SMTPFromName,
 	})
 
-	store := storage.New(cfg)
-	if err := store.Init(); err != nil {
-		log.Fatalf("failed to init storage: %v", err)
-	}
-
 	engine := gin.Default()
 	engine.Use(middleware.RequestID())
-	engine.Use(middleware.CORS())
-	engine.Use(middleware.AuthMiddleware())
+	engine.Use(middleware.CORS(cfg.AllowedOrigins))
+	engine.Use(middleware.AuthMiddleware(tokenManager, redisClient))
 
 	api := engine.Group("/v1")
 	{
 		auth := api.Group("/auth")
 		{
-			auth.POST("/register", handler.Register)
+			auth.Use(middleware.RateLimit(20, time.Minute))
 			auth.POST("/send-code", handler.SendCode)
 			auth.POST("/login", handler.Login)
 			auth.POST("/admin/login", handler.AdminLogin)
@@ -118,7 +121,7 @@ func main() {
 			auth.POST("/app/register/verify", handler.AppRegisterVerify)
 			auth.POST("/webapp/login", handler.WebappLogin)
 			auth.POST("/google", handler.GoogleLogin)
-			auth.POST("/logout", handler.Logout)
+			auth.POST("/logout", middleware.RequireAuth(), handler.Logout)
 			auth.POST("/refresh", handler.RefreshToken)
 		}
 
@@ -174,17 +177,18 @@ func main() {
 		{
 			media.POST("/upload", middleware.RequireAuth(), handler.UploadMedia)
 			media.POST("/generate", middleware.RequireAuth(), handler.GenerateMedia)
-			media.GET("/:id", handler.GetMedia)
+			media.GET("/:id", middleware.RequireAuth(), handler.GetMedia)
 		}
 
 		api.GET("/health", handler.Health)
 		api.GET("/app-content", handler.AppContent)
-		api.POST("/events", handler.IngestAnalyticsEvents)
+		api.POST("/events", middleware.RateLimit(120, time.Minute), handler.IngestAnalyticsEvents)
 
 		// Current account — used by the admin dashboard to rehydrate a stored
 		// session and to verify the account has the admin role.
 		api.GET("/me", middleware.RequireAuth(), handler.Me)
 		api.PUT("/me/locale", middleware.RequireAuth(), handler.UpdateMyLocale)
+		api.DELETE("/me", middleware.RequireAuth(), handler.DeleteMe)
 
 		admin := api.Group("/admin", middleware.RequireAdmin())
 		{
@@ -288,16 +292,4 @@ func main() {
 
 func init() {
 	gin.SetMode(gin.ReleaseMode)
-}
-
-func jwtSecret() []byte {
-	return []byte("dev-secret-change-me-32-characters-min")
-}
-
-func generateToken(userID uuid.UUID) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id": userID.String(),
-		"exp":     time.Now().Add(24 * time.Hour).Unix(),
-	})
-	return token.SignedString(jwtSecret())
 }

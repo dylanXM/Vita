@@ -10,12 +10,11 @@ RUN corepack enable
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/webapp/node_modules ./node_modules
 COPY webapp/ ./
-COPY backend/openapi/openapi.json /app/backend/openapi/openapi.json
 ARG VITA_API_URL
 ARG VITA_ENV=staging
 ENV NEXT_PUBLIC_VITA_API_URL=$VITA_API_URL
 ENV NEXT_PUBLIC_VITA_ENV=$VITA_ENV
-RUN pnpm gen:api && pnpm build
+RUN pnpm build
 
 FROM node:22-alpine AS runner
 WORKDIR /app

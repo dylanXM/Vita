@@ -1,25 +1,53 @@
 
 services:
+  migrate:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: vita/api:${IMAGE_TAG:-prod}
+    command: ["/app/migrate"]
+    restart: "no"
+    environment:
+      VITA_DB_DSN: "${VITA_DB_DSN:?set VITA_DB_DSN in .env.prod}"
+    networks:
+      - vita-net
+
   api:
     build:
       context: ../backend
       dockerfile: Dockerfile
     image: vita/api:${IMAGE_TAG:-prod}
     restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     environment:
       VITA_ENV: "${VITA_ENV:-prod}"
       VITA_HTTP_ADDR: ":8080"
       VITA_DB_DSN: "${VITA_DB_DSN:?set VITA_DB_DSN in .env.prod}"
       VITA_REDIS_URL: "${VITA_REDIS_URL:?set VITA_REDIS_URL in .env.prod}"
       VITA_JWT_SECRET: "${VITA_JWT_SECRET:?set VITA_JWT_SECRET in .env.prod}"
+      VITA_JWT_ACCESS_TTL: "${VITA_JWT_ACCESS_TTL:-15m}"
+      VITA_JWT_REFRESH_TTL: "${VITA_JWT_REFRESH_TTL:-720h}"
+      VITA_ALLOWED_ORIGINS: "${VITA_ALLOWED_ORIGINS:?set VITA_ALLOWED_ORIGINS in .env.prod}"
       VITA_MOCK_GENERATION: "${VITA_MOCK_GENERATION:-false}"
       VITA_AGENT_CONFIG_KEY: "${VITA_AGENT_CONFIG_KEY:?set VITA_AGENT_CONFIG_KEY in .env.prod}"
       VITA_AGENT_ENABLED: "${VITA_AGENT_ENABLED:-true}"
       VITA_AGENT_TICK: "${VITA_AGENT_TICK:-1m}"
       VITA_FIREBASE_PROJECT_ID: "${VITA_FIREBASE_PROJECT_ID:-}"
       VITA_FIREBASE_SERVICE_ACCOUNT_BASE64: "${VITA_FIREBASE_SERVICE_ACCOUNT_BASE64:-}"
+      VITA_GOOGLE_CLIENT_ID: "${VITA_GOOGLE_CLIENT_ID:-}"
+      VITA_REVENUECAT_WEBHOOK_SECRET: "${VITA_REVENUECAT_WEBHOOK_SECRET:-}"
+      VITA_STRIPE_SECRET_KEY: "${VITA_STRIPE_SECRET_KEY:-}"
+      VITA_STRIPE_WEBHOOK_SECRET: "${VITA_STRIPE_WEBHOOK_SECRET:-}"
+      VITA_STRIPE_PRICE_PLUS: "${VITA_STRIPE_PRICE_PLUS:-}"
+      VITA_STRIPE_PRICE_PREMIUM: "${VITA_STRIPE_PRICE_PREMIUM:-}"
       VITA_AUTO_MIGRATE: "${VITA_AUTO_MIGRATE:-false}"
       VITA_STORAGE_PROVIDER: "${VITA_STORAGE_PROVIDER:-cos}"
+      VITA_S3_BUCKET: "${VITA_S3_BUCKET:-}"
+      VITA_S3_ENDPOINT: "${VITA_S3_ENDPOINT:-}"
+      VITA_S3_ACCESS_KEY: "${VITA_S3_ACCESS_KEY:-}"
+      VITA_S3_SECRET_KEY: "${VITA_S3_SECRET_KEY:-}"
       VITA_ADMIN_EMAIL: "${VITA_ADMIN_EMAIL:-}"
       VITA_ADMIN_PASSWORD: "${VITA_ADMIN_PASSWORD:-}"
       VITA_ADMIN_EMAILS: "${VITA_ADMIN_EMAILS:-}"
@@ -30,22 +58,42 @@ services:
       VITA_SMTP_FROM: "${VITA_SMTP_FROM:-}"
       VITA_SMTP_FROM_NAME: "${VITA_SMTP_FROM_NAME:-Vita}"
     ports:
-      - "0.0.0.0:8270:8080"
+      - "${BIND_HOST:-127.0.0.1}:${SERVER_PORT:-8270}:8080"
     networks:
       - vita-net
     healthcheck:
-      test: ["CMD", "wget", "-q", "-T", "5", "-O", "/dev/null", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "-q", "-T", "5", "-O", "/dev/null", "http://localhost:8080/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
+
+  admin:
+    build:
+      context: ../admin
+      dockerfile: Dockerfile
+    image: vita/admin:${IMAGE_TAG:-prod}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${ADMIN_BIND_HOST:-127.0.0.1}:${ADMIN_PORT:-8261}:80"
+    networks:
+      - vita-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   webapp:
     build:
       context: ..
       dockerfile: webapp/Dockerfile
       args:
-        VITA_API_URL: "${WEBAPP_API_URL:-http://api:8080}"
+        VITA_API_URL: "${WEBAPP_API_URL:?set public WEBAPP_API_URL in .env.prod}"
         VITA_ENV: "${WEBAPP_ENV:-prod}"
     image: vita/webapp:${IMAGE_TAG:-prod}
     restart: unless-stopped
@@ -53,7 +101,7 @@ services:
       api:
         condition: service_healthy
     environment:
-      VITA_API_URL: "${WEBAPP_API_URL:-http://api:8080}"
+      VITA_API_URL: "${WEBAPP_API_URL:?set public WEBAPP_API_URL in .env.prod}"
       VITA_ENV: "${WEBAPP_ENV:-prod}"
     ports:
       - "${WEBAPP_BIND_HOST:-127.0.0.1}:${WEBAPP_PORT:-8263}:3000"

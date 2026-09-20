@@ -20,6 +20,7 @@ class BillingController extends GetxController {
   final subscription = Rxn<Map<String, dynamic>>();
   final entitlements = <String>[].obs;
   final offerings = Rxn<Offerings>();
+  String? _identifiedUserID;
 
   @override
   void onInit() {
@@ -43,6 +44,28 @@ class BillingController extends GetxController {
     }
     await refreshSubscription();
     await refreshCredits();
+  }
+
+  Future<void> syncUser(String userID) async {
+    if (!rcReady.value || userID.isEmpty || _identifiedUserID == userID) return;
+    try {
+      await Purchases.logIn(userID);
+      _identifiedUserID = userID;
+      offerings.value = await Purchases.getOfferings();
+    } catch (_) {
+      _identifiedUserID = null;
+    }
+  }
+
+  Future<void> clearUser() async {
+    if (!rcReady.value || _identifiedUserID == null) return;
+    try {
+      await Purchases.logOut();
+    } catch (_) {
+      // The local Vita session must still be cleared if RevenueCat is offline.
+    } finally {
+      _identifiedUserID = null;
+    }
   }
 
   Future<void> refreshCredits() async {

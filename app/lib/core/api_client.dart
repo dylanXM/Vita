@@ -25,6 +25,7 @@ class ApiClient {
   static final ApiClient instance = ApiClient._();
 
   late final Dio dio = _build();
+  Future<bool>? _refreshing;
 
   Dio _build() {
     final d = Dio(
@@ -52,9 +53,72 @@ class ApiClient {
               vitaLocaleTag(Get.locale ?? vitaSupportedLocales[1]);
           handler.next(options);
         },
+        onError: (error, handler) async {
+          final options = error.requestOptions;
+          final canRefresh = error.response?.statusCode == 401 &&
+              options.extra['vitaRetried'] != true &&
+              !options.path.startsWith('/v1/auth/');
+          if (!canRefresh || !await _refreshSession()) {
+            handler.next(error);
+            return;
+          }
+          try {
+            options.extra['vitaRetried'] = true;
+            options.headers['Authorization'] =
+                'Bearer ${await TokenStorage.read()}';
+            handler.resolve(await d.fetch(options));
+          } on DioException catch (retryError) {
+            handler.next(retryError);
+          }
+        },
       ),
     );
     return d;
+  }
+
+  Future<bool> _refreshSession() {
+    final active = _refreshing;
+    if (active != null) return active;
+    final future = _performRefresh();
+    _refreshing = future;
+    future.whenComplete(() {
+      if (identical(_refreshing, future)) _refreshing = null;
+    });
+    return future;
+  }
+
+  Future<bool> _performRefresh() async {
+    try {
+      final refreshToken = await TokenStorage.readRefresh();
+      if (refreshToken == null || refreshToken.isEmpty) {
+        await TokenStorage.clear();
+        return false;
+      }
+      final refreshClient = Dio(
+        BaseOptions(
+          baseUrl: vitaApiBaseUrl,
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 20),
+          headers: const {'Content-Type': 'application/json'},
+        ),
+      );
+      final response = await refreshClient.post(
+        '/v1/auth/refresh',
+        data: {'refresh_token': refreshToken},
+      );
+      final data = Map<String, dynamic>.from(response.data as Map);
+      final token = data['token'] as String? ?? '';
+      final rotatedRefresh = data['refresh_token'] as String? ?? '';
+      if (token.isEmpty || rotatedRefresh.isEmpty) {
+        await TokenStorage.clear();
+        return false;
+      }
+      await TokenStorage.writeSession(token, rotatedRefresh);
+      return true;
+    } catch (_) {
+      await TokenStorage.clear();
+      return false;
+    }
   }
 
   Future<dynamic> get(String path, {Map<String, dynamic>? query}) async {

@@ -8,12 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
@@ -25,11 +25,11 @@ import (
 	"vita/internal/mail"
 )
 
-const jwtSecret = "dev-secret-change-me-32-characters-min"
 const codeLength = 6
 const codeTTL = 5 * time.Minute
 
 var rdb *redis.Client
+var tokenManager *auth.TokenManager
 
 // envName is the deployment environment this server runs in (VITA_ENV: dev /
 // beta / prod). Accounts created while it is set get stamped with this value
@@ -63,16 +63,27 @@ func currentEnvironment() string {
 	return envName
 }
 
-func InitRedis(redisURL string) {
-	var err error
-	rdb = redis.NewClient(&redis.Options{
-		Addr:     redisURL,
-		Password: "",
-		DB:       0,
-	})
+func InitRedis(redisURL, passwordOverride string) (*redis.Client, error) {
+	options, err := redis.ParseURL(redisURL)
 	if err != nil {
-		fmt.Printf("Warning: Redis connection failed: %v\n", err)
+		return nil, fmt.Errorf("parse Redis URL: %w", err)
 	}
+	if passwordOverride != "" {
+		options.Password = passwordOverride
+	}
+	client := redis.NewClient(options)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := client.Ping(ctx).Err(); err != nil {
+		_ = client.Close()
+		return nil, fmt.Errorf("ping Redis: %w", err)
+	}
+	rdb = client
+	return client, nil
+}
+
+func InitAuth(manager *auth.TokenManager) {
+	tokenManager = manager
 }
 
 type HealthResponse struct {
@@ -81,6 +92,16 @@ type HealthResponse struct {
 }
 
 func Health(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+	defer cancel()
+	if database := db.Get(); database == nil || database.PingContext(ctx) != nil {
+		c.JSON(http.StatusServiceUnavailable, HealthResponse{Status: "database_unavailable", Version: "0.1.0"})
+		return
+	}
+	if rdb == nil || rdb.Ping(ctx).Err() != nil {
+		c.JSON(http.StatusServiceUnavailable, HealthResponse{Status: "redis_unavailable", Version: "0.1.0"})
+		return
+	}
 	c.JSON(http.StatusOK, HealthResponse{Status: "ok", Version: "0.1.0"})
 }
 
@@ -117,7 +138,11 @@ func SendCode(c *gin.Context) {
 	}
 
 	// Generate verification code
-	code := generateCode()
+	code, err := generateCode()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate verification code"})
+		return
+	}
 	expiresAt := time.Now().Add(codeTTL)
 
 	// Store code in Redis with expiration
@@ -129,7 +154,7 @@ func SendCode(c *gin.Context) {
 		"purpose": req.Purpose,
 	}
 	codeJSON, _ := json.Marshal(codeData)
-	err = rdb.Set(ctx, "vcode:"+code, string(codeJSON), codeTTL).Err()
+	err = rdb.Set(ctx, verificationCodeKey(req.Email, code), string(codeJSON), codeTTL).Err()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store verification code"})
 		return
@@ -137,7 +162,7 @@ func SendCode(c *gin.Context) {
 
 	// Also store in DB for backup
 	codeID := uuid.New().String()
-	_, err = db.Get().Exec(`INSERT INTO verification_codes (id, email, code, purpose, expires_at) VALUES ($1, $2, $3, $4, $4)`,
+	_, err = db.Get().Exec(`INSERT INTO verification_codes (id, email, code, purpose, expires_at) VALUES ($1, $2, $3, $4, $5)`,
 		codeID, req.Email, code, req.Purpose, expiresAt)
 	if err != nil {
 		// Non-fatal, Redis is the primary store
@@ -152,10 +177,16 @@ func SendCode(c *gin.Context) {
 	c.JSON(http.StatusOK, SendCodeResponse{Message: "Verification code sent"})
 }
 
-func generateCode() string {
-	bytes := make([]byte, 3)
-	rand.Read(bytes)
-	return fmt.Sprintf("%06d", int32(bytes[0])<<16|int32(bytes[1])<<8|int32(bytes[2]))
+func generateCode() (string, error) {
+	value, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%06d", value.Int64()), nil
+}
+
+func verificationCodeKey(email, code string) string {
+	return "vcode:" + strings.ToLower(strings.TrimSpace(email)) + ":" + code
 }
 
 // --- Auth Routes ---
@@ -166,7 +197,7 @@ type RegisterRequest struct {
 
 type RegisterResponse struct {
 	UserID string `json:"user_id"`
-	Token  string `json:"token"`
+	TokenResponse
 }
 
 func Register(c *gin.Context) {
@@ -191,12 +222,12 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	token, err := generateToken(uuid.MustParse(userID), "user")
+	tokens, err := issueTokens(userID, "user")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return
 	}
-	c.JSON(http.StatusCreated, RegisterResponse{UserID: userID, Token: token})
+	c.JSON(http.StatusCreated, RegisterResponse{UserID: userID, TokenResponse: tokens})
 }
 
 type LoginRequest struct {
@@ -206,8 +237,8 @@ type LoginRequest struct {
 
 type LoginResponse struct {
 	UserID string `json:"user_id"`
-	Token  string `json:"token"`
 	Role   string `json:"role"`
+	TokenResponse
 }
 
 func Login(c *gin.Context) {
@@ -219,7 +250,7 @@ func Login(c *gin.Context) {
 
 	// Verify code from Redis
 	ctx := context.Background()
-	codeDataJSON, err := rdb.Get(ctx, "vcode:"+req.Code).Result()
+	codeDataJSON, err := rdb.Get(ctx, verificationCodeKey(req.Email, req.Code)).Result()
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired verification code"})
 		return
@@ -232,13 +263,13 @@ func Login(c *gin.Context) {
 	}
 
 	// Verify email matches
-	if codeData["email"] != req.Email {
+	if !strings.EqualFold(codeData["email"], req.Email) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "verification code does not match this email"})
 		return
 	}
 
 	// Mark code as used (delete from Redis)
-	rdb.Del(ctx, "vcode:"+req.Code)
+	rdb.Del(ctx, verificationCodeKey(req.Email, req.Code))
 
 	// Mark as used in DB
 	_, _ = db.Get().Exec(`UPDATE verification_codes SET used = true WHERE code = $1 AND email = $2`, req.Code, req.Email)
@@ -260,13 +291,13 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	token, err := generateToken(func() uuid.UUID { u, _ := uuid.Parse(userID); return u }(), userRole)
+	tokens, err := issueTokens(userID, userRole)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return
 	}
 
-	c.JSON(http.StatusOK, LoginResponse{UserID: userID, Token: token, Role: userRole})
+	c.JSON(http.StatusOK, LoginResponse{UserID: userID, Role: userRole, TokenResponse: tokens})
 }
 
 // AdminLogin - admin sign-in for the dashboard. Accepts either an
@@ -281,8 +312,8 @@ type AdminLoginRequest struct {
 
 type AdminLoginResponse struct {
 	UserID string `json:"user_id"`
-	Token  string `json:"token"`
 	Role   string `json:"role"`
+	TokenResponse
 }
 
 func AdminLogin(c *gin.Context) {
@@ -323,13 +354,13 @@ func AdminLogin(c *gin.Context) {
 		return
 	}
 
-	token, err := generateToken(parseUUID(userID), "admin")
+	tokens, err := issueTokens(userID, "admin")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return
 	}
 
-	c.JSON(http.StatusOK, AdminLoginResponse{UserID: userID, Token: token, Role: "admin"})
+	c.JSON(http.StatusOK, AdminLoginResponse{UserID: userID, Role: "admin", TokenResponse: tokens})
 }
 
 // userIDByPassword resolves an account by email and checks its bcrypt hash.
@@ -350,7 +381,7 @@ func userIDByPassword(email, password string) (string, error) {
 // was issued for, marking the code used.
 func consumeVerificationCode(email, code string) (string, error) {
 	ctx := context.Background()
-	codeDataJSON, err := rdb.Get(ctx, "vcode:"+code).Result()
+	codeDataJSON, err := rdb.Get(ctx, verificationCodeKey(email, code)).Result()
 	if err != nil {
 		return "", errors.New("invalid or expired verification code")
 	}
@@ -360,11 +391,11 @@ func consumeVerificationCode(email, code string) (string, error) {
 		return "", errors.New("invalid verification code")
 	}
 
-	if codeData["email"] != email {
+	if !strings.EqualFold(codeData["email"], email) {
 		return "", errors.New("verification code does not match this email")
 	}
 
-	rdb.Del(ctx, "vcode:"+code)
+	rdb.Del(ctx, verificationCodeKey(email, code))
 	_, _ = db.Get().Exec(`UPDATE verification_codes SET used = true WHERE code = $1 AND email = $2`, code, email)
 
 	if userID := codeData["user_id"]; userID != "" {
@@ -422,6 +453,60 @@ func Me(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, p)
+}
+
+// DeleteMe permanently removes the signed-in regular account and its owned
+// content. Billing provider records are removed locally; store subscriptions
+// must still be cancelled by the user in Apple/Google account settings.
+func DeleteMe(c *gin.Context) {
+	userID := c.GetString("user_id")
+	var email, role string
+	if err := db.Get().QueryRow(`SELECT email,COALESCE(role_id,'user') FROM users WHERE id=$1`, userID).Scan(&email, &role); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "account not found"})
+		return
+	}
+	if role == "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "administrator accounts cannot be deleted here"})
+		return
+	}
+	tx, err := db.Get().BeginTx(c.Request.Context(), nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start account deletion"})
+		return
+	}
+	defer tx.Rollback() //nolint:errcheck
+	steps := []struct {
+		query string
+		args  []any
+	}{
+		{`DELETE FROM invitation_rewards WHERE inviter_user_id=$1 OR invited_user_id=$1`, []any{userID}},
+		{`DELETE FROM billing_purchases WHERE user_id=$1`, []any{userID}},
+		{`DELETE FROM subscriptions WHERE user_id=$1`, []any{userID}},
+		{`DELETE FROM credit_transactions WHERE user_id=$1`, []any{userID}},
+		{`DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id=$1)`, []any{userID}},
+		{`DELETE FROM conversations WHERE user_id=$1`, []any{userID}},
+		{`DELETE FROM memories WHERE companion_id IN (SELECT id FROM companions WHERE user_id=$1)`, []any{userID}},
+		{`DELETE FROM life_events WHERE companion_id IN (SELECT id FROM companions WHERE user_id=$1)`, []any{userID}},
+		{`DELETE FROM relationship_states WHERE companion_id IN (SELECT id FROM companions WHERE user_id=$1)`, []any{userID}},
+		{`DELETE FROM companion_states WHERE companion_id IN (SELECT id FROM companions WHERE user_id=$1)`, []any{userID}},
+		{`DELETE FROM companions WHERE user_id=$1`, []any{userID}},
+		{`DELETE FROM verification_codes WHERE email=$1`, []any{email}},
+		{`DELETE FROM users WHERE id=$1`, []any{userID}},
+	}
+	for _, step := range steps {
+		if _, err := tx.ExecContext(c.Request.Context(), step.query, step.args...); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete account data"})
+			return
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to finish account deletion"})
+		return
+	}
+	if sessionID := c.GetString("session_id"); sessionID != "" {
+		_ = rdb.Set(c.Request.Context(), "vita:session:revoked:"+sessionID, "1", tokenManager.RefreshTTL()).Err()
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "account deleted"})
 }
 
 func UpdateMyLocale(c *gin.Context) {
@@ -501,8 +586,8 @@ type AppLoginRequest struct {
 
 type AppLoginResponse struct {
 	UserID string `json:"user_id"`
-	Token  string `json:"token"`
 	Role   string `json:"role"`
+	TokenResponse
 }
 
 func AppLogin(c *gin.Context) {
@@ -528,13 +613,13 @@ func AppLogin(c *gin.Context) {
 		return
 	}
 
-	token, err := generateToken(uuid.MustParse(userID), role)
+	tokens, err := issueTokens(userID, role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return
 	}
 
-	c.JSON(http.StatusOK, AppLoginResponse{UserID: userID, Token: token, Role: role})
+	c.JSON(http.StatusOK, AppLoginResponse{UserID: userID, Role: role, TokenResponse: tokens})
 }
 
 // --- App Registration (email + password + verification code) ---
@@ -608,13 +693,18 @@ func AppRegister(c *gin.Context) {
 		return
 	}
 
-	code := generateCode()
+	code, err := generateCode()
+	if err != nil {
+		rdb.Del(ctx, pendingKey)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate verification code"})
+		return
+	}
 	codeJSON, _ := json.Marshal(map[string]string{
 		"email":      req.Email,
 		"purpose":    "register",
 		"inviter_id": inviterID,
 	})
-	if err := rdb.Set(ctx, "vcode:"+code, string(codeJSON), codeTTL).Err(); err != nil {
+	if err := rdb.Set(ctx, verificationCodeKey(req.Email, code), string(codeJSON), codeTTL).Err(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send verification code"})
 		return
 	}
@@ -622,7 +712,7 @@ func AppRegister(c *gin.Context) {
 
 	if err := mailCfg.SendVerificationCode(req.Email, code); err != nil {
 		// Roll back so the user can retry immediately.
-		rdb.Del(ctx, pendingKey, "vcode:"+code, cooldownKey)
+		rdb.Del(ctx, pendingKey, verificationCodeKey(req.Email, code), cooldownKey)
 		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to send verification code"})
 		return
 	}
@@ -640,14 +730,14 @@ func AppRegisterVerify(c *gin.Context) {
 	}
 
 	ctx := context.Background()
-	codeDataJSON, err := rdb.Get(ctx, "vcode:"+req.Code).Result()
+	codeDataJSON, err := rdb.Get(ctx, verificationCodeKey(req.Email, req.Code)).Result()
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired verification code"})
 		return
 	}
 	var codeData map[string]string
 	if err := json.Unmarshal([]byte(codeDataJSON), &codeData); err != nil ||
-		codeData["email"] != req.Email || codeData["purpose"] != "register" {
+		!strings.EqualFold(codeData["email"], req.Email) || codeData["purpose"] != "register" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid verification code"})
 		return
 	}
@@ -688,18 +778,18 @@ func AppRegisterVerify(c *gin.Context) {
 	}
 
 	// Consume the code and the pending registration.
-	rdb.Del(ctx, "vcode:"+req.Code, pendingKey, "vcode:cooldown:"+req.Email)
+	rdb.Del(ctx, verificationCodeKey(req.Email, req.Code), pendingKey, "vcode:cooldown:"+req.Email)
 	_, _ = db.Get().Exec(
 		`INSERT INTO verification_codes (id, email, code, purpose, expires_at, used) VALUES ($1, $2, $3, 'register', $4, true)`,
 		uuid.New().String(), req.Email, req.Code, time.Now().Add(codeTTL))
 
-	token, err := generateToken(uuid.MustParse(userID), "user")
+	tokens, err := issueTokens(userID, "user")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return
 	}
 
-	c.JSON(http.StatusOK, AppLoginResponse{UserID: userID, Token: token, Role: "user"})
+	c.JSON(http.StatusOK, AppLoginResponse{UserID: userID, Role: "user", TokenResponse: tokens})
 }
 
 // WebappLogin - login endpoint for web app
@@ -710,8 +800,8 @@ type WebappLoginRequest struct {
 
 type WebappLoginResponse struct {
 	UserID string `json:"user_id"`
-	Token  string `json:"token"`
 	Role   string `json:"role"`
+	TokenResponse
 }
 
 func WebappLogin(c *gin.Context) {
@@ -722,7 +812,7 @@ func WebappLogin(c *gin.Context) {
 	}
 
 	ctx := context.Background()
-	codeDataJSON, err := rdb.Get(ctx, "vcode:"+req.Code).Result()
+	codeDataJSON, err := rdb.Get(ctx, verificationCodeKey(req.Email, req.Code)).Result()
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired verification code"})
 		return
@@ -734,12 +824,12 @@ func WebappLogin(c *gin.Context) {
 		return
 	}
 
-	if codeData["email"] != req.Email {
+	if !strings.EqualFold(codeData["email"], req.Email) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "verification code does not match this email"})
 		return
 	}
 
-	rdb.Del(ctx, "vcode:"+req.Code)
+	rdb.Del(ctx, verificationCodeKey(req.Email, req.Code))
 	_, _ = db.Get().Exec(`UPDATE verification_codes SET used = true WHERE code = $1 AND email = $2`, req.Code, req.Email)
 
 	userID := codeData["user_id"]
@@ -762,13 +852,13 @@ func WebappLogin(c *gin.Context) {
 		role = "user"
 	}
 
-	token, err := generateToken(func() uuid.UUID { u, _ := uuid.Parse(userID); return u }(), role)
+	tokens, err := issueTokens(userID, role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return
 	}
 
-	c.JSON(http.StatusOK, WebappLoginResponse{UserID: userID, Token: token, Role: role})
+	c.JSON(http.StatusOK, WebappLoginResponse{UserID: userID, Role: role, TokenResponse: tokens})
 }
 
 type LogoutResponse struct {
@@ -776,11 +866,72 @@ type LogoutResponse struct {
 }
 
 func Logout(c *gin.Context) {
+	sessionID := c.GetString("session_id")
+	if sessionID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
+	if err := rdb.Set(c.Request.Context(), "vita:session:revoked:"+sessionID, "1", tokenManager.RefreshTTL()).Err(); err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "failed to revoke session"})
+		return
+	}
 	c.JSON(http.StatusOK, LogoutResponse{Message: "logged out"})
 }
 
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
 func RefreshToken(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"token": "new_token_placeholder"})
+	var req RefreshTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "refresh_token is required"})
+		return
+	}
+	claims, err := tokenManager.Parse(req.RefreshToken, auth.TokenTypeRefresh)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired refresh token"})
+		return
+	}
+	ctx := c.Request.Context()
+	revoked, err := rdb.Exists(ctx, "vita:session:revoked:"+claims.SessionID).Result()
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "session store unavailable"})
+		return
+	}
+	if revoked > 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "session has been revoked"})
+		return
+	}
+	remaining := time.Until(claims.ExpiresAt.Time)
+	if remaining <= 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "refresh token expired"})
+		return
+	}
+	used, err := rdb.SetNX(ctx, "vita:refresh:used:"+claims.ID, "1", remaining).Result()
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "session store unavailable"})
+		return
+	}
+	if !used {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "refresh token has already been used"})
+		return
+	}
+	if err := rdb.Set(ctx, "vita:session:revoked:"+claims.SessionID, "1", remaining).Err(); err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "failed to rotate session"})
+		return
+	}
+	var role string
+	if err := db.Get().QueryRow(`SELECT COALESCE(role_id,'user') FROM users WHERE id=$1 AND banned=false`, claims.UserID).Scan(&role); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "account is unavailable"})
+		return
+	}
+	tokens, err := issueTokens(claims.UserID, role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+		return
+	}
+	c.JSON(http.StatusOK, tokens)
 }
 
 // --- Companion Routes ---
@@ -1491,7 +1642,7 @@ func UploadMedia(c *gin.Context) {
 func GetMedia(c *gin.Context) {
 	var mimeType string
 	var data []byte
-	if err := db.Get().QueryRow(`SELECT mime_type,data FROM media_assets WHERE id=$1`, c.Param("id")).Scan(&mimeType, &data); err != nil {
+	if err := db.Get().QueryRow(`SELECT mime_type,data FROM media_assets WHERE id=$1 AND user_id=$2`, c.Param("id"), c.GetString("user_id")).Scan(&mimeType, &data); err != nil {
 		c.Status(http.StatusNotFound)
 		return
 	}
@@ -1505,26 +1656,23 @@ func GenerateMedia(c *gin.Context) {
 
 // --- Token Generation ---
 
-type Claims struct {
-	UserID string `json:"user_id"`
-	Role   string `json:"role"`
-	jwt.RegisteredClaims
+type TokenResponse struct {
+	Token        string `json:"token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int64  `json:"expires_in"`
 }
 
-func parseUUID(s string) uuid.UUID {
-	u, _ := uuid.Parse(s)
-	return u
-}
-
-func generateToken(userID uuid.UUID, role string) (string, error) {
-	claims := Claims{
-		UserID: userID.String(),
-		Role:   role,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
+func issueTokens(userID, role string) (TokenResponse, error) {
+	if tokenManager == nil {
+		return TokenResponse{}, errors.New("token manager is not initialized")
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(jwtSecret))
+	pair, err := tokenManager.Issue(userID, role)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+	return TokenResponse{
+		Token:        pair.AccessToken,
+		RefreshToken: pair.RefreshToken,
+		ExpiresIn:    pair.ExpiresIn,
+	}, nil
 }

@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import 'dart:convert';
-
 import '../../core/api_client.dart';
 import '../../core/analytics_service.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
+import '../../shared/media_image.dart';
 
 /// Life tab — the companion's timeline for today ("what she experienced"),
 /// distinct from Chat ("what she chose to tell you").
@@ -259,19 +258,12 @@ class _LifePhoto extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    ImageProvider provider;
-    if (url.startsWith('data:image/') && url.contains(',')) {
-      provider = MemoryImage(base64Decode(url.substring(url.indexOf(',') + 1)));
-    } else {
-      provider = NetworkImage(url);
-    }
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: AspectRatio(
         aspectRatio: 4 / 3,
-        child: Image(
-          image: provider,
-          fit: BoxFit.cover,
+        child: VitaMediaImage(
+          url: url,
           errorBuilder: (_, __, ___) => ColoredBox(
             color: context.vita.pageBg,
             child: Icon(Icons.broken_image_outlined, color: context.vita.hint),

@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../core/theme.dart';
 import '../../core/token_storage.dart';
 import '../../core/app_content_controller.dart';
+import 'auth_controller.dart';
 
 /// Startup gate: restores the stored session and routes to the shell or login.
 class SplashPage extends StatefulWidget {
@@ -38,7 +39,14 @@ class _SplashPageState extends State<SplashPage> {
       return;
     }
     if (token != null && token.isNotEmpty) {
-      Get.offAllNamed('/shell');
+      try {
+        await AuthController.to.fetchProfile();
+      } catch (_) {
+        await TokenStorage.clear();
+        if (mounted) Get.offAllNamed('/login');
+        return;
+      }
+      if (mounted) Get.offAllNamed('/shell');
     } else {
       Get.offAllNamed('/login');
     }

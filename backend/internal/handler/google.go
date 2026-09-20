@@ -70,8 +70,8 @@ type GoogleLoginRequest struct {
 type GoogleLoginResponse struct {
 	UserID string `json:"user_id"`
 	Email  string `json:"email"`
-	Token  string `json:"token"`
 	Role   string `json:"role"`
+	TokenResponse
 }
 
 // GoogleLogin signs in (or registers) a user from a verified Google ID token.
@@ -104,8 +104,8 @@ func GoogleLogin(c *gin.Context) {
 		userID = uuid.New().String()
 		role = "user"
 		if _, err := db.Get().Exec(
-			`INSERT INTO users (id, email, role_id) VALUES ($1, $2, $3)`,
-			userID, claims.Email, role); err != nil {
+			`INSERT INTO users (id, email, role_id, environment) VALUES ($1, $2, $3, $4)`,
+			userID, claims.Email, role, currentEnvironment()); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 			return
 		}
@@ -119,13 +119,13 @@ func GoogleLogin(c *gin.Context) {
 		return
 	}
 
-	token, err := generateToken(parseUUID(userID), role)
+	tokens, err := issueTokens(userID, role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return
 	}
 	c.JSON(http.StatusOK, GoogleLoginResponse{
-		UserID: userID, Email: claims.Email, Token: token, Role: role,
+		UserID: userID, Email: claims.Email, Role: role, TokenResponse: tokens,
 	})
 }
 

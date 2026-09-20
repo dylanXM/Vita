@@ -6,11 +6,22 @@ class TokenStorage {
 
   static const _storage = FlutterSecureStorage();
   static const _key = 'vita_token';
+  static const _refreshKey = 'vita_refresh_token';
 
   static Future<String?> read() => _storage.read(key: _key);
 
   static Future<void> write(String token) =>
       _storage.write(key: _key, value: token);
 
-  static Future<void> clear() => _storage.delete(key: _key);
+  static Future<String?> readRefresh() => _storage.read(key: _refreshKey);
+
+  static Future<void> writeSession(String token, String refreshToken) async {
+    await _storage.write(key: _key, value: token);
+    await _storage.write(key: _refreshKey, value: refreshToken);
+  }
+
+  static Future<void> clear() async {
+    await _storage.delete(key: _key);
+    await _storage.delete(key: _refreshKey);
+  }
 }

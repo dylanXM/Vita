@@ -186,7 +186,7 @@ be-fmt:
 	cd backend && if [ -d ent/schema ]; then gofmt -w cmd internal ent/schema; else gofmt -w cmd internal; fi
 
 be-migrate:
-	@cd backend && go run ./cmd/migrate $(NAME) 2>/dev/null || echo "Migration generation skipped"
+	cd backend && go run ./cmd/migrate
 
 be-rehash-migrations:
 	@cd backend && go run ./cmd/rehashmigrations 2>/dev/null || echo "Rehash skipped"

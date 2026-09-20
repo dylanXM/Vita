@@ -1,14 +1,17 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 import '../../core/constants.dart';
+import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
 import '../life/life_page.dart';
 import '../shell/shell_page.dart';
@@ -127,6 +130,21 @@ class _ChatPageState extends State<ChatPage> {
     final resolved = url.startsWith('http')
         ? url
         : '${vitaApiBaseUrl.replaceFirst(RegExp(r'/+$'), '')}${url.startsWith('/') ? url : '/$url'}';
+    if (Uri.tryParse(resolved)?.path.startsWith('/v1/media/') == true) {
+      final response = await ApiClient.instance.dio.get<List<int>>(
+        resolved,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      final bytes = response.data;
+      if (bytes == null || bytes.isEmpty) return;
+      final directory = await getTemporaryDirectory();
+      final file = File(
+        '${directory.path}/vita_audio_${Uri.parse(resolved).pathSegments.last}.m4a',
+      );
+      await file.writeAsBytes(bytes, flush: true);
+      await _player.play(DeviceFileSource(file.path));
+      return;
+    }
     await _player.play(UrlSource(resolved));
   }
 
@@ -542,7 +560,7 @@ class _ChatMessageBody extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
         child: AspectRatio(
           aspectRatio: 4 / 3,
-          child: Image(image: _messageImage(mediaURL), fit: BoxFit.cover),
+          child: VitaMediaImage(url: mediaURL),
         ),
       ));
     }
@@ -595,13 +613,6 @@ class _ChatMessageBody extends StatelessWidget {
     return Column(
         crossAxisAlignment: CrossAxisAlignment.start, children: children);
   }
-}
-
-ImageProvider _messageImage(String url) {
-  if (url.startsWith('data:image/') && url.contains(',')) {
-    return MemoryImage(base64Decode(url.substring(url.indexOf(',') + 1)));
-  }
-  return NetworkImage(url);
 }
 
 class _SheetInfoRow extends StatelessWidget {

@@ -19,7 +19,7 @@ func Open(cfg *config.Config) (*sql.DB, error) {
 	db.SetMaxIdleConns(5)
 
 	if cfg.AutoMigrate {
-		if err := migrate(db); err != nil {
+		if err := Migrate(db); err != nil {
 			return nil, fmt.Errorf("migration failed: %w", err)
 		}
 	}
@@ -43,7 +43,9 @@ func Get() *sql.DB {
 	return _db
 }
 
-func migrate(db *sql.DB) error {
+// Migrate applies the idempotent schema required by the current backend.
+// Production runs this explicitly through cmd/migrate before the API starts.
+func Migrate(db *sql.DB) error {
 	queries := []string{
 		`CREATE TABLE IF NOT EXISTS roles (
 			id TEXT PRIMARY KEY,

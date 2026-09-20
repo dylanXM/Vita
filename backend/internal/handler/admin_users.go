@@ -411,6 +411,10 @@ func AdminDeleteUser(c *gin.Context) {
 	// Delete children in FK order: messages → conversations, memories/life/
 	// states → companions, companions → user, then the account itself.
 	steps := []string{
+		`DELETE FROM invitation_rewards WHERE inviter_user_id = $1 OR invited_user_id = $1`,
+		`DELETE FROM billing_purchases WHERE user_id = $1`,
+		`DELETE FROM subscriptions WHERE user_id = $1`,
+		`DELETE FROM credit_transactions WHERE user_id = $1`,
 		`DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id = $1)`,
 		`DELETE FROM conversations WHERE user_id = $1`,
 		`DELETE FROM memories WHERE companion_id IN (SELECT id FROM companions WHERE user_id = $1)`,
@@ -422,7 +426,11 @@ func AdminDeleteUser(c *gin.Context) {
 		`DELETE FROM users WHERE id = $1`,
 	}
 	for _, q := range steps {
-		if _, err := tx.Exec(q, id, u.Email); err != nil {
+		args := []any{id}
+		if strings.Contains(q, "$2") {
+			args = append(args, u.Email)
+		}
+		if _, err := tx.Exec(q, args...); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete user data"})
 			return
 		}

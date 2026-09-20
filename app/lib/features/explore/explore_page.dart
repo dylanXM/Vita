@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -7,6 +5,7 @@ import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
+import '../../shared/media_image.dart';
 import '../memories/memories_page.dart';
 
 class ExploreController extends GetxController {
@@ -314,9 +313,8 @@ class _MomentMedia extends StatelessWidget {
         ),
         itemCount: visible.length,
         itemBuilder: (context, index) => ClipRect(
-          child: Image(
-            image: _momentImage(visible[index]),
-            fit: BoxFit.cover,
+          child: VitaMediaImage(
+            url: visible[index],
             errorBuilder: (_, __, ___) => Container(
               color: context.vita.pageBg,
               child: Icon(
@@ -329,11 +327,4 @@ class _MomentMedia extends StatelessWidget {
       ),
     );
   }
-}
-
-ImageProvider _momentImage(String url) {
-  if (url.startsWith('data:image/') && url.contains(',')) {
-    return MemoryImage(base64Decode(url.substring(url.indexOf(',') + 1)));
-  }
-  return NetworkImage(url);
 }
