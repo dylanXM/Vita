@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -37,7 +38,11 @@ class SettingsPage extends StatelessWidget {
               children: [
                 Obx(
                   () => VitaListTile(
-                    icon: Icons.language,
+                    customIcon: SvgPicture.asset(
+                      'assets/icons/menu_language.svg',
+                      width: 18,
+                      height: 18,
+                    ),
                     title: 'lang.title'.tr,
                     subtitle: _langLabel(context, settings.locale.value),
                     borderRadius: BorderRadius.zero,
@@ -51,7 +56,11 @@ class SettingsPage extends StatelessWidget {
                 const Divider(indent: 52, height: 0.5),
                 Obx(
                   () => VitaListTile(
-                    icon: Icons.dark_mode_outlined,
+                    customIcon: SvgPicture.asset(
+                      'assets/icons/menu_theme.svg',
+                      width: 18,
+                      height: 18,
+                    ),
                     title: 'theme.title'.tr,
                     subtitle: _themeLabel(context, settings.themeMode.value),
                     borderRadius: BorderRadius.zero,
@@ -64,7 +73,11 @@ class SettingsPage extends StatelessWidget {
                 ),
                 const Divider(indent: 52, height: 0.5),
                 VitaListTile(
-                  icon: Icons.notifications_outlined,
+                  customIcon: SvgPicture.asset(
+                      'assets/icons/menu_notifications.svg',
+                      width: 18,
+                      height: 18,
+                    ),
                   title: 'settings.notifications'.tr,
                   subtitle: 'settings.notifications.subtitle'.tr,
                   borderRadius: BorderRadius.zero,
@@ -85,14 +98,22 @@ class SettingsPage extends StatelessWidget {
             child: Column(
               children: [
                 VitaListTile(
-                  icon: Icons.privacy_tip_outlined,
+                  customIcon: SvgPicture.asset(
+                      'assets/icons/menu_privacy.svg',
+                      width: 18,
+                      height: 18,
+                    ),
                   title: 'settings.privacy'.tr,
                   borderRadius: BorderRadius.zero,
                   onTap: () => _openLegal(LegalDocumentType.privacy),
                 ),
                 const Divider(indent: 52, height: 0.5),
                 VitaListTile(
-                  icon: Icons.description_outlined,
+                  customIcon: SvgPicture.asset(
+                      'assets/icons/menu_terms.svg',
+                      width: 18,
+                      height: 18,
+                    ),
                   title: 'settings.terms'.tr,
                   borderRadius: BorderRadius.zero,
                   onTap: () => _openLegal(LegalDocumentType.terms),
@@ -113,7 +134,11 @@ class SettingsPage extends StatelessWidget {
             child: Column(
               children: [
                 VitaListTile(
-                  icon: Icons.logout,
+                  customIcon: SvgPicture.asset(
+                      'assets/icons/menu_logout.svg',
+                      width: 18,
+                      height: 18,
+                    ),
                   title: 'common.signout'.tr,
                   iconColor: vita.red,
                   borderRadius: BorderRadius.zero,
