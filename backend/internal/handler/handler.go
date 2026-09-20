@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
+	"vita/internal/agent"
 	"vita/internal/auth"
 	"vita/internal/config"
 	"vita/internal/db"
@@ -750,19 +751,40 @@ type Companion struct {
 	Occupation        string    `json:"occupation"`
 	Interests         string    `json:"interests"`
 	RelationshipStage string    `json:"relationship_stage"`
+	PersonalityTags   []string  `json:"personality_tags"`
+	SpeakingStyle     string    `json:"speaking_style"`
+	Likes             string    `json:"likes"`
+	Dislikes          string    `json:"dislikes"`
+	LifeHabits        string    `json:"life_habits"`
+	LifeGoal          string    `json:"life_goal"`
+	Backstory         string    `json:"backstory"`
+	PortraitID        *string   `json:"portrait_id"`
+	PortraitURL       string    `json:"portrait_url"`
+	ModelID           *string   `json:"model_id"`
+	CreationSource    string    `json:"creation_source"`
+	ProactiveEnabled  bool      `json:"proactive_enabled"`
+	Active            bool      `json:"active"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 type CreateCompanionRequest struct {
-	Name              string `json:"name" binding:"required"`
-	Gender            string `json:"gender"`
-	Persona           string `json:"persona"`
-	Appearance        string `json:"appearance"`
-	City              string `json:"city"`
-	Occupation        string `json:"occupation"`
-	Interests         string `json:"interests"`
-	RelationshipStage string `json:"relationship_stage"`
+	Name              string   `json:"name" binding:"required"`
+	Gender            string   `json:"gender"`
+	Persona           string   `json:"persona"`
+	Appearance        string   `json:"appearance"`
+	City              string   `json:"city"`
+	Occupation        string   `json:"occupation"`
+	Interests         string   `json:"interests"`
+	RelationshipStage string   `json:"relationship_stage"`
+	PersonalityTags   []string `json:"personality_tags"`
+	SpeakingStyle     string   `json:"speaking_style"`
+	Likes             string   `json:"likes"`
+	Dislikes          string   `json:"dislikes"`
+	LifeHabits        string   `json:"life_habits"`
+	LifeGoal          string   `json:"life_goal"`
+	Backstory         string   `json:"backstory"`
+	PortraitID        *string  `json:"portrait_id"`
 }
 
 func CreateCompanion(c *gin.Context) {
@@ -773,11 +795,34 @@ func CreateCompanion(c *gin.Context) {
 	}
 	companionID := uuid.New().String()
 	userID := c.GetString("user_id")
-	if userID == "" {
-		userID = uuid.New().String()
+	if len(req.PersonalityTags) > 8 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "choose no more than 8 personality tags"})
+		return
 	}
-	query := `INSERT INTO companions (id, user_id, name, gender, persona, appearance, city, occupation, interests, relationship_stage) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
-	_, err := db.Get().Exec(query, companionID, userID, req.Name, req.Gender, req.Persona, req.Appearance, req.City, req.Occupation, req.Interests, req.RelationshipStage)
+	if req.RelationshipStage == "" {
+		req.RelationshipStage = "stranger"
+	}
+	tags, _ := json.Marshal(req.PersonalityTags)
+	tx, err := db.Get().Begin()
+	if err == nil {
+		_, err = tx.Exec(`INSERT INTO companions
+			(id,user_id,name,gender,persona,appearance,city,occupation,interests,relationship_stage,
+			 personality_tags,speaking_style,likes,dislikes,life_habits,life_goal,backstory,portrait_id,creation_source,proactive_enabled,active)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'tags_portrait',true,true)`,
+			companionID, userID, req.Name, req.Gender, req.Persona, req.Appearance, req.City, req.Occupation, req.Interests,
+			req.RelationshipStage, tags, req.SpeakingStyle, req.Likes, req.Dislikes, req.LifeHabits, req.LifeGoal, req.Backstory, req.PortraitID)
+	}
+	if err == nil {
+		_, err = tx.Exec(`INSERT INTO relationship_states (companion_id) VALUES ($1)`, companionID)
+	}
+	if err == nil {
+		_, err = tx.Exec(`INSERT INTO companion_states (companion_id) VALUES ($1)`, companionID)
+	}
+	if err == nil {
+		err = tx.Commit()
+	} else if tx != nil {
+		_ = tx.Rollback()
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create companion"})
 		return
@@ -785,25 +830,32 @@ func CreateCompanion(c *gin.Context) {
 	c.JSON(http.StatusCreated, Companion{
 		ID: companionID, UserID: userID, Name: req.Name,
 		Gender: req.Gender, Persona: req.Persona,
-		RelationshipStage: req.RelationshipStage,
+		RelationshipStage: req.RelationshipStage, PersonalityTags: req.PersonalityTags,
+		SpeakingStyle: req.SpeakingStyle, Likes: req.Likes, Dislikes: req.Dislikes,
+		LifeHabits: req.LifeHabits, LifeGoal: req.LifeGoal, Backstory: req.Backstory,
+		PortraitID: req.PortraitID, CreationSource: "tags_portrait", ProactiveEnabled: true, Active: true,
 	})
 }
 
 func GetCompanion(c *gin.Context) {
 	id := c.Param("id")
 	var comp Companion
-	err := db.Get().QueryRow(`SELECT id, user_id, name, gender, persona, appearance, city, occupation, interests, relationship_stage, created_at, updated_at FROM companions WHERE id = $1`, id).Scan(
-		&comp.ID, &comp.UserID, &comp.Name, &comp.Gender, &comp.Persona, &comp.Appearance, &comp.City, &comp.Occupation, &comp.Interests, &comp.RelationshipStage, &comp.CreatedAt, &comp.UpdatedAt,
-	)
+	var tags string
+	var portraitID, modelID sql.NullString
+	err := db.Get().QueryRow(`SELECT c.id,c.user_id,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.appearance,''),COALESCE(c.city,''),COALESCE(c.occupation,''),COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.portrait_id,COALESCE(p.image_url,''),c.model_id,c.creation_source,c.proactive_enabled,c.active,c.created_at,c.updated_at FROM companions c LEFT JOIN companion_portraits p ON p.id=c.portrait_id WHERE c.id=$1 AND c.user_id=$2`, id, c.GetString("user_id")).Scan(
+		&comp.ID, &comp.UserID, &comp.Name, &comp.Gender, &comp.Persona, &comp.Appearance, &comp.City, &comp.Occupation, &comp.Interests, &comp.RelationshipStage, &tags, &comp.SpeakingStyle, &comp.Likes, &comp.Dislikes, &comp.LifeHabits, &comp.LifeGoal, &comp.Backstory, &portraitID, &comp.PortraitURL, &modelID, &comp.CreationSource, &comp.ProactiveEnabled, &comp.Active, &comp.CreatedAt, &comp.UpdatedAt)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "companion not found"})
 		return
 	}
+	_ = json.Unmarshal([]byte(tags), &comp.PersonalityTags)
+	comp.PortraitID = nullString(portraitID)
+	comp.ModelID = nullString(modelID)
 	c.JSON(http.StatusOK, comp)
 }
 
 func ListCompanions(c *gin.Context) {
-	rows, err := db.Get().Query(`SELECT id, user_id, name, gender, persona, appearance, city, occupation, interests, relationship_stage, created_at, updated_at FROM companions ORDER BY created_at DESC`)
+	rows, err := db.Get().Query(`SELECT c.id,c.user_id,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.appearance,''),COALESCE(c.city,''),COALESCE(c.occupation,''),COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.portrait_id,COALESCE(p.image_url,''),c.model_id,c.creation_source,c.proactive_enabled,c.active,c.created_at,c.updated_at FROM companions c LEFT JOIN companion_portraits p ON p.id=c.portrait_id WHERE c.user_id=$1 AND c.active=true ORDER BY c.created_at DESC`, c.GetString("user_id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list companions"})
 		return
@@ -812,17 +864,53 @@ func ListCompanions(c *gin.Context) {
 	var companions []Companion
 	for rows.Next() {
 		var comp Companion
-		rows.Scan(&comp.ID, &comp.UserID, &comp.Name, &comp.Gender, &comp.Persona, &comp.Appearance, &comp.City, &comp.Occupation, &comp.Interests, &comp.RelationshipStage, &comp.CreatedAt, &comp.UpdatedAt)
+		var tags string
+		var portraitID, modelID sql.NullString
+		if err := rows.Scan(&comp.ID, &comp.UserID, &comp.Name, &comp.Gender, &comp.Persona, &comp.Appearance, &comp.City, &comp.Occupation, &comp.Interests, &comp.RelationshipStage, &tags, &comp.SpeakingStyle, &comp.Likes, &comp.Dislikes, &comp.LifeHabits, &comp.LifeGoal, &comp.Backstory, &portraitID, &comp.PortraitURL, &modelID, &comp.CreationSource, &comp.ProactiveEnabled, &comp.Active, &comp.CreatedAt, &comp.UpdatedAt); err != nil {
+			continue
+		}
+		_ = json.Unmarshal([]byte(tags), &comp.PersonalityTags)
+		comp.PortraitID = nullString(portraitID)
+		comp.ModelID = nullString(modelID)
 		companions = append(companions, comp)
 	}
 	c.JSON(http.StatusOK, companions)
 }
 
 func UpdateCompanion(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "companion updated"})
+	id := c.Param("id")
+	var req CreateCompanionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(req.PersonalityTags) > 8 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "choose no more than 8 personality tags"})
+		return
+	}
+	tags, _ := json.Marshal(req.PersonalityTags)
+	result, err := db.Get().Exec(`UPDATE companions SET name=$3,gender=$4,persona=$5,appearance=$6,city=$7,occupation=$8,interests=$9,relationship_stage=$10,personality_tags=$11,speaking_style=$12,likes=$13,dislikes=$14,life_habits=$15,life_goal=$16,backstory=$17,portrait_id=$18,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$2`, id, c.GetString("user_id"), req.Name, req.Gender, req.Persona, req.Appearance, req.City, req.Occupation, req.Interests, req.RelationshipStage, tags, req.SpeakingStyle, req.Likes, req.Dislikes, req.LifeHabits, req.LifeGoal, req.Backstory, req.PortraitID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to update companion"})
+		return
+	}
+	if count, _ := result.RowsAffected(); count == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "companion not found"})
+		return
+	}
+	GetCompanion(c)
 }
 
 func DeleteCompanion(c *gin.Context) {
+	result, err := db.Get().Exec(`UPDATE companions SET active=false,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$2`, c.Param("id"), c.GetString("user_id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete companion"})
+		return
+	}
+	if count, _ := result.RowsAffected(); count == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "companion not found"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "companion deleted"})
 }
 
@@ -832,10 +920,13 @@ type SendMessageRequest struct {
 }
 
 type SendMessageResponse struct {
-	ID      string    `json:"id"`
-	Content string    `json:"content"`
-	Sender  string    `json:"sender"`
-	Created time.Time `json:"created_at"`
+	ID               string              `json:"id"`
+	Content          string              `json:"content"`
+	Sender           string              `json:"sender"`
+	Created          time.Time           `json:"created_at"`
+	UserMessage      *agent.SavedMessage `json:"user_message,omitempty"`
+	CompanionMessage *agent.SavedMessage `json:"companion_message"`
+	AgentError       string              `json:"agent_error,omitempty"`
 }
 
 func SendMessage(c *gin.Context) {
@@ -847,21 +938,56 @@ func SendMessage(c *gin.Context) {
 	}
 	msgID := uuid.New().String()
 	userID := c.GetString("user_id")
-	if userID == "" {
-		userID = uuid.New().String()
+	if req.MessageType == "" {
+		req.MessageType = "text"
 	}
-	query := `INSERT INTO messages (id, conversation_id, sender_type, message_type, content, created_at) VALUES ($1, $2, $3, $4, $5, $6)`
-	_, err := db.Get().Exec(query, msgID, conversationID, "user", req.MessageType, req.Content, time.Now())
+	if req.MessageType != "text" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "this version supports text messages only"})
+		return
+	}
+	var owns bool
+	if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM conversations WHERE id=$1 AND user_id=$2)`, conversationID, userID).Scan(&owns); err != nil || !owns {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
+		return
+	}
+	createdAt := time.Now().UTC()
+	query := `INSERT INTO messages (id,conversation_id,sender_type,message_type,content,payload,source,delivery_status,created_at) VALUES ($1,$2,'user',$3,$4,'{}'::jsonb,'user','delivered',$5)`
+	_, err := db.Get().Exec(query, msgID, conversationID, req.MessageType, req.Content, createdAt)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send message"})
 		return
 	}
-	c.JSON(http.StatusCreated, SendMessageResponse{ID: msgID, Content: req.Content, Sender: "user", Created: time.Now()})
+	userMessage := &agent.SavedMessage{ID: msgID, ConversationID: conversationID, SenderType: "user", MessageType: req.MessageType, Content: req.Content, Payload: map[string]any{}, Source: "user", DeliveryStatus: "delivered", CreatedAt: createdAt}
+	response := SendMessageResponse{ID: msgID, Content: req.Content, Sender: "user", Created: createdAt, UserMessage: userMessage}
+	if companionAgent == nil {
+		response.AgentError = "agent service is unavailable"
+		c.JSON(http.StatusCreated, response)
+		return
+	}
+	replyCtx, cancel := context.WithTimeout(c.Request.Context(), 50*time.Second)
+	defer cancel()
+	reply, replyErr := companionAgent.Reply(replyCtx, conversationID, userID)
+	if replyErr != nil {
+		response.AgentError = "companion could not reply yet"
+	} else {
+		response.CompanionMessage = reply
+	}
+	c.JSON(http.StatusCreated, response)
 }
 
 func GetMessages(c *gin.Context) {
 	conversationID := c.Param("id")
-	rows, err := db.Get().Query(`SELECT id, conversation_id, sender_type, message_type, content, media_url, created_at FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC`, conversationID)
+	userID := c.GetString("user_id")
+	query := `SELECT m.id,m.conversation_id,m.sender_type,m.message_type,COALESCE(m.content,''),COALESCE(m.media_url,''),m.payload::text,m.source,COALESCE(m.life_event_id,''),m.delivery_status,m.created_at FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE m.conversation_id=$1 AND c.user_id=$2`
+	args := []any{conversationID, userID}
+	if after := c.Query("after"); after != "" {
+		if parsed, parseErr := time.Parse(time.RFC3339Nano, after); parseErr == nil {
+			query += ` AND m.created_at > $3`
+			args = append(args, parsed)
+		}
+	}
+	query += ` ORDER BY m.created_at ASC`
+	rows, err := db.Get().Query(query, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get messages"})
 		return
@@ -870,10 +996,14 @@ func GetMessages(c *gin.Context) {
 	var messages []map[string]interface{}
 	for rows.Next() {
 		var m map[string]interface{}
-		var id, conversationID, senderType, messageType, content, mediaURL string
+		var id, conversationID, senderType, messageType, content, mediaURL, payloadRaw, source, lifeEventID, deliveryStatus string
 		var created time.Time
-		rows.Scan(&id, &conversationID, &senderType, &messageType, &content, &mediaURL, &created)
-		m = map[string]interface{}{"id": id, "conversation_id": conversationID, "sender_type": senderType, "message_type": messageType, "content": content, "media_url": mediaURL, "created_at": created}
+		if err := rows.Scan(&id, &conversationID, &senderType, &messageType, &content, &mediaURL, &payloadRaw, &source, &lifeEventID, &deliveryStatus, &created); err != nil {
+			continue
+		}
+		payload := map[string]any{}
+		_ = json.Unmarshal([]byte(payloadRaw), &payload)
+		m = map[string]interface{}{"id": id, "conversation_id": conversationID, "sender_type": senderType, "message_type": messageType, "content": content, "media_url": mediaURL, "payload": payload, "source": source, "life_event_id": lifeEventID, "delivery_status": deliveryStatus, "created_at": created}
 		messages = append(messages, m)
 	}
 	c.JSON(http.StatusOK, messages)
@@ -927,7 +1057,17 @@ func GetOrCreateConversation(c *gin.Context) {
 
 func GetTodayLife(c *gin.Context) {
 	companionID := c.Param("id")
-	rows, err := db.Get().Query(`SELECT id, event_type, title, description, location, start_time, end_time, emotion, importance FROM life_events WHERE companion_id = $1 AND DATE(start_time) = CURRENT_DATE ORDER BY start_time`, companionID)
+	var timezone string
+	if err := db.Get().QueryRow(`SELECT COALESCE(u.timezone,'UTC') FROM companions c JOIN users u ON u.id=c.user_id WHERE c.id=$1 AND c.user_id=$2`, companionID, c.GetString("user_id")).Scan(&timezone); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "companion not found"})
+		return
+	}
+	location, err := time.LoadLocation(timezone)
+	if err != nil {
+		location = time.UTC
+	}
+	localDate := time.Now().In(location).Format("2006-01-02")
+	rows, err := db.Get().Query(`SELECT e.id,COALESCE(e.event_type,''),COALESCE(e.title,''),COALESCE(e.description,''),COALESCE(e.location,''),e.start_time,e.end_time,COALESCE(e.emotion,''),e.importance,e.user_relevance,e.shareability,e.payload::text,e.generation_source,e.shared_at FROM life_events e JOIN companions c ON c.id=e.companion_id WHERE e.companion_id=$1 AND c.user_id=$2 AND e.local_date=$3 ORDER BY e.start_time`, companionID, c.GetString("user_id"), localDate)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get today's life"})
 		return
@@ -937,13 +1077,21 @@ func GetTodayLife(c *gin.Context) {
 	for rows.Next() {
 		var id, eventType, title, description, location string
 		var startTime, endTime time.Time
-		var emotion, importance int
-		rows.Scan(&id, &eventType, &title, &description, &location, &startTime, &endTime, &emotion, &importance)
+		var emotion, payloadRaw, generationSource string
+		var importance, userRelevance int
+		var shareability bool
+		var sharedAt sql.NullTime
+		if err := rows.Scan(&id, &eventType, &title, &description, &location, &startTime, &endTime, &emotion, &importance, &userRelevance, &shareability, &payloadRaw, &generationSource, &sharedAt); err != nil {
+			continue
+		}
+		payload := map[string]any{}
+		_ = json.Unmarshal([]byte(payloadRaw), &payload)
 		m := map[string]interface{}{
 			"id": id, "event_type": eventType, "title": title,
 			"description": description, "location": location,
 			"start_time": startTime, "end_time": endTime,
-			"emotion": emotion, "importance": importance,
+			"emotion": emotion, "importance": importance, "user_relevance": userRelevance,
+			"shareability": shareability, "payload": payload, "generation_source": generationSource, "shared_at": nullTime(sharedAt),
 		}
 		events = append(events, m)
 	}
@@ -951,11 +1099,49 @@ func GetTodayLife(c *gin.Context) {
 }
 
 func GetLifeEvents(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"events": []interface{}{}})
+	companionID := c.Param("id")
+	rows, err := db.Get().Query(`SELECT e.id,COALESCE(e.event_type,''),COALESCE(e.title,''),COALESCE(e.description,''),COALESCE(e.location,''),e.start_time,e.end_time,COALESCE(e.emotion,''),e.importance,e.user_relevance,e.shareability,e.payload::text,e.generation_source,e.shared_at FROM life_events e JOIN companions c ON c.id=e.companion_id WHERE e.companion_id=$1 AND c.user_id=$2 ORDER BY e.start_time DESC LIMIT 200`, companionID, c.GetString("user_id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get life events"})
+		return
+	}
+	defer rows.Close()
+	events := make([]gin.H, 0)
+	for rows.Next() {
+		var id, eventType, title, description, location, emotion, payloadRaw, generationSource string
+		var startTime, endTime time.Time
+		var importance, userRelevance int
+		var shareability bool
+		var sharedAt sql.NullTime
+		if rows.Scan(&id, &eventType, &title, &description, &location, &startTime, &endTime, &emotion, &importance, &userRelevance, &shareability, &payloadRaw, &generationSource, &sharedAt) != nil {
+			continue
+		}
+		payload := map[string]any{}
+		_ = json.Unmarshal([]byte(payloadRaw), &payload)
+		events = append(events, gin.H{"id": id, "event_type": eventType, "title": title, "description": description, "location": location, "start_time": startTime, "end_time": endTime, "emotion": emotion, "importance": importance, "user_relevance": userRelevance, "shareability": shareability, "payload": payload, "generation_source": generationSource, "shared_at": nullTime(sharedAt)})
+	}
+	c.JSON(http.StatusOK, gin.H{"events": events})
 }
 
 func GetMemories(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"memories": []interface{}{}})
+	rows, err := db.Get().Query(`SELECT m.id,COALESCE(m.type,''),COALESCE(m.content,''),m.importance,m.event_time,COALESCE(m.metadata,''),m.created_at FROM memories m JOIN companions c ON c.id=m.companion_id WHERE m.companion_id=$1 AND c.user_id=$2 ORDER BY m.importance DESC,m.created_at DESC`, c.Param("id"), c.GetString("user_id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get memories"})
+		return
+	}
+	defer rows.Close()
+	memories := make([]gin.H, 0)
+	for rows.Next() {
+		var id, kind, content, metadata string
+		var importance int
+		var eventTime sql.NullTime
+		var created time.Time
+		if rows.Scan(&id, &kind, &content, &importance, &eventTime, &metadata, &created) != nil {
+			continue
+		}
+		memories = append(memories, gin.H{"id": id, "type": kind, "content": content, "importance": importance, "event_time": nullTime(eventTime), "metadata": metadata, "created_at": created})
+	}
+	c.JSON(http.StatusOK, gin.H{"memories": memories})
 }
 
 func UploadMedia(c *gin.Context) {

@@ -14,6 +14,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 
+	"vita/internal/agent"
 	"vita/internal/config"
 	"vita/internal/db"
 	"vita/internal/handler"
@@ -31,6 +32,17 @@ func main() {
 		log.Fatalf("failed to connect database: %v", err)
 	}
 	defer dbClient.Close()
+
+	agentService, err := agent.NewService(dbClient, cfg.AgentConfigKey, cfg.MockGeneration)
+	if err != nil {
+		log.Fatalf("failed to initialize companion agent: %v", err)
+	}
+	handler.InitAgent(agentService)
+	agentCtx, stopAgent := context.WithCancel(context.Background())
+	defer stopAgent()
+	if cfg.AgentEnabled {
+		go agentService.Run(agentCtx, cfg.AgentTick)
+	}
 
 	// The stamped environment must be set before any request creates an account.
 	handler.SetEnvironment(cfg.Env)
@@ -93,16 +105,20 @@ func main() {
 
 		companions := api.Group("/companions")
 		{
+			companions.Use(middleware.RequireAuth())
 			companions.POST("/", handler.CreateCompanion)
 			companions.GET("/:id", handler.GetCompanion)
 			companions.GET("/", handler.ListCompanions)
 			companions.PUT("/:id", handler.UpdateCompanion)
 			companions.DELETE("/:id", handler.DeleteCompanion)
 		}
+		api.GET("/companion-options", middleware.RequireAuth(), handler.CompanionOptions)
+		api.GET("/me/agent-notifications", middleware.RequireAuth(), handler.AgentNotifications)
 
 		conversations := api.Group("/conversations")
 		{
-			conversations.POST("/", middleware.RequireAuth(), handler.GetOrCreateConversation)
+			conversations.Use(middleware.RequireAuth())
+			conversations.POST("/", handler.GetOrCreateConversation)
 			conversations.POST("/:id/messages", handler.SendMessage)
 			conversations.GET("/:id/messages", handler.GetMessages)
 		}
@@ -117,12 +133,14 @@ func main() {
 
 		life := api.Group("/companions/:id/life")
 		{
+			life.Use(middleware.RequireAuth())
 			life.GET("/today", handler.GetTodayLife)
 			life.GET("/events", handler.GetLifeEvents)
 		}
 
 		memories := api.Group("/companions/:id/memories")
 		{
+			memories.Use(middleware.RequireAuth())
 			memories.GET("/", handler.GetMemories)
 		}
 
@@ -153,6 +171,23 @@ func main() {
 				users.POST("/:id/ban", func(c *gin.Context) { handler.AdminSetBanned(c, true) })
 				users.POST("/:id/unban", func(c *gin.Context) { handler.AdminSetBanned(c, false) })
 			}
+
+			agentAdmin := admin.Group("/agent")
+			{
+				agentAdmin.GET("/config", handler.AdminAgentConfig)
+				agentAdmin.PUT("/settings", handler.AdminUpdateAgentSettings)
+				agentAdmin.POST("/providers", handler.AdminCreateProvider)
+				agentAdmin.PUT("/providers/:id", handler.AdminUpdateProvider)
+				agentAdmin.DELETE("/providers/:id", handler.AdminDeleteProvider)
+				agentAdmin.POST("/models", handler.AdminCreateModel)
+				agentAdmin.PUT("/models/:id", handler.AdminUpdateModel)
+				agentAdmin.DELETE("/models/:id", handler.AdminDeleteModel)
+				agentAdmin.POST("/portraits", handler.AdminCreatePortrait)
+				agentAdmin.PUT("/portraits/:id", handler.AdminUpdatePortrait)
+				agentAdmin.GET("/companions", handler.AdminListCompanions)
+				agentAdmin.POST("/companions", handler.AdminCreateCompanion)
+				agentAdmin.PUT("/companions/:id", handler.AdminUpdateCompanion)
+			}
 		}
 	}
 
@@ -160,7 +195,7 @@ func main() {
 		Addr:         cfg.HTTPAddr,
 		Handler:      engine,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 60 * time.Second,
 	}
 
 	go func() {
@@ -172,6 +207,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
+	stopAgent()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

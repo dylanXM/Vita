@@ -65,6 +65,13 @@ type Config struct {
 	SMTPFrom     string
 	SMTPFromName string
 
+	// AgentConfigKey encrypts provider API keys stored through the admin UI.
+	// Production should set a dedicated high-entropy value. Falling back to the
+	// JWT secret keeps local development compatible with existing environments.
+	AgentConfigKey string
+	AgentEnabled   bool
+	AgentTick      time.Duration
+
 	// RevenueCatWebhookSecret verifies the Authorization header on the
 	// RevenueCat webhook (the "Shared Secret" shown in the RC dashboard).
 	RevenueCatWebhookSecret string
@@ -113,6 +120,10 @@ func Load() *Config {
 		SMTPFrom:     getEnv("VITA_SMTP_FROM", ""),
 		SMTPFromName: getEnv("VITA_SMTP_FROM_NAME", "Vita"),
 
+		AgentConfigKey: getEnv("VITA_AGENT_CONFIG_KEY", getEnv("VITA_JWT_SECRET", "dev-secret-change-me-32-characters-min")),
+		AgentEnabled:   getEnv("VITA_AGENT_ENABLED", "true") == "true",
+		AgentTick:      durationEnv(getEnv("VITA_AGENT_TICK", "1m"), time.Minute),
+
 		RevenueCatWebhookSecret: getEnv("VITA_REVENUECAT_WEBHOOK_SECRET", ""),
 
 		StripeSecretKey:     getEnv("VITA_STRIPE_SECRET_KEY", ""),
@@ -127,6 +138,13 @@ func Load() *Config {
 func atoiEnv(raw string, fallback int) int {
 	if v, err := strconv.Atoi(raw); err == nil {
 		return v
+	}
+	return fallback
+}
+
+func durationEnv(raw string, fallback time.Duration) time.Duration {
+	if value, err := time.ParseDuration(raw); err == nil && value > 0 {
+		return value
 	}
 	return fallback
 }

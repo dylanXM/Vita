@@ -37,7 +37,8 @@ class ChatListPage extends StatelessWidget {
                     transition: Transition.cupertino,
                     duration: const Duration(milliseconds: 300),
                   ),
-                  icon: Icon(Icons.person_add_alt_1, color: context.vita.green, size: 21),
+                  icon: Icon(Icons.person_add_alt_1,
+                      color: context.vita.green, size: 21),
                 ),
               ),
             ),
@@ -92,24 +93,33 @@ class ChatListPage extends StatelessWidget {
             ),
             child: Row(
               children: [
-                VitaAvatar(name: name, radius: 26),
+                VitaAvatar(
+                    name: name,
+                    radius: 26,
+                    imageUrl: c['portrait_url'] as String?),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: context.vita.text)),
+                      Text(name,
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: context.vita.text)),
                       const SizedBox(height: 3),
                       Text(
                         subtitle.isEmpty ? 'chat.distant'.tr : subtitle,
-                        style: TextStyle(fontSize: 13, color: context.vita.subText),
+                        style: TextStyle(
+                            fontSize: 13, color: context.vita.subText),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right, size: 20, color: context.vita.chevron),
+                Icon(Icons.chevron_right,
+                    size: 20, color: context.vita.chevron),
               ],
             ),
           ),

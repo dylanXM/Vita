@@ -97,3 +97,101 @@ export interface AdminUserInput {
   timezone?: string;
   environment?: Environment;
 }
+
+export type AIProviderKind = "openai" | "anthropic";
+
+export interface AIProvider {
+  id: string;
+  name: string;
+  kind: AIProviderKind;
+  base_url: string;
+  api_key_configured: boolean;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AIProviderInput {
+  name: string;
+  kind: AIProviderKind;
+  base_url: string;
+  /** Write-only. Empty on update keeps the existing key. */
+  api_key?: string;
+  enabled: boolean;
+}
+
+export interface AIModel {
+  id: string;
+  provider_id: string;
+  provider_name: string;
+  model_name: string;
+  display_name: string;
+  capabilities: Array<"text" | "image" | "audio">;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AIModelInput {
+  provider_id: string;
+  model_name: string;
+  display_name: string;
+  capabilities: Array<"text" | "image" | "audio">;
+  enabled: boolean;
+}
+
+export interface AgentSettings {
+  chat_model_id: string | null;
+  life_model_id: string | null;
+  proactive_model_id: string | null;
+  daily_event_min: number;
+  daily_event_max: number;
+  daily_proactive_limit: number;
+  quiet_hours_start: number;
+  quiet_hours_end: number;
+}
+
+export interface CompanionPortrait {
+  id: string;
+  name: string;
+  image_url: string;
+  gender: string;
+  personality_tags: string[];
+  enabled: boolean;
+  sort_order: number;
+}
+
+export interface AgentConfig {
+  providers: AIProvider[];
+  models: AIModel[];
+  settings: AgentSettings;
+  portraits: CompanionPortrait[];
+}
+
+export interface AdminCompanion {
+  id: string;
+  user_id: string;
+  user_email: string;
+  name: string;
+  gender: string;
+  persona: string;
+  city: string;
+  occupation: string;
+  interests: string;
+  relationship_stage: string;
+  personality_tags: string[];
+  speaking_style: string;
+  likes: string;
+  dislikes: string;
+  life_habits: string;
+  life_goal: string;
+  backstory: string;
+  model_id: string | null;
+  portrait_id: string | null;
+  proactive_enabled: boolean;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminCompanionInput extends Omit<AdminCompanion, "id" | "user_email" | "created_at" | "updated_at"> {}

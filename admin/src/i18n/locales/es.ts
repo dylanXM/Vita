@@ -20,6 +20,7 @@ const es = {
     dashboard: "Panel",
     management: "Gestión",
     users: "Usuarios",
+    agent: "Compañero IA",
   },
 
   login: {
@@ -127,6 +128,15 @@ const es = {
     conversations: "Conversaciones",
     messages: "Mensajes",
     memories: "Recuerdos",
+  },
+
+  agent: {
+    title: "Agente de compañero IA", desc: "Configura proveedores, enrutamiento, generación de vida y personajes.",
+    providers: "Proveedores", providersDesc: "OpenAI compatible y Anthropic. Las claves son de solo escritura y cifradas.", providerName: "Nombre", providerType: "Tipo", baseUrl: "URL base", apiKey: "Clave API", keepSecret: "Deja vacío para conservar la clave", defaultEndpoint: "Endpoint predeterminado", keyConfigured: "Clave configurada", keyMissing: "Falta la clave", noProviders: "No hay proveedores.", provider: "Proveedor",
+    models: "Modelos", modelsDesc: "Registra los modelos remotos disponibles para los agentes.", modelId: "ID del modelo", displayName: "Nombre visible", noModels: "No hay modelos.",
+    routing: "Enrutamiento y Life Engine", routingDesc: "Elige modelos por tarea y limita la actividad autónoma.", chatModel: "Modelo de chat", lifeModel: "Modelo de planificación", proactiveModel: "Modelo de mensaje proactivo", selectModel: "Seleccionar…", eventMin: "Eventos mínimos", eventMax: "Eventos máximos", proactiveLimit: "Límite proactivo diario", quietStart: "Silencio inicia", quietEnd: "Silencio termina", saveSettings: "Guardar enrutamiento",
+    portraits: "Retratos del sistema", portraitsDesc: "Retratos disponibles durante la creación inicial.", portraitName: "Nombre del retrato", imageUrl: "URL de imagen", gender: "Tipo", tags: "Rasgos de personalidad", addPortrait: "Añadir retrato",
+    companions: "Personajes", companionsDesc: "Configura identidad, modelo y vida independiente.", noCompanions: "No hay personajes.", companion: "Personaje", name: "Nombre", city: "Ciudad", occupation: "Profesión", model: "Modelo asignado", portrait: "Retrato", noPortrait: "Sin retrato", useDefault: "Usar modelo de chat predeterminado", persona: "Personalidad y límites", backstory: "Historia", speakingStyle: "Forma de hablar", habitsGoal: "Hábitos (primera línea) y meta vital", proactiveEnabled: "Permitir contacto proactivo limitado", saveCompanion: "Guardar personaje", add: "Añadir", update: "Actualizar", saved: "Configuración del agente guardada",
   },
 
   time: {

@@ -20,6 +20,7 @@ const ja = {
     dashboard: "ダッシュボード",
     management: "管理",
     users: "ユーザー",
+    agent: "AIコンパニオン",
   },
 
   login: {
@@ -127,6 +128,15 @@ const ja = {
     conversations: "会話",
     messages: "メッセージ",
     memories: "メモリー",
+  },
+
+  agent: {
+    title: "AIコンパニオンエージェント", desc: "モデル、エージェントルーティング、生活生成、人物を設定します。",
+    providers: "プロバイダー", providersDesc: "OpenAI互換とAnthropic。APIキーは書き込み専用で暗号化されます。", providerName: "名前", providerType: "種類", baseUrl: "ベースURL", apiKey: "APIキー", keepSecret: "空欄で現在のキーを保持", defaultEndpoint: "既定エンドポイント", keyConfigured: "キー設定済み", keyMissing: "キー未設定", noProviders: "プロバイダーがありません。", provider: "プロバイダー",
+    models: "モデル", modelsDesc: "コンパニオンが利用するモデルIDを登録します。", modelId: "モデルID", displayName: "表示名", noModels: "モデルがありません。",
+    routing: "エージェントルーティングとLife Engine", routingDesc: "各タスクのモデルと自律活動の上限を設定します。", chatModel: "チャットモデル", lifeModel: "生活計画モデル", proactiveModel: "自発メッセージモデル", selectModel: "選択…", eventMin: "イベント最小数", eventMax: "イベント最大数", proactiveLimit: "1日の自発連絡上限", quietStart: "静音開始", quietEnd: "静音終了", saveSettings: "ルーティングを保存",
+    portraits: "システム人物画像", portraitsDesc: "初期作成で選択できる人物画像です。", portraitName: "画像名", imageUrl: "画像URL", gender: "タイプ", tags: "性格タグ", addPortrait: "画像を追加",
+    companions: "人物管理", companionsDesc: "人物、モデル、独立した生活行動を手動設定します。", noCompanions: "人物がいません。", companion: "人物", name: "名前", city: "都市", occupation: "職業", model: "割当モデル", portrait: "人物画像", noPortrait: "画像なし", useDefault: "既定チャットモデルを使用", persona: "人格と境界", backstory: "背景", speakingStyle: "話し方", habitsGoal: "習慣（1行目）と人生目標", proactiveEnabled: "制限内の自発連絡を許可", saveCompanion: "人物を保存", add: "追加", update: "更新", saved: "エージェント設定を保存しました",
   },
 
   time: {

@@ -11,6 +11,7 @@ class VitaAvatar extends StatelessWidget {
     this.radius = 24,
     this.background,
     this.textColor,
+    this.imageUrl,
   });
 
   final String name;
@@ -19,21 +20,31 @@ class VitaAvatar extends StatelessWidget {
   /// Optional background override (e.g. white on gradient headers).
   final Color? background;
   final Color? textColor;
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
     final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
+    final source = imageUrl?.trim() ?? '';
+    final ImageProvider<Object>? image = source.startsWith('asset://')
+        ? AssetImage(source.substring('asset://'.length))
+        : source.isNotEmpty
+            ? NetworkImage(source)
+            : null;
     return CircleAvatar(
       radius: radius,
       backgroundColor: background ?? context.vita.green.withValues(alpha: 0.18),
-      child: Text(
-        initial,
-        style: TextStyle(
-          color: textColor ?? context.vita.green,
-          fontSize: radius * 0.9,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+      backgroundImage: image,
+      child: image == null
+          ? Text(
+              initial,
+              style: TextStyle(
+                color: textColor ?? context.vita.green,
+                fontSize: radius * 0.9,
+                fontWeight: FontWeight.w600,
+              ),
+            )
+          : null,
     );
   }
 }
@@ -363,7 +374,7 @@ class VitaListTile extends StatelessWidget {
   final String? subtitle;
   final Widget? trailing;
   final Color? iconColor;
-  final BorderRadiusGeometry? borderRadius;
+  final BorderRadius? borderRadius;
   final VoidCallback? onTap;
 
   @override

@@ -7,6 +7,7 @@ import { DashboardPage } from "@/pages/DashboardPage";
 import { UsersPage } from "@/pages/UsersPage";
 import { UserDetailPage } from "@/pages/UserDetailPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
+import { AgentPage } from "@/pages/AgentPage";
 import { Button } from "@/components/ui/button";
 
 function RouteError() {
@@ -45,6 +46,7 @@ const router = createBrowserRouter([
       { path: "dashboard", element: <DashboardPage /> },
       { path: "users", element: <UsersPage /> },
       { path: "users/:id", element: <UserDetailPage /> },
+      { path: "agent", element: <AgentPage /> },
     ],
   },
   { path: "*", element: <NotFoundPage /> },

@@ -20,6 +20,7 @@ const ar = {
     dashboard: "لوحة التحكم",
     management: "الإدارة",
     users: "المستخدمون",
+    agent: "رفيق الذكاء الاصطناعي",
   },
 
   login: {
@@ -127,6 +128,15 @@ const ar = {
     conversations: "المحادثات",
     messages: "الرسائل",
     memories: "الذكريات",
+  },
+
+  agent: {
+    title: "وكيل رفيق الذكاء الاصطناعي", desc: "إعداد مزودي النماذج والتوجيه وتوليد الحياة والشخصيات.",
+    providers: "المزودون", providersDesc: "يدعم OpenAI المتوافق وAnthropic. المفاتيح للكتابة فقط ومشفرة.", providerName: "الاسم", providerType: "النوع", baseUrl: "الرابط الأساسي", apiKey: "مفتاح API", keepSecret: "اتركه فارغاً للاحتفاظ بالمفتاح الحالي", defaultEndpoint: "النقطة الافتراضية", keyConfigured: "المفتاح مضبوط", keyMissing: "المفتاح مفقود", noProviders: "لا يوجد مزودون.", provider: "المزود",
+    models: "النماذج", modelsDesc: "سجل معرفات النماذج التي يستخدمها الوكلاء.", modelId: "معرف النموذج", displayName: "اسم العرض", noModels: "لا توجد نماذج.",
+    routing: "التوجيه ومحرك الحياة", routingDesc: "اختر نموذجاً لكل مهمة وحدد النشاط الذاتي.", chatModel: "نموذج المحادثة", lifeModel: "نموذج تخطيط الحياة", proactiveModel: "نموذج الرسائل الاستباقية", selectModel: "اختر…", eventMin: "الحد الأدنى للأحداث", eventMax: "الحد الأقصى للأحداث", proactiveLimit: "حد التواصل اليومي", quietStart: "بدء الهدوء", quietEnd: "نهاية الهدوء", saveSettings: "حفظ التوجيه",
+    portraits: "صور الشخصيات", portraitsDesc: "الصور المتاحة عند الإنشاء الأولي.", portraitName: "اسم الصورة", imageUrl: "رابط الصورة", gender: "النوع", tags: "سمات الشخصية", addPortrait: "إضافة صورة",
+    companions: "الشخصيات", companionsDesc: "إعداد الهوية والنموذج والحياة المستقلة يدوياً.", noCompanions: "لا توجد شخصيات.", companion: "الشخصية", name: "الاسم", city: "المدينة", occupation: "المهنة", model: "النموذج المعين", portrait: "الصورة", noPortrait: "بلا صورة", useDefault: "استخدام نموذج المحادثة الافتراضي", persona: "الشخصية والحدود", backstory: "الخلفية", speakingStyle: "أسلوب الكلام", habitsGoal: "العادات والهدف الحياتي", proactiveEnabled: "السماح بتواصل استباقي محدود", saveCompanion: "حفظ الشخصية", add: "إضافة", update: "تحديث", saved: "تم حفظ إعدادات الوكيل",
   },
 
   time: {

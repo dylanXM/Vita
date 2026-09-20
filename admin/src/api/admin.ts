@@ -10,6 +10,15 @@ import type {
   AdminUserListParams,
   HealthResponse,
   Profile,
+  AgentConfig,
+  AgentSettings,
+  AIModel,
+  AIModelInput,
+  AIProvider,
+  AIProviderInput,
+  AdminCompanion,
+  AdminCompanionInput,
+  CompanionPortrait,
 } from "./types";
 
 /** Admin sign-in. The API also accepts a 6-digit code for the same accounts. */
@@ -44,4 +53,27 @@ export const envApi = {
 
 export const healthApi = {
   get: (signal?: AbortSignal) => http.get<HealthResponse>("/health", { signal }),
+};
+
+export const agentApi = {
+  config: (signal?: AbortSignal) => http.get<AgentConfig>("/admin/agent/config", { signal }),
+  saveSettings: (body: AgentSettings) => http.put<AgentSettings>("/admin/agent/settings", body),
+  createProvider: (body: AIProviderInput) => http.post<AIProvider>("/admin/agent/providers", body),
+  updateProvider: (id: string, body: AIProviderInput) =>
+    http.put<AIProvider>(`/admin/agent/providers/${id}`, body),
+  removeProvider: (id: string) => http.del<{ message: string }>(`/admin/agent/providers/${id}`),
+  createModel: (body: AIModelInput) => http.post<AIModel>("/admin/agent/models", body),
+  updateModel: (id: string, body: AIModelInput) =>
+    http.put<AIModel>(`/admin/agent/models/${id}`, body),
+  removeModel: (id: string) => http.del<{ message: string }>(`/admin/agent/models/${id}`),
+  createPortrait: (body: Omit<CompanionPortrait, "id">) =>
+    http.post<CompanionPortrait>("/admin/agent/portraits", body),
+  updatePortrait: (id: string, body: Omit<CompanionPortrait, "id">) =>
+    http.put<CompanionPortrait>(`/admin/agent/portraits/${id}`, body),
+  companions: (signal?: AbortSignal) =>
+    http.get<{ items: AdminCompanion[] }>("/admin/agent/companions", { signal }),
+  createCompanion: (body: AdminCompanionInput) =>
+    http.post<{ id: string }>("/admin/agent/companions", body),
+  updateCompanion: (id: string, body: AdminCompanionInput) =>
+    http.put<{ id: string }>(`/admin/agent/companions/${id}`, body),
 };

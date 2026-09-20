@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../chat/chat_list_page.dart';
 import '../life/life_page.dart';
@@ -19,8 +21,66 @@ class ShellController extends GetxController {
   void switchTo(int i) => index.value = i;
 }
 
-class ShellPage extends StatelessWidget {
+class ShellPage extends StatefulWidget {
   const ShellPage({super.key});
+
+  @override
+  State<ShellPage> createState() => _ShellPageState();
+}
+
+class _ShellPageState extends State<ShellPage> {
+  Timer? _initialNotificationTimer;
+  Timer? _notificationTimer;
+  bool _pollingNotifications = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _notificationTimer = Timer.periodic(
+      const Duration(seconds: 20),
+      (_) => _pollNotifications(),
+    );
+    _initialNotificationTimer = Timer(
+      const Duration(seconds: 5),
+      _pollNotifications,
+    );
+  }
+
+  Future<void> _pollNotifications() async {
+    if (!mounted || _pollingNotifications) return;
+    _pollingNotifications = true;
+    try {
+      final data = await ApiClient.instance.get('/v1/me/agent-notifications');
+      final items = data is Map ? data['items'] : null;
+      if (!mounted || items is! List) return;
+      for (final raw in items.take(3)) {
+        if (raw is! Map) continue;
+        final payload = raw['payload'];
+        if (payload is! Map) continue;
+        final title = payload['title']?.toString() ?? 'Vita';
+        final body = payload['body']?.toString() ?? '';
+        if (body.isEmpty) continue;
+        Get.snackbar(
+          title,
+          body,
+          snackPosition: SnackPosition.TOP,
+          duration: const Duration(seconds: 5),
+          margin: const EdgeInsets.all(12),
+        );
+      }
+    } catch (_) {
+      // Logged-out and temporarily offline states are retried on the next tick.
+    } finally {
+      _pollingNotifications = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _initialNotificationTimer?.cancel();
+    _notificationTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
