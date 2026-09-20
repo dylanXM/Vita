@@ -3,13 +3,19 @@ INSERT INTO subscription_plans
 SELECT 'catalog-' || env || '-' || platform || '-' || key,key,name,env,platform,coins,price,period,product_id,true,sort_order
 FROM (VALUES
     ('plus_monthly','Vita Plus Monthly',500,9.99::numeric,'month','vita.plus.monthly',10),
-    ('plus_yearly','Vita Plus Yearly',6000,79.99::numeric,'year','vita.plus.yearly',20),
+    ('plus_yearly','Vita Plus Yearly',500,79.99::numeric,'year','vita.plus.yearly',20),
     ('premium_monthly','Vita Premium Monthly',1200,19.99::numeric,'month','vita.premium.monthly',30),
-    ('premium_yearly','Vita Premium Yearly',14400,159.99::numeric,'year','vita.premium.yearly',40)
+    ('premium_yearly','Vita Premium Yearly',1200,159.99::numeric,'year','vita.premium.yearly',40)
 ) AS products(key,name,coins,price,period,product_id,sort_order)
 CROSS JOIN (VALUES('dev'),('beta'),('prod')) AS environments(env)
 CROSS JOIN (VALUES('ios'),('android')) AS platforms(platform)
-ON CONFLICT(environment,platform,key) DO UPDATE SET product_id=EXCLUDED.product_id;
+ON CONFLICT(environment,platform,key) DO UPDATE SET
+    name=EXCLUDED.name,coins_granted=EXCLUDED.coins_granted,price_usd=EXCLUDED.price_usd,
+    period=EXCLUDED.period,product_id=EXCLUDED.product_id,sort_order=EXCLUDED.sort_order;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_transactions_annual_subscription_month
+    ON credit_transactions(user_id,description)
+    WHERE description LIKE 'annual-subscription-month:%';
 
 INSERT INTO coin_packs
     (id,key,name,environment,platform,coins,price_usd,product_id,popular,enabled,sort_order)

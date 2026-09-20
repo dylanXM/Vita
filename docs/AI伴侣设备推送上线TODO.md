@@ -374,14 +374,14 @@ VITA_FIREBASE_SERVICE_ACCOUNT_BASE64=<服务账号 JSON 的单行 Base64>
 | Product ID | 类型 | 建议美元价格 | 发放金币 |
 | --- | --- | ---: | ---: |
 | `vita.plus.monthly` | Plus 月付 | $9.99 | 每次购买/续订 500 |
-| `vita.plus.yearly` | Plus 年付 | $79.99 | 每次购买/续订 6,000 |
+| `vita.plus.yearly` | Plus 年付 | $79.99 | 有效期内每月 500 |
 | `vita.premium.monthly` | Premium 月付 | $19.99 | 每次购买/续订 1,200 |
-| `vita.premium.yearly` | Premium 年付 | $159.99 | 每次购买/续订 14,400 |
+| `vita.premium.yearly` | Premium 年付 | $159.99 | 有效期内每月 1,200 |
 | `vita.coins.100` | 消耗型金币包 | $1.99 | 100 |
 | `vita.coins.500` | 消耗型金币包 | $7.99 | 500 |
 | `vita.coins.1200` | 消耗型金币包 | $14.99 | 1,200 |
 
-年付方案一次发放全年额度，因为商店的年度订阅不会每月产生续订事件。Apple/Google 的实际本地化价格是购买页的最终价格来源。
+年付首次购买时立即发放第一个月额度，Backend 此后以购买日为锚点每小时检查并补发到期月份；月底购买会在短月份按最后一天发放。每月批次具有数据库唯一键，服务重启、Webhook 重放或多实例执行不会重复发放。用户关闭自动续订后，在已付年度有效期结束前仍会按月收到额度。Apple/Google 的实际本地化价格是购买页的最终价格来源。
 
 1. 先在 App Store Connect 和 Google Play Console 创建正式 App，包名/Bundle ID 必须与构建配置一致。
 2. 在两个商店分别创建 Plus、Premium 自动续订商品和金币消耗型商品；记录每个平台的 Product ID。

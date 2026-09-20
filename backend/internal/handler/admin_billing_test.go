@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,6 +18,29 @@ func TestAdminBillingEnvironmentDefaultsToDeployment(t *testing.T) {
 	environment, ok := adminBillingEnvironment(c)
 	if !ok || environment != "beta" {
 		t.Fatalf("environment = %q, ok = %v; want beta, true", environment, ok)
+	}
+}
+
+func TestMonthlyInstallmentsDueUsesAnchoredClampedDates(t *testing.T) {
+	start := time.Date(2026, time.January, 31, 10, 0, 0, 0, time.UTC)
+	end := time.Date(2027, time.January, 31, 10, 0, 0, 0, time.UTC)
+	beforeFirstDue := time.Date(2026, time.February, 28, 9, 59, 0, 0, time.UTC)
+	if got := monthlyInstallmentsDue(start, end, beforeFirstDue); len(got) != 0 {
+		t.Fatalf("installments before first due = %#v", got)
+	}
+	afterMarchDue := time.Date(2026, time.March, 31, 10, 0, 0, 0, time.UTC)
+	got := monthlyInstallmentsDue(start, end, afterMarchDue)
+	if len(got) != 2 || got[0] != 1 || got[1] != 2 {
+		t.Fatalf("installments = %#v; want [1 2]", got)
+	}
+}
+
+func TestMonthlyInstallmentsDueNeverIncludesAnnualRenewal(t *testing.T) {
+	start := time.Date(2026, time.September, 20, 0, 0, 0, 0, time.UTC)
+	end := start.AddDate(1, 0, 0)
+	got := monthlyInstallmentsDue(start, end, end)
+	if len(got) != 11 || got[10] != 11 {
+		t.Fatalf("installments = %#v; want 1 through 11", got)
 	}
 }
 

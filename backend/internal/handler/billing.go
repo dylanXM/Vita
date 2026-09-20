@@ -283,8 +283,8 @@ func upsertSubscription(userID, provider, providerRef, productID, entitlement, s
 		   status = EXCLUDED.status,
 		   platform = EXCLUDED.platform,
 		   environment = EXCLUDED.environment,
-		   current_period_start = EXCLUDED.current_period_start,
-		   current_period_end = EXCLUDED.current_period_end,
+		   current_period_start = COALESCE(EXCLUDED.current_period_start, subscriptions.current_period_start),
+		   current_period_end = COALESCE(EXCLUDED.current_period_end, subscriptions.current_period_end),
 		   will_renew = EXCLUDED.will_renew,
 		   updated_at = CURRENT_TIMESTAMP`,
 		uuid.New().String(), userID, provider, providerRef, productID, entitlement, status, platform,
@@ -470,7 +470,9 @@ func processRevenueCatEvent(ev *revenueCatEvent) {
 			}
 		}
 	case "CANCELLATION":
-		status = "cancelled"
+		// Store cancellation disables renewal but access and monthly annual-plan
+		// allowances continue until the paid period expires.
+		status = "active"
 		willRenew = false
 	case "EXPIRATION":
 		status = "expired"
@@ -523,6 +525,98 @@ func configuredProductCredits(table, productID, platform string) (int, bool) {
 		return 0, false
 	}
 	return credits, true
+}
+
+// GrantDueAnnualSubscriptionCredits grants the monthly allowance for active
+// yearly RevenueCat subscriptions. The purchase webhook grants installment 0;
+// this job grants installments 1-11 as their anchored monthly dates arrive.
+func GrantDueAnnualSubscriptionCredits() error {
+	return grantDueAnnualSubscriptionCreditsAt(time.Now().UTC())
+}
+
+func grantDueAnnualSubscriptionCreditsAt(now time.Time) error {
+	rows, err := db.Get().Query(`SELECT s.user_id,s.provider,s.provider_ref,s.platform,
+			s.current_period_start,s.current_period_end,p.coins_granted
+		 FROM subscriptions s
+		 JOIN subscription_plans p ON p.environment=s.environment AND p.platform=s.platform
+			AND p.product_id=s.product_id AND p.period='year' AND p.enabled=true
+		 WHERE s.provider='revenuecat' AND s.status='active'
+			AND s.current_period_start IS NOT NULL AND s.current_period_end IS NOT NULL
+			AND s.current_period_start <= $1 AND s.current_period_end > $1`, now)
+	if err != nil {
+		return err
+	}
+	type annualSubscription struct {
+		userID, provider, providerRef, platform string
+		periodStart, periodEnd                  time.Time
+		coins                                   int
+	}
+	items := make([]annualSubscription, 0)
+	for rows.Next() {
+		var item annualSubscription
+		if err := rows.Scan(&item.userID, &item.provider, &item.providerRef, &item.platform,
+			&item.periodStart, &item.periodEnd, &item.coins); err != nil {
+			rows.Close()
+			return err
+		}
+		items = append(items, item)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+
+	var grantErrors []error
+	for _, item := range items {
+		installments := monthlyInstallmentsDue(item.periodStart, item.periodEnd, now)
+		if len(installments) == 0 {
+			continue
+		}
+		latestDedupe := annualSubscriptionGrantKey(item.provider, item.providerRef, installments[len(installments)-1])
+		var latestGranted bool
+		if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM credit_transactions WHERE user_id=$1 AND description=$2)`, item.userID, latestDedupe).Scan(&latestGranted); err != nil {
+			grantErrors = append(grantErrors, fmt.Errorf("subscription %s grant lookup: %w", item.providerRef, err))
+			continue
+		}
+		if latestGranted {
+			continue
+		}
+		for _, installment := range installments {
+			dedupe := annualSubscriptionGrantKey(item.provider, item.providerRef, installment)
+			if _, err := grantCreditsForPlatform(item.userID, item.coins, "grant", dedupe, item.platform, true); err != nil {
+				grantErrors = append(grantErrors, fmt.Errorf("subscription %s installment %d: %w", item.providerRef, installment, err))
+				break
+			}
+		}
+	}
+	return errors.Join(grantErrors...)
+}
+
+func annualSubscriptionGrantKey(provider, providerRef string, installment int) string {
+	return fmt.Sprintf("annual-subscription-month:%s:%s:%d", provider, providerRef, installment)
+}
+
+func monthlyInstallmentsDue(periodStart, periodEnd, now time.Time) []int {
+	installments := make([]int, 0, 11)
+	for installment := 1; installment < 12; installment++ {
+		dueAt := addClampedMonths(periodStart, installment)
+		if !dueAt.Before(periodEnd) || dueAt.After(now) {
+			break
+		}
+		installments = append(installments, installment)
+	}
+	return installments
+}
+
+func addClampedMonths(value time.Time, months int) time.Time {
+	totalMonths := int(value.Month()) - 1 + months
+	year := value.Year() + totalMonths/12
+	month := time.Month(totalMonths%12 + 1)
+	lastDay := time.Date(year, month+1, 0, value.Hour(), value.Minute(), value.Second(), value.Nanosecond(), value.Location()).Day()
+	day := value.Day()
+	if day > lastDay {
+		day = lastDay
+	}
+	return time.Date(year, month, day, value.Hour(), value.Minute(), value.Second(), value.Nanosecond(), value.Location())
 }
 
 func platformFromRevenueCatStore(store string) string {

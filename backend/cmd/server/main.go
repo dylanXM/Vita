@@ -91,6 +91,23 @@ func main() {
 		StripePricePremium:         cfg.StripePricePremium,
 		SubscriptionCreditsMonthly: cfg.SubscriptionCreditsMonthly,
 	})
+	go func() {
+		if err := handler.GrantDueAnnualSubscriptionCredits(); err != nil {
+			log.Printf("annual subscription monthly credits: %v", err)
+		}
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-agentCtx.Done():
+				return
+			case <-ticker.C:
+				if err := handler.GrantDueAnnualSubscriptionCredits(); err != nil {
+					log.Printf("annual subscription monthly credits: %v", err)
+				}
+			}
+		}
+	}()
 	handler.SetGoogleClientID(cfg.GoogleClientID)
 
 	// Verification-code email (dev: codes are printed to the server log).
