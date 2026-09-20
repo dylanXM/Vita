@@ -141,6 +141,8 @@ const zhHans = {
     noGrantOperations: "暂无赠予操作记录。", operationType: "操作类型", grantDetails: "赠予内容",
     operator: "操作人", operationTime: "操作时间", grantFailed: "赠予失败",
     grantCoinsSuccess: "已赠送 {{coins}} 金币", grantSubscriptionSuccess: "已赠予 {{plan}}，并发放 {{coins}} 金币",
+    behaviorTimeline: "行为轨迹", behaviorTimelineDesc: "按时间倒序展示 App 行为与业务记录，共 {{total}} 条", behaviorTime: "时间", behaviorEvent: "行为", behaviorDetails: "详细信息", behaviorContext: "客户端", behaviorEmpty: "暂时没有行为记录。", behaviorRange: "第 {{from}}–{{to}} 条，共 {{total}} 条",
+    behaviorCategories: { all: "全部", navigation: "页面与导航", auth: "账户", onboarding: "首次引导", chat: "聊天", companion: "角色", billing: "订阅与金币", life: "生活与回忆", profile: "个人中心", updates: "近期更新", system: "系统业务记录", general: "其他" },
   },
 
   invitation: { title: "邀请码配置", desc: "配置付费订阅和金币充值产生的邀请人奖励。", invitedUsers: "受邀用户数", rewardedCoins: "累计奖励金币", rate: "奖励比例", rateDesc: "受邀用户每次通过订阅或充值增加金币时，邀请人按此比例获得金币；管理员赠予不参与奖励。", percent: "奖励比例（%）", example: "受邀用户购买 1,000 金币时，邀请人获得 {{coins}} 金币。", save: "保存配置", saved: "邀请码配置已保存" },

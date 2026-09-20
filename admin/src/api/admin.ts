@@ -33,6 +33,8 @@ import type {
   ManagedCompanionList,
   AdminConversation,
   AdminMessage,
+  UserBehaviorCategory,
+  UserBehaviorTimeline,
   OnboardingConfig,
   WhatsNewCampaign,
   MobilePlatform,
@@ -67,6 +69,8 @@ export const usersApi = {
     http.post<AdminGrantResult>(`/admin/users/${id}/grant-coins`, body),
   grantSubscription: (id: string, body: { plan_id: string; ends_at: string; note: string }) =>
     http.post<AdminGrantResult>(`/admin/users/${id}/grant-subscription`, body),
+  timeline: (id: string, params: { category?: UserBehaviorCategory; limit?: number; offset?: number }, signal?: AbortSignal) =>
+    http.get<UserBehaviorTimeline>(`/admin/users/${id}/timeline`, { params, signal }),
 };
 
 /** Deployment environment of the API instance (admin-only). */

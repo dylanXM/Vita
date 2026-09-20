@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 
 import '../../core/api_client.dart';
+import '../../core/analytics_service.dart';
 import '../../core/constants.dart';
 import '../chat/chat_list_controller.dart';
 
@@ -76,16 +77,37 @@ class BillingController extends GetxController {
   /// Subscribes to a RevenueCat package (Plus / Premium / credit pack).
   Future<void> purchasePackage(Package pkg) async {
     busy.value = true;
+    AnalyticsService.to.track('purchase_started',
+        category: 'billing',
+        properties: {
+          'package_id': pkg.identifier,
+          'product_id': pkg.storeProduct.identifier
+        });
     try {
       await Purchases.purchase(PurchaseParams.package(pkg));
       await refreshSubscription();
       await refreshCredits();
       await ChatListController.to.load();
+      AnalyticsService.to.track('purchase_succeeded',
+          category: 'billing',
+          properties: {
+            'package_id': pkg.identifier,
+            'product_id': pkg.storeProduct.identifier
+          });
       Get.snackbar('Vita', 'Purchase successful');
     } catch (e) {
       // RevenueCat errors include the user cancelling the sheet; only surface
       // real failures.
       final msg = '$e';
+      AnalyticsService.to.track(
+          msg.toLowerCase().contains('cancel')
+              ? 'purchase_canceled'
+              : 'purchase_failed',
+          category: 'billing',
+          properties: {
+            'package_id': pkg.identifier,
+            'product_id': pkg.storeProduct.identifier
+          });
       if (!msg.toLowerCase().contains('cancel')) {
         Get.snackbar('Purchase failed', msg);
       }
@@ -96,13 +118,17 @@ class BillingController extends GetxController {
 
   Future<void> restorePurchases() async {
     busy.value = true;
+    AnalyticsService.to.track('purchase_restore_started', category: 'billing');
     try {
       await Purchases.restorePurchases();
       await refreshSubscription();
       await refreshCredits();
       await ChatListController.to.load();
+      AnalyticsService.to
+          .track('purchase_restore_succeeded', category: 'billing');
       Get.snackbar('Vita', 'Purchases restored');
     } catch (e) {
+      AnalyticsService.to.track('purchase_restore_failed', category: 'billing');
       Get.snackbar('Restore failed', '$e');
     } finally {
       busy.value = false;

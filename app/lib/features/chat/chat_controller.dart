@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:get/get.dart';
 
 import '../../core/api_client.dart';
+import '../../core/analytics_service.dart';
 
 /// State for a single chat session: get-or-create the conversation, load the
 /// messages and send new ones.
@@ -23,6 +24,8 @@ class ChatController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    AnalyticsService.to.track('chat_opened',
+        category: 'chat', properties: {'companion_id': companionId});
     load();
   }
 
@@ -116,8 +119,20 @@ class ChatController extends GetxController {
         if (companionMessage is Map) {
           _addIfNew(Map<String, dynamic>.from(companionMessage));
         }
+        AnalyticsService.to
+            .track('message_sent', category: 'chat', properties: {
+          'companion_id': companionId,
+          'conversation_id': _conversationId ?? '',
+          'message_type': 'text',
+          'character_count': content.length,
+        });
       }
     } on ApiException catch (e) {
+      AnalyticsService.to
+          .track('message_send_failed', category: 'chat', properties: {
+        'companion_id': companionId,
+        'reason': e.code ?? e.message,
+      });
       if (e.action == 'open_subscription') {
         accessError.value = e.code ?? 'subscription_required';
       } else {

@@ -158,6 +158,7 @@ func main() {
 
 		api.GET("/health", handler.Health)
 		api.GET("/app-content", handler.AppContent)
+		api.POST("/events", handler.IngestAnalyticsEvents)
 
 		// Current account — used by the admin dashboard to rehydrate a stored
 		// session and to verify the account has the admin role.
@@ -196,6 +197,7 @@ func main() {
 				users.POST("/:id/ban", func(c *gin.Context) { handler.AdminSetBanned(c, true) })
 				users.POST("/:id/unban", func(c *gin.Context) { handler.AdminSetBanned(c, false) })
 				users.GET("/:id/grant-operations", handler.AdminListGrantOperations)
+				users.GET("/:id/timeline", handler.AdminUserTimeline)
 				users.POST("/:id/grant-coins", handler.AdminGrantCoins)
 				users.POST("/:id/grant-subscription", handler.AdminGrantSubscription)
 			}

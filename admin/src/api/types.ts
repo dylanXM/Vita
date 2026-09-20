@@ -70,6 +70,27 @@ export interface AdminUserDetail extends AdminUser {
   memories: number;
 }
 
+export type UserBehaviorCategory = "navigation" | "auth" | "onboarding" | "chat" | "companion" | "billing" | "life" | "profile" | "updates" | "system" | "general";
+
+export interface UserBehaviorEvent {
+  id: string;
+  event_name: string;
+  category: UserBehaviorCategory;
+  source: "app" | "system";
+  properties: Record<string, unknown>;
+  platform: string;
+  app_version: string;
+  session_id: string;
+  occurred_at: string;
+}
+
+export interface UserBehaviorTimeline {
+  items: UserBehaviorEvent[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 /** `GET /v1/admin/users` — paginated list response. */
 export interface AdminUserList {
   items: AdminUser[];

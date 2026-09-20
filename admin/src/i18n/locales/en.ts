@@ -141,6 +141,8 @@ const en = {
     noGrantOperations: "No grant operations yet.", operationType: "Operation", grantDetails: "Details",
     operator: "Operator", operationTime: "Operation time", grantFailed: "Grant failed",
     grantCoinsSuccess: "Granted {{coins}} coins", grantSubscriptionSuccess: "Granted {{plan}} and {{coins}} coins",
+    behaviorTimeline: "Behavior timeline", behaviorTimelineDesc: "All recorded App actions and business events, newest first · {{total}} total", behaviorTime: "Time", behaviorEvent: "Event", behaviorDetails: "Details", behaviorContext: "Client", behaviorEmpty: "No behavior has been recorded yet.", behaviorRange: "{{from}}–{{to}} of {{total}}",
+    behaviorCategories: { all: "All", navigation: "Navigation", auth: "Account", onboarding: "Onboarding", chat: "Chat", companion: "Companion", billing: "Billing", life: "Life & memories", profile: "Profile", updates: "What's new", system: "System records", general: "Other" },
   },
 
   invitation: { title: "Invitation settings", desc: "Configure inviter rewards for paid subscription and coin purchases.", invitedUsers: "Invited users", rewardedCoins: "Rewarded coins", rate: "Reward ratio", rateDesc: "The inviter receives this percentage of every paid coin increase. Admin grants are excluded.", percent: "Reward percentage (%)", example: "For 1,000 purchased coins, the inviter receives {{coins}} coins.", save: "Save settings", saved: "Invitation settings saved" },

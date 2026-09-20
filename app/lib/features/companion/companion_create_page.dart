@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../core/api_client.dart';
+import '../../core/analytics_service.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../chat/chat_list_controller.dart';
@@ -45,6 +46,7 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService.to.track('companion_create_viewed', category: 'companion');
     _loadOptions();
   }
 
@@ -87,7 +89,7 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
     }
     setState(() => _busy = true);
     try {
-      await ApiClient.instance.post('/v1/companions', data: {
+      final result = await ApiClient.instance.post('/v1/companions', data: {
         'name': _name.text.trim(),
         'gender': _gender,
         'city': _city.text.trim(),
@@ -97,11 +99,20 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
         'personality_tags': _personalityTags.toList(),
         'portrait_id': _portraitId,
       });
+      AnalyticsService.to
+          .track('companion_created', category: 'companion', properties: {
+        'companion_id': result is Map ? '${result['id'] ?? ''}' : '',
+        'relationship_stage': _relationship,
+        'personality_tag_count': _personalityTags.length,
+        'has_portrait': _portraitId != null,
+      });
       Get.back();
       ChatListController.to.load();
       Get.snackbar(
           'companion.create.success'.tr, 'companion.create.successMessage'.tr);
     } on ApiException catch (e) {
+      AnalyticsService.to.track('companion_create_failed',
+          category: 'companion', properties: {'reason': e.code ?? e.message});
       if (e.action == 'open_subscription') {
         Get.snackbar('subscription.required.title'.tr,
             'subscription.required.create'.tr);
@@ -110,6 +121,8 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
         Get.snackbar('companion.create.failed'.tr, e.message);
       }
     } catch (e) {
+      AnalyticsService.to.track('companion_create_failed',
+          category: 'companion', properties: {'reason': 'unexpected'});
       Get.snackbar('companion.create.failed'.tr, '$e');
     } finally {
       if (mounted) setState(() => _busy = false);

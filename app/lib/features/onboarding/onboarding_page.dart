@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../core/app_content_controller.dart';
+import '../../core/analytics_service.dart';
 import '../../core/theme.dart';
 import '../../core/token_storage.dart';
 
@@ -20,7 +21,17 @@ class _OnboardingPageState extends State<OnboardingPage> {
   List<OnboardingContentPage> get _pages =>
       AppContentController.to.onboarding?.pages ?? const [];
 
-  Future<void> _finish() async {
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService.to.track('onboarding_viewed',
+        category: 'onboarding', properties: {'page_index': 0});
+  }
+
+  Future<void> _finish(String reason) async {
+    AnalyticsService.to.track('onboarding_completed',
+        category: 'onboarding', properties: {'reason': reason});
+    await AnalyticsService.to.flush();
     await AppContentController.to.completeOnboarding();
     final token = await TokenStorage.read();
     if (!mounted) return;
@@ -29,9 +40,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   void _next() {
     if (_index >= _pages.length - 1) {
-      _finish();
+      _finish('completed');
       return;
     }
+    AnalyticsService.to.track('onboarding_next_clicked',
+        category: 'onboarding', properties: {'from_index': _index});
     _controller.nextPage(
         duration: const Duration(milliseconds: 320),
         curve: Curves.easeOutCubic);
@@ -61,7 +74,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       color: context.vita.green, size: 30),
                   const Spacer(),
                   TextButton(
-                      onPressed: _finish, child: Text('onboarding.skip'.tr)),
+                      onPressed: () => _finish('skipped'),
+                      child: Text('onboarding.skip'.tr)),
                   const SizedBox(width: 8),
                 ],
               ),
@@ -70,7 +84,15 @@ class _OnboardingPageState extends State<OnboardingPage> {
               child: PageView.builder(
                 controller: _controller,
                 itemCount: pages.length,
-                onPageChanged: (value) => setState(() => _index = value),
+                onPageChanged: (value) {
+                  setState(() => _index = value);
+                  AnalyticsService.to.track('onboarding_page_viewed',
+                      category: 'onboarding',
+                      properties: {
+                        'page_index': value,
+                        'page_id': pages[value].id,
+                      });
+                },
                 itemBuilder: (context, index) =>
                     _OnboardingPanel(page: pages[index]),
               ),

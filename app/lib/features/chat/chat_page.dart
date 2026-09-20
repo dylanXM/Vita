@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../core/theme.dart';
+import '../../core/analytics_service.dart';
 import '../../shared/widgets.dart';
 import '../../core/api_client.dart';
 import '../billing/billing_controller.dart';
@@ -72,10 +73,19 @@ class _ChatPageState extends State<ChatPage> {
           '/v1/companions/${widget.companionId}/gifts',
           data: {'coins': coins});
       await BillingController.to.refreshCredits();
+      AnalyticsService.to.track('gift_sent',
+          category: 'billing',
+          properties: {'companion_id': widget.companionId, 'coins': coins});
       Get.back();
       Get.snackbar('gift.sent.title'.tr,
           'gift.sent.message'.trParams({'coins': '$coins'}));
     } on ApiException catch (e) {
+      AnalyticsService.to
+          .track('gift_send_failed', category: 'billing', properties: {
+        'companion_id': widget.companionId,
+        'coins': coins,
+        'reason': e.code ?? e.message
+      });
       if (e.action == 'open_subscription') {
         Get.back();
         Get.toNamed('/subscription');

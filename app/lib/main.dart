@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
 
 import 'core/bootstrap.dart';
+import 'core/analytics_service.dart';
 import 'core/i18n/translations.dart';
 import 'core/push_notification_service.dart';
 import 'core/settings_controller.dart';
@@ -61,6 +62,12 @@ class _VitaAppState extends State<VitaApp> {
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       translations: VitaTranslations(),
       debugShowCheckedModeBanner: false,
+      routingCallback: (routing) {
+        final route = routing?.current;
+        if (route != null && route.isNotEmpty) {
+          AnalyticsService.to.screen(route);
+        }
+      },
       initialRoute: '/',
       defaultTransition: Transition.fadeIn,
       transitionDuration: const Duration(milliseconds: 280),

@@ -130,7 +130,7 @@ const zhHant = {
     conversations: "對話",
     messages: "訊息",
     memories: "記憶",
-    grantCoins: "贈送金幣", coinAmount: "金幣數量", grantNote: "操作備註", confirmGrant: "確認贈予", grantSubscription: "贈予訂閱方案", subscriptionPlan: "訂閱方案", selectPlan: "選擇訂閱方案", subscriptionEndsAt: "訂閱結束時間", coins: "金幣", grantOperations: "贈予操作記錄", noGrantOperations: "暫無贈予操作記錄。", operationType: "操作類型", grantDetails: "贈予內容", operator: "操作人", operationTime: "操作時間", grantFailed: "贈予失敗", grantCoinsSuccess: "已贈送 {{coins}} 金幣", grantSubscriptionSuccess: "已贈予 {{plan}} 並發放 {{coins}} 金幣",
+    grantCoins: "贈送金幣", coinAmount: "金幣數量", grantNote: "操作備註", confirmGrant: "確認贈予", grantSubscription: "贈予訂閱方案", subscriptionPlan: "訂閱方案", selectPlan: "選擇訂閱方案", subscriptionEndsAt: "訂閱結束時間", coins: "金幣", grantOperations: "贈予操作記錄", noGrantOperations: "暫無贈予操作記錄。", operationType: "操作類型", grantDetails: "贈予內容", operator: "操作人", operationTime: "操作時間", grantFailed: "贈予失敗", grantCoinsSuccess: "已贈送 {{coins}} 金幣", grantSubscriptionSuccess: "已贈予 {{plan}} 並發放 {{coins}} 金幣", behaviorTimeline: "行為軌跡", behaviorTimelineDesc: "按時間倒序顯示 App 行為與業務記錄，共 {{total}} 條", behaviorTime: "時間", behaviorEvent: "行為", behaviorDetails: "詳細資訊", behaviorContext: "用戶端", behaviorEmpty: "暫無行為記錄。", behaviorRange: "第 {{from}}–{{to}} 條，共 {{total}} 條", behaviorCategories: { all: "全部", navigation: "頁面與導覽", auth: "帳戶", onboarding: "首次引導", chat: "聊天", companion: "角色", billing: "訂閱與金幣", life: "生活與回憶", profile: "個人中心", updates: "近期更新", system: "系統記錄", general: "其他" },
   },
 
   invitation: { title: "邀請碼設定", desc: "設定付費訂閱與金幣儲值的邀請獎勵。", invitedUsers: "受邀使用者", rewardedCoins: "累計獎勵金幣", rate: "獎勵比例", rateDesc: "受邀使用者付費增加金幣時，邀請人按此比例獲得金幣；管理員贈予不計入。", percent: "獎勵比例（%）", example: "購買 1,000 金幣時，邀請人獲得 {{coins}} 金幣。", save: "儲存設定", saved: "邀請碼設定已儲存" },

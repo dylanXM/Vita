@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 
 import '../../core/push_notification_service.dart';
 import '../../core/app_content_controller.dart';
+import '../../core/analytics_service.dart';
 import '../../core/theme.dart';
 import '../chat/chat_list_page.dart';
 import '../life/life_page.dart';
@@ -19,7 +20,14 @@ class ShellController extends GetxController {
 
   final index = 0.obs;
 
-  void switchTo(int i) => index.value = i;
+  void switchTo(int i) {
+    if (i == index.value) return;
+    const tabs = ['chat', 'life', 'memories', 'me'];
+    AnalyticsService.to.track('tab_selected',
+        category: 'navigation',
+        properties: {'from': tabs[index.value], 'to': tabs[i]});
+    index.value = i;
+  }
 }
 
 class ShellPage extends StatefulWidget {

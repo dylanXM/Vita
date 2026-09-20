@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants.dart';
+import '../../core/analytics_service.dart';
 import '../auth/auth_controller.dart';
 import '../billing/billing_controller.dart';
 import '../billing/credits_page.dart';
@@ -18,6 +19,7 @@ class MePage extends StatelessWidget {
   const MePage({super.key});
 
   Future<void> _rateApp() async {
+    AnalyticsService.to.track('profile_rate_clicked', category: 'profile');
     final url = defaultTargetPlatform == TargetPlatform.iOS
         ? appStoreUrl
         : playStoreUrl;
@@ -29,6 +31,7 @@ class MePage extends StatelessWidget {
   }
 
   Future<void> _contactUs() async {
+    AnalyticsService.to.track('profile_contact_clicked', category: 'profile');
     final uri = Uri(
       scheme: 'mailto',
       path: supportEmail,
@@ -118,11 +121,13 @@ class MePage extends StatelessWidget {
                             })
                           : 'me.plus.unlock'.tr,
                       borderRadius: BorderRadius.zero,
-                      onTap: () => Get.to(
-                        () => const SubscriptionPage(),
-                        transition: Transition.cupertino,
-                        duration: const Duration(milliseconds: 300),
-                      ),
+                      onTap: () {
+                        AnalyticsService.to.track('subscription_page_opened',
+                            category: 'billing', properties: {'source': 'me'});
+                        Get.to(() => const SubscriptionPage(),
+                            transition: Transition.cupertino,
+                            duration: const Duration(milliseconds: 300));
+                      },
                     ),
                     const Divider(indent: 52, height: 0.5),
                     VitaListTile(
@@ -132,11 +137,13 @@ class MePage extends StatelessWidget {
                         'n': '${billing.balance.value}',
                       }),
                       borderRadius: BorderRadius.zero,
-                      onTap: () => Get.to(
-                        () => const CreditsPage(),
-                        transition: Transition.cupertino,
-                        duration: const Duration(milliseconds: 300),
-                      ),
+                      onTap: () {
+                        AnalyticsService.to.track('credits_page_opened',
+                            category: 'billing', properties: {'source': 'me'});
+                        Get.to(() => const CreditsPage(),
+                            transition: Transition.cupertino,
+                            duration: const Duration(milliseconds: 300));
+                      },
                     ),
                   ],
                 ),
@@ -156,6 +163,9 @@ class MePage extends StatelessWidget {
                       onTap: inviteCode.isEmpty
                           ? null
                           : () async {
+                              AnalyticsService.to.track(
+                                  'profile_invite_code_copied',
+                                  category: 'profile');
                               await Clipboard.setData(
                                   ClipboardData(text: inviteCode));
                               Get.snackbar(
@@ -182,11 +192,13 @@ class MePage extends StatelessWidget {
                       icon: Icons.settings_outlined,
                       title: 'me.settings'.tr,
                       borderRadius: BorderRadius.zero,
-                      onTap: () => Get.to(
-                        () => const SettingsPage(),
-                        transition: Transition.cupertino,
-                        duration: const Duration(milliseconds: 300),
-                      ),
+                      onTap: () {
+                        AnalyticsService.to.track('profile_settings_opened',
+                            category: 'profile');
+                        Get.to(() => const SettingsPage(),
+                            transition: Transition.cupertino,
+                            duration: const Duration(milliseconds: 300));
+                      },
                     ),
                   ],
                 ),

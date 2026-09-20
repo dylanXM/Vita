@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_content_controller.dart';
+import '../../core/analytics_service.dart';
 import '../../core/theme.dart';
 
 class WhatsNewSheet extends StatefulWidget {
@@ -14,6 +15,11 @@ class WhatsNewSheet extends StatefulWidget {
 
   static Future<void> show(
       BuildContext context, WhatsNewCampaignContent campaign) {
+    AnalyticsService.to
+        .track('whats_new_impression', category: 'updates', properties: {
+      'campaign_id': campaign.id,
+      'page_count': campaign.pages.length,
+    });
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -32,6 +38,12 @@ class _WhatsNewSheetState extends State<WhatsNewSheet> {
   int _index = 0;
 
   Future<void> _action(WhatsNewContentPage page) async {
+    AnalyticsService.to
+        .track('whats_new_cta_clicked', category: 'updates', properties: {
+      'campaign_id': widget.campaign.id,
+      'page_id': page.id,
+      'action': page.ctaAction,
+    });
     switch (page.ctaAction) {
       case 'next':
         if (_index < widget.campaign.pages.length - 1) {
@@ -96,7 +108,16 @@ class _WhatsNewSheetState extends State<WhatsNewSheet> {
                   child: PageView.builder(
                     controller: _controller,
                     itemCount: pages.length,
-                    onPageChanged: (value) => setState(() => _index = value),
+                    onPageChanged: (value) {
+                      setState(() => _index = value);
+                      AnalyticsService.to.track('whats_new_page_viewed',
+                          category: 'updates',
+                          properties: {
+                            'campaign_id': widget.campaign.id,
+                            'page_index': value,
+                            'page_id': pages[value].id,
+                          });
+                    },
                     itemBuilder: (_, i) => _UpdatePage(page: pages[i]),
                   ),
                 ),

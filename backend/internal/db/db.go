@@ -459,6 +459,24 @@ func migrate(db *sql.DB) error {
 			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_whats_new_scope ON whats_new_campaigns(environment,platform,enabled,starts_at,ends_at)`,
+		`CREATE TABLE IF NOT EXISTS analytics_events (
+			id TEXT PRIMARY KEY,
+			user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+			anonymous_id TEXT NOT NULL DEFAULT '',
+			session_id TEXT NOT NULL DEFAULT '',
+			event_name TEXT NOT NULL,
+			category TEXT NOT NULL DEFAULT 'general',
+			properties JSONB NOT NULL DEFAULT '{}'::jsonb,
+			platform TEXT NOT NULL DEFAULT 'unknown',
+			environment TEXT NOT NULL DEFAULT 'dev',
+			app_version TEXT NOT NULL DEFAULT '',
+			locale TEXT NOT NULL DEFAULT '',
+			client_at TIMESTAMP,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_analytics_events_user_time ON analytics_events(user_id,created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_analytics_events_install ON analytics_events(anonymous_id,created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_analytics_events_scope ON analytics_events(environment,platform,event_name,created_at DESC)`,
 		`ALTER TABLE notification_outbox ALTER COLUMN channel SET DEFAULT 'push'`,
 		`CREATE TABLE IF NOT EXISTS device_push_tokens (
 			id TEXT PRIMARY KEY,

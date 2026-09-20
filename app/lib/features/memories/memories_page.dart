@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../core/api_client.dart';
+import '../../core/analytics_service.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 
@@ -45,6 +46,8 @@ class MemoriesController extends GetxController {
     final id = selectedId.value;
     if (id == null) return;
     loading.value = true;
+    AnalyticsService.to.track('memory_list_viewed',
+        category: 'life', properties: {'companion_id': id});
     try {
       final data = await ApiClient.instance.get('/v1/companions/$id/memories');
       final list = data is Map ? data['memories'] : data;

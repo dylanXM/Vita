@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../core/api_client.dart';
+import '../../core/analytics_service.dart';
 import '../../core/constants.dart';
 import '../../core/push_notification_service.dart';
 import '../../core/token_storage.dart';
@@ -20,6 +21,10 @@ class AuthController extends GetxController {
   Future<void> register(
       String email, String password, String inviteCode) async {
     loading.value = true;
+    AnalyticsService.to
+        .track('auth_register_started', category: 'auth', properties: {
+      'has_invite_code': inviteCode.trim().isNotEmpty,
+    });
     try {
       await ApiClient.instance.post(
         '/v1/auth/app/register',
@@ -29,6 +34,11 @@ class AuthController extends GetxController {
           'invite_code': inviteCode.trim().toUpperCase(),
         },
       );
+      AnalyticsService.to.track('auth_register_code_sent', category: 'auth');
+    } catch (e) {
+      AnalyticsService.to.track('auth_register_failed',
+          category: 'auth', properties: {'stage': 'send_code'});
+      rethrow;
     } finally {
       loading.value = false;
     }
@@ -44,6 +54,12 @@ class AuthController extends GetxController {
       );
       await TokenStorage.write(data['token'] as String);
       await fetchProfile();
+      AnalyticsService.to.track('auth_register_succeeded', category: 'auth');
+      await AnalyticsService.to.flush();
+    } catch (e) {
+      AnalyticsService.to.track('auth_register_failed',
+          category: 'auth', properties: {'stage': 'verify'});
+      rethrow;
     } finally {
       loading.value = false;
     }
@@ -51,6 +67,8 @@ class AuthController extends GetxController {
 
   Future<void> login(String email, String password) async {
     loading.value = true;
+    AnalyticsService.to.track('auth_login_started',
+        category: 'auth', properties: {'method': 'password'});
     try {
       final data = await ApiClient.instance.post(
         '/v1/auth/app/login',
@@ -58,6 +76,13 @@ class AuthController extends GetxController {
       );
       await TokenStorage.write(data['token'] as String);
       await fetchProfile();
+      AnalyticsService.to.track('auth_login_succeeded',
+          category: 'auth', properties: {'method': 'password'});
+      await AnalyticsService.to.flush();
+    } catch (e) {
+      AnalyticsService.to.track('auth_login_failed',
+          category: 'auth', properties: {'method': 'password'});
+      rethrow;
     } finally {
       loading.value = false;
     }
@@ -65,6 +90,8 @@ class AuthController extends GetxController {
 
   Future<void> loginWithGoogle() async {
     loading.value = true;
+    AnalyticsService.to.track('auth_login_started',
+        category: 'auth', properties: {'method': 'google'});
     try {
       final google = GoogleSignIn(serverClientId: googleServerClientId);
       final account = await google.signIn();
@@ -80,6 +107,13 @@ class AuthController extends GetxController {
       );
       await TokenStorage.write(data['token'] as String);
       await fetchProfile();
+      AnalyticsService.to.track('auth_login_succeeded',
+          category: 'auth', properties: {'method': 'google'});
+      await AnalyticsService.to.flush();
+    } catch (e) {
+      AnalyticsService.to.track('auth_login_failed',
+          category: 'auth', properties: {'method': 'google'});
+      rethrow;
     } finally {
       loading.value = false;
     }
@@ -93,6 +127,8 @@ class AuthController extends GetxController {
   String get email => profile.value?['email'] as String? ?? '';
 
   Future<void> logout() async {
+    AnalyticsService.to.track('auth_logout', category: 'auth');
+    await AnalyticsService.to.flush();
     await PushNotificationService.instance.deactivate();
     await TokenStorage.clear();
     profile.value = null;
