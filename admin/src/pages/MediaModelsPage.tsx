@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Headphones, Image, Plus, Save, Trash2, Video } from "lucide-react";
+import { Headphones, Image, MessageCircle, Plus, Save, Trash2, Video } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { agentApi } from "@/api/admin";
@@ -14,6 +14,7 @@ import { toast } from "@/components/ui/sonner";
 import { compatibleMediaModels, normalizeMediaRoutesForSave, selectedMediaModelIDs } from "./media-model-routes";
 
 const groups: Array<{ type: MediaModelType; icon: typeof Image }> = [
+  { type: "text", icon: MessageCircle },
   { type: "image", icon: Image },
   { type: "audio", icon: Headphones },
   { type: "video", icon: Video },
@@ -24,6 +25,7 @@ export function MediaModelsPage() {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["media-model-routes"], queryFn: ({ signal }) => agentApi.mediaRoutes(signal) });
   const [routes, setRoutes] = useState<MediaModelRoute[]>([]);
+  const [activeType, setActiveType] = useState<MediaModelType>("text");
   useEffect(() => { if (query.data) setRoutes(query.data.routes); }, [query.data]);
   const save = useMutation({
     mutationFn: () => agentApi.saveMediaRoutes(normalizeMediaRoutesForSave(routes)),
@@ -40,16 +42,15 @@ export function MediaModelsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title={t("mediaModels.title")} description={t("mediaModels.description")} actions={<Button disabled={save.isPending} onClick={() => save.mutate()}><Save />{t("mediaModels.save")}</Button>} />
-      {groups.map(({ type, icon: Icon }) => (
-        <Card key={type}>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Icon className="size-5" />{t(`mediaModels.type.${type}`)}</CardTitle><CardDescription>{t(`mediaModels.type.${type}.desc`)}</CardDescription></CardHeader>
-          <CardContent className="space-y-4">
-            {routes.filter((route) => route.media_type === type).map((route) => (
-              <RouteEditor key={route.route_key} route={route} models={query.data.models} onChange={update} />
-            ))}
-          </CardContent>
-        </Card>
-      ))}
+      <div className="flex gap-1 overflow-x-auto rounded-lg border bg-muted/40 p-1" role="tablist" aria-label={t("mediaModels.title")}>
+        {groups.map(({ type, icon: Icon }) => <button key={type} type="button" role="tab" aria-selected={activeType === type} onClick={() => setActiveType(type)} className={`flex min-w-24 flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${activeType === type ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><Icon className="size-4" />{t(`mediaModels.type.${type}`)}</button>)}
+      </div>
+      {groups.filter(({ type }) => type === activeType).map(({ type, icon: Icon }) => <Card key={type} role="tabpanel">
+        <CardHeader><CardTitle className="flex items-center gap-2"><Icon className="size-5" />{t(`mediaModels.type.${type}`)}</CardTitle><CardDescription>{t(`mediaModels.type.${type}.desc`)}</CardDescription></CardHeader>
+        <CardContent className="space-y-4">
+          {routes.filter((route) => route.media_type === type).map((route) => <RouteEditor key={route.route_key} route={route} models={query.data.models} onChange={update} />)}
+        </CardContent>
+      </Card>)}
     </div>
   );
 }

@@ -91,13 +91,13 @@ export function AgentPage() {
         <>
           <ProviderSection providers={configQuery.data.providers} onSaved={refresh} />
           <ModelSection providers={configQuery.data.providers} models={configQuery.data.models} onSaved={refresh} />
-          <SettingsSection models={configQuery.data.models} initial={configQuery.data.settings} onSaved={refresh} />
+          <SettingsSection initial={configQuery.data.settings} onSaved={refresh} />
           <PortraitSection portraits={configQuery.data.portraits} onSaved={refresh} />
         </>
       )}
       <CompanionSection
         companions={companionsQuery.data?.items ?? []}
-        models={configQuery.data?.models ?? []}
+        models={(configQuery.data?.models ?? []).filter((model) => model.enabled && model.capabilities.includes("text"))}
         portraits={configQuery.data?.portraits ?? []}
         loading={companionsQuery.isLoading}
         onSaved={refresh}
@@ -179,17 +179,15 @@ function ModelSection({ providers, models, onSaved }: { providers: AIProvider[];
   );
 }
 
-function SettingsSection({ models, initial, onSaved }: { models: AIModel[]; initial: AgentSettings; onSaved: () => void }) {
+function SettingsSection({ initial, onSaved }: { initial: AgentSettings; onSaved: () => void }) {
   const { t } = useTranslation();
   const [form, setForm] = useState(initial);
   useEffect(() => setForm(initial), [initial]);
   const save = useMutation({ mutationFn: () => agentApi.saveSettings(form), onSuccess: () => { toast.success(t("agent.saved")); onSaved(); }, onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))) });
-	const modelSelect = (value: string | null, onChange: (value: string | null) => void) => <select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={value ?? ""} onChange={(e) => onChange(e.target.value || null)}><option value="">{t("agent.selectModel")}</option>{models.filter((m) => m.enabled && m.capabilities.includes("text")).map((m) => <option key={m.id} value={m.id}>{m.display_name}</option>)}</select>;
   return (
     <Card>
       <CardHeader><CardTitle>{t("agent.routing")}</CardTitle><CardDescription>{t("agent.routingDesc")}</CardDescription></CardHeader>
       <CardContent className="space-y-4">
-		<div className="grid gap-3 md:grid-cols-3"><Field label={t("agent.chatModel")}>{modelSelect(form.chat_model_id, (v) => setForm({ ...form, chat_model_id: v }))}</Field><Field label={t("agent.lifeModel")}>{modelSelect(form.life_model_id, (v) => setForm({ ...form, life_model_id: v }))}</Field><Field label={t("agent.proactiveModel")}>{modelSelect(form.proactive_model_id, (v) => setForm({ ...form, proactive_model_id: v }))}</Field></div>
 		<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7"><NumberField label={t("agent.eventMin")} value={form.daily_event_min} min={8} max={15} onChange={(v) => setForm({ ...form, daily_event_min: v })} /><NumberField label={t("agent.eventMax")} value={form.daily_event_max} min={8} max={15} onChange={(v) => setForm({ ...form, daily_event_max: v })} /><NumberField label={t("agent.proactiveLimit")} value={form.daily_proactive_limit} min={0} max={8} onChange={(v) => setForm({ ...form, daily_proactive_limit: v })} /><NumberField label={t("agent.photoLimit")} value={form.daily_life_photo_limit} min={0} max={4} onChange={(v) => setForm({ ...form, daily_life_photo_limit: v })} /><NumberField label={t("agent.quietStart")} value={form.quiet_hours_start} min={0} max={23} onChange={(v) => setForm({ ...form, quiet_hours_start: v })} /><NumberField label={t("agent.quietEnd")} value={form.quiet_hours_end} min={0} max={23} onChange={(v) => setForm({ ...form, quiet_hours_end: v })} /><NumberField label={t("agent.freeDefaultChatHours")} value={form.free_default_chat_hours} min={1} max={720} onChange={(v) => setForm({ ...form, free_default_chat_hours: v })} /></div>
         <Button onClick={() => save.mutate()} disabled={save.isPending}><Save />{t("agent.saveSettings")}</Button>
       </CardContent>

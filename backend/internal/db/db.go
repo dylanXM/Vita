@@ -415,17 +415,37 @@ func migrate(db *sql.DB) error {
 		`INSERT INTO agent_settings (id) VALUES ('default') ON CONFLICT (id) DO NOTHING`,
 		`CREATE TABLE IF NOT EXISTS agent_media_routes (
 			route_key TEXT PRIMARY KEY,
-			media_type TEXT NOT NULL CHECK (media_type IN ('image','audio','video')),
+			media_type TEXT NOT NULL CHECK (media_type IN ('text','image','audio','video')),
 			enabled BOOLEAN NOT NULL DEFAULT false,
 			primary_model_id TEXT REFERENCES ai_models(id) ON DELETE SET NULL,
 			fallback_model_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
 			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
+		`DO $$ BEGIN
+			IF EXISTS (
+				SELECT 1 FROM pg_constraint
+				WHERE conname='agent_media_routes_media_type_check'
+				AND pg_get_constraintdef(oid) NOT LIKE '%''text''%'
+			) THEN
+				ALTER TABLE agent_media_routes DROP CONSTRAINT agent_media_routes_media_type_check;
+				ALTER TABLE agent_media_routes ADD CONSTRAINT agent_media_routes_media_type_check CHECK (media_type IN ('text','image','audio','video'));
+			END IF;
+		END $$`,
 		`INSERT INTO agent_media_routes(route_key,media_type) VALUES
+			('text_chat','text'),('text_life_plan','text'),('text_proactive','text'),
 			('image_life_photo','image'),('image_requested_photo','image'),
 			('audio_transcription','audio'),('audio_speech','audio'),
 			('video_life_clip','video'),('video_realtime_avatar','video')
 		ON CONFLICT(route_key) DO NOTHING`,
+		`UPDATE agent_media_routes r SET primary_model_id=s.chat_model_id,enabled=true
+		FROM agent_settings s WHERE s.id='default' AND s.chat_model_id IS NOT NULL
+		AND r.route_key='text_chat' AND r.primary_model_id IS NULL`,
+		`UPDATE agent_media_routes r SET primary_model_id=s.life_model_id,enabled=true
+		FROM agent_settings s WHERE s.id='default' AND s.life_model_id IS NOT NULL
+		AND r.route_key='text_life_plan' AND r.primary_model_id IS NULL`,
+		`UPDATE agent_media_routes r SET primary_model_id=s.proactive_model_id,enabled=true
+		FROM agent_settings s WHERE s.id='default' AND s.proactive_model_id IS NOT NULL
+		AND r.route_key='text_proactive' AND r.primary_model_id IS NULL`,
 		`UPDATE agent_media_routes r SET primary_model_id=s.image_model_id,enabled=true
 		FROM agent_settings s WHERE s.id='default' AND s.image_model_id IS NOT NULL
 		AND r.route_key IN ('image_life_photo','image_requested_photo') AND r.primary_model_id IS NULL`,

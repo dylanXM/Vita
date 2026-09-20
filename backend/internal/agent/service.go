@@ -178,7 +178,7 @@ func (s *Service) GenerateDueLifePhotos(ctx context.Context) error {
 	if err != nil || s.mock || settings.DailyLifePhotoLimit <= 0 {
 		return err
 	}
-	models, err := s.loadMediaRouteModels(ctx, "image_life_photo")
+	models, err := s.loadModelRouteModels(ctx, "image_life_photo")
 	if err != nil {
 		return nil
 	}
@@ -271,7 +271,7 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 	if err != nil {
 		return nil, err
 	}
-	model, err := s.loadRoutedModel(ctx, profile.ID, "chat")
+	models, err := s.loadTextRouteModels(ctx, "text_chat", profile.ID)
 	if err != nil && !s.mock {
 		return nil, err
 	}
@@ -283,21 +283,19 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 	if s.mock || err != nil {
 		text = mockReply(profile, recent, detectSupportedLocale(latestQuestion, preferredLocale))
 	} else {
-		text, err = s.client.GenerateText(ctx, model, GenerateRequest{
+		text, _, err = s.generateTextWithFallback(ctx, profile.ID, "reply", models, GenerateRequest{
 			System: system, Messages: recent, Temperature: 0.9, MaxTokens: 320,
 		})
 		if err != nil {
-			s.recordRun(ctx, profile.ID, "reply", model.ID, "failed", err.Error())
 			return nil, err
 		}
-		s.recordRun(ctx, profile.ID, "reply", model.ID, "succeeded", "")
 	}
 	reply, err := s.insertMessage(ctx, conversationID, "assistant", "text", text, "reply", "", map[string]any{})
 	if err != nil {
 		return nil, err
 	}
 	if profile.VoiceEnabled {
-		if audioModels, modelErr := s.loadMediaRouteModels(ctx, "audio_speech"); modelErr == nil {
+		if audioModels, modelErr := s.loadModelRouteModels(ctx, "audio_speech"); modelErr == nil {
 			voice := "alloy"
 			voiceConfig := map[string]any{}
 			_ = json.Unmarshal([]byte(profile.VoiceConfig), &voiceConfig)
@@ -321,7 +319,7 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 }
 
 func (s *Service) TranscribeMedia(ctx context.Context, mediaID, userID, companionID string) (string, error) {
-	models, err := s.loadMediaRouteModels(ctx, "audio_transcription")
+	models, err := s.loadModelRouteModels(ctx, "audio_transcription")
 	if err != nil {
 		return "", err
 	}
@@ -360,7 +358,7 @@ func (s *Service) GenerateRequestedLifePhoto(ctx context.Context, userID, compan
 	if eventType == "sleep" {
 		return nil, fmt.Errorf("the companion is asleep and cannot take a photo now")
 	}
-	models, err := s.loadMediaRouteModels(ctx, "image_requested_photo")
+	models, err := s.loadModelRouteModels(ctx, "image_requested_photo")
 	if err != nil {
 		return nil, err
 	}
@@ -420,7 +418,7 @@ func (s *Service) SpeakLatestReply(ctx context.Context, userID, companionID stri
 	if message.MessageType == "voice" && message.MediaURL != "" {
 		return nil, fmt.Errorf("the latest reply already has voice")
 	}
-	models, err := s.loadMediaRouteModels(ctx, "audio_speech")
+	models, err := s.loadModelRouteModels(ctx, "audio_speech")
 	if err != nil {
 		return nil, err
 	}
@@ -541,9 +539,22 @@ func (s *Service) DispatchDueReplies(ctx context.Context) error {
 }
 
 func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
+	if !s.mock {
+		enabled, err := s.modelRouteEnabled(ctx, "text_proactive")
+		if err != nil || !enabled {
+			return err
+		}
+	}
 	settings, err := s.loadLifeSettings(ctx)
 	if err != nil {
 		return err
+	}
+	var proactiveModels []Model
+	if !s.mock {
+		proactiveModels, err = s.loadTextRouteModels(ctx, "text_proactive", "")
+		if err != nil {
+			return err
+		}
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT m.id,m.companion_id,c.user_id,cv.id,COALESCE(m.content,''),c.name,COALESCE(u.timezone,'UTC')
 		FROM memories m JOIN companions c ON c.id=m.companion_id JOIN users u ON u.id=c.user_id
@@ -606,16 +617,15 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 			"ar":      "كيف سار الأمر الذي أخبرتني عنه؟",
 		}, preferredLocale, "How did the thing you told me about go?")
 		modelID := ""
-		if !s.mock && settings.ProactiveModelID.Valid {
-			model, modelErr := s.loadModel(ctx, settings.ProactiveModelID.String)
-			if modelErr == nil {
-				modelID = model.ID
-				text, modelErr = s.client.GenerateText(ctx, model, GenerateRequest{
-					System:      companionSystemBoundary + "\n\n" + responseLanguagePolicy("", preferredLocale) + "\n\n" + emojiMessagePolicy,
-					Messages:    []ChatMessage{{Role: "user", Content: fmt.Sprintf("The user previously said: %q. Follow up naturally now without assuming or inventing the outcome. Ask one concise, specific question.", item.content)}},
-					Temperature: 0.8, MaxTokens: 120,
-				})
-			}
+		if !s.mock {
+			var model Model
+			var modelErr error
+			text, model, modelErr = s.generateTextWithFallback(ctx, item.companionID, "memory_followup", proactiveModels, GenerateRequest{
+				System:      companionSystemBoundary + "\n\n" + responseLanguagePolicy("", preferredLocale) + "\n\n" + emojiMessagePolicy,
+				Messages:    []ChatMessage{{Role: "user", Content: fmt.Sprintf("The user previously said: %q. Follow up naturally now without assuming or inventing the outcome. Ask one concise, specific question.", item.content)}},
+				Temperature: 0.8, MaxTokens: 120,
+			})
+			modelID = model.ID
 			if modelErr != nil {
 				_, _ = s.db.ExecContext(ctx, `UPDATE memories SET follow_up_claimed_at=NULL WHERE id=$1`, item.id)
 				continue
@@ -647,6 +657,12 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 }
 
 func (s *Service) EnsureDailyPlans(ctx context.Context) error {
+	if !s.mock {
+		enabled, err := s.modelRouteEnabled(ctx, "text_life_plan")
+		if err != nil || !enabled {
+			return err
+		}
+	}
 	settings, err := s.loadLifeSettings(ctx)
 	if err != nil {
 		return err
@@ -769,31 +785,32 @@ func (s *Service) ensurePlan(ctx context.Context, profile companionContext, time
 }
 
 func (s *Service) generatePlan(ctx context.Context, profile companionContext, localDate, timezone string, settings lifeSettings, proactiveLimit int) ([]lifePlanEvent, string, error) {
-	if s.mock || !settings.LifeModelID.Valid {
+	if s.mock {
 		return mockPlan(profile), "", nil
 	}
-	model, err := s.loadModel(ctx, settings.LifeModelID.String)
+	models, err := s.loadTextRouteModels(ctx, "text_life_plan", "")
 	if err != nil {
 		return nil, "", err
 	}
 	recentLife := s.recentLifeContext(ctx, profile.ID, localDate)
 	prompt := lifePlanPrompt(profile, localDate, timezone, recentLife,
 		settings.DailyEventMin, settings.DailyEventMax, proactiveLimit)
-	text, err := s.client.GenerateText(ctx, model, GenerateRequest{
-		System:   "You plan a believable daily timeline for a fictional AI companion. Output strict JSON only.",
-		Messages: []ChatMessage{{Role: "user", Content: prompt}}, Temperature: 0.85, MaxTokens: 2200,
-	})
-	if err != nil {
-		s.recordRun(ctx, profile.ID, "life_plan", model.ID, "failed", err.Error())
-		return nil, model.ID, err
+	request := GenerateRequest{System: "You plan a believable daily timeline for a fictional AI companion. Output strict JSON only.", Messages: []ChatMessage{{Role: "user", Content: prompt}}, Temperature: 0.85, MaxTokens: 2200}
+	var lastErr error
+	for _, model := range models {
+		text, generateErr := s.client.GenerateText(ctx, model, request)
+		if generateErr == nil {
+			var events []lifePlanEvent
+			events, generateErr = parseLifePlan(text)
+			if generateErr == nil {
+				s.recordRun(ctx, profile.ID, "life_plan", model.ID, "succeeded", "")
+				return events, model.ID, nil
+			}
+		}
+		lastErr = generateErr
+		s.recordRun(ctx, profile.ID, "life_plan", model.ID, "failed", generateErr.Error())
 	}
-	events, err := parseLifePlan(text)
-	if err != nil {
-		s.recordRun(ctx, profile.ID, "life_plan", model.ID, "failed", err.Error())
-		return nil, model.ID, err
-	}
-	s.recordRun(ctx, profile.ID, "life_plan", model.ID, "succeeded", "")
-	return events, model.ID, nil
+	return nil, "", lastErr
 }
 
 func lifePlanPrompt(profile companionContext, localDate, timezone, recentLife string, minEvents, maxEvents, proactiveLimit int) string {
@@ -851,6 +868,12 @@ func (s *Service) recentLifeContext(ctx context.Context, companionID, beforeDate
 // are used; owner identity, conversations and private memories never cross the
 // relationship boundary.
 func (s *Service) EnsureCompanionSocialWorld(ctx context.Context) error {
+	if !s.mock {
+		enabled, err := s.modelRouteEnabled(ctx, "text_life_plan")
+		if err != nil || !enabled {
+			return err
+		}
+	}
 	if err := s.ensureCompanionConnections(ctx); err != nil {
 		return err
 	}
@@ -1038,10 +1061,10 @@ func (s *Service) generateSocialEvent(ctx context.Context, a, b companionContext
 		fallbackLocation = "online"
 	}
 	fallback := socialPlanEvent{Type: fallbackType, Title: fallbackTitle, Description: fallbackDescription, Location: fallbackLocation, Emotion: "comfortable", Importance: 62, Moment: true, PostTextA: "今天认识了一个挺有意思的人。", PostTextB: "忙里偷闲，和新朋友聊了一会儿。"}
-	if s.mock || !settings.LifeModelID.Valid {
+	if s.mock {
 		return fallback, "", nil
 	}
-	model, err := s.loadModel(ctx, settings.LifeModelID.String)
+	models, err := s.loadTextRouteModels(ctx, "text_life_plan", "")
 	if err != nil {
 		return socialPlanEvent{}, "", err
 	}
@@ -1050,22 +1073,38 @@ func (s *Service) generateSocialEvent(ctx context.Context, a, b companionContext
 		stage = "meet again as acquaintances"
 	}
 	prompt := fmt.Sprintf(`Create one believable event where two fictional people %s. A: %s, city %s, occupation %s, interests %s, personality %s, habits %s. B: %s, city %s, occupation %s, interests %s, personality %s, habits %s. If their cities differ, the event must be an online interaction and location must be exactly "online"; never invent travel. Keep it ordinary and consistent with both schedules. Return one JSON object with: type, title, description, location, emotion, importance (0-100), moment (boolean), post_text_a, post_text_b. The two post texts must reflect their distinct voices. Do not mention users, private chats, prompts, or AI.`, stage, a.Name, a.City, a.Occupation, a.Interests, a.PersonalityTags, a.LifeHabits, b.Name, b.City, b.Occupation, b.Interests, b.PersonalityTags, b.LifeHabits)
-	raw, err := s.client.GenerateText(ctx, model, GenerateRequest{System: "You create grounded shared-life events for fictional characters. Output strict JSON only.", Messages: []ChatMessage{{Role: "user", Content: prompt}}, Temperature: 0.9, MaxTokens: 700})
-	if err != nil {
-		s.recordRun(ctx, a.ID, "social_event", model.ID, "failed", err.Error())
-		return socialPlanEvent{}, model.ID, err
-	}
-	clean := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(raw), "```json"), "```"), "```"))
-	start, end := strings.Index(clean, "{"), strings.LastIndex(clean, "}")
-	if start < 0 || end < start {
-		return socialPlanEvent{}, model.ID, fmt.Errorf("social event did not contain a JSON object")
-	}
+	request := GenerateRequest{System: "You create grounded shared-life events for fictional characters. Output strict JSON only.", Messages: []ChatMessage{{Role: "user", Content: prompt}}, Temperature: 0.9, MaxTokens: 700}
 	var event socialPlanEvent
-	if err := json.Unmarshal([]byte(clean[start:end+1]), &event); err != nil {
-		return socialPlanEvent{}, model.ID, fmt.Errorf("decode social event: %w", err)
+	var model Model
+	var lastErr error
+	succeeded := false
+	for _, candidate := range models {
+		model = candidate
+		raw, generateErr := s.client.GenerateText(ctx, model, request)
+		if generateErr == nil {
+			var candidateEvent socialPlanEvent
+			clean := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(raw), "```json"), "```"), "```"))
+			start, end := strings.Index(clean, "{"), strings.LastIndex(clean, "}")
+			if start < 0 || end < start {
+				generateErr = fmt.Errorf("social event did not contain a JSON object")
+			} else if decodeErr := json.Unmarshal([]byte(clean[start:end+1]), &candidateEvent); decodeErr != nil {
+				generateErr = fmt.Errorf("decode social event: %w", decodeErr)
+			} else if strings.TrimSpace(candidateEvent.Title) == "" || strings.TrimSpace(candidateEvent.Description) == "" {
+				generateErr = fmt.Errorf("social event was incomplete")
+			} else {
+				event = candidateEvent
+			}
+		}
+		if generateErr == nil {
+			s.recordRun(ctx, a.ID, "social_event", model.ID, "succeeded", "")
+			succeeded = true
+			break
+		}
+		lastErr = generateErr
+		s.recordRun(ctx, a.ID, "social_event", model.ID, "failed", generateErr.Error())
 	}
-	if strings.TrimSpace(event.Title) == "" || strings.TrimSpace(event.Description) == "" {
-		return socialPlanEvent{}, model.ID, fmt.Errorf("social event was incomplete")
+	if !succeeded {
+		return socialPlanEvent{}, model.ID, lastErr
 	}
 	event.Title = strings.TrimSpace(event.Title)
 	event.Description = strings.TrimSpace(event.Description)
@@ -1086,7 +1125,6 @@ func (s *Service) generateSocialEvent(ctx context.Context, a, b companionContext
 	if event.Moment && event.PostTextB == "" {
 		event.PostTextB = event.Description
 	}
-	s.recordRun(ctx, a.ID, "social_event", model.ID, "succeeded", "")
 	return event, model.ID, nil
 }
 
@@ -1151,9 +1189,20 @@ func momentPostType(content string, media []string) string {
 }
 
 func (s *Service) DispatchDueProactive(ctx context.Context) error {
+	if !s.mock {
+		enabled, err := s.modelRouteEnabled(ctx, "text_proactive")
+		if err != nil || !enabled {
+			return err
+		}
+	}
 	settings, err := s.loadLifeSettings(ctx)
 	if err != nil {
 		return err
+	}
+	if !s.mock {
+		if _, err := s.loadTextRouteModels(ctx, "text_proactive", ""); err != nil {
+			return err
+		}
 	}
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT e.id, e.companion_id, c.user_id, c.name, COALESCE(c.city, ''),
@@ -1240,21 +1289,21 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 	targetLocale := detectSupportedLocale(latestQuestion, preferredLocale)
 	text := mockProactiveMessage(targetLocale)
 	modelID := ""
-	if !s.mock && settings.ProactiveModelID.Valid {
-		model, modelErr := s.loadModel(ctx, settings.ProactiveModelID.String)
+	if !s.mock {
+		models, modelErr := s.loadTextRouteModels(ctx, "text_proactive", "")
 		if modelErr != nil {
 			return modelErr
 		}
-		modelID = model.ID
-		text, err = s.client.GenerateText(ctx, model, GenerateRequest{
+		var model Model
+		text, model, err = s.generateTextWithFallback(ctx, event.companionID, "proactive", models, GenerateRequest{
 			System: companionSystemBoundary + "\n\n" + responseLanguagePolicy(latestQuestion, preferredLocale) + "\n\n" + emojiMessagePolicy,
 			Messages: []ChatMessage{{Role: "user", Content: fmt.Sprintf(
 				"As %s living in %s, you just experienced: %s — %s, at %s. Send one natural message only if it feels worth sharing. Do not start with a greeting or ask a generic question.",
 				event.name, event.city, event.title, event.description, event.location)}},
 			Temperature: 0.95, MaxTokens: 180,
 		})
+		modelID = model.ID
 		if err != nil {
-			s.recordRun(ctx, event.companionID, "proactive", model.ID, "failed", err.Error())
 			return err
 		}
 	}
@@ -1538,42 +1587,20 @@ func (s *Service) loadRecentMessages(ctx context.Context, conversationID string,
 	return messages, rows.Err()
 }
 
-func (s *Service) loadRoutedModel(ctx context.Context, companionID, route string) (Model, error) {
-	column := "chat_model_id"
-	if route == "life" {
-		column = "life_model_id"
-	} else if route == "proactive" {
-		column = "proactive_model_id"
-	} else if route == "transcription" {
-		column = "transcription_model_id"
-	} else if route == "speech" {
-		column = "speech_model_id"
-	}
-	var modelID sql.NullString
-	query := fmt.Sprintf(`SELECT COALESCE(c.model_id, s.%s) FROM companions c CROSS JOIN agent_settings s WHERE c.id = $1 AND s.id = 'default'`, column)
-	if err := s.db.QueryRowContext(ctx, query, companionID).Scan(&modelID); err != nil {
-		return Model{}, err
-	}
-	if !modelID.Valid || modelID.String == "" {
-		return Model{}, fmt.Errorf("no %s model configured", route)
-	}
-	return s.loadModel(ctx, modelID.String)
-}
-
-func (s *Service) loadMediaRouteModels(ctx context.Context, routeKey string) ([]Model, error) {
+func (s *Service) loadModelRouteModels(ctx context.Context, routeKey string) ([]Model, error) {
 	var enabled bool
 	var primary sql.NullString
 	var fallbackRaw, mediaType string
 	err := s.db.QueryRowContext(ctx, `SELECT enabled,primary_model_id,fallback_model_ids::text,media_type
 		FROM agent_media_routes WHERE route_key=$1`, routeKey).Scan(&enabled, &primary, &fallbackRaw, &mediaType)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("media behavior %s is not configured", routeKey)
+		return nil, fmt.Errorf("model behavior %s is not configured", routeKey)
 	}
 	if err != nil {
 		return nil, err
 	}
 	if !enabled || !primary.Valid || strings.TrimSpace(primary.String) == "" {
-		return nil, fmt.Errorf("media behavior %s is not configured", routeKey)
+		return nil, fmt.Errorf("model behavior %s is not configured", routeKey)
 	}
 	ids := []string{primary.String}
 	var fallbacks []string
@@ -1599,9 +1626,64 @@ func (s *Service) loadMediaRouteModels(ctx context.Context, routeKey string) ([]
 		}
 	}
 	if len(models) == 0 {
-		return nil, fmt.Errorf("media behavior %s has no available models", routeKey)
+		return nil, fmt.Errorf("model behavior %s has no available models", routeKey)
 	}
 	return models, nil
+}
+
+func (s *Service) modelRouteEnabled(ctx context.Context, routeKey string) (bool, error) {
+	var enabled bool
+	err := s.db.QueryRowContext(ctx, `SELECT enabled FROM agent_media_routes WHERE route_key=$1`, routeKey).Scan(&enabled)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return enabled, err
+}
+
+func (s *Service) loadTextRouteModels(ctx context.Context, routeKey, companionID string) ([]Model, error) {
+	models, err := s.loadModelRouteModels(ctx, routeKey)
+	if err != nil || routeKey != "text_chat" || companionID == "" {
+		return models, err
+	}
+	var override sql.NullString
+	if err := s.db.QueryRowContext(ctx, `SELECT model_id FROM companions WHERE id=$1`, companionID).Scan(&override); err != nil {
+		return nil, err
+	}
+	if !override.Valid || strings.TrimSpace(override.String) == "" {
+		return models, nil
+	}
+	var compatible bool
+	if err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_models WHERE id=$1 AND enabled=true AND capabilities ? 'text')`, override.String).Scan(&compatible); err != nil || !compatible {
+		return models, nil
+	}
+	overrideModel, err := s.loadModel(ctx, override.String)
+	if err != nil {
+		return models, nil
+	}
+	ordered := []Model{overrideModel}
+	for _, model := range models {
+		if model.ID != overrideModel.ID {
+			ordered = append(ordered, model)
+		}
+	}
+	return ordered, nil
+}
+
+func (s *Service) generateTextWithFallback(ctx context.Context, companionID, runKind string, models []Model, request GenerateRequest) (string, Model, error) {
+	var lastErr error
+	for _, model := range models {
+		output, err := s.client.GenerateText(ctx, model, request)
+		if err == nil {
+			s.recordRun(ctx, companionID, runKind, model.ID, "succeeded", "")
+			return output, model, nil
+		}
+		lastErr = err
+		s.recordRun(ctx, companionID, runKind, model.ID, "failed", err.Error())
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no text model is available")
+	}
+	return "", Model{}, lastErr
 }
 
 func (s *Service) generateImageWithFallback(ctx context.Context, companionID, runKind string, models []Model, request GenerateImageRequest) (string, Model, error) {

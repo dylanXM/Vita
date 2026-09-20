@@ -40,6 +40,12 @@ describe("media model route helpers", () => {
     expect([...selectedMediaModelIDs(route)]).toEqual(["primary", "backup"]);
   });
 
+  it("offers only enabled text models for text routes", () => {
+    const textRoute: MediaModelRoute = { route_key: "text_chat", media_type: "text", enabled: true, primary_model_id: null, fallback_model_ids: [] };
+    const result = compatibleMediaModels([model("text", true, ["text"]), model("image", true, ["image"]), model("disabled", false, ["text"])], textRoute);
+    expect(result.map((item) => item.id)).toEqual(["text"]);
+  });
+
   it("removes unfinished fallback rows before saving without mutating UI state", () => {
     const input = [{ ...route, primary_model_id: " primary ", fallback_model_ids: [" backup-1 ", "", " backup-2 ", "   "] }];
     const result = normalizeMediaRoutesForSave(input);

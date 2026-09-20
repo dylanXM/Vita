@@ -177,7 +177,7 @@ func AdminDeleteProvider(c *gin.Context) {
 		return
 	}
 	if usedByMediaRoute {
-		c.JSON(http.StatusConflict, gin.H{"error": "provider has models used by a media route"})
+		c.JSON(http.StatusConflict, gin.H{"error": "provider has models used by a model route"})
 		return
 	}
 	result, err := db.Get().Exec(`DELETE FROM ai_providers WHERE id = $1`, c.Param("id"))
@@ -257,6 +257,9 @@ type mediaModelRoute struct {
 }
 
 var mediaRouteTypes = map[string]string{
+	"text_chat":             "text",
+	"text_life_plan":        "text",
+	"text_proactive":        "text",
 	"image_life_photo":      "image",
 	"image_requested_photo": "image",
 	"audio_transcription":   "audio",
@@ -268,7 +271,7 @@ var mediaRouteTypes = map[string]string{
 func AdminListMediaModelRoutes(c *gin.Context) {
 	routes, err := loadMediaModelRoutes()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load media model routes"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load model routes"})
 		return
 	}
 	models, err := loadAdminModels()
@@ -284,7 +287,7 @@ func AdminUpdateMediaModelRoutes(c *gin.Context) {
 		Routes []mediaModelRoute `json:"routes" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid media model routes"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid model routes"})
 		return
 	}
 	normalizedRoutes, err := normalizeMediaModelRoutes(input.Routes)
@@ -309,18 +312,21 @@ func AdminUpdateMediaModelRoutes(c *gin.Context) {
 	}
 	tx, err := db.Get().BeginTx(c.Request.Context(), nil)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save media model routes"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save model routes"})
 		return
 	}
 	defer tx.Rollback()
 	for _, route := range input.Routes {
 		fallbacks, _ := json.Marshal(route.FallbackModelIDs)
 		if _, err := tx.ExecContext(c.Request.Context(), `UPDATE agent_media_routes SET enabled=$2,primary_model_id=$3,fallback_model_ids=$4,updated_at=CURRENT_TIMESTAMP WHERE route_key=$1`, route.RouteKey, route.Enabled, route.PrimaryModelID, fallbacks); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save media model routes"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save model routes"})
 			return
 		}
 	}
 	if _, err := tx.ExecContext(c.Request.Context(), `UPDATE agent_settings SET
+		chat_model_id=(SELECT CASE WHEN enabled THEN primary_model_id END FROM agent_media_routes WHERE route_key='text_chat'),
+		life_model_id=(SELECT CASE WHEN enabled THEN primary_model_id END FROM agent_media_routes WHERE route_key='text_life_plan'),
+		proactive_model_id=(SELECT CASE WHEN enabled THEN primary_model_id END FROM agent_media_routes WHERE route_key='text_proactive'),
 		image_model_id=(SELECT CASE WHEN enabled THEN primary_model_id END FROM agent_media_routes WHERE route_key='image_life_photo'),
 		transcription_model_id=(SELECT CASE WHEN enabled THEN primary_model_id END FROM agent_media_routes WHERE route_key='audio_transcription'),
 		speech_model_id=(SELECT CASE WHEN enabled THEN primary_model_id END FROM agent_media_routes WHERE route_key='audio_speech'),updated_at=CURRENT_TIMESTAMP
@@ -329,7 +335,7 @@ func AdminUpdateMediaModelRoutes(c *gin.Context) {
 		return
 	}
 	if err := tx.Commit(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save media model routes"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save model routes"})
 		return
 	}
 	AdminListMediaModelRoutes(c)
@@ -357,7 +363,7 @@ func normalizeMediaModelRoutes(routes []mediaModelRoute) ([]mediaModelRoute, err
 		route.FallbackModelIDs = fallbacks
 		expectedType, ok := mediaRouteTypes[route.RouteKey]
 		if !ok || route.MediaType != expectedType || seen[route.RouteKey] || len(route.FallbackModelIDs) > 5 {
-			return nil, errors.New("invalid media model route")
+			return nil, errors.New("invalid model route")
 		}
 		seen[route.RouteKey] = true
 		if route.Enabled && route.PrimaryModelID == nil {
@@ -370,14 +376,14 @@ func normalizeMediaModelRoutes(routes []mediaModelRoute) ([]mediaModelRoute, err
 		unique := map[string]bool{}
 		for _, modelID := range modelIDs {
 			if unique[modelID] {
-				return nil, errors.New("media route models must be unique")
+				return nil, errors.New("model route models must be unique")
 			}
 			unique[modelID] = true
 		}
 		normalized = append(normalized, route)
 	}
 	if len(seen) != len(mediaRouteTypes) {
-		return nil, errors.New("all media model routes are required")
+		return nil, errors.New("all model routes are required")
 	}
 	return normalized, nil
 }
@@ -414,7 +420,7 @@ func AdminDeleteModel(c *gin.Context) {
 		return
 	}
 	if usedByMediaRoute {
-		c.JSON(http.StatusConflict, gin.H{"error": "model is still used by a media route"})
+		c.JSON(http.StatusConflict, gin.H{"error": "model is still used by a model route"})
 		return
 	}
 	result, err := db.Get().Exec(`DELETE FROM ai_models WHERE id = $1`, c.Param("id"))
@@ -450,26 +456,12 @@ func AdminUpdateAgentSettings(c *gin.Context) {
 	}
 	defer tx.Rollback()
 	_, err = tx.ExecContext(c.Request.Context(), `
-		UPDATE agent_settings SET chat_model_id=$1,life_model_id=$2,proactive_model_id=$3,image_model_id=$4,transcription_model_id=$5,speech_model_id=$6,
-		daily_event_min=$7,daily_event_max=$8,daily_proactive_limit=$9,daily_life_photo_limit=$10,quiet_hours_start=$11,quiet_hours_end=$12,
-		free_default_chat_hours=$13,updated_at=CURRENT_TIMESTAMP WHERE id='default'`, input.ChatModelID, input.LifeModelID, input.ProactiveModelID, input.ImageModelID, input.TranscriptionModelID, input.SpeechModelID,
+		UPDATE agent_settings SET daily_event_min=$1,daily_event_max=$2,daily_proactive_limit=$3,daily_life_photo_limit=$4,
+		quiet_hours_start=$5,quiet_hours_end=$6,free_default_chat_hours=$7,updated_at=CURRENT_TIMESTAMP WHERE id='default'`,
 		input.DailyEventMin, input.DailyEventMax, input.DailyProactiveLimit, input.DailyLifePhotoLimit, input.QuietHoursStart, input.QuietHoursEnd, input.FreeDefaultChatHours)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save agent settings"})
 		return
-	}
-	legacyRoutes := []struct {
-		key     string
-		modelID *string
-	}{
-		{"image_life_photo", input.ImageModelID}, {"image_requested_photo", input.ImageModelID},
-		{"audio_transcription", input.TranscriptionModelID}, {"audio_speech", input.SpeechModelID},
-	}
-	for _, route := range legacyRoutes {
-		if _, err := tx.ExecContext(c.Request.Context(), `UPDATE agent_media_routes SET primary_model_id=$2,enabled=($2 IS NOT NULL),updated_at=CURRENT_TIMESTAMP WHERE route_key=$1`, route.key, route.modelID); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to sync media model routes"})
-			return
-		}
 	}
 	if err := tx.Commit(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save agent settings"})
@@ -691,6 +683,19 @@ func saveAdminCompanion(c *gin.Context, id string) {
 	}
 	if input.RelationshipStage == "" {
 		input.RelationshipStage = "stranger"
+	}
+	if input.ModelID != nil {
+		modelID := strings.TrimSpace(*input.ModelID)
+		if modelID == "" {
+			input.ModelID = nil
+		} else {
+			var valid bool
+			if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM ai_models WHERE id=$1 AND enabled=true AND capabilities ? 'text')`, modelID).Scan(&valid); err != nil || !valid {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "companion model must be an enabled text model"})
+				return
+			}
+			input.ModelID = &modelID
+		}
 	}
 	if id == "" {
 		voiceEnabled := false

@@ -40,6 +40,36 @@ func TestGenerateImageUsesFallbackInConfiguredOrder(t *testing.T) {
 	}
 }
 
+func TestGenerateTextUsesFallbackInConfiguredOrder(t *testing.T) {
+	primaryCalls := 0
+	primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		primaryCalls++
+		http.Error(w, "primary unavailable", http.StatusServiceUnavailable)
+	}))
+	defer primary.Close()
+	backupCalls := 0
+	backup := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		backupCalls++
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": "fallback reply"}}}})
+	}))
+	defer backup.Close()
+
+	service := &Service{client: NewClient()}
+	text, used, err := service.generateTextWithFallback(context.Background(), "", "reply", []Model{
+		{ID: "primary", Kind: "openai", BaseURL: primary.URL, ModelName: "primary"},
+		{ID: "backup", Kind: "openai", BaseURL: backup.URL, ModelName: "backup"},
+	}, GenerateRequest{Messages: []ChatMessage{{Role: "user", Content: "hello"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text != "fallback reply" || used.ID != "backup" {
+		t.Fatalf("text = %q, model = %q", text, used.ID)
+	}
+	if primaryCalls != 1 || backupCalls != 1 {
+		t.Fatalf("calls primary=%d backup=%d", primaryCalls, backupCalls)
+	}
+}
+
 func TestParseLifePlanFromFence(t *testing.T) {
 	events, err := parseLifePlan("```json\n[{\"type\":\"meal\",\"title\":\"Lunch\"}]\n```")
 	if err != nil {

@@ -32,7 +32,13 @@ export function CompanionDetailPage() {
   const queryClient = useQueryClient();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const detail = useQuery({ queryKey: ["managed-companion", id], queryFn: ({ signal }) => companionsApi.get(id, signal), retry: false });
-  const config = useQuery({ queryKey: ["agent-config"], queryFn: ({ signal }) => agentApi.config(signal) });
+  const config = useQuery({
+    queryKey: ["agent-config"],
+    queryFn: async ({ signal }) => {
+      const value = await agentApi.config(signal);
+      return { ...value, models: value.models.filter((model) => model.enabled && model.capabilities.includes("text")) };
+    },
+  });
   const [form, setForm] = useState<AdminCompanionInput | null>(null);
   const [voiceJSON, setVoiceJSON] = useState("{}");
   useEffect(() => {

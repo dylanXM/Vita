@@ -7,6 +7,9 @@ import (
 
 func mediaRouteFixture() []mediaModelRoute {
 	return []mediaModelRoute{
+		{RouteKey: "text_chat", MediaType: "text"},
+		{RouteKey: "text_life_plan", MediaType: "text"},
+		{RouteKey: "text_proactive", MediaType: "text"},
 		{RouteKey: "image_life_photo", MediaType: "image"},
 		{RouteKey: "image_requested_photo", MediaType: "image"},
 		{RouteKey: "audio_transcription", MediaType: "audio"},
