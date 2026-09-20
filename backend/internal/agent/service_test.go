@@ -123,6 +123,14 @@ func TestReasonableSocialHour(t *testing.T) {
 	}
 }
 
+func TestEmojiMessagePolicyKeepsEmojiNatural(t *testing.T) {
+	for _, expected := range []string{"Emoji are supported", "0 to 2 emoji", "speaking style", "Do not add emoji mechanically"} {
+		if !strings.Contains(emojiMessagePolicy, expected) {
+			t.Fatalf("emoji policy missing %q", expected)
+		}
+	}
+}
+
 func TestMomentPostType(t *testing.T) {
 	if got := momentPostType("hello", nil); got != "text" {
 		t.Fatalf("text post type = %q", got)

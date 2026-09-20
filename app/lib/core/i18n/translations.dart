@@ -42,6 +42,7 @@ class VitaTranslations extends Translations {
       'chat.sayHello': 'Say hello',
       'chat.sayHelloSub': 'Start the conversation with your companion',
       'chat.message': 'Message',
+      'chat.emoji': 'Emoji',
       'subscription.required.title': 'Subscription required',
       'subscription.required.create':
           'Subscribe before creating your own companion.',
@@ -242,6 +243,7 @@ class VitaTranslations extends Translations {
       'chat.sayHello': '打个招呼吧',
       'chat.sayHelloSub': '开始和你的伙伴聊天',
       'chat.message': '消息',
+      'chat.emoji': '表情',
       'subscription.required.title': '需要订阅',
       'subscription.required.create': '订阅后才能创建自己的角色。',
       'subscription.continue': '继续订阅',

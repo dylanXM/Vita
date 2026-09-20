@@ -122,6 +122,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'chat.sayHello': 'Saluda',
     'chat.sayHelloSub': 'Comienza la conversación con tu compañero',
     'chat.message': 'Mensaje',
+    'chat.emoji': 'Emoji',
     'subscription.active': 'Tu plan está activo',
     'subscription.hero': 'Más vida, más recuerdos, más de ella.',
     'subscription.description':
@@ -324,6 +325,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'chat.sayHello': 'Diga olá',
     'chat.sayHelloSub': 'Comece a conversa com seu companheiro',
     'chat.message': 'Mensagem',
+    'chat.emoji': 'Emoji',
     'subscription.active': 'Seu plano está ativo',
     'subscription.hero': 'Mais vida, mais memórias, mais dela.',
     'subscription.description':
@@ -520,6 +522,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'chat.sayHello': '話しかけてみよう',
     'chat.sayHelloSub': 'コンパニオンとの会話を始めましょう',
     'chat.message': 'メッセージ',
+    'chat.emoji': '絵文字',
     'subscription.active': 'プランは有効です',
     'subscription.hero': 'もっと日常を、もっと思い出を、もっと彼女を。',
     'subscription.description': 'プレミアム画像や音声などに使えるクレジットが毎月含まれます。',
@@ -710,6 +713,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'chat.sayHello': '인사해 보세요',
     'chat.sayHelloSub': '컴패니언과 대화를 시작하세요',
     'chat.message': '메시지',
+    'chat.emoji': '이모지',
     'subscription.active': '플랜을 이용 중입니다',
     'subscription.hero': '더 많은 일상과 추억, 그리고 더 가까운 관계.',
     'subscription.description': '프리미엄 이미지와 음성 등에 사용할 수 있는 크레딧이 매월 포함됩니다.',
@@ -899,6 +903,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'chat.sayHello': 'ابدأ بالتحية',
     'chat.sayHelloSub': 'ابدأ المحادثة مع رفيقك',
     'chat.message': 'رسالة',
+    'chat.emoji': 'رموز تعبيرية',
     'subscription.active': 'خطتك نشطة',
     'subscription.hero': 'المزيد من الحياة والذكريات والقرب.',
     'subscription.description':
@@ -1091,6 +1096,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'chat.sayHello': '打個招呼吧',
     'chat.sayHelloSub': '開始和你的夥伴聊天',
     'chat.message': '訊息',
+    'chat.emoji': '表情符號',
     'subscription.active': '你的訂閱已生效',
     'subscription.hero': '更多生活、更多回憶，也更了解她。',
     'subscription.description': '訂閱每月包含積分，可用於進階圖片、語音及更多功能。',

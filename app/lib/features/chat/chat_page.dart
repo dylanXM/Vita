@@ -28,6 +28,41 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
+  static const _messageEmojis = <String>[
+    '😊',
+    '😂',
+    '🥰',
+    '😍',
+    '🥹',
+    '😢',
+    '😭',
+    '😡',
+    '😳',
+    '🤔',
+    '😏',
+    '😴',
+    '🤗',
+    '🫡',
+    '🥳',
+    '😎',
+    '👍',
+    '👏',
+    '🙌',
+    '🤝',
+    '🙏',
+    '💪',
+    '👋',
+    '🫶',
+    '❤️',
+    '🩷',
+    '💕',
+    '✨',
+    '🎉',
+    '🌟',
+    '🔥',
+    '🌸',
+  ];
+
   late final ChatController ctrl = Get.put(
     ChatController(companionId: widget.companionId, companionName: widget.name),
     tag: widget.companionId,
@@ -65,6 +100,52 @@ class _ChatPageState extends State<ChatPage> {
         }
       });
     });
+  }
+
+  void _insertEmoji(String emoji) {
+    final selection = _input.selection;
+    final start = selection.isValid ? selection.start : _input.text.length;
+    final end = selection.isValid ? selection.end : _input.text.length;
+    final updated = _input.text.replaceRange(start, end, emoji);
+    _input.value = TextEditingValue(
+      text: updated,
+      selection: TextSelection.collapsed(offset: start + emoji.length),
+    );
+  }
+
+  void _showEmojiPicker() {
+    FocusScope.of(context).unfocus();
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: context.vita.surface,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          child: GridView.builder(
+            shrinkWrap: true,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 8,
+              mainAxisSpacing: 4,
+              crossAxisSpacing: 4,
+            ),
+            itemCount: _messageEmojis.length,
+            itemBuilder: (_, index) {
+              final emoji = _messageEmojis[index];
+              return InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () {
+                  _insertEmoji(emoji);
+                  Navigator.of(sheetContext).pop();
+                },
+                child: Center(
+                    child: Text(emoji, style: const TextStyle(fontSize: 26))),
+              );
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _sendGift(int coins) async {
@@ -352,6 +433,13 @@ class _ChatPageState extends State<ChatPage> {
           12, 8, 12, 8 + MediaQuery.of(context).padding.bottom),
       child: Row(
         children: [
+          IconButton(
+            onPressed: locked ? null : _showEmojiPicker,
+            tooltip: 'chat.emoji'.tr,
+            icon: Icon(Icons.sentiment_satisfied_alt_outlined,
+                color: locked ? context.vita.hint : context.vita.subText),
+          ),
+          const SizedBox(width: 2),
           Expanded(
             child: TextField(
               controller: _input,

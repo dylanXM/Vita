@@ -163,7 +163,7 @@ func (s *Service) Reply(ctx context.Context, conversationID, userID string) (*Sa
 
 	preferredLocale := s.preferredLocale(ctx, userID)
 	latestQuestion := latestUserMessage(recent)
-	system := s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy(latestQuestion, preferredLocale)
+	system := s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy(latestQuestion, preferredLocale) + "\n\n" + emojiMessagePolicy
 	var text string
 	if s.mock || err != nil {
 		text = mockReply(profile, recent, detectSupportedLocale(latestQuestion, preferredLocale))
@@ -788,7 +788,7 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 		}
 		modelID = model.ID
 		text, err = s.client.GenerateText(ctx, model, GenerateRequest{
-			System: companionSystemBoundary + "\n\n" + responseLanguagePolicy(latestQuestion, preferredLocale),
+			System: companionSystemBoundary + "\n\n" + responseLanguagePolicy(latestQuestion, preferredLocale) + "\n\n" + emojiMessagePolicy,
 			Messages: []ChatMessage{{Role: "user", Content: fmt.Sprintf(
 				"As %s living in %s, you just experienced: %s — %s, at %s. Send one natural message only if it feels worth sharing. Do not start with a greeting or ask a generic question.",
 				event.name, event.city, event.title, event.description, event.location)}},
@@ -1494,6 +1494,8 @@ func containsLanguageMarker(value string, markers []string) bool {
 	}
 	return false
 }
+
+const emojiMessagePolicy = `Emoji are supported in chat messages. You may use 0 to 2 emoji when they naturally fit the character's emotion and speaking style. Do not add emoji mechanically, repeat them excessively, or use them in every reply.`
 
 func mockReply(profile companionContext, messages []ChatMessage, locale string) string {
 	last := ""
