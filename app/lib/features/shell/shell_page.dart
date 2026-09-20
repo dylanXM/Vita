@@ -14,7 +14,7 @@ import '../explore/explore_page.dart';
 import '../whats_new/whats_new_sheet.dart';
 
 /// Main shell — iOS default style: content scrolls edge to edge behind a
-/// flush, full-width frosted UITabBar (Chat | Life | Explore | Me).
+/// flush, full-width frosted UITabBar (Chat | Contacts | Explore | Me).
 class ShellController extends GetxController {
   static ShellController get to => Get.find();
 
@@ -22,7 +22,7 @@ class ShellController extends GetxController {
 
   void switchTo(int i) {
     if (i == index.value) return;
-    const tabs = ['chat', 'life', 'explore', 'me'];
+    const tabs = ['chat', 'contacts', 'explore', 'me'];
     AnalyticsService.to.track('tab_selected',
         category: 'navigation',
         properties: {'from': tabs[index.value], 'to': tabs[i]});
@@ -98,9 +98,9 @@ const List<_NavItem> _kTabs = [
     activeIcon: Icons.forum_rounded,
   ),
   _NavItem(
-    labelKey: 'tab.life',
-    icon: Icons.access_time_outlined,
-    activeIcon: Icons.access_time_filled,
+    labelKey: 'tab.contacts',
+    icon: Icons.contacts_outlined,
+    activeIcon: Icons.contacts_rounded,
   ),
   _NavItem(
     labelKey: 'tab.explore',

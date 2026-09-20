@@ -13,7 +13,6 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
-import '../life/life_page.dart';
 import '../shell/shell_page.dart';
 import '../auth/auth_controller.dart';
 import 'chat_controller.dart';
@@ -577,8 +576,6 @@ class _ChatMessageBody extends StatelessWidget {
       children.add(InkWell(
         onTap: () {
           Get.back();
-          LifeController.to.selectedId.value = companionId;
-          LifeController.to.loadEvents();
           ShellController.to.switchTo(1);
         },
         borderRadius: BorderRadius.circular(6),
