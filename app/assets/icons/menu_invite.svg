@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <defs>
+    <linearGradient id="box" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FF9BB3"/>
+      <stop offset="1" stop-color="#E56BA0"/>
+    </linearGradient>
+    <linearGradient id="ribbon" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFD66B"/>
+      <stop offset="1" stop-color="#F5A623"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="9.5" width="16" height="10.5" rx="1.6" fill="url(#box)"/>
+  <rect x="3.3" y="7" width="17.4" height="3.2" rx="1.1" fill="url(#ribbon)"/>
+  <rect x="10.9" y="7" width="2.2" height="13" fill="url(#ribbon)" opacity="0.95"/>
+  <path fill="url(#ribbon)" d="M12 7c-1.7-2.7-4.9-2.6-4.9-0.5 0 1.5 2 2 4.9 2s4.9-.5 4.9-2C16.9 4.4 13.7 4.3 12 7z"/>
+</svg>
