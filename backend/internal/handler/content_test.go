@@ -31,3 +31,24 @@ func TestContentActionValidation(t *testing.T) {
 		t.Fatal("unexpected custom action accepted")
 	}
 }
+
+func TestNormalizeExternalURL(t *testing.T) {
+	tests := []struct {
+		value string
+		want  string
+		ok    bool
+	}{
+		{"", "", true},
+		{"  https://www.instagram.com/vita  ", "https://www.instagram.com/vita", true},
+		{"http://x.com/vita", "http://x.com/vita", true},
+		{"mailto:hello@example.com", "", false},
+		{"javascript:alert(1)", "", false},
+		{"https:///missing-host", "", false},
+	}
+	for _, test := range tests {
+		got, ok := normalizeExternalURL(test.value)
+		if got != test.want || ok != test.ok {
+			t.Errorf("normalizeExternalURL(%q) = (%q, %v), want (%q, %v)", test.value, got, ok, test.want, test.ok)
+		}
+	}
+}

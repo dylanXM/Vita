@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants.dart';
+import '../../core/app_content_controller.dart';
 import '../../core/analytics_service.dart';
 import '../auth/auth_controller.dart';
 import '../billing/billing_controller.dart';
@@ -204,6 +206,12 @@ class MePage extends StatelessWidget {
                 ),
               ),
 
+              Obx(() {
+                final links = AppContentController.to.socialLinks.value;
+                if (links.isEmpty) return const SizedBox.shrink();
+                return _SocialMediaCard(links: links);
+              }),
+
               const SizedBox(height: 24),
               Text(
                 'me.version'.tr,
@@ -212,6 +220,120 @@ class MePage extends StatelessWidget {
               ),
               const SizedBox(height: 24),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SocialMediaCard extends StatelessWidget {
+  const _SocialMediaCard({required this.links});
+
+  final SocialMediaLinks links;
+
+  @override
+  Widget build(BuildContext context) {
+    final vita = context.vita;
+    final items = <({String name, String url, String icon})>[
+      (
+        name: 'Instagram',
+        url: links.instagramUrl,
+        icon: 'assets/icons/instagram.svg'
+      ),
+      (name: 'TikTok', url: links.tiktokUrl, icon: 'assets/icons/tiktok.svg'),
+      (name: 'X', url: links.xUrl, icon: 'assets/icons/x.svg'),
+      (
+        name: 'Discord',
+        url: links.discordUrl,
+        icon: 'assets/icons/discord.svg'
+      ),
+    ].where((item) => item.url.isNotEmpty).toList();
+
+    return VitaCard(
+      radius: 0,
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('me.social.title'.tr, style: vita.sectionTitle),
+          const SizedBox(height: 4),
+          Text('me.social.subtitle'.tr, style: vita.sub),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var index = 0; index < items.length; index++) ...[
+                if (index > 0) const SizedBox(width: 12),
+                Expanded(child: _SocialMediaButton(item: items[index])),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SocialMediaButton extends StatelessWidget {
+  const _SocialMediaButton({required this.item});
+
+  final ({String name, String url, String icon}) item;
+
+  Future<void> _open() async {
+    AnalyticsService.to.track(
+      'profile_social_link_clicked',
+      category: 'profile',
+      properties: {'platform': item.name.toLowerCase()},
+    );
+    final uri = Uri.tryParse(item.url);
+    if (uri == null ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        uri.host.isEmpty) {
+      Get.snackbar('me.social.title'.tr, 'me.social.unavailable'.tr);
+      return;
+    }
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      Get.snackbar('me.social.title'.tr, 'me.social.unavailable'.tr);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vita = context.vita;
+    return Semantics(
+      button: true,
+      label: item.name,
+      child: Material(
+        color: vita.greenTint,
+        borderRadius: BorderRadius.circular(4),
+        child: InkWell(
+          onTap: _open,
+          borderRadius: BorderRadius.circular(4),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SvgPicture.asset(
+                  item.icon,
+                  width: 22,
+                  height: 22,
+                  colorFilter: ColorFilter.mode(vita.text, BlendMode.srcIn),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  item.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: vita.text,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

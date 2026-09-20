@@ -27,7 +27,7 @@ const en = {
     subscriptionPlans: "Subscription plans",
     coinPacks: "Coin packs",
     billingActivity: "Purchases & ledger",
-    appContent: "App content", onboarding: "Onboarding", whatsNew: "What's new",
+    appContent: "App content", onboarding: "Onboarding", whatsNew: "What's new", socialLinks: "Social media links",
   },
 
   login: {
@@ -243,6 +243,7 @@ const en = {
   },
   content: { enabled: "Enabled", disabled: "Disabled", save: "Save", saved: "Saved", cancel: "Cancel", deleted: "Deleted", name: "Name", status: "Status", schedule: "Schedule", operator: "Operator", actions: "Actions", identifier: "Identifier", icon: "Icon", imageUrl: "Image URL", title: "Title", body: "Description", startsAt: "Starts at", endsAt: "Ends at" },
   onboarding: { title: "Onboarding", desc: "Configure the first-run introduction by environment and platform.", settings: "Delivery settings", settingsDesc: "Revision is recorded for QA and content coordination; each install completes onboarding only once.", revision: "Revision", page: "Page {{n}}", addPage: "Add page" },
+  social: { title: "Social media links", desc: "Configure the official accounts shown in the Vita app.", cardTitle: "Follow Vita", cardDesc: "Only configured links appear in the Me tab for the selected environment.", hint: "Use a complete http or https URL. Leave a field empty to hide that platform.", save: "Save links", saved: "Social media links saved" },
   whatsNew: { title: "What's new", desc: "Create scheduled, version-targeted update campaigns for each environment and platform.", create: "New campaign", edit: "Edit campaign", version: "Minimum app version", action: "CTA action", actionValue: "Route or URL", actionLabel: "CTA label", deleteConfirm: "Delete this campaign?", empty: "No campaigns in this scope." },
 };
 

@@ -255,6 +255,16 @@ export interface WhatsNewCampaign {
   updated_at: string;
 }
 
+export interface SocialMediaLinksConfig {
+  environment: Environment;
+  social_instagram_url: string;
+  social_tiktok_url: string;
+  social_x_url: string;
+  social_discord_url: string;
+  updated_by: string;
+  updated_at: string;
+}
+
 export type AIProviderKind = "openai" | "anthropic";
 
 export interface AIProvider {

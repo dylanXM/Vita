@@ -15,6 +15,7 @@ import { CompanionsPage } from "@/pages/CompanionsPage";
 import { CompanionDetailPage } from "@/pages/CompanionDetailPage";
 import { OnboardingPage } from "@/pages/OnboardingPage";
 import { WhatsNewPage } from "@/pages/WhatsNewPage";
+import { SocialLinksPage } from "@/pages/SocialLinksPage";
 import { Button } from "@/components/ui/button";
 
 function RouteError() {
@@ -62,6 +63,7 @@ const router = createBrowserRouter([
       { path: "invitation-settings", element: <InvitationSettingsPage /> },
       { path: "onboarding", element: <OnboardingPage /> },
       { path: "whats-new", element: <WhatsNewPage /> },
+      { path: "social-links", element: <SocialLinksPage /> },
     ],
   },
   { path: "*", element: <NotFoundPage /> },

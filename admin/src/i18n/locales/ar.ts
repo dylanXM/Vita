@@ -22,7 +22,7 @@ const ar = {
     users: "المستخدمون",
     companions: "إدارة الشخصيات",
     agent: "رفيق الذكاء الاصطناعي", invitationSettings: "إعدادات رمز الدعوة",
-    billing: "إدارة الفوترة", subscriptionPlans: "خطط الاشتراك", coinPacks: "حزم العملات", billingActivity: "المشتريات والسجل", appContent: "محتوى التطبيق", onboarding: "صفحات الترحيب", whatsNew: "ما الجديد",
+    billing: "إدارة الفوترة", subscriptionPlans: "خطط الاشتراك", coinPacks: "حزم العملات", billingActivity: "المشتريات والسجل", appContent: "محتوى التطبيق", onboarding: "صفحات الترحيب", whatsNew: "ما الجديد", socialLinks: "روابط التواصل الاجتماعي",
   },
 
   login: {
@@ -166,6 +166,7 @@ const ar = {
   },
   content: { enabled: "مفعّل", disabled: "متوقف", save: "حفظ", saved: "تم الحفظ", cancel: "إلغاء", deleted: "تم الحذف", name: "الاسم", status: "الحالة", schedule: "الجدول", operator: "المنفذ", actions: "الإجراءات", identifier: "المعرّف", icon: "الأيقونة", imageUrl: "رابط الصورة", title: "العنوان", body: "الوصف", startsAt: "وقت البدء", endsAt: "وقت الانتهاء" },
   onboarding: { title: "صفحات الترحيب", desc: "إعداد تجربة البدء الأولى حسب البيئة والمنصة.", settings: "إعدادات العرض", settingsDesc: "يستخدم رقم المراجعة للاختبار، وتظهر التجربة مرة واحدة لكل جهاز.", revision: "المراجعة", page: "الصفحة {{n}}", addPage: "إضافة صفحة" },
+  social: { title: "روابط التواصل الاجتماعي", desc: "إعداد الحسابات الرسمية التي تظهر في تطبيق Vita.", cardTitle: "تابع Vita", cardDesc: "تظهر الروابط المعدة فقط في البيئة المحددة.", hint: "استخدم رابط http أو https كاملاً. اترك الحقل فارغاً لإخفاء المنصة.", save: "حفظ الروابط", saved: "تم حفظ الروابط" },
   whatsNew: { title: "ما الجديد", desc: "إنشاء حملات تحديث حسب البيئة والمنصة والإصدار والوقت.", create: "حملة جديدة", edit: "تعديل الحملة", version: "أقل إصدار للتطبيق", action: "إجراء الزر", actionValue: "المسار أو الرابط", actionLabel: "نص الزر", deleteConfirm: "حذف هذه الحملة؟", empty: "لا توجد حملات." },
 };
 

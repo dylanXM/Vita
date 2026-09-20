@@ -188,6 +188,8 @@ func main() {
 			admin.POST("/whats-new", handler.AdminCreateWhatsNew)
 			admin.PUT("/whats-new/:id", handler.AdminUpdateWhatsNew)
 			admin.DELETE("/whats-new/:id", handler.AdminDeleteWhatsNew)
+			admin.GET("/social-links", handler.AdminGetSocialMediaLinks)
+			admin.PUT("/social-links", handler.AdminUpdateSocialMediaLinks)
 
 			users := admin.Group("/users")
 			{

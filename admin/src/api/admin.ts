@@ -38,6 +38,7 @@ import type {
   OnboardingConfig,
   WhatsNewCampaign,
   MobilePlatform,
+  SocialMediaLinksConfig,
 } from "./types";
 
 /** Admin sign-in. The API also accepts a 6-digit code for the same accounts. */
@@ -140,6 +141,14 @@ export const whatsNewApi = {
   update: (id: string, body: Omit<WhatsNewCampaign, "id" | "updated_by" | "created_at" | "updated_at">) =>
     http.put<WhatsNewCampaign>(`/admin/whats-new/${id}`, body),
   remove: (id: string) => http.del<{ message: string }>(`/admin/whats-new/${id}`),
+};
+
+export const socialLinksApi = {
+  get: (environment: Environment, signal?: AbortSignal) =>
+    http.get<SocialMediaLinksConfig>("/admin/social-links", { params: { environment }, signal }),
+  save: (environment: Environment, body: Pick<SocialMediaLinksConfig,
+    "social_instagram_url" | "social_tiktok_url" | "social_x_url" | "social_discord_url">) =>
+    http.put<SocialMediaLinksConfig>("/admin/social-links", body, { params: { environment } }),
 };
 
 export const agentApi = {

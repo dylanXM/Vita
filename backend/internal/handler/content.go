@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -61,6 +62,16 @@ type whatsNewCampaign struct {
 	UpdatedAt     time.Time      `json:"updated_at"`
 }
 
+type socialMediaLinks struct {
+	Environment  string    `json:"environment"`
+	InstagramURL string    `json:"social_instagram_url"`
+	TiktokURL    string    `json:"social_tiktok_url"`
+	XURL         string    `json:"social_x_url"`
+	DiscordURL   string    `json:"social_discord_url"`
+	UpdatedBy    string    `json:"updated_by"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 func defaultOnboardingPages() []onboardingPage {
 	return []onboardingPage{
 		{ID: "meet", Icon: "chat", Title: localizedCopy{"en": "A person who feels present", "zh": "遇见一个真实存在的人"}, Body: localizedCopy{"en": "Talk naturally, build memories, and let your relationship grow over time.", "zh": "自然地聊天、共同积累回忆，让关系随着时间慢慢生长。"}},
@@ -116,10 +127,25 @@ func readOnboarding(environment, platform string) (onboardingConfig, error) {
 	return output, nil
 }
 
+func readSocialMediaLinks(environment string) (socialMediaLinks, error) {
+	var output socialMediaLinks
+	err := db.Get().QueryRow(`SELECT environment,instagram_url,tiktok_url,x_url,discord_url,updated_by,updated_at
+		FROM social_media_links WHERE environment=$1`, environment).Scan(
+		&output.Environment, &output.InstagramURL, &output.TiktokURL, &output.XURL,
+		&output.DiscordURL, &output.UpdatedBy, &output.UpdatedAt)
+	return output, err
+}
+
 // AppContent is public because onboarding must load before authentication.
 func AppContent(c *gin.Context) {
+	environment := currentEnvironment()
 	platform := normalizeMobilePlatform(c.GetHeader("X-Vita-Platform"))
-	onboarding, err := readOnboarding(currentEnvironment(), platform)
+	onboarding, err := readOnboarding(environment, platform)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load app content"})
+		return
+	}
+	socialLinks, err := readSocialMediaLinks(environment)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load app content"})
 		return
@@ -130,7 +156,7 @@ func AppContent(c *gin.Context) {
 		FROM whats_new_campaigns WHERE environment=$1 AND platform=$2 AND enabled=true
 		AND (starts_at IS NULL OR starts_at<=CURRENT_TIMESTAMP)
 		AND (ends_at IS NULL OR ends_at>CURRENT_TIMESTAMP)
-		ORDER BY starts_at DESC NULLS LAST,updated_at DESC`, currentEnvironment(), platform)
+		ORDER BY starts_at DESC NULLS LAST,updated_at DESC`, environment, platform)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
@@ -141,7 +167,76 @@ func AppContent(c *gin.Context) {
 			}
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{"onboarding": onboarding, "whats_new": campaign})
+	c.JSON(http.StatusOK, gin.H{
+		"onboarding":   onboarding,
+		"whats_new":    campaign,
+		"social_links": socialLinks,
+	})
+}
+
+func AdminGetSocialMediaLinks(c *gin.Context) {
+	environment := strings.TrimSpace(c.Query("environment"))
+	if !config.IsValidEnvironment(environment) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "environment is required"})
+		return
+	}
+	output, err := readSocialMediaLinks(environment)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load social media links"})
+		return
+	}
+	c.JSON(http.StatusOK, output)
+}
+
+func AdminUpdateSocialMediaLinks(c *gin.Context) {
+	environment := strings.TrimSpace(c.Query("environment"))
+	if !config.IsValidEnvironment(environment) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "environment is required"})
+		return
+	}
+	var input socialMediaLinks
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid social media links"})
+		return
+	}
+	values := []*string{&input.InstagramURL, &input.TiktokURL, &input.XURL, &input.DiscordURL}
+	for _, value := range values {
+		normalized, ok := normalizeExternalURL(*value)
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "social media links must use http or https"})
+			return
+		}
+		*value = normalized
+	}
+	_, err := db.Get().Exec(`INSERT INTO social_media_links(
+		environment,instagram_url,tiktok_url,x_url,discord_url,updated_by,updated_at)
+		VALUES($1,$2,$3,$4,$5,$6,CURRENT_TIMESTAMP)
+		ON CONFLICT(environment) DO UPDATE SET instagram_url=EXCLUDED.instagram_url,
+		tiktok_url=EXCLUDED.tiktok_url,x_url=EXCLUDED.x_url,discord_url=EXCLUDED.discord_url,
+		updated_by=EXCLUDED.updated_by,updated_at=CURRENT_TIMESTAMP`, environment,
+		input.InstagramURL, input.TiktokURL, input.XURL, input.DiscordURL, contentOperator(c))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save social media links"})
+		return
+	}
+	output, err := readSocialMediaLinks(environment)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reload social media links"})
+		return
+	}
+	c.JSON(http.StatusOK, output)
+}
+
+func normalizeExternalURL(value string) (string, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", true
+	}
+	parsed, err := url.ParseRequestURI(value)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return "", false
+	}
+	return value, true
 }
 
 func AdminGetOnboarding(c *gin.Context) {

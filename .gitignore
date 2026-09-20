@@ -27,6 +27,8 @@ website/.env
 # Node / frontend
 node_modules/
 **/node_modules/
+.pnpm-store/
+**/.pnpm-store/
 dist/
 **/dist/
 .next/
@@ -71,5 +73,3 @@ app/.dart_tool/
 tmp/
 .cache/
 vs_code.json
-
-.cocoapods-local

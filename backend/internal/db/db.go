@@ -524,6 +524,18 @@ func migrate(db *sql.DB) error {
 			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_whats_new_scope ON whats_new_campaigns(environment,platform,enabled,starts_at,ends_at)`,
+		`CREATE TABLE IF NOT EXISTS social_media_links (
+			environment TEXT PRIMARY KEY CHECK (environment IN ('dev', 'beta', 'prod')),
+			instagram_url TEXT NOT NULL DEFAULT '',
+			tiktok_url TEXT NOT NULL DEFAULT '',
+			x_url TEXT NOT NULL DEFAULT '',
+			discord_url TEXT NOT NULL DEFAULT '',
+			updated_by TEXT NOT NULL DEFAULT '',
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`INSERT INTO social_media_links(environment) VALUES('dev'),('beta'),('prod')
+		ON CONFLICT(environment) DO NOTHING`,
 		`CREATE TABLE IF NOT EXISTS analytics_events (
 			id TEXT PRIMARY KEY,
 			user_id TEXT REFERENCES users(id) ON DELETE CASCADE,

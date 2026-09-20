@@ -111,6 +111,33 @@ class WhatsNewCampaignContent {
       );
 }
 
+class SocialMediaLinks {
+  const SocialMediaLinks({
+    this.instagramUrl = '',
+    this.tiktokUrl = '',
+    this.xUrl = '',
+    this.discordUrl = '',
+  });
+
+  final String instagramUrl;
+  final String tiktokUrl;
+  final String xUrl;
+  final String discordUrl;
+
+  bool get isEmpty =>
+      instagramUrl.isEmpty &&
+      tiktokUrl.isEmpty &&
+      xUrl.isEmpty &&
+      discordUrl.isEmpty;
+
+  factory SocialMediaLinks.from(Map<String, dynamic> json) => SocialMediaLinks(
+        instagramUrl: '${json['social_instagram_url'] ?? ''}'.trim(),
+        tiktokUrl: '${json['social_tiktok_url'] ?? ''}'.trim(),
+        xUrl: '${json['social_x_url'] ?? ''}'.trim(),
+        discordUrl: '${json['social_discord_url'] ?? ''}'.trim(),
+      );
+}
+
 class AppContentController extends GetxController {
   static AppContentController get to => Get.find();
   static const _onboardingDoneKey = 'vita.onboarding.completed';
@@ -159,6 +186,7 @@ class AppContentController extends GetxController {
     ],
   );
   WhatsNewCampaignContent? whatsNew;
+  final socialLinks = const SocialMediaLinks().obs;
 
   Future<void> load() async {
     try {
@@ -166,6 +194,7 @@ class AppContentController extends GetxController {
       if (raw is! Map) return;
       final onboardingRaw = raw['onboarding'];
       final whatsNewRaw = raw['whats_new'];
+      final socialLinksRaw = raw['social_links'];
       if (onboardingRaw is Map) {
         onboarding =
             OnboardingContent.from(Map<String, dynamic>.from(onboardingRaw));
@@ -173,6 +202,10 @@ class AppContentController extends GetxController {
       if (whatsNewRaw is Map) {
         whatsNew = WhatsNewCampaignContent.from(
             Map<String, dynamic>.from(whatsNewRaw));
+      }
+      if (socialLinksRaw is Map) {
+        socialLinks.value =
+            SocialMediaLinks.from(Map<String, dynamic>.from(socialLinksRaw));
       }
     } catch (_) {
       // Content is remotely managed but must never block app startup.
