@@ -430,6 +430,35 @@ func migrate(db *sql.DB) error {
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_outbox_message_channel ON notification_outbox(message_id, channel)`,
+		`CREATE TABLE IF NOT EXISTS onboarding_configs (
+			environment TEXT NOT NULL CHECK (environment IN ('dev', 'beta', 'prod')),
+			platform TEXT NOT NULL CHECK (platform IN ('ios', 'android')),
+			enabled BOOLEAN NOT NULL DEFAULT true,
+			revision INTEGER NOT NULL DEFAULT 1,
+			pages JSONB NOT NULL DEFAULT '[]'::jsonb,
+			updated_by TEXT NOT NULL DEFAULT '',
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY(environment, platform)
+		)`,
+		`INSERT INTO onboarding_configs(environment,platform) VALUES
+			('dev','ios'),('dev','android'),('beta','ios'),('beta','android'),('prod','ios'),('prod','android')
+		ON CONFLICT(environment,platform) DO NOTHING`,
+		`CREATE TABLE IF NOT EXISTS whats_new_campaigns (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL,
+			environment TEXT NOT NULL CHECK (environment IN ('dev', 'beta', 'prod')),
+			platform TEXT NOT NULL CHECK (platform IN ('ios', 'android')),
+			min_app_version TEXT NOT NULL DEFAULT '',
+			enabled BOOLEAN NOT NULL DEFAULT false,
+			starts_at TIMESTAMP,
+			ends_at TIMESTAMP,
+			pages JSONB NOT NULL DEFAULT '[]'::jsonb,
+			updated_by TEXT NOT NULL DEFAULT '',
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_whats_new_scope ON whats_new_campaigns(environment,platform,enabled,starts_at,ends_at)`,
 		`ALTER TABLE notification_outbox ALTER COLUMN channel SET DEFAULT 'push'`,
 		`CREATE TABLE IF NOT EXISTS device_push_tokens (
 			id TEXT PRIMARY KEY,

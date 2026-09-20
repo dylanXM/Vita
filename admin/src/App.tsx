@@ -13,6 +13,8 @@ import { BillingActivityPage } from "@/pages/BillingActivityPage";
 import { InvitationSettingsPage } from "@/pages/InvitationSettingsPage";
 import { CompanionsPage } from "@/pages/CompanionsPage";
 import { CompanionDetailPage } from "@/pages/CompanionDetailPage";
+import { OnboardingPage } from "@/pages/OnboardingPage";
+import { WhatsNewPage } from "@/pages/WhatsNewPage";
 import { Button } from "@/components/ui/button";
 
 function RouteError() {
@@ -58,6 +60,8 @@ const router = createBrowserRouter([
       { path: "coin-packs", element: <CoinPacksPage /> },
       { path: "billing-activity", element: <BillingActivityPage /> },
       { path: "invitation-settings", element: <InvitationSettingsPage /> },
+      { path: "onboarding", element: <OnboardingPage /> },
+      { path: "whats-new", element: <WhatsNewPage /> },
     ],
   },
   { path: "*", element: <NotFoundPage /> },

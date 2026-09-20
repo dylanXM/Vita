@@ -22,7 +22,7 @@ const ja = {
     users: "ユーザー",
     companions: "キャラクター管理",
     agent: "AIコンパニオン", invitationSettings: "招待コード設定",
-    billing: "課金管理", subscriptionPlans: "サブスクリプションプラン", coinPacks: "コインパック", billingActivity: "購入と台帳",
+    billing: "課金管理", subscriptionPlans: "サブスクリプションプラン", coinPacks: "コインパック", billingActivity: "購入と台帳", appContent: "アプリコンテンツ", onboarding: "オンボーディング", whatsNew: "新着情報",
   },
 
   login: {
@@ -164,6 +164,9 @@ const ja = {
     hoursAgo: "{{n}} 時間前",
     daysAgo: "{{n}} 日前",
   },
+  content: { enabled: "有効", disabled: "無効", save: "保存", saved: "保存しました", cancel: "キャンセル", deleted: "削除しました", name: "名前", status: "状態", schedule: "配信期間", operator: "操作者", actions: "操作", identifier: "識別子", icon: "アイコン", imageUrl: "画像 URL", title: "タイトル", body: "説明", startsAt: "開始日時", endsAt: "終了日時" },
+  onboarding: { title: "オンボーディング", desc: "環境とプラットフォーム別に初回案内を設定します。", settings: "配信設定", settingsDesc: "リビジョンは QA とコンテンツ管理用です。各端末では一度だけ表示されます。", revision: "リビジョン", page: "ページ {{n}}", addPage: "ページを追加" },
+  whatsNew: { title: "新着情報", desc: "環境、プラットフォーム、バージョン、期間ごとに更新キャンペーンを配信します。", create: "キャンペーン作成", edit: "キャンペーン編集", version: "最小アプリバージョン", action: "CTA アクション", actionValue: "ルートまたは URL", actionLabel: "CTA ラベル", deleteConfirm: "このキャンペーンを削除しますか？", empty: "キャンペーンはありません。" },
 };
 
 export default ja;

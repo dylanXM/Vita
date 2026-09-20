@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:get/get.dart';
 
 import 'constants.dart';
 import 'token_storage.dart';
@@ -45,6 +46,8 @@ class ApiClient {
             TargetPlatform.android => 'android',
             _ => 'web',
           };
+          options.headers['X-Vita-App-Version'] = vitaAppVersion;
+          options.headers['Accept-Language'] = Get.locale?.languageCode ?? 'en';
           handler.next(options);
         },
       ),

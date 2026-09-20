@@ -1,4 +1,4 @@
-import { Bot, Coins, CreditCard, HeartHandshake, LayoutDashboard, ReceiptText, UserPlus, Users, type LucideIcon } from "lucide-react";
+import { Bot, Coins, CreditCard, HeartHandshake, LayoutDashboard, Megaphone, PanelsTopLeft, ReceiptText, UserPlus, Users, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   to: string;
@@ -20,6 +20,13 @@ export const NAV: NavGroup[] = [
   {
     titleKey: "nav.overview",
     items: [{ to: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard }],
+  },
+  {
+    titleKey: "nav.appContent",
+    items: [
+      { to: "/onboarding", labelKey: "nav.onboarding", icon: PanelsTopLeft },
+      { to: "/whats-new", labelKey: "nav.whatsNew", icon: Megaphone },
+    ],
   },
   {
     titleKey: "nav.management",

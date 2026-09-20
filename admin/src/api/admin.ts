@@ -33,6 +33,9 @@ import type {
   ManagedCompanionList,
   AdminConversation,
   AdminMessage,
+  OnboardingConfig,
+  WhatsNewCampaign,
+  MobilePlatform,
 } from "./types";
 
 /** Admin sign-in. The API also accepts a 6-digit code for the same accounts. */
@@ -116,6 +119,23 @@ export const invitationApi = {
     http.get<InvitationSettings>("/admin/invitation-settings", { signal }),
   saveSettings: (rewardPercent: number) =>
     http.put<InvitationSettings>("/admin/invitation-settings", { reward_percent: rewardPercent }),
+};
+
+export const onboardingApi = {
+  get: (environment: Environment, platform: MobilePlatform, signal?: AbortSignal) =>
+    http.get<OnboardingConfig>("/admin/onboarding", { params: { environment, platform }, signal }),
+  save: (environment: Environment, platform: MobilePlatform, body: Pick<OnboardingConfig, "enabled" | "revision" | "pages">) =>
+    http.put<OnboardingConfig>("/admin/onboarding", body, { params: { environment, platform } }),
+};
+
+export const whatsNewApi = {
+  list: (environment: Environment, platform: MobilePlatform, signal?: AbortSignal) =>
+    http.get<{ items: WhatsNewCampaign[] }>("/admin/whats-new", { params: { environment, platform }, signal }),
+  create: (body: Omit<WhatsNewCampaign, "id" | "updated_by" | "created_at" | "updated_at">) =>
+    http.post<WhatsNewCampaign>("/admin/whats-new", body),
+  update: (id: string, body: Omit<WhatsNewCampaign, "id" | "updated_by" | "created_at" | "updated_at">) =>
+    http.put<WhatsNewCampaign>(`/admin/whats-new/${id}`, body),
+  remove: (id: string) => http.del<{ message: string }>(`/admin/whats-new/${id}`),
 };
 
 export const agentApi = {

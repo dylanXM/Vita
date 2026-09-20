@@ -22,7 +22,7 @@ const zhHant = {
     users: "使用者",
     companions: "角色管理",
     agent: "AI 伴侶", invitationSettings: "邀請碼設定",
-    billing: "計費管理", subscriptionPlans: "訂閱方案", coinPacks: "金幣包", billingActivity: "購買與流水",
+    billing: "計費管理", subscriptionPlans: "訂閱方案", coinPacks: "金幣包", billingActivity: "購買與流水", appContent: "App 內容", onboarding: "引導頁", whatsNew: "近期更新",
   },
 
   login: {
@@ -164,6 +164,9 @@ const zhHant = {
     hoursAgo: "{{n}} 小時前",
     daysAgo: "{{n}} 天前",
   },
+  content: { enabled: "已啟用", disabled: "已停用", save: "儲存", saved: "已儲存", cancel: "取消", deleted: "已刪除", name: "名稱", status: "狀態", schedule: "投放時間", operator: "操作人", actions: "操作", identifier: "頁面識別碼", icon: "圖示", imageUrl: "圖片網址", title: "標題", body: "說明", startsAt: "開始時間", endsAt: "結束時間" },
+  onboarding: { title: "引導頁", desc: "按環境與平台設定首次啟動引導內容。", settings: "投放設定", settingsDesc: "版本號用於測試和內容協作；每台裝置只完成一次首次引導。", revision: "內容版本", page: "第 {{n}} 頁", addPage: "新增頁面" },
+  whatsNew: { title: "近期更新", desc: "按環境、平台、版本和時間投放更新活動。", create: "新增活動", edit: "編輯活動", version: "最低 App 版本", action: "按鈕動作", actionValue: "頁面路由或網址", actionLabel: "按鈕文字", deleteConfirm: "確定刪除此活動？", empty: "目前範圍沒有活動。" },
 };
 
 export default zhHant;

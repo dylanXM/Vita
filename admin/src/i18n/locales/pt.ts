@@ -22,7 +22,7 @@ const pt = {
     users: "Usuários",
     companions: "Personagens",
     agent: "Companheiro IA", invitationSettings: "Configuração de convites",
-    billing: "Faturação", subscriptionPlans: "Planos de assinatura", coinPacks: "Pacotes de moedas", billingActivity: "Compras e extrato",
+    billing: "Faturação", subscriptionPlans: "Planos de assinatura", coinPacks: "Pacotes de moedas", billingActivity: "Compras e extrato", appContent: "Conteúdo do app", onboarding: "Integração", whatsNew: "Novidades",
   },
 
   login: {
@@ -164,6 +164,9 @@ const pt = {
     hoursAgo: "há {{n}}h",
     daysAgo: "há {{n}}d",
   },
+  content: { enabled: "Ativo", disabled: "Inativo", save: "Guardar", saved: "Guardado", cancel: "Cancelar", deleted: "Eliminado", name: "Nome", status: "Estado", schedule: "Agenda", operator: "Operador", actions: "Ações", identifier: "Identificador", icon: "Ícone", imageUrl: "URL da imagem", title: "Título", body: "Descrição", startsAt: "Início", endsAt: "Fim" },
+  onboarding: { title: "Integração", desc: "Configure a introdução inicial por ambiente e plataforma.", settings: "Definições de entrega", settingsDesc: "A revisão serve para QA; cada dispositivo conclui a integração uma vez.", revision: "Revisão", page: "Página {{n}}", addPage: "Adicionar página" },
+  whatsNew: { title: "Novidades", desc: "Crie campanhas por ambiente, plataforma, versão e período.", create: "Nova campanha", edit: "Editar campanha", version: "Versão mínima", action: "Ação CTA", actionValue: "Rota ou URL", actionLabel: "Texto CTA", deleteConfirm: "Eliminar esta campanha?", empty: "Sem campanhas." },
 };
 
 export default pt;

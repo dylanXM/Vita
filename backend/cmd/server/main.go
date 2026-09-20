@@ -157,6 +157,7 @@ func main() {
 		}
 
 		api.GET("/health", handler.Health)
+		api.GET("/app-content", handler.AppContent)
 
 		// Current account — used by the admin dashboard to rehydrate a stored
 		// session and to verify the account has the admin role.
@@ -178,6 +179,12 @@ func main() {
 			admin.GET("/credit-ledger", handler.AdminListCreditLedger)
 			admin.GET("/invitation-settings", handler.AdminGetInvitationSettings)
 			admin.PUT("/invitation-settings", handler.AdminUpdateInvitationSettings)
+			admin.GET("/onboarding", handler.AdminGetOnboarding)
+			admin.PUT("/onboarding", handler.AdminUpdateOnboarding)
+			admin.GET("/whats-new", handler.AdminListWhatsNew)
+			admin.POST("/whats-new", handler.AdminCreateWhatsNew)
+			admin.PUT("/whats-new/:id", handler.AdminUpdateWhatsNew)
+			admin.DELETE("/whats-new/:id", handler.AdminDeleteWhatsNew)
 
 			users := admin.Group("/users")
 			{

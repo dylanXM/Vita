@@ -22,7 +22,7 @@ const ko = {
     users: "사용자",
     companions: "캐릭터 관리",
     agent: "AI 컴패니언", invitationSettings: "초대 코드 설정",
-    billing: "결제 관리", subscriptionPlans: "구독 플랜", coinPacks: "코인 팩", billingActivity: "구매 및 원장",
+    billing: "결제 관리", subscriptionPlans: "구독 플랜", coinPacks: "코인 팩", billingActivity: "구매 및 원장", appContent: "앱 콘텐츠", onboarding: "온보딩", whatsNew: "새 소식",
   },
 
   login: {
@@ -164,6 +164,9 @@ const ko = {
     hoursAgo: "{{n}}시간 전",
     daysAgo: "{{n}}일 전",
   },
+  content: { enabled: "활성", disabled: "비활성", save: "저장", saved: "저장됨", cancel: "취소", deleted: "삭제됨", name: "이름", status: "상태", schedule: "노출 기간", operator: "작업자", actions: "작업", identifier: "식별자", icon: "아이콘", imageUrl: "이미지 URL", title: "제목", body: "설명", startsAt: "시작 시간", endsAt: "종료 시간" },
+  onboarding: { title: "온보딩", desc: "환경과 플랫폼별 첫 실행 안내를 설정합니다.", settings: "노출 설정", settingsDesc: "리비전은 QA와 콘텐츠 관리에 사용되며 기기당 한 번 완료됩니다.", revision: "리비전", page: "페이지 {{n}}", addPage: "페이지 추가" },
+  whatsNew: { title: "새 소식", desc: "환경, 플랫폼, 버전, 기간별 업데이트 캠페인을 만듭니다.", create: "캠페인 만들기", edit: "캠페인 편집", version: "최소 앱 버전", action: "CTA 작업", actionValue: "경로 또는 URL", actionLabel: "CTA 문구", deleteConfirm: "이 캠페인을 삭제할까요?", empty: "캠페인이 없습니다." },
 };
 
 export default ko;

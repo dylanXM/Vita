@@ -22,7 +22,7 @@ const es = {
     users: "Usuarios",
     companions: "Personajes",
     agent: "Compañero IA", invitationSettings: "Configuración de invitaciones",
-    billing: "Facturación", subscriptionPlans: "Planes de suscripción", coinPacks: "Paquetes de monedas", billingActivity: "Compras y movimientos",
+    billing: "Facturación", subscriptionPlans: "Planes de suscripción", coinPacks: "Paquetes de monedas", billingActivity: "Compras y movimientos", appContent: "Contenido de la app", onboarding: "Introducción", whatsNew: "Novedades",
   },
 
   login: {
@@ -164,6 +164,9 @@ const es = {
     hoursAgo: "hace {{n}} h",
     daysAgo: "hace {{n}} d",
   },
+  content: { enabled: "Activo", disabled: "Inactivo", save: "Guardar", saved: "Guardado", cancel: "Cancelar", deleted: "Eliminado", name: "Nombre", status: "Estado", schedule: "Programación", operator: "Operador", actions: "Acciones", identifier: "Identificador", icon: "Icono", imageUrl: "URL de imagen", title: "Título", body: "Descripción", startsAt: "Inicio", endsAt: "Fin" },
+  onboarding: { title: "Introducción", desc: "Configura la introducción inicial por entorno y plataforma.", settings: "Ajustes de entrega", settingsDesc: "La revisión se usa para QA; cada dispositivo completa la introducción una sola vez.", revision: "Revisión", page: "Página {{n}}", addPage: "Añadir página" },
+  whatsNew: { title: "Novedades", desc: "Crea campañas de actualización por entorno, plataforma, versión y fecha.", create: "Nueva campaña", edit: "Editar campaña", version: "Versión mínima", action: "Acción CTA", actionValue: "Ruta o URL", actionLabel: "Texto CTA", deleteConfirm: "¿Eliminar esta campaña?", empty: "No hay campañas." },
 };
 
 export default es;

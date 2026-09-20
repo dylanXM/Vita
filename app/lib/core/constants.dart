@@ -8,6 +8,11 @@ const String vitaApiBaseUrl = String.fromEnvironment(
   defaultValue: 'http://127.0.0.1:8260',
 );
 
+const String vitaAppVersion = String.fromEnvironment(
+  'VITA_APP_VERSION',
+  defaultValue: '1.0.0',
+);
+
 /// RevenueCat public SDK key (from the RevenueCat dashboard).
 const String revenueCatApiKey = String.fromEnvironment(
   'VITA_REVENUECAT_KEY',

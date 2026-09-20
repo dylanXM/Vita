@@ -27,6 +27,7 @@ const zhHans = {
     subscriptionPlans: "订阅计划",
     coinPacks: "金币包",
     billingActivity: "购买与流水",
+    appContent: "App 内容", onboarding: "引导页", whatsNew: "近期更新",
   },
 
   login: {
@@ -238,6 +239,9 @@ const zhHans = {
     hoursAgo: "{{n}} 小时前",
     daysAgo: "{{n}} 天前",
   },
+  content: { enabled: "已启用", disabled: "已停用", save: "保存", saved: "已保存", cancel: "取消", deleted: "已删除", name: "名称", status: "状态", schedule: "投放时间", operator: "操作人", actions: "操作", identifier: "页面标识", icon: "图标", imageUrl: "图片地址", title: "标题", body: "说明", startsAt: "开始时间", endsAt: "结束时间" },
+  onboarding: { title: "引导页", desc: "按环境与平台配置首次启动引导内容。", settings: "投放设置", settingsDesc: "版本号用于测试和内容协作；每台设备只会完成一次首次引导。", revision: "内容版本", page: "第 {{n}} 页", addPage: "添加页面" },
+  whatsNew: { title: "近期更新", desc: "按环境、平台、版本和时间投放更新活动。", create: "新建活动", edit: "编辑活动", version: "最低 App 版本", action: "按钮动作", actionValue: "页面路由或网址", actionLabel: "按钮文案", deleteConfirm: "确定删除该活动？", empty: "当前范围暂无活动。" },
 };
 
 export default zhHans;

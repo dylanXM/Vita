@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../core/push_notification_service.dart';
+import '../../core/app_content_controller.dart';
 import '../../core/theme.dart';
 import '../chat/chat_list_page.dart';
 import '../life/life_page.dart';
 import '../me/me_page.dart';
 import '../memories/memories_page.dart';
+import '../whats_new/whats_new_sheet.dart';
 
 /// Main shell — iOS 27 style: content scrolls edge to edge behind a
 /// floating Liquid Glass tab capsule (Chat | Life | Memories | Me).
@@ -32,6 +34,11 @@ class _ShellPageState extends State<ShellPage> {
   void initState() {
     super.initState();
     PushNotificationService.instance.activateForSignedInUser();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final campaign = await AppContentController.to.campaignToShow();
+      if (!mounted || campaign == null) return;
+      await WhatsNewSheet.show(context, campaign);
+    });
   }
 
   @override

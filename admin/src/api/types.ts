@@ -192,6 +192,48 @@ export interface InvitationSettings {
   rewarded_coins: number;
 }
 
+export type MobilePlatform = "ios" | "android";
+export type LocalizedCopy = Record<string, string>;
+
+export interface OnboardingContentPage {
+  id: string;
+  image_url: string;
+  icon: "chat" | "life" | "infinity" | "memory" | string;
+  title: LocalizedCopy;
+  body: LocalizedCopy;
+}
+
+export interface OnboardingConfig {
+  environment: Environment;
+  platform: MobilePlatform;
+  enabled: boolean;
+  revision: number;
+  pages: OnboardingContentPage[];
+  updated_by: string;
+  updated_at: string;
+}
+
+export interface WhatsNewContentPage extends OnboardingContentPage {
+  cta_label: LocalizedCopy;
+  cta_action: "next" | "close" | "route" | "url" | "";
+  cta_value: string;
+}
+
+export interface WhatsNewCampaign {
+  id: string;
+  name: string;
+  environment: Environment;
+  platform: MobilePlatform;
+  min_app_version: string;
+  enabled: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  pages: WhatsNewContentPage[];
+  updated_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export type AIProviderKind = "openai" | "anthropic";
 
 export interface AIProvider {

@@ -10,6 +10,7 @@ import 'core/theme.dart';
 import 'features/auth/login_page.dart';
 import 'features/auth/register_page.dart';
 import 'features/auth/splash_page.dart';
+import 'features/onboarding/onboarding_page.dart';
 import 'features/billing/credits_page.dart';
 import 'features/billing/subscription_page.dart';
 import 'features/companion/companion_create_page.dart';
@@ -65,6 +66,11 @@ class _VitaAppState extends State<VitaApp> {
       transitionDuration: const Duration(milliseconds: 280),
       getPages: [
         GetPage(name: '/', page: () => const SplashPage()),
+        GetPage(
+          name: '/onboarding',
+          page: () => const OnboardingPage(),
+          transition: Transition.fadeIn,
+        ),
         GetPage(
           name: '/login',
           page: () => const LoginPage(),

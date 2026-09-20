@@ -27,6 +27,7 @@ const en = {
     subscriptionPlans: "Subscription plans",
     coinPacks: "Coin packs",
     billingActivity: "Purchases & ledger",
+    appContent: "App content", onboarding: "Onboarding", whatsNew: "What's new",
   },
 
   login: {
@@ -238,6 +239,9 @@ const en = {
     hoursAgo: "{{n}}h ago",
     daysAgo: "{{n}}d ago",
   },
+  content: { enabled: "Enabled", disabled: "Disabled", save: "Save", saved: "Saved", cancel: "Cancel", deleted: "Deleted", name: "Name", status: "Status", schedule: "Schedule", operator: "Operator", actions: "Actions", identifier: "Identifier", icon: "Icon", imageUrl: "Image URL", title: "Title", body: "Description", startsAt: "Starts at", endsAt: "Ends at" },
+  onboarding: { title: "Onboarding", desc: "Configure the first-run introduction by environment and platform.", settings: "Delivery settings", settingsDesc: "Revision is recorded for QA and content coordination; each install completes onboarding only once.", revision: "Revision", page: "Page {{n}}", addPage: "Add page" },
+  whatsNew: { title: "What's new", desc: "Create scheduled, version-targeted update campaigns for each environment and platform.", create: "New campaign", edit: "Edit campaign", version: "Minimum app version", action: "CTA action", actionValue: "Route or URL", actionLabel: "CTA label", deleteConfirm: "Delete this campaign?", empty: "No campaigns in this scope." },
 };
 
 export default en;
