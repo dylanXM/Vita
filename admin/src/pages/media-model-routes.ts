@@ -1,7 +1,7 @@
 import type { AIModel, MediaModelRoute } from "@/api/types";
 
 export function compatibleMediaModels(models: AIModel[], route: MediaModelRoute): AIModel[] {
-  return models.filter((model) => model.enabled && model.capabilities.includes(route.media_type));
+  return models.filter((model) => model.enabled && model.capabilities.includes(route.media_type) && (model.configured_scenarios ?? []).some((scenario) => scenario === route.route_key));
 }
 
 export function selectedMediaModelIDs(route: MediaModelRoute): Set<string> {

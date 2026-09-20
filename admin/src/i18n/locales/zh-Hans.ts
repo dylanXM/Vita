@@ -170,6 +170,7 @@ const zhHans = {
     displayName: "显示名称",
     noModels: "尚未配置模型。",
 	"capability.text": "文本", "capability.image": "图片", "capability.audio": "语音", "capability.video": "视频",
+    modelScenarios: "模型场景", modelScenariosDesc: "选择该模型计划支持的场景；可用性测试为可选操作。", verifiedScenariosLocked: "模型服务、模型 ID 和能力不可修改；如需更换，请新增模型。", transcriptionTestFile: "测试音频", videoTestUnavailable: "视频尚无测试适配器，测试结果会显示当前不可用。", testingModel: "正在测试…", testAvailability: "测试可用性", optionalTestDesc: "测试与添加完全分离：测试会真实调用供应商并可能产生费用，其结果不会启用或阻止添加按钮。", modelTestsPassed: "所选场景测试全部通过", modelTestsHaveFailures: "部分场景测试失败，请查看下方结果", testPassed: "通过", testFailed: "失败",
     routing: "Life Engine 设置",
     routingDesc: "配置生活事件、主动消息、照片和免打扰等行为上限。",
     chatModel: "对话模型",

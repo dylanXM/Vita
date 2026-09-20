@@ -8,6 +8,8 @@ import type {
   AgentSettings,
   AIModel,
   AIModelInput,
+  AIModelScenario,
+  AIModelTestResult,
   AIProvider,
   AIProviderInput,
   AdminCompanion,
@@ -39,9 +41,21 @@ const emptyModel: AIModelInput = {
   provider_id: "",
   model_name: "",
   display_name: "",
-  capabilities: ["text"],
+  capabilities: [],
   enabled: true,
 };
+
+const modelScenarios: AIModelScenario[] = [
+  "text_chat",
+  "text_life_plan",
+  "text_proactive",
+  "image_life_photo",
+  "image_requested_photo",
+  "audio_transcription",
+  "audio_speech",
+  "video_life_clip",
+  "video_realtime_avatar",
+];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -157,23 +171,48 @@ function ModelSection({ providers, models, onSaved }: { providers: AIProvider[];
   const { t } = useTranslation();
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState<AIModelInput>(emptyModel);
-  const save = useMutation({ mutationFn: () => editing ? agentApi.updateModel(editing, form) : agentApi.createModel(form), onSuccess: () => { toast.success(t("agent.saved")); setEditing(null); setForm(emptyModel); onSaved(); }, onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))) });
+  const [scenarios, setScenarios] = useState<AIModelScenario[]>([]);
+  const [transcriptionFile, setTranscriptionFile] = useState<File | null>(null);
+  const [testResults, setTestResults] = useState<AIModelTestResult[]>([]);
+  const reset = () => { setEditing(null); setForm(emptyModel); setScenarios([]); setTranscriptionFile(null); setTestResults([]); };
+  const save = useMutation({
+    mutationFn: () => editing
+      ? agentApi.updateModel(editing, form)
+      : agentApi.createModel({ provider_id: form.provider_id, model_name: form.model_name, display_name: form.display_name, scenarios, enabled: form.enabled }),
+    onSuccess: () => { toast.success(t("agent.saved")); reset(); onSaved(); },
+    onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))),
+  });
+  const testModel = useMutation({
+    mutationFn: () => agentApi.testModel({ provider_id: form.provider_id, model_name: form.model_name, scenarios, transcription_file: transcriptionFile }),
+    onSuccess: ({ results }) => { setTestResults(results); results.every((result) => result.success) ? toast.success(t("agent.modelTestsPassed")) : toast.warning(t("agent.modelTestsHaveFailures")); },
+    onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))),
+  });
   const remove = useMutation({ mutationFn: agentApi.removeModel, onSuccess: onSaved, onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))) });
-  const edit = (model: AIModel) => { setEditing(model.id); setForm({ provider_id: model.provider_id, model_name: model.model_name, display_name: model.display_name, capabilities: model.capabilities, enabled: model.enabled }); };
+  const edit = (model: AIModel) => { setEditing(model.id); setScenarios(model.configured_scenarios ?? []); setTranscriptionFile(null); setForm({ provider_id: model.provider_id, model_name: model.model_name, display_name: model.display_name, capabilities: model.capabilities, enabled: model.enabled }); };
+  const needsAudio = scenarios.includes("audio_transcription");
+  const canSave = Boolean(form.provider_id && form.model_name && form.display_name && (editing || scenarios.length > 0));
   return (
     <Card>
       <CardHeader><CardTitle>{t("agent.models")}</CardTitle><CardDescription>{t("agent.modelsDesc")}</CardDescription></CardHeader>
       <CardContent className="space-y-5">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Field label={t("agent.provider")}><select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={form.provider_id} onChange={(e) => setForm({ ...form, provider_id: e.target.value })}><option value="">{t("agent.selectModel")}</option>{providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
-          <Field label={t("agent.modelId")}><Input placeholder="gpt-5-mini / claude-sonnet-4-5" value={form.model_name} onChange={(e) => setForm({ ...form, model_name: e.target.value })} /></Field>
+          <Field label={t("agent.provider")}><select disabled={Boolean(editing)} className="h-9 w-full rounded-md border bg-background px-3 text-sm disabled:opacity-60" value={form.provider_id} onChange={(e) => { setForm({ ...form, provider_id: e.target.value }); setTestResults([]); }}><option value="">{t("agent.selectModel")}</option>{providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+          <Field label={t("agent.modelId")}><Input disabled={Boolean(editing)} placeholder="gpt-5-mini / claude-sonnet-4-5" value={form.model_name} onChange={(e) => { setForm({ ...form, model_name: e.target.value }); setTestResults([]); }} /></Field>
           <Field label={t("agent.displayName")}><Input value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} /></Field>
-          <div className="flex items-end gap-2"><Button disabled={!form.provider_id || !form.model_name || !form.display_name || save.isPending} onClick={() => save.mutate()}>{editing ? <Save /> : <Plus />}{editing ? t("agent.update") : t("agent.add")}</Button>{editing && <Button variant="ghost" onClick={() => { setEditing(null); setForm(emptyModel); }}>{t("users.cancel")}</Button>}</div>
+          <div className="flex items-end gap-2"><Button disabled={!canSave || save.isPending} onClick={() => save.mutate()}>{save.isPending ? <RefreshCw className="animate-spin" /> : editing ? <Save /> : <Plus />}{editing ? t("agent.update") : t("agent.add")}</Button>{!editing && <Button variant="outline" disabled={!form.provider_id || !form.model_name || scenarios.length === 0 || testModel.isPending} onClick={() => testModel.mutate()}>{testModel.isPending && <RefreshCw className="animate-spin" />}{testModel.isPending ? t("agent.testingModel") : t("agent.testAvailability")}</Button>}{editing && <Button variant="ghost" onClick={reset}>{t("users.cancel")}</Button>}</div>
         </div>
-		<div className="flex flex-wrap gap-5">
-		{(["text", "image", "audio", "video"] as const).map((capability) => <label key={capability} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.capabilities.includes(capability)} onChange={(e) => setForm({ ...form, capabilities: e.target.checked ? [...form.capabilities, capability] : form.capabilities.filter((item) => item !== capability) })} />{t(`agent.capability.${capability}`)}</label>)}
-		</div>
-        <div className="divide-y rounded-md border">{models.map((model) => <div key={model.id} className="flex items-center gap-3 p-3 text-sm"><div className="flex-1"><div className="font-medium">{model.display_name}</div><div className="text-xs text-muted-foreground">{model.provider_name} · {model.model_name}</div></div><Badge variant="muted">{model.capabilities.join(" · ")}</Badge><Button size="sm" variant="outline" onClick={() => edit(model)}><Pencil />{t("users.edit")}</Button><Button size="sm" variant="ghost" onClick={() => remove.mutate(model.id)}><Trash2 /></Button></div>)}{models.length === 0 && <p className="p-4 text-sm text-muted-foreground">{t("agent.noModels")}</p>}</div>
+        <div className="rounded-md border p-4">
+          <div className="font-medium">{t("agent.modelScenarios")}</div>
+          <p className="mt-1 text-xs text-muted-foreground">{editing ? t("agent.verifiedScenariosLocked") : t("agent.modelScenariosDesc")}</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {modelScenarios.map((scenario) => <label key={scenario} className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={Boolean(editing)} checked={scenarios.includes(scenario)} onChange={(event) => { setScenarios(event.target.checked ? [...scenarios, scenario] : scenarios.filter((item) => item !== scenario)); setTestResults([]); }} />{t(`mediaModels.route.${scenario}`)}</label>)}
+          </div>
+          {!editing && <p className="mt-3 text-xs text-muted-foreground">{t("agent.optionalTestDesc")}</p>}
+          {!editing && scenarios.some((scenario) => scenario.startsWith("video_")) && <p className="mt-2 text-xs text-amber-600">{t("agent.videoTestUnavailable")}</p>}
+          {!editing && needsAudio && <div className="mt-4 max-w-md"><Field label={t("agent.transcriptionTestFile")}><Input type="file" accept="audio/*,.m4a,.mp3,.mp4,.mpeg,.mpga,.wav,.webm" onChange={(event) => { setTranscriptionFile(event.target.files?.[0] ?? null); setTestResults([]); }} /></Field></div>}
+          {!editing && testResults.length > 0 && <div className="mt-4 divide-y rounded-md border">{testResults.map((result) => <div key={result.scenario} className="flex items-start gap-3 p-3 text-sm"><Badge variant={result.success ? "success" : "warning"}>{result.success ? t("agent.testPassed") : t("agent.testFailed")}</Badge><div><div>{t(`mediaModels.route.${result.scenario}`)}</div>{result.error && <div className="mt-1 break-all text-xs text-muted-foreground">{result.error}</div>}</div></div>)}</div>}
+        </div>
+        <div className="divide-y rounded-md border">{models.map((model) => <div key={model.id} className="flex flex-wrap items-center gap-3 p-3 text-sm"><div className="min-w-52 flex-1"><div className="font-medium">{model.display_name}</div><div className="text-xs text-muted-foreground">{model.provider_name} · {model.model_name}</div><div className="mt-1 text-xs text-muted-foreground">{(model.configured_scenarios ?? []).map((scenario) => t(`mediaModels.route.${scenario}`)).join(" · ")}</div></div><Badge variant="muted">{model.capabilities.join(" · ")}</Badge><Button size="sm" variant="outline" onClick={() => edit(model)}><Pencil />{t("users.edit")}</Button><Button size="sm" variant="ghost" onClick={() => remove.mutate(model.id)}><Trash2 /></Button></div>)}{models.length === 0 && <p className="p-4 text-sm text-muted-foreground">{t("agent.noModels")}</p>}</div>
       </CardContent>
     </Card>
   );
@@ -218,6 +257,7 @@ function CompanionSection({ companions, models, portraits, loading, onSaved }: {
     const body: AdminCompanionInput = { ...form };
     return agentApi.updateCompanion(form.id, body);
   }, onSuccess: () => { toast.success(t("agent.saved")); onSaved(); }, onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))) });
+  const chatModels = models.filter((model) => model.enabled && model.capabilities.includes("text") && (model.configured_scenarios ?? []).includes("text_chat"));
   if (loading) return <Skeleton className="h-72" />;
-  return <Card><CardHeader><CardTitle>{t("agent.companions")}</CardTitle><CardDescription>{t("agent.companionsDesc")}</CardDescription></CardHeader><CardContent className="space-y-4">{companions.length === 0 || !form ? <p className="text-sm text-muted-foreground">{t("agent.noCompanions")}</p> : <><Field label={t("agent.companion")}><select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={form.id} onChange={(e) => setSelectedId(e.target.value)}>{companions.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.user_email}</option>)}</select></Field><div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3"><Field label={t("agent.name")}><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field><Field label={t("agent.city")}><Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></Field><Field label={t("agent.occupation")}><Input value={form.occupation} onChange={(e) => setForm({ ...form, occupation: e.target.value })} /></Field><Field label={t("agent.model")}><select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={form.model_id ?? ""} onChange={(e) => setForm({ ...form, model_id: e.target.value || null })}><option value="">{t("agent.useDefault")}</option>{models.map((model) => <option key={model.id} value={model.id}>{model.display_name}</option>)}</select></Field><Field label={t("agent.portrait")}><select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={form.portrait_id ?? ""} onChange={(e) => setForm({ ...form, portrait_id: e.target.value || null })}><option value="">{t("agent.noPortrait")}</option>{portraits.map((portrait) => <option key={portrait.id} value={portrait.id}>{portrait.name}</option>)}</select></Field><Field label={t("agent.tags")}><Input value={form.personality_tags.join(", ")} onChange={(e) => setForm({ ...form, personality_tags: e.target.value.split(",").map((v) => v.trim()).filter(Boolean) })} /></Field></div><div className="grid gap-3 md:grid-cols-2"><Field label={t("agent.persona")}><textarea className={textareaClass} value={form.persona} onChange={(e) => setForm({ ...form, persona: e.target.value })} /></Field><Field label={t("agent.backstory")}><textarea className={textareaClass} value={form.backstory} onChange={(e) => setForm({ ...form, backstory: e.target.value })} /></Field><Field label={t("agent.speakingStyle")}><textarea className={textareaClass} value={form.speaking_style} onChange={(e) => setForm({ ...form, speaking_style: e.target.value })} /></Field><Field label={t("agent.habitsGoal")}><textarea className={textareaClass} value={`${form.life_habits}\n${form.life_goal}`} onChange={(e) => { const [life_habits, ...rest] = e.target.value.split("\n"); setForm({ ...form, life_habits, life_goal: rest.join("\n") }); }} /></Field></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.proactive_enabled} onChange={(e) => setForm({ ...form, proactive_enabled: e.target.checked })} />{t("agent.proactiveEnabled")}</label><Button disabled={save.isPending} onClick={() => save.mutate()}><Bot />{t("agent.saveCompanion")}</Button></>}</CardContent></Card>;
+  return <Card><CardHeader><CardTitle>{t("agent.companions")}</CardTitle><CardDescription>{t("agent.companionsDesc")}</CardDescription></CardHeader><CardContent className="space-y-4">{companions.length === 0 || !form ? <p className="text-sm text-muted-foreground">{t("agent.noCompanions")}</p> : <><Field label={t("agent.companion")}><select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={form.id} onChange={(e) => setSelectedId(e.target.value)}>{companions.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.user_email}</option>)}</select></Field><div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3"><Field label={t("agent.name")}><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field><Field label={t("agent.city")}><Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></Field><Field label={t("agent.occupation")}><Input value={form.occupation} onChange={(e) => setForm({ ...form, occupation: e.target.value })} /></Field><Field label={t("agent.model")}><select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={form.model_id ?? ""} onChange={(e) => setForm({ ...form, model_id: e.target.value || null })}><option value="">{t("agent.useDefault")}</option>{chatModels.map((model) => <option key={model.id} value={model.id}>{model.display_name}</option>)}</select></Field><Field label={t("agent.portrait")}><select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={form.portrait_id ?? ""} onChange={(e) => setForm({ ...form, portrait_id: e.target.value || null })}><option value="">{t("agent.noPortrait")}</option>{portraits.map((portrait) => <option key={portrait.id} value={portrait.id}>{portrait.name}</option>)}</select></Field><Field label={t("agent.tags")}><Input value={form.personality_tags.join(", ")} onChange={(e) => setForm({ ...form, personality_tags: e.target.value.split(",").map((v) => v.trim()).filter(Boolean) })} /></Field></div><div className="grid gap-3 md:grid-cols-2"><Field label={t("agent.persona")}><textarea className={textareaClass} value={form.persona} onChange={(e) => setForm({ ...form, persona: e.target.value })} /></Field><Field label={t("agent.backstory")}><textarea className={textareaClass} value={form.backstory} onChange={(e) => setForm({ ...form, backstory: e.target.value })} /></Field><Field label={t("agent.speakingStyle")}><textarea className={textareaClass} value={form.speaking_style} onChange={(e) => setForm({ ...form, speaking_style: e.target.value })} /></Field><Field label={t("agent.habitsGoal")}><textarea className={textareaClass} value={`${form.life_habits}\n${form.life_goal}`} onChange={(e) => { const [life_habits, ...rest] = e.target.value.split("\n"); setForm({ ...form, life_habits, life_goal: rest.join("\n") }); }} /></Field></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.proactive_enabled} onChange={(e) => setForm({ ...form, proactive_enabled: e.target.checked })} />{t("agent.proactiveEnabled")}</label><Button disabled={save.isPending} onClick={() => save.mutate()}><Bot />{t("agent.saveCompanion")}</Button></>}</CardContent></Card>;
 }

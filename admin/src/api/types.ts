@@ -326,9 +326,46 @@ export interface AIModel {
   model_name: string;
   display_name: string;
   capabilities: Array<"text" | "image" | "audio" | "video">;
+  configured_scenarios: AIModelScenario[];
   enabled: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface AIModelTestResult {
+  scenario: AIModelScenario;
+  success: boolean;
+  error?: string;
+}
+
+export type AIModelScenario =
+  | "text_chat"
+  | "text_life_plan"
+  | "text_proactive"
+  | "image_life_photo"
+  | "image_requested_photo"
+  | "audio_transcription"
+  | "audio_speech"
+  | "video_life_clip"
+  | "video_realtime_avatar";
+
+export interface AIModelCreateInput {
+  provider_id: string;
+  model_name: string;
+  display_name: string;
+  scenarios: AIModelScenario[];
+  enabled: boolean;
+}
+
+export interface AIModelTestInput {
+  provider_id: string;
+  model_name: string;
+  scenarios: AIModelScenario[];
+  transcription_file?: File | null;
+}
+
+export interface AIModelTestResponse {
+  results: AIModelTestResult[];
 }
 
 export interface AIModelInput {

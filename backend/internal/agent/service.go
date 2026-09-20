@@ -126,6 +126,8 @@ func NewService(db *sql.DB, secret string, mock bool, push *FCMClient) (*Service
 
 func (s *Service) EncryptSecret(value string) (string, error) { return s.box.Encrypt(value) }
 
+func (s *Service) DecryptSecret(value string) (string, error) { return s.box.Decrypt(value) }
+
 func (s *Service) Run(ctx context.Context, interval time.Duration) {
 	if interval <= 0 {
 		interval = time.Minute
@@ -1616,8 +1618,8 @@ func (s *Service) loadModelRouteModels(ctx context.Context, routeKey string) ([]
 		seen[id] = true
 		var compatible bool
 		if checkErr := s.db.QueryRowContext(ctx, `SELECT EXISTS(
-			SELECT 1 FROM ai_models WHERE id=$1 AND enabled=true AND capabilities ? $2
-		)`, id, mediaType).Scan(&compatible); checkErr != nil || !compatible {
+			SELECT 1 FROM ai_models WHERE id=$1 AND enabled=true AND capabilities ? $2 AND configured_scenarios ? $3
+		)`, id, mediaType, routeKey).Scan(&compatible); checkErr != nil || !compatible {
 			continue
 		}
 		model, loadErr := s.loadModel(ctx, id)
@@ -1653,7 +1655,7 @@ func (s *Service) loadTextRouteModels(ctx context.Context, routeKey, companionID
 		return models, nil
 	}
 	var compatible bool
-	if err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_models WHERE id=$1 AND enabled=true AND capabilities ? 'text')`, override.String).Scan(&compatible); err != nil || !compatible {
+	if err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_models WHERE id=$1 AND enabled=true AND capabilities ? 'text' AND configured_scenarios ? 'text_chat')`, override.String).Scan(&compatible); err != nil || !compatible {
 		return models, nil
 	}
 	overrideModel, err := s.loadModel(ctx, override.String)

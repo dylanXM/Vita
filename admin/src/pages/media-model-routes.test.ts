@@ -19,6 +19,7 @@ function model(id: string, enabled: boolean, capabilities: AIModel["capabilities
     model_name: id,
     display_name: id,
     capabilities,
+    configured_scenarios: [...(capabilities.includes("text") ? ["text_chat" as const] : []), ...(capabilities.includes("image") ? ["image_life_photo" as const] : [])],
     enabled,
     created_at: "2026-09-20T00:00:00Z",
     updated_at: "2026-09-20T00:00:00Z",
@@ -34,6 +35,18 @@ describe("media model route helpers", () => {
       model("multi", true, ["text", "image"]),
     ], route);
     expect(result.map((item) => item.id)).toEqual(["image", "multi"]);
+  });
+
+  it("does not require an optional availability test for routing", () => {
+    const requestedPhotoRoute: MediaModelRoute = { ...route, route_key: "image_requested_photo" };
+    const untested = model("untested-image", true, ["image"]);
+    untested.configured_scenarios = ["image_requested_photo"];
+    expect(compatibleMediaModels([untested], requestedPhotoRoute).map((item) => item.id)).toEqual(["untested-image"]);
+  });
+
+  it("does not offer a model for a scene it was not configured to serve", () => {
+    const requestedPhotoRoute: MediaModelRoute = { ...route, route_key: "image_requested_photo" };
+    expect(compatibleMediaModels([model("life-only", true, ["image"])], requestedPhotoRoute)).toEqual([]);
   });
 
   it("tracks both the default and ordered fallback selections", () => {

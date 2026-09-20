@@ -255,6 +255,7 @@ func main() {
 				agentAdmin.PUT("/providers/:id", handler.AdminUpdateProvider)
 				agentAdmin.DELETE("/providers/:id", handler.AdminDeleteProvider)
 				agentAdmin.POST("/models", handler.AdminCreateModel)
+				agentAdmin.POST("/models/test", handler.AdminTestModel)
 				agentAdmin.PUT("/models/:id", handler.AdminUpdateModel)
 				agentAdmin.DELETE("/models/:id", handler.AdminDeleteModel)
 				agentAdmin.GET("/media-routes", handler.AdminListMediaModelRoutes)

@@ -4,7 +4,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -34,15 +37,22 @@ type adminProvider struct {
 }
 
 type adminModel struct {
-	ID           string          `json:"id"`
-	ProviderID   string          `json:"provider_id"`
-	ProviderName string          `json:"provider_name"`
-	ModelName    string          `json:"model_name"`
-	DisplayName  string          `json:"display_name"`
-	Capabilities json.RawMessage `json:"capabilities"`
-	Enabled      bool            `json:"enabled"`
-	CreatedAt    time.Time       `json:"created_at"`
-	UpdatedAt    time.Time       `json:"updated_at"`
+	ID                  string          `json:"id"`
+	ProviderID          string          `json:"provider_id"`
+	ProviderName        string          `json:"provider_name"`
+	ModelName           string          `json:"model_name"`
+	DisplayName         string          `json:"display_name"`
+	Capabilities        json.RawMessage `json:"capabilities"`
+	ConfiguredScenarios json.RawMessage `json:"configured_scenarios"`
+	Enabled             bool            `json:"enabled"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+}
+
+type modelTestResult struct {
+	Scenario string `json:"scenario"`
+	Success  bool   `json:"success"`
+	Error    string `json:"error,omitempty"`
 }
 
 type agentSettingsResponse struct {
@@ -200,44 +210,268 @@ type modelInput struct {
 	Enabled      *bool    `json:"enabled"`
 }
 
-func AdminCreateModel(c *gin.Context) { upsertModel(c, "") }
-func AdminUpdateModel(c *gin.Context) { upsertModel(c, c.Param("id")) }
+type modelCreateInput struct {
+	ProviderID   string   `json:"provider_id" binding:"required"`
+	ModelName    string   `json:"model_name" binding:"required"`
+	DisplayName  string   `json:"display_name" binding:"required"`
+	Scenarios    []string `json:"scenarios"`
+	Capabilities []string `json:"capabilities"`
+	Enabled      *bool    `json:"enabled"`
+}
 
-func upsertModel(c *gin.Context, id string) {
+const (
+	maxModelTestUploadBytes  = 12 << 20
+	maxModelTestRequestBytes = 13 << 20
+)
+
+var modelScenarioCapabilities = map[string]string{
+	"text_chat":             "text",
+	"text_life_plan":        "text",
+	"text_proactive":        "text",
+	"image_life_photo":      "image",
+	"image_requested_photo": "image",
+	"audio_transcription":   "audio",
+	"audio_speech":          "audio",
+	"video_life_clip":       "video",
+	"video_realtime_avatar": "video",
+}
+
+var orderedModelScenarios = []string{
+	"text_chat", "text_life_plan", "text_proactive",
+	"image_life_photo", "image_requested_photo",
+	"audio_transcription", "audio_speech",
+	"video_life_clip", "video_realtime_avatar",
+}
+
+func AdminCreateModel(c *gin.Context) {
+	var input modelCreateInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	input.ProviderID = strings.TrimSpace(input.ProviderID)
+	input.ModelName = strings.TrimSpace(input.ModelName)
+	input.DisplayName = strings.TrimSpace(input.DisplayName)
+	if input.ProviderID == "" || input.ModelName == "" || input.DisplayName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "provider, model ID, and display name are required"})
+		return
+	}
+	if len(input.Scenarios) == 0 {
+		legacyScenarios, legacyErr := scenariosForCapabilities(input.Capabilities)
+		if legacyErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": legacyErr.Error()})
+			return
+		}
+		input.Scenarios = legacyScenarios
+	}
+	scenarios, capabilities, err := normalizeModelScenarios(input.Scenarios)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var alreadyExists bool
+	if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM ai_models WHERE provider_id=$1 AND model_name=$2)`, input.ProviderID, input.ModelName).Scan(&alreadyExists); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check model"})
+		return
+	}
+	if alreadyExists {
+		c.JSON(http.StatusConflict, gin.H{"error": "this provider and model ID already exist"})
+		return
+	}
+	enabled := true
+	if input.Enabled != nil {
+		enabled = *input.Enabled
+	}
+	capabilitiesJSON, _ := json.Marshal(capabilities)
+	id := uuid.New().String()
+	configuredScenariosJSON, _ := json.Marshal(scenarios)
+	if _, err := db.Get().Exec(`INSERT INTO ai_models (id,provider_id,model_name,display_name,capabilities,configured_scenarios,enabled) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+		id, input.ProviderID, input.ModelName, input.DisplayName, capabilitiesJSON, configuredScenariosJSON, enabled); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save model"})
+		return
+	}
+	respondWithAdminModel(c, id)
+}
+
+func scenariosForCapabilities(capabilities []string) ([]string, error) {
+	if len(capabilities) == 0 {
+		return nil, errors.New("select at least one model scenario")
+	}
+	wanted := make(map[string]bool, len(capabilities))
+	for _, raw := range capabilities {
+		capability := strings.TrimSpace(raw)
+		if capability != "text" && capability != "image" && capability != "audio" && capability != "video" {
+			return nil, fmt.Errorf("unsupported model capability %q", capability)
+		}
+		wanted[capability] = true
+	}
+	scenarios := make([]string, 0)
+	for _, scenario := range orderedModelScenarios {
+		if wanted[modelScenarioCapabilities[scenario]] {
+			scenarios = append(scenarios, scenario)
+		}
+	}
+	return scenarios, nil
+}
+
+func AdminTestModel(c *gin.Context) {
+	if companionAgent == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "agent service is unavailable"})
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxModelTestRequestBytes)
+	if err := c.Request.ParseMultipartForm(maxModelTestRequestBytes); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid model test form or upload is too large"})
+		return
+	}
+	defer c.Request.MultipartForm.RemoveAll()
+	providerID := strings.TrimSpace(c.PostForm("provider_id"))
+	modelName := strings.TrimSpace(c.PostForm("model_name"))
+	if providerID == "" || modelName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "provider and model ID are required"})
+		return
+	}
+	var requestedScenarios []string
+	if err := json.Unmarshal([]byte(c.PostForm("scenarios")), &requestedScenarios); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "scenarios must be a JSON array"})
+		return
+	}
+	scenarios, _, err := normalizeModelScenarios(requestedScenarios)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	model, loadErr := loadModelForValidation(providerID, modelName)
+	var testAudio *agent.ModelTestAudio
+	var audioErr error
+	if slices.Contains(scenarios, "audio_transcription") {
+		testAudio, audioErr = readModelTestAudio(c)
+	}
+	client := agent.NewClient()
+	results := collectModelTestResults(scenarios, func(scenario string) error {
+		testErr := loadErr
+		if testErr == nil && scenario == "audio_transcription" && audioErr != nil {
+			testErr = audioErr
+		}
+		if testErr == nil {
+			testErr = agent.TestModelScenario(c.Request.Context(), client, model, scenario, testAudio)
+		}
+		return testErr
+	})
+	c.JSON(http.StatusOK, gin.H{"results": results})
+}
+
+func collectModelTestResults(scenarios []string, test func(string) error) []modelTestResult {
+	results := make([]modelTestResult, 0, len(scenarios))
+	for _, scenario := range scenarios {
+		err := test(scenario)
+		result := modelTestResult{Scenario: scenario, Success: err == nil}
+		if err != nil {
+			result.Error = err.Error()
+		}
+		results = append(results, result)
+	}
+	return results
+}
+
+func AdminUpdateModel(c *gin.Context) { updateModel(c, c.Param("id")) }
+
+func updateModel(c *gin.Context, id string) {
 	var input modelInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if id == "" {
-		id = uuid.New().String()
-	}
-	if len(input.Capabilities) == 0 {
-		input.Capabilities = []string{"text"}
-	}
-	for _, capability := range input.Capabilities {
-		if capability != "text" && capability != "image" && capability != "audio" && capability != "video" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported model capability"})
-			return
-		}
-	}
-	capabilities, _ := json.Marshal(input.Capabilities)
 	enabled := true
 	if input.Enabled != nil {
 		enabled = *input.Enabled
 	}
-	var err error
-	if c.Request.Method == http.MethodPost {
-		_, err = db.Get().Exec(`INSERT INTO ai_models (id,provider_id,model_name,display_name,capabilities,enabled) VALUES ($1,$2,$3,$4,$5,$6)`,
-			id, input.ProviderID, strings.TrimSpace(input.ModelName), strings.TrimSpace(input.DisplayName), capabilities, enabled)
-	} else {
-		_, err = db.Get().Exec(`UPDATE ai_models SET provider_id=$2,model_name=$3,display_name=$4,capabilities=$5,enabled=$6,updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
-			id, input.ProviderID, strings.TrimSpace(input.ModelName), strings.TrimSpace(input.DisplayName), capabilities, enabled)
+	var storedProviderID, storedModelName, storedCapabilities string
+	if err := db.Get().QueryRow(`SELECT provider_id,model_name,capabilities FROM ai_models WHERE id=$1`, id).Scan(&storedProviderID, &storedModelName, &storedCapabilities); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "model not found"})
+		return
 	}
+	requestedCapabilities, _ := json.Marshal(input.Capabilities)
+	if input.ProviderID != storedProviderID || strings.TrimSpace(input.ModelName) != storedModelName || !jsonEqual([]byte(storedCapabilities), requestedCapabilities) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "provider, model ID, and capabilities cannot be changed; add a new model instead"})
+		return
+	}
+	_, err := db.Get().Exec(`UPDATE ai_models SET display_name=$2,enabled=$3,updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
+		id, strings.TrimSpace(input.DisplayName), enabled)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save model"})
 		return
 	}
+	respondWithAdminModel(c, id)
+}
+
+func normalizeModelScenarios(input []string) ([]string, []string, error) {
+	if len(input) == 0 {
+		return nil, nil, errors.New("select at least one testable model scenario")
+	}
+	seenScenarios := make(map[string]bool, len(input))
+	seenCapabilities := make(map[string]bool)
+	scenarios := make([]string, 0, len(input))
+	for _, raw := range input {
+		scenario := strings.TrimSpace(raw)
+		capability, ok := modelScenarioCapabilities[scenario]
+		if !ok {
+			return nil, nil, fmt.Errorf("scenario %q has no runtime validation adapter", scenario)
+		}
+		if seenScenarios[scenario] {
+			return nil, nil, fmt.Errorf("scenario %q is duplicated", scenario)
+		}
+		seenScenarios[scenario] = true
+		seenCapabilities[capability] = true
+		scenarios = append(scenarios, scenario)
+	}
+	capabilities := make([]string, 0, len(seenCapabilities))
+	for _, capability := range []string{"text", "image", "audio", "video"} {
+		if seenCapabilities[capability] {
+			capabilities = append(capabilities, capability)
+		}
+	}
+	return scenarios, capabilities, nil
+}
+
+func loadModelForValidation(providerID, modelName string) (agent.Model, error) {
+	var model agent.Model
+	var encryptedKey string
+	if err := db.Get().QueryRow(`SELECT id,kind,base_url,api_key_ciphertext FROM ai_providers WHERE id=$1 AND enabled=true AND api_key_ciphertext <> ''`, providerID).
+		Scan(&model.ID, &model.Kind, &model.BaseURL, &encryptedKey); err != nil {
+		return model, err
+	}
+	apiKey, err := companionAgent.DecryptSecret(encryptedKey)
+	if err != nil {
+		return model, err
+	}
+	model.APIKey = apiKey
+	model.ModelName = modelName
+	return model, nil
+}
+
+func readModelTestAudio(c *gin.Context) (*agent.ModelTestAudio, error) {
+	header, err := c.FormFile("transcription_file")
+	if err != nil {
+		return nil, errors.New("a test audio file is required for audio transcription")
+	}
+	file, err := header.Open()
+	if err != nil {
+		return nil, errors.New("failed to open the test audio file")
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, maxModelTestUploadBytes+1))
+	if err != nil || len(data) == 0 || len(data) > maxModelTestUploadBytes {
+		return nil, errors.New("test audio must be a non-empty file no larger than 12 MB")
+	}
+	mimeType := header.Header.Get("Content-Type")
+	if mimeType == "" {
+		mimeType = http.DetectContentType(data)
+	}
+	return &agent.ModelTestAudio{Filename: header.Filename, MIMEType: mimeType, Data: data}, nil
+}
+
+func respondWithAdminModel(c *gin.Context, id string) {
 	models, _ := loadAdminModels()
 	for _, model := range models {
 		if model.ID == id {
@@ -246,6 +480,11 @@ func upsertModel(c *gin.Context, id string) {
 		}
 	}
 	c.JSON(http.StatusNotFound, gin.H{"error": "model not found"})
+}
+
+func jsonEqual(left, right []byte) bool {
+	var a, b []string
+	return json.Unmarshal(left, &a) == nil && json.Unmarshal(right, &b) == nil && slices.Equal(a, b)
 }
 
 type mediaModelRoute struct {
@@ -304,8 +543,8 @@ func AdminUpdateMediaModelRoutes(c *gin.Context) {
 		}
 		for _, modelID := range modelIDs {
 			var valid bool
-			if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM ai_models WHERE id=$1 AND enabled=true AND capabilities ? $2)`, modelID, expectedType).Scan(&valid); err != nil || !valid {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "a selected model does not support " + expectedType})
+			if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM ai_models WHERE id=$1 AND enabled=true AND capabilities ? $2 AND configured_scenarios ? $3)`, modelID, expectedType, route.RouteKey).Scan(&valid); err != nil || !valid {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "a selected model is not configured for " + route.RouteKey})
 				return
 			}
 		}
@@ -690,8 +929,8 @@ func saveAdminCompanion(c *gin.Context, id string) {
 			input.ModelID = nil
 		} else {
 			var valid bool
-			if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM ai_models WHERE id=$1 AND enabled=true AND capabilities ? 'text')`, modelID).Scan(&valid); err != nil || !valid {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "companion model must be an enabled text model"})
+			if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM ai_models WHERE id=$1 AND enabled=true AND capabilities ? 'text' AND configured_scenarios ? 'text_chat')`, modelID).Scan(&valid); err != nil || !valid {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "companion model must be enabled and configured for text_chat"})
 				return
 			}
 			input.ModelID = &modelID
@@ -765,7 +1004,7 @@ func loadAdminProviders() ([]adminProvider, error) {
 }
 
 func loadAdminModels() ([]adminModel, error) {
-	rows, err := db.Get().Query(`SELECT m.id,m.provider_id,p.name,m.model_name,m.display_name,m.capabilities::text,m.enabled,m.created_at,m.updated_at FROM ai_models m JOIN ai_providers p ON p.id=m.provider_id ORDER BY m.created_at`)
+	rows, err := db.Get().Query(`SELECT m.id,m.provider_id,p.name,m.model_name,m.display_name,m.capabilities::text,m.configured_scenarios::text,m.enabled,m.created_at,m.updated_at FROM ai_models m JOIN ai_providers p ON p.id=m.provider_id ORDER BY m.created_at`)
 	if err != nil {
 		return nil, err
 	}
@@ -773,11 +1012,12 @@ func loadAdminModels() ([]adminModel, error) {
 	items := make([]adminModel, 0)
 	for rows.Next() {
 		var item adminModel
-		var raw string
-		if err := rows.Scan(&item.ID, &item.ProviderID, &item.ProviderName, &item.ModelName, &item.DisplayName, &raw, &item.Enabled, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		var raw, configuredRaw string
+		if err := rows.Scan(&item.ID, &item.ProviderID, &item.ProviderName, &item.ModelName, &item.DisplayName, &raw, &configuredRaw, &item.Enabled, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, err
 		}
 		item.Capabilities = json.RawMessage(raw)
+		item.ConfiguredScenarios = json.RawMessage(configuredRaw)
 		items = append(items, item)
 	}
 	return items, rows.Err()

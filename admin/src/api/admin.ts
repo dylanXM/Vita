@@ -16,7 +16,10 @@ import type {
   AgentConfig,
   AgentSettings,
   AIModel,
+  AIModelCreateInput,
   AIModelInput,
+  AIModelTestInput,
+  AIModelTestResponse,
   AIProvider,
   AIProviderInput,
   AdminCompanion,
@@ -186,7 +189,15 @@ export const agentApi = {
   updateProvider: (id: string, body: AIProviderInput) =>
     http.put<AIProvider>(`/admin/agent/providers/${id}`, body),
   removeProvider: (id: string) => http.del<{ message: string }>(`/admin/agent/providers/${id}`),
-  createModel: (body: AIModelInput) => http.post<AIModel>("/admin/agent/models", body),
+  createModel: (body: AIModelCreateInput) => http.post<AIModel>("/admin/agent/models", body),
+  testModel: (body: AIModelTestInput) => {
+    const form = new FormData();
+    form.set("provider_id", body.provider_id);
+    form.set("model_name", body.model_name);
+    form.set("scenarios", JSON.stringify(body.scenarios));
+    if (body.transcription_file) form.set("transcription_file", body.transcription_file);
+    return http.post<AIModelTestResponse>("/admin/agent/models/test", form, { timeout: 360_000 });
+  },
   updateModel: (id: string, body: AIModelInput) =>
     http.put<AIModel>(`/admin/agent/models/${id}`, body),
   removeModel: (id: string) => http.del<{ message: string }>(`/admin/agent/models/${id}`),

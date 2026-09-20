@@ -170,6 +170,7 @@ const en = {
     displayName: "Display name",
     noModels: "No models configured.",
 	"capability.text": "Text", "capability.image": "Image", "capability.audio": "Audio", "capability.video": "Video",
+    modelScenarios: "Model scenarios", modelScenariosDesc: "Select the scenarios this model is intended to support. Availability testing is optional.", verifiedScenariosLocked: "Provider, model ID, and capabilities are locked. Add a new model to change them.", transcriptionTestFile: "Test audio", videoTestUnavailable: "Video has no test adapter yet and will be reported as unavailable.", testingModel: "Testing…", testAvailability: "Test availability", optionalTestDesc: "Testing is separate from adding. It calls the real provider and may incur charges; its result never enables or blocks Add.", modelTestsPassed: "All selected scenario tests passed", modelTestsHaveFailures: "Some scenario tests failed; review the results below", testPassed: "Passed", testFailed: "Failed",
     routing: "Life Engine settings",
     routingDesc: "Configure limits for life events, proactive messages, photos, and quiet hours.",
     chatModel: "Chat model",

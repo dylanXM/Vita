@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -16,6 +17,18 @@ func mediaRouteFixture() []mediaModelRoute {
 		{RouteKey: "audio_speech", MediaType: "audio"},
 		{RouteKey: "video_life_clip", MediaType: "video"},
 		{RouteKey: "video_realtime_avatar", MediaType: "video"},
+	}
+}
+
+func TestCollectModelTestResultsKeepsFailuresInformational(t *testing.T) {
+	results := collectModelTestResults([]string{"text_chat", "video_life_clip"}, func(scenario string) error {
+		if scenario == "video_life_clip" {
+			return errors.New("adapter unavailable")
+		}
+		return nil
+	})
+	if len(results) != 2 || !results[0].Success || results[1].Success || results[1].Error != "adapter unavailable" {
+		t.Fatalf("results = %#v", results)
 	}
 }
 
@@ -75,5 +88,47 @@ func TestNormalizeMediaModelRoutesRejectsInvalidConfiguration(t *testing.T) {
 				t.Fatal("expected a descriptive validation error")
 			}
 		})
+	}
+}
+
+func TestNormalizeModelScenariosDerivesCapabilities(t *testing.T) {
+	scenarios, capabilities, err := normalizeModelScenarios([]string{"text_chat", "image_life_photo", "audio_speech"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(scenarios, ",") != "text_chat,image_life_photo,audio_speech" {
+		t.Fatalf("scenarios = %#v", scenarios)
+	}
+	if strings.Join(capabilities, ",") != "text,image,audio" {
+		t.Fatalf("capabilities = %#v", capabilities)
+	}
+}
+
+func TestNormalizeModelScenariosRejectsUntestableAndDuplicateScenarios(t *testing.T) {
+	for _, scenarios := range [][]string{{}, {"unknown_scene"}, {"text_chat", "text_chat"}} {
+		if _, _, err := normalizeModelScenarios(scenarios); err == nil {
+			t.Fatalf("expected validation error for %#v", scenarios)
+		}
+	}
+}
+
+func TestNormalizeModelScenariosAllowsVideoWithoutRequiringATestAdapter(t *testing.T) {
+	_, capabilities, err := normalizeModelScenarios([]string{"video_life_clip"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(capabilities, ",") != "video" {
+		t.Fatalf("capabilities = %#v", capabilities)
+	}
+}
+
+func TestScenariosForCapabilitiesKeepsLegacyCreateRequestsCompatible(t *testing.T) {
+	scenarios, err := scenariosForCapabilities([]string{"text", "audio"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "text_chat,text_life_plan,text_proactive,audio_transcription,audio_speech"
+	if strings.Join(scenarios, ",") != want {
+		t.Fatalf("scenarios = %#v", scenarios)
 	}
 }
