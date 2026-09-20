@@ -72,9 +72,13 @@ class MePage extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(20, 24, 16, 24),
                 child: Row(
                   children: [
-                    VitaAvatar(
-                      name: auth.email,
-                      radius: 31,
+                    ClipOval(
+                      child: Image.asset(
+                        'assets/icons/profile_default.png',
+                        width: 62,
+                        height: 62,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
