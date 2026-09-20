@@ -9,6 +9,7 @@ import { errorMessage } from "@/api/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
 import { compatibleMediaModels, normalizeMediaRoutesForSave, selectedMediaModelIDs } from "./media-model-routes";
@@ -60,10 +61,17 @@ function RouteEditor({ route, models, onChange }: { route: MediaModelRoute; mode
   const candidates = useMemo(() => compatibleMediaModels(models, route), [models, route]);
   const selected = selectedMediaModelIDs(route);
   const modelSelect = (value: string | null, onSelect: (id: string | null) => void) => (
-    <select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={value ?? ""} onChange={(event) => onSelect(event.target.value || null)}>
-      <option value="">{t("mediaModels.notSelected")}</option>
-      {candidates.map((model) => <option key={model.id} value={model.id} disabled={model.id !== value && selected.has(model.id)}>{model.display_name} · {model.provider_name}</option>)}
-    </select>
+    <Select value={value ?? "none"} onValueChange={(v) => onSelect(v === "none" ? null : v)}>
+      <SelectTrigger className="w-full"><SelectValue placeholder={t("mediaModels.notSelected")} /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="none">{t("mediaModels.notSelected")}</SelectItem>
+        {candidates.map((model) => (
+          <SelectItem key={model.id} value={model.id} disabled={model.id !== value && selected.has(model.id)}>
+            {model.display_name} · {model.provider_name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
   return (
     <div className="rounded-lg border p-4">
