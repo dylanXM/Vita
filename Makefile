@@ -281,12 +281,20 @@ else
 FLUTTER_CMD = flutter
 endif
 
+# App API base URL, injected at build time via --dart-define (dev only).
+# iOS and Android currently share the same dev endpoint; if the Android
+# emulator cannot reach the host backend, change APP_API_URL_ANDROID to
+# http://10.0.2.2:8260 (host loopback as seen from the emulator).
+APP_API_URL_IOS     = http://127.0.0.1:8260
+APP_API_URL_ANDROID = http://127.0.0.1:8260
+APP_API_URL         = $(APP_API_URL_IOS)
+
 app-prepare-dirs:
 	mkdir -p app/build/ios/SourcePackages app/build/macos/SourcePackages app/.cocoapods-local app/.home
 
 app-run: app-prepare-dirs
 	@cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; }
-	cd app && PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" $(FLUTTER_CMD) run --dart-define-from-file=config/dev.json
+	cd app && PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" $(FLUTTER_CMD) run --dart-define-from-file=config/dev.json --dart-define=VITA_API_BASE_URL=$(APP_API_URL)
 
 app-run-beta: app-prepare-dirs
 	@cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; }
