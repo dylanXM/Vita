@@ -20,6 +20,7 @@ function model(id: string, enabled: boolean, capabilities: AIModel["capabilities
     display_name: id,
     capabilities,
     configured_scenarios: [...(capabilities.includes("text") ? ["text_chat" as const] : []), ...(capabilities.includes("image") ? ["image_life_photo" as const] : [])],
+    subscription_plan_ids: [],
     enabled,
     created_at: "2026-09-20T00:00:00Z",
     updated_at: "2026-09-20T00:00:00Z",
@@ -47,6 +48,12 @@ describe("media model route helpers", () => {
   it("does not offer a model for a scene it was not configured to serve", () => {
     const requestedPhotoRoute: MediaModelRoute = { ...route, route_key: "image_requested_photo" };
     expect(compatibleMediaModels([model("life-only", true, ["image"])], requestedPhotoRoute)).toEqual([]);
+  });
+
+  it("keeps subscription-only models out of the standard route", () => {
+    const dedicated = model("dedicated", true, ["image"]);
+    dedicated.subscription_plan_ids = ["plus-plan"];
+    expect(compatibleMediaModels([dedicated], route)).toEqual([]);
   });
 
   it("tracks both the default and ordered fallback selections", () => {

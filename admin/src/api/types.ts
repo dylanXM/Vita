@@ -327,6 +327,7 @@ export interface AIModel {
   display_name: string;
   capabilities: Array<"text" | "image" | "audio" | "video">;
   configured_scenarios: AIModelScenario[];
+  subscription_plan_ids: string[];
   enabled: boolean;
   created_at: string;
   updated_at: string;
@@ -354,6 +355,7 @@ export interface AIModelCreateInput {
   model_name: string;
   display_name: string;
   scenarios: AIModelScenario[];
+  subscription_plan_ids: string[];
   enabled: boolean;
 }
 
@@ -373,6 +375,7 @@ export interface AIModelInput {
   model_name: string;
   display_name: string;
   capabilities: Array<"text" | "image" | "audio" | "video">;
+  subscription_plan_ids: string[];
   enabled: boolean;
 }
 
@@ -406,6 +409,7 @@ export interface CompanionPortrait {
 export interface AgentConfig {
   providers: AIProvider[];
   models: AIModel[];
+  subscription_plans: BillingProduct[];
   settings: AgentSettings;
   portraits: CompanionPortrait[];
 }

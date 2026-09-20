@@ -288,3 +288,10 @@ func TestClassifyMemory(t *testing.T) {
 		t.Fatal("ordinary small talk should not become long-term memory")
 	}
 }
+
+func TestOrderedModelCandidateIDsPrefersNewestSubscriptionModels(t *testing.T) {
+	got := orderedModelCandidateIDs([]string{"plus-newest", "plus-older"}, "standard-primary", []string{"standard-backup"})
+	if strings.Join(got, ",") != "plus-newest,plus-older,standard-primary,standard-backup" {
+		t.Fatalf("model candidates = %v", got)
+	}
+}

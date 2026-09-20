@@ -14,6 +14,7 @@ import type {
   AIProviderInput,
   AdminCompanion,
   AdminCompanionInput,
+  BillingProduct,
   CompanionPortrait,
 } from "@/api/types";
 import { errorMessage } from "@/api/client";
@@ -42,6 +43,7 @@ const emptyModel: AIModelInput = {
   model_name: "",
   display_name: "",
   capabilities: [],
+  subscription_plan_ids: [],
   enabled: true,
 };
 
@@ -104,7 +106,7 @@ export function AgentPage() {
       ) : (
         <>
           <ProviderSection providers={configQuery.data.providers} onSaved={refresh} />
-          <ModelSection providers={configQuery.data.providers} models={configQuery.data.models} onSaved={refresh} />
+          <ModelSection providers={configQuery.data.providers} models={configQuery.data.models} subscriptionPlans={configQuery.data.subscription_plans} onSaved={refresh} />
           <SettingsSection initial={configQuery.data.settings} onSaved={refresh} />
           <PortraitSection portraits={configQuery.data.portraits} onSaved={refresh} />
         </>
@@ -167,7 +169,7 @@ function ProviderSection({ providers, onSaved }: { providers: AIProvider[]; onSa
   );
 }
 
-function ModelSection({ providers, models, onSaved }: { providers: AIProvider[]; models: AIModel[]; onSaved: () => void }) {
+function ModelSection({ providers, models, subscriptionPlans, onSaved }: { providers: AIProvider[]; models: AIModel[]; subscriptionPlans: BillingProduct[]; onSaved: () => void }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState<AIModelInput>(emptyModel);
@@ -178,7 +180,7 @@ function ModelSection({ providers, models, onSaved }: { providers: AIProvider[];
   const save = useMutation({
     mutationFn: () => editing
       ? agentApi.updateModel(editing, form)
-      : agentApi.createModel({ provider_id: form.provider_id, model_name: form.model_name, display_name: form.display_name, scenarios, enabled: form.enabled }),
+      : agentApi.createModel({ provider_id: form.provider_id, model_name: form.model_name, display_name: form.display_name, scenarios, subscription_plan_ids: form.subscription_plan_ids, enabled: form.enabled }),
     onSuccess: () => { toast.success(t("agent.saved")); reset(); onSaved(); },
     onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))),
   });
@@ -188,7 +190,7 @@ function ModelSection({ providers, models, onSaved }: { providers: AIProvider[];
     onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))),
   });
   const remove = useMutation({ mutationFn: agentApi.removeModel, onSuccess: onSaved, onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))) });
-  const edit = (model: AIModel) => { setEditing(model.id); setScenarios(model.configured_scenarios ?? []); setTranscriptionFile(null); setForm({ provider_id: model.provider_id, model_name: model.model_name, display_name: model.display_name, capabilities: model.capabilities, enabled: model.enabled }); };
+  const edit = (model: AIModel) => { setEditing(model.id); setScenarios(model.configured_scenarios ?? []); setTranscriptionFile(null); setForm({ provider_id: model.provider_id, model_name: model.model_name, display_name: model.display_name, capabilities: model.capabilities, subscription_plan_ids: model.subscription_plan_ids ?? [], enabled: model.enabled }); };
   const needsAudio = scenarios.includes("audio_transcription");
   const canSave = Boolean(form.provider_id && form.model_name && form.display_name && (editing || scenarios.length > 0));
   return (
@@ -212,7 +214,15 @@ function ModelSection({ providers, models, onSaved }: { providers: AIProvider[];
           {!editing && needsAudio && <div className="mt-4 max-w-md"><Field label={t("agent.transcriptionTestFile")}><Input type="file" accept="audio/*,.m4a,.mp3,.mp4,.mpeg,.mpga,.wav,.webm" onChange={(event) => { setTranscriptionFile(event.target.files?.[0] ?? null); setTestResults([]); }} /></Field></div>}
           {!editing && testResults.length > 0 && <div className="mt-4 divide-y rounded-md border">{testResults.map((result) => <div key={result.scenario} className="flex items-start gap-3 p-3 text-sm"><Badge variant={result.success ? "success" : "warning"}>{result.success ? t("agent.testPassed") : t("agent.testFailed")}</Badge><div><div>{t(`mediaModels.route.${result.scenario}`)}</div>{result.error && <div className="mt-1 break-all text-xs text-muted-foreground">{result.error}</div>}</div></div>)}</div>}
         </div>
-        <div className="divide-y rounded-md border">{models.map((model) => <div key={model.id} className="flex flex-wrap items-center gap-3 p-3 text-sm"><div className="min-w-52 flex-1"><div className="font-medium">{model.display_name}</div><div className="text-xs text-muted-foreground">{model.provider_name} · {model.model_name}</div><div className="mt-1 text-xs text-muted-foreground">{(model.configured_scenarios ?? []).map((scenario) => t(`mediaModels.route.${scenario}`)).join(" · ")}</div></div><Badge variant="muted">{model.capabilities.join(" · ")}</Badge><Button size="sm" variant="outline" onClick={() => edit(model)}><Pencil />{t("users.edit")}</Button><Button size="sm" variant="ghost" onClick={() => remove.mutate(model.id)}><Trash2 /></Button></div>)}{models.length === 0 && <p className="p-4 text-sm text-muted-foreground">{t("agent.noModels")}</p>}</div>
+        <div className="rounded-md border p-4">
+          <div className="font-medium">{t("agent.subscriptionAccess")}</div>
+          <p className="mt-1 text-xs text-muted-foreground">{t("agent.subscriptionAccessDesc")}</p>
+          <div className="mt-3 grid max-h-52 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
+            {subscriptionPlans.map((plan) => <label key={plan.id} className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5" checked={form.subscription_plan_ids.includes(plan.id)} onChange={(event) => setForm({ ...form, subscription_plan_ids: event.target.checked ? [...form.subscription_plan_ids, plan.id] : form.subscription_plan_ids.filter((id) => id !== plan.id) })} /><span>{plan.name}<span className="block text-xs text-muted-foreground">{t(`billing.env.${plan.environment}`)} · {t(`billing.platform.${plan.platform}`)} · {plan.product_id}</span></span></label>)}
+          </div>
+          {subscriptionPlans.length === 0 && <p className="mt-3 text-sm text-muted-foreground">{t("agent.noSubscriptionPlans")}</p>}
+        </div>
+        <div className="divide-y rounded-md border">{models.map((model) => { const planNames = subscriptionPlans.filter((plan) => model.subscription_plan_ids?.includes(plan.id)).map((plan) => `${plan.name} · ${t(`billing.env.${plan.environment}`)} · ${t(`billing.platform.${plan.platform}`)}`); return <div key={model.id} className="flex flex-wrap items-center gap-3 p-3 text-sm"><div className="min-w-52 flex-1"><div className="font-medium">{model.display_name}</div><div className="text-xs text-muted-foreground">{model.provider_name} · {model.model_name}</div><div className="mt-1 text-xs text-muted-foreground">{(model.configured_scenarios ?? []).map((scenario) => t(`mediaModels.route.${scenario}`)).join(" · ")}</div><div className="mt-1 text-xs text-muted-foreground">{planNames.length > 0 ? `${t("agent.subscriptionOnly")}: ${planNames.join(" · ")}` : t("agent.standardUsers")}</div></div><Badge variant="muted">{model.capabilities.join(" · ")}</Badge><Button size="sm" variant="outline" onClick={() => edit(model)}><Pencil />{t("users.edit")}</Button><Button size="sm" variant="ghost" onClick={() => remove.mutate(model.id)}><Trash2 /></Button></div>; })}{models.length === 0 && <p className="p-4 text-sm text-muted-foreground">{t("agent.noModels")}</p>}</div>
       </CardContent>
     </Card>
   );

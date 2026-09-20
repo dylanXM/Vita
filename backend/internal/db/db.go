@@ -493,6 +493,13 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			UNIQUE(provider_id, model_name)
 		)`,
 		`ALTER TABLE ai_models ADD COLUMN IF NOT EXISTS configured_scenarios JSONB NOT NULL DEFAULT '[]'::jsonb`,
+		`CREATE TABLE IF NOT EXISTS ai_model_subscription_plans (
+			model_id TEXT NOT NULL REFERENCES ai_models(id) ON DELETE CASCADE,
+			subscription_plan_id TEXT NOT NULL REFERENCES subscription_plans(id) ON DELETE CASCADE,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY(model_id, subscription_plan_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_ai_model_subscription_plans_plan ON ai_model_subscription_plans(subscription_plan_id, model_id)`,
 		`UPDATE ai_models SET configured_scenarios =
 			(CASE WHEN capabilities ? 'text' THEN '["text_chat","text_life_plan","text_proactive"]'::jsonb ELSE '[]'::jsonb END) ||
 			(CASE WHEN capabilities ? 'image' THEN '["image_life_photo","image_requested_photo"]'::jsonb ELSE '[]'::jsonb END) ||

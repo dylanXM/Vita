@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 
 	"vita/internal/agent"
 	"vita/internal/db"
@@ -44,6 +46,7 @@ type adminModel struct {
 	DisplayName         string          `json:"display_name"`
 	Capabilities        json.RawMessage `json:"capabilities"`
 	ConfiguredScenarios json.RawMessage `json:"configured_scenarios"`
+	SubscriptionPlanIDs json.RawMessage `json:"subscription_plan_ids"`
 	Enabled             bool            `json:"enabled"`
 	CreatedAt           time.Time       `json:"created_at"`
 	UpdatedAt           time.Time       `json:"updated_at"`
@@ -103,8 +106,14 @@ func AdminAgentConfig(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load portraits"})
 		return
 	}
+	plans, err := loadModelSubscriptionPlans()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load subscription plans"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"providers": providers, "models": models, "settings": settings, "portraits": portraits,
+		"subscription_plans": plans,
 	})
 }
 
@@ -203,20 +212,22 @@ func AdminDeleteProvider(c *gin.Context) {
 }
 
 type modelInput struct {
-	ProviderID   string   `json:"provider_id" binding:"required"`
-	ModelName    string   `json:"model_name" binding:"required"`
-	DisplayName  string   `json:"display_name" binding:"required"`
-	Capabilities []string `json:"capabilities"`
-	Enabled      *bool    `json:"enabled"`
+	ProviderID          string   `json:"provider_id" binding:"required"`
+	ModelName           string   `json:"model_name" binding:"required"`
+	DisplayName         string   `json:"display_name" binding:"required"`
+	Capabilities        []string `json:"capabilities"`
+	SubscriptionPlanIDs []string `json:"subscription_plan_ids"`
+	Enabled             *bool    `json:"enabled"`
 }
 
 type modelCreateInput struct {
-	ProviderID   string   `json:"provider_id" binding:"required"`
-	ModelName    string   `json:"model_name" binding:"required"`
-	DisplayName  string   `json:"display_name" binding:"required"`
-	Scenarios    []string `json:"scenarios"`
-	Capabilities []string `json:"capabilities"`
-	Enabled      *bool    `json:"enabled"`
+	ProviderID          string   `json:"provider_id" binding:"required"`
+	ModelName           string   `json:"model_name" binding:"required"`
+	DisplayName         string   `json:"display_name" binding:"required"`
+	Scenarios           []string `json:"scenarios"`
+	Capabilities        []string `json:"capabilities"`
+	SubscriptionPlanIDs []string `json:"subscription_plan_ids"`
+	Enabled             *bool    `json:"enabled"`
 }
 
 const (
@@ -269,6 +280,11 @@ func AdminCreateModel(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	planIDs, err := normalizeSubscriptionPlanIDs(input.SubscriptionPlanIDs)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	var alreadyExists bool
 	if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM ai_models WHERE provider_id=$1 AND model_name=$2)`, input.ProviderID, input.ModelName).Scan(&alreadyExists); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check model"})
@@ -285,9 +301,27 @@ func AdminCreateModel(c *gin.Context) {
 	capabilitiesJSON, _ := json.Marshal(capabilities)
 	id := uuid.New().String()
 	configuredScenariosJSON, _ := json.Marshal(scenarios)
-	if _, err := db.Get().Exec(`INSERT INTO ai_models (id,provider_id,model_name,display_name,capabilities,configured_scenarios,enabled) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+	tx, err := db.Get().BeginTx(c.Request.Context(), nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save model"})
+		return
+	}
+	defer tx.Rollback()
+	if err := validateSubscriptionPlanIDs(c.Request.Context(), tx, planIDs); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if _, err := tx.ExecContext(c.Request.Context(), `INSERT INTO ai_models (id,provider_id,model_name,display_name,capabilities,configured_scenarios,enabled) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
 		id, input.ProviderID, input.ModelName, input.DisplayName, capabilitiesJSON, configuredScenariosJSON, enabled); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save model"})
+		return
+	}
+	if err := replaceModelSubscriptionPlans(c.Request.Context(), tx, id, planIDs); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save model subscription plans"})
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save model"})
 		return
 	}
 	respondWithAdminModel(c, id)
@@ -396,13 +430,95 @@ func updateModel(c *gin.Context, id string) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "provider, model ID, and capabilities cannot be changed; add a new model instead"})
 		return
 	}
-	_, err := db.Get().Exec(`UPDATE ai_models SET display_name=$2,enabled=$3,updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
+	planIDs, err := normalizeSubscriptionPlanIDs(input.SubscriptionPlanIDs)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	tx, err := db.Get().BeginTx(c.Request.Context(), nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save model"})
+		return
+	}
+	defer tx.Rollback()
+	if err := validateSubscriptionPlanIDs(c.Request.Context(), tx, planIDs); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(planIDs) > 0 {
+		var usedByGlobalRoute bool
+		if err := tx.QueryRowContext(c.Request.Context(), `SELECT EXISTS(SELECT 1 FROM agent_media_routes WHERE primary_model_id=$1 OR fallback_model_ids ? $1)`, id).Scan(&usedByGlobalRoute); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to validate model routes"})
+			return
+		}
+		if usedByGlobalRoute {
+			c.JSON(http.StatusConflict, gin.H{"error": "remove the model from global routes before making it subscription-only"})
+			return
+		}
+	}
+	_, err = tx.ExecContext(c.Request.Context(), `UPDATE ai_models SET display_name=$2,enabled=$3,updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
 		id, strings.TrimSpace(input.DisplayName), enabled)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save model"})
 		return
 	}
+	if err := replaceModelSubscriptionPlans(c.Request.Context(), tx, id, planIDs); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save model subscription plans"})
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save model"})
+		return
+	}
 	respondWithAdminModel(c, id)
+}
+
+type modelPlanStore interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+func normalizeSubscriptionPlanIDs(input []string) ([]string, error) {
+	result := make([]string, 0, len(input))
+	seen := make(map[string]bool, len(input))
+	for _, raw := range input {
+		id := strings.TrimSpace(raw)
+		if id == "" {
+			continue
+		}
+		if seen[id] {
+			return nil, fmt.Errorf("subscription plan %q is duplicated", id)
+		}
+		seen[id] = true
+		result = append(result, id)
+	}
+	return result, nil
+}
+
+func validateSubscriptionPlanIDs(ctx context.Context, store modelPlanStore, planIDs []string) error {
+	if len(planIDs) == 0 {
+		return nil
+	}
+	var count int
+	if err := store.QueryRowContext(ctx, `SELECT COUNT(*) FROM subscription_plans WHERE id=ANY($1)`, pq.Array(planIDs)).Scan(&count); err != nil {
+		return errors.New("failed to validate subscription plans")
+	}
+	if count != len(planIDs) {
+		return errors.New("one or more subscription plans do not exist")
+	}
+	return nil
+}
+
+func replaceModelSubscriptionPlans(ctx context.Context, store modelPlanStore, modelID string, planIDs []string) error {
+	if _, err := store.ExecContext(ctx, `DELETE FROM ai_model_subscription_plans WHERE model_id=$1`, modelID); err != nil {
+		return err
+	}
+	for _, planID := range planIDs {
+		if _, err := store.ExecContext(ctx, `INSERT INTO ai_model_subscription_plans(model_id,subscription_plan_id) VALUES($1,$2)`, modelID, planID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func normalizeModelScenarios(input []string) ([]string, []string, error) {
@@ -543,7 +659,8 @@ func AdminUpdateMediaModelRoutes(c *gin.Context) {
 		}
 		for _, modelID := range modelIDs {
 			var valid bool
-			if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM ai_models WHERE id=$1 AND enabled=true AND capabilities ? $2 AND configured_scenarios ? $3)`, modelID, expectedType, route.RouteKey).Scan(&valid); err != nil || !valid {
+			if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM ai_models m WHERE id=$1 AND enabled=true AND capabilities ? $2 AND configured_scenarios ? $3
+				AND NOT EXISTS(SELECT 1 FROM ai_model_subscription_plans link WHERE link.model_id=m.id))`, modelID, expectedType, route.RouteKey).Scan(&valid); err != nil || !valid {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "a selected model is not configured for " + route.RouteKey})
 				return
 			}
@@ -1004,7 +1121,9 @@ func loadAdminProviders() ([]adminProvider, error) {
 }
 
 func loadAdminModels() ([]adminModel, error) {
-	rows, err := db.Get().Query(`SELECT m.id,m.provider_id,p.name,m.model_name,m.display_name,m.capabilities::text,m.configured_scenarios::text,m.enabled,m.created_at,m.updated_at FROM ai_models m JOIN ai_providers p ON p.id=m.provider_id ORDER BY m.created_at`)
+	rows, err := db.Get().Query(`SELECT m.id,m.provider_id,p.name,m.model_name,m.display_name,m.capabilities::text,m.configured_scenarios::text,
+		COALESCE((SELECT jsonb_agg(link.subscription_plan_id ORDER BY link.subscription_plan_id) FROM ai_model_subscription_plans link WHERE link.model_id=m.id),'[]'::jsonb)::text,
+		m.enabled,m.created_at,m.updated_at FROM ai_models m JOIN ai_providers p ON p.id=m.provider_id ORDER BY m.created_at`)
 	if err != nil {
 		return nil, err
 	}
@@ -1012,12 +1131,34 @@ func loadAdminModels() ([]adminModel, error) {
 	items := make([]adminModel, 0)
 	for rows.Next() {
 		var item adminModel
-		var raw, configuredRaw string
-		if err := rows.Scan(&item.ID, &item.ProviderID, &item.ProviderName, &item.ModelName, &item.DisplayName, &raw, &configuredRaw, &item.Enabled, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		var raw, configuredRaw, planIDsRaw string
+		if err := rows.Scan(&item.ID, &item.ProviderID, &item.ProviderName, &item.ModelName, &item.DisplayName, &raw, &configuredRaw, &planIDsRaw, &item.Enabled, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, err
 		}
 		item.Capabilities = json.RawMessage(raw)
 		item.ConfiguredScenarios = json.RawMessage(configuredRaw)
+		item.SubscriptionPlanIDs = json.RawMessage(planIDsRaw)
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func loadModelSubscriptionPlans() ([]adminProduct, error) {
+	rows, err := db.Get().Query(`SELECT id,key,name,environment,platform,coins_granted,price_usd,period,
+		product_id,enabled,sort_order,created_at,updated_at
+		FROM subscription_plans ORDER BY environment,platform,sort_order,price_usd,key`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]adminProduct, 0)
+	for rows.Next() {
+		var item adminProduct
+		if err := rows.Scan(&item.ID, &item.Key, &item.Name, &item.Environment, &item.Platform,
+			&item.Coins, &item.PriceUSD, &item.Period, &item.ProductID, &item.Enabled,
+			&item.SortOrder, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			return nil, err
+		}
 		items = append(items, item)
 	}
 	return items, rows.Err()

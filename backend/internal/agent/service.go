@@ -54,6 +54,7 @@ type CompanionStatus struct {
 
 type companionContext struct {
 	ID                string
+	UserID            string
 	Name              string
 	Gender            string
 	Persona           string
@@ -180,12 +181,8 @@ func (s *Service) GenerateDueLifePhotos(ctx context.Context) error {
 	if err != nil || s.mock || settings.DailyLifePhotoLimit <= 0 {
 		return err
 	}
-	models, err := s.loadModelRouteModels(ctx, "image_life_photo")
-	if err != nil {
-		return nil
-	}
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT e.id,e.companion_id,c.name,COALESCE(c.appearance,''),COALESCE(c.city,''),
+		SELECT e.id,e.companion_id,c.user_id,c.name,COALESCE(c.appearance,''),COALESCE(c.city,''),
 		       COALESCE(e.title,''),COALESCE(e.description,''),COALESCE(e.location,''),COALESCE(e.emotion,''),
 		       e.payload::text
 		FROM life_events e JOIN companions c ON c.id=e.companion_id
@@ -201,12 +198,12 @@ func (s *Service) GenerateDueLifePhotos(ctx context.Context) error {
 		return err
 	}
 	type candidate struct {
-		id, companionID, name, appearance, city, title, description, location, emotion, payload string
+		id, companionID, userID, name, appearance, city, title, description, location, emotion, payload string
 	}
 	var candidates []candidate
 	for rows.Next() {
 		var item candidate
-		if err := rows.Scan(&item.id, &item.companionID, &item.name, &item.appearance, &item.city, &item.title, &item.description, &item.location, &item.emotion, &item.payload); err != nil {
+		if err := rows.Scan(&item.id, &item.companionID, &item.userID, &item.name, &item.appearance, &item.city, &item.title, &item.description, &item.location, &item.emotion, &item.payload); err != nil {
 			rows.Close()
 			return err
 		}
@@ -216,6 +213,10 @@ func (s *Service) GenerateDueLifePhotos(ctx context.Context) error {
 		return err
 	}
 	for _, item := range candidates {
+		models, modelErr := s.loadModelRouteModels(ctx, "image_life_photo", item.userID)
+		if modelErr != nil {
+			continue
+		}
 		var photoCount int
 		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM life_events WHERE companion_id=$1 AND local_date=(SELECT local_date FROM life_events WHERE id=$2) AND jsonb_array_length(COALESCE(payload->'media_urls','[]'::jsonb))>0`, item.companionID, item.id).Scan(&photoCount); err != nil {
 			return err
@@ -273,7 +274,7 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 	if err != nil {
 		return nil, err
 	}
-	models, err := s.loadTextRouteModels(ctx, "text_chat", profile.ID)
+	models, err := s.loadTextRouteModels(ctx, "text_chat", profile.ID, userID)
 	if err != nil && !s.mock {
 		return nil, err
 	}
@@ -297,7 +298,7 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 		return nil, err
 	}
 	if profile.VoiceEnabled {
-		if audioModels, modelErr := s.loadModelRouteModels(ctx, "audio_speech"); modelErr == nil {
+		if audioModels, modelErr := s.loadModelRouteModels(ctx, "audio_speech", userID); modelErr == nil {
 			voice := "alloy"
 			voiceConfig := map[string]any{}
 			_ = json.Unmarshal([]byte(profile.VoiceConfig), &voiceConfig)
@@ -321,7 +322,7 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 }
 
 func (s *Service) TranscribeMedia(ctx context.Context, mediaID, userID, companionID string) (string, error) {
-	models, err := s.loadModelRouteModels(ctx, "audio_transcription")
+	models, err := s.loadModelRouteModels(ctx, "audio_transcription", userID)
 	if err != nil {
 		return "", err
 	}
@@ -360,7 +361,7 @@ func (s *Service) GenerateRequestedLifePhoto(ctx context.Context, userID, compan
 	if eventType == "sleep" {
 		return nil, fmt.Errorf("the companion is asleep and cannot take a photo now")
 	}
-	models, err := s.loadModelRouteModels(ctx, "image_requested_photo")
+	models, err := s.loadModelRouteModels(ctx, "image_requested_photo", userID)
 	if err != nil {
 		return nil, err
 	}
@@ -420,7 +421,7 @@ func (s *Service) SpeakLatestReply(ctx context.Context, userID, companionID stri
 	if message.MessageType == "voice" && message.MediaURL != "" {
 		return nil, fmt.Errorf("the latest reply already has voice")
 	}
-	models, err := s.loadModelRouteModels(ctx, "audio_speech")
+	models, err := s.loadModelRouteModels(ctx, "audio_speech", userID)
 	if err != nil {
 		return nil, err
 	}
@@ -551,13 +552,6 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	var proactiveModels []Model
-	if !s.mock {
-		proactiveModels, err = s.loadTextRouteModels(ctx, "text_proactive", "")
-		if err != nil {
-			return err
-		}
-	}
 	rows, err := s.db.QueryContext(ctx, `SELECT m.id,m.companion_id,c.user_id,cv.id,COALESCE(m.content,''),c.name,COALESCE(u.timezone,'UTC')
 		FROM memories m JOIN companions c ON c.id=m.companion_id JOIN users u ON u.id=c.user_id
 		JOIN conversations cv ON cv.companion_id=c.id AND cv.user_id=c.user_id
@@ -620,8 +614,12 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 		}, preferredLocale, "How did the thing you told me about go?")
 		modelID := ""
 		if !s.mock {
+			proactiveModels, modelErr := s.loadTextRouteModels(ctx, "text_proactive", "", item.userID)
+			if modelErr != nil {
+				_, _ = s.db.ExecContext(ctx, `UPDATE memories SET follow_up_claimed_at=NULL WHERE id=$1`, item.id)
+				return modelErr
+			}
 			var model Model
-			var modelErr error
 			text, model, modelErr = s.generateTextWithFallback(ctx, item.companionID, "memory_followup", proactiveModels, GenerateRequest{
 				System:      companionSystemBoundary + "\n\n" + responseLanguagePolicy("", preferredLocale) + "\n\n" + emojiMessagePolicy,
 				Messages:    []ChatMessage{{Role: "user", Content: fmt.Sprintf("The user previously said: %q. Follow up naturally now without assuming or inventing the outcome. Ask one concise, specific question.", item.content)}},
@@ -670,7 +668,7 @@ func (s *Service) EnsureDailyPlans(ctx context.Context) error {
 		return err
 	}
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT c.id, c.name, COALESCE(c.gender, ''), COALESCE(c.persona, ''),
+		SELECT c.id, c.user_id, c.name, COALESCE(c.gender, ''), COALESCE(c.persona, ''),
 		       COALESCE(c.city, ''), COALESCE(c.occupation, ''), COALESCE(c.interests, ''),
 		       COALESCE(c.relationship_stage, 'stranger'), c.personality_tags::text,
 		       c.speaking_style, c.likes, c.dislikes, c.life_habits, c.life_goal, c.backstory,
@@ -693,7 +691,7 @@ func (s *Service) EnsureDailyPlans(ctx context.Context) error {
 	for rows.Next() {
 		var current item
 		if err := rows.Scan(
-			&current.profile.ID, &current.profile.Name, &current.profile.Gender, &current.profile.Persona,
+			&current.profile.ID, &current.profile.UserID, &current.profile.Name, &current.profile.Gender, &current.profile.Persona,
 			&current.profile.City, &current.profile.Occupation, &current.profile.Interests,
 			&current.profile.RelationshipStage, &current.profile.PersonalityTags,
 			&current.profile.SpeakingStyle, &current.profile.Likes, &current.profile.Dislikes,
@@ -790,7 +788,7 @@ func (s *Service) generatePlan(ctx context.Context, profile companionContext, lo
 	if s.mock {
 		return mockPlan(profile), "", nil
 	}
-	models, err := s.loadTextRouteModels(ctx, "text_life_plan", "")
+	models, err := s.loadTextRouteModels(ctx, "text_life_plan", "", profile.UserID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -885,8 +883,8 @@ func (s *Service) EnsureCompanionSocialWorld(ctx context.Context) error {
 	}
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT r.id,r.last_interaction_at,
-		       a.id,a.name,COALESCE(a.gender,''),COALESCE(a.persona,''),COALESCE(a.city,''),COALESCE(a.occupation,''),COALESCE(a.interests,''),COALESCE(a.relationship_stage,'stranger'),a.personality_tags::text,a.speaking_style,a.likes,a.dislikes,a.life_habits,a.life_goal,a.backstory,COALESCE(ra.enthusiasm,0),COALESCE(ua.timezone,'UTC'),
-		       b.id,b.name,COALESCE(b.gender,''),COALESCE(b.persona,''),COALESCE(b.city,''),COALESCE(b.occupation,''),COALESCE(b.interests,''),COALESCE(b.relationship_stage,'stranger'),b.personality_tags::text,b.speaking_style,b.likes,b.dislikes,b.life_habits,b.life_goal,b.backstory,COALESCE(rb.enthusiasm,0),COALESCE(ub.timezone,'UTC')
+		       a.id,a.user_id,a.name,COALESCE(a.gender,''),COALESCE(a.persona,''),COALESCE(a.city,''),COALESCE(a.occupation,''),COALESCE(a.interests,''),COALESCE(a.relationship_stage,'stranger'),a.personality_tags::text,a.speaking_style,a.likes,a.dislikes,a.life_habits,a.life_goal,a.backstory,COALESCE(ra.enthusiasm,0),COALESCE(ua.timezone,'UTC'),
+		       b.id,b.user_id,b.name,COALESCE(b.gender,''),COALESCE(b.persona,''),COALESCE(b.city,''),COALESCE(b.occupation,''),COALESCE(b.interests,''),COALESCE(b.relationship_stage,'stranger'),b.personality_tags::text,b.speaking_style,b.likes,b.dislikes,b.life_habits,b.life_goal,b.backstory,COALESCE(rb.enthusiasm,0),COALESCE(ub.timezone,'UTC')
 		FROM companion_relationships r
 		JOIN companions a ON a.id=r.companion_a_id
 		JOIN companions b ON b.id=r.companion_b_id
@@ -913,8 +911,8 @@ func (s *Service) EnsureCompanionSocialWorld(ctx context.Context) error {
 	for rows.Next() {
 		var p pair
 		if err := rows.Scan(&p.relationshipID, &p.lastInteraction,
-			&p.a.ID, &p.a.Name, &p.a.Gender, &p.a.Persona, &p.a.City, &p.a.Occupation, &p.a.Interests, &p.a.RelationshipStage, &p.a.PersonalityTags, &p.a.SpeakingStyle, &p.a.Likes, &p.a.Dislikes, &p.a.LifeHabits, &p.a.LifeGoal, &p.a.Backstory, &p.a.Enthusiasm, &p.timezoneA,
-			&p.b.ID, &p.b.Name, &p.b.Gender, &p.b.Persona, &p.b.City, &p.b.Occupation, &p.b.Interests, &p.b.RelationshipStage, &p.b.PersonalityTags, &p.b.SpeakingStyle, &p.b.Likes, &p.b.Dislikes, &p.b.LifeHabits, &p.b.LifeGoal, &p.b.Backstory, &p.b.Enthusiasm, &p.timezoneB); err != nil {
+			&p.a.ID, &p.a.UserID, &p.a.Name, &p.a.Gender, &p.a.Persona, &p.a.City, &p.a.Occupation, &p.a.Interests, &p.a.RelationshipStage, &p.a.PersonalityTags, &p.a.SpeakingStyle, &p.a.Likes, &p.a.Dislikes, &p.a.LifeHabits, &p.a.LifeGoal, &p.a.Backstory, &p.a.Enthusiasm, &p.timezoneA,
+			&p.b.ID, &p.b.UserID, &p.b.Name, &p.b.Gender, &p.b.Persona, &p.b.City, &p.b.Occupation, &p.b.Interests, &p.b.RelationshipStage, &p.b.PersonalityTags, &p.b.SpeakingStyle, &p.b.Likes, &p.b.Dislikes, &p.b.LifeHabits, &p.b.LifeGoal, &p.b.Backstory, &p.b.Enthusiasm, &p.timezoneB); err != nil {
 			return err
 		}
 		pairs = append(pairs, p)
@@ -1066,7 +1064,7 @@ func (s *Service) generateSocialEvent(ctx context.Context, a, b companionContext
 	if s.mock {
 		return fallback, "", nil
 	}
-	models, err := s.loadTextRouteModels(ctx, "text_life_plan", "")
+	models, err := s.loadTextRouteModels(ctx, "text_life_plan", "", a.UserID)
 	if err != nil {
 		return socialPlanEvent{}, "", err
 	}
@@ -1202,7 +1200,7 @@ func (s *Service) DispatchDueProactive(ctx context.Context) error {
 		return err
 	}
 	if !s.mock {
-		if _, err := s.loadTextRouteModels(ctx, "text_proactive", ""); err != nil {
+		if _, err := s.loadTextRouteModels(ctx, "text_proactive", "", ""); err != nil {
 			return err
 		}
 	}
@@ -1292,7 +1290,7 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 	text := mockProactiveMessage(targetLocale)
 	modelID := ""
 	if !s.mock {
-		models, modelErr := s.loadTextRouteModels(ctx, "text_proactive", "")
+		models, modelErr := s.loadTextRouteModels(ctx, "text_proactive", "", event.userID)
 		if modelErr != nil {
 			return modelErr
 		}
@@ -1506,13 +1504,13 @@ func (s *Service) dispatchPushItem(ctx context.Context, outboxID, userID, compan
 func (s *Service) loadCompanionForConversation(ctx context.Context, conversationID, userID string) (companionContext, error) {
 	var profile companionContext
 	err := s.db.QueryRowContext(ctx, `
-		SELECT c.id, c.name, COALESCE(c.gender, ''), COALESCE(c.persona, ''), COALESCE(c.city, ''),
+		SELECT c.id, c.user_id, c.name, COALESCE(c.gender, ''), COALESCE(c.persona, ''), COALESCE(c.city, ''),
 		       COALESCE(c.occupation, ''), COALESCE(c.interests, ''), COALESCE(c.relationship_stage, 'stranger'),
 		       c.personality_tags::text, c.speaking_style, c.likes, c.dislikes, c.life_habits, c.life_goal, c.backstory,
 		       c.voice_enabled,c.voice_config::text,COALESCE((SELECT p.metadata->>'style' FROM credit_products p JOIN users u ON u.environment=p.environment WHERE u.id=c.user_id AND p.product_key=c.equipped_outfit_key),'')
 		FROM conversations v JOIN companions c ON c.id = v.companion_id
 		WHERE v.id = $1 AND v.user_id = $2 AND c.active = true`, conversationID, userID).Scan(
-		&profile.ID, &profile.Name, &profile.Gender, &profile.Persona, &profile.City, &profile.Occupation,
+		&profile.ID, &profile.UserID, &profile.Name, &profile.Gender, &profile.Persona, &profile.City, &profile.Occupation,
 		&profile.Interests, &profile.RelationshipStage, &profile.PersonalityTags, &profile.SpeakingStyle,
 		&profile.Likes, &profile.Dislikes, &profile.LifeHabits, &profile.LifeGoal, &profile.Backstory,
 		&profile.VoiceEnabled, &profile.VoiceConfig, &profile.EquippedOutfit,
@@ -1589,7 +1587,7 @@ func (s *Service) loadRecentMessages(ctx context.Context, conversationID string,
 	return messages, rows.Err()
 }
 
-func (s *Service) loadModelRouteModels(ctx context.Context, routeKey string) ([]Model, error) {
+func (s *Service) loadModelRouteModels(ctx context.Context, routeKey, userID string) ([]Model, error) {
 	var enabled bool
 	var primary sql.NullString
 	var fallbackRaw, mediaType string
@@ -1604,10 +1602,37 @@ func (s *Service) loadModelRouteModels(ctx context.Context, routeKey string) ([]
 	if !enabled || !primary.Valid || strings.TrimSpace(primary.String) == "" {
 		return nil, fmt.Errorf("model behavior %s is not configured", routeKey)
 	}
-	ids := []string{primary.String}
+	ids := make([]string, 0)
+	if userID != "" {
+		rows, queryErr := s.db.QueryContext(ctx, `SELECT m.id
+			FROM ai_models m
+			JOIN ai_model_subscription_plans link ON link.model_id=m.id
+			JOIN subscription_plans p ON p.id=link.subscription_plan_id AND p.enabled=true
+			JOIN subscriptions s ON s.user_id=$1 AND s.environment=p.environment AND s.platform=p.platform AND s.product_id=p.product_id
+			WHERE m.enabled=true AND m.capabilities ? $2 AND m.configured_scenarios ? $3
+			  AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP)
+			GROUP BY m.id,m.created_at ORDER BY m.created_at DESC,m.id DESC`, userID, mediaType, routeKey)
+		if queryErr != nil {
+			return nil, queryErr
+		}
+		for rows.Next() {
+			var id string
+			if scanErr := rows.Scan(&id); scanErr != nil {
+				rows.Close()
+				return nil, scanErr
+			}
+			ids = append(ids, id)
+		}
+		if closeErr := rows.Close(); closeErr != nil {
+			return nil, closeErr
+		}
+		if rowsErr := rows.Err(); rowsErr != nil {
+			return nil, rowsErr
+		}
+	}
 	var fallbacks []string
 	_ = json.Unmarshal([]byte(fallbackRaw), &fallbacks)
-	ids = append(ids, fallbacks...)
+	ids = orderedModelCandidateIDs(ids, primary.String, fallbacks)
 	models := make([]Model, 0, len(ids))
 	seen := map[string]bool{}
 	for _, id := range ids {
@@ -1618,8 +1643,16 @@ func (s *Service) loadModelRouteModels(ctx context.Context, routeKey string) ([]
 		seen[id] = true
 		var compatible bool
 		if checkErr := s.db.QueryRowContext(ctx, `SELECT EXISTS(
-			SELECT 1 FROM ai_models WHERE id=$1 AND enabled=true AND capabilities ? $2 AND configured_scenarios ? $3
-		)`, id, mediaType, routeKey).Scan(&compatible); checkErr != nil || !compatible {
+			SELECT 1 FROM ai_models m WHERE m.id=$1 AND m.enabled=true AND m.capabilities ? $2 AND m.configured_scenarios ? $3
+			AND (NOT EXISTS(SELECT 1 FROM ai_model_subscription_plans link WHERE link.model_id=m.id)
+				OR EXISTS(
+					SELECT 1 FROM ai_model_subscription_plans link
+					JOIN subscription_plans p ON p.id=link.subscription_plan_id AND p.enabled=true
+					JOIN subscriptions s ON s.user_id=$4 AND s.environment=p.environment AND s.platform=p.platform AND s.product_id=p.product_id
+					WHERE link.model_id=m.id AND s.status='active'
+					AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP)
+				))
+		)`, id, mediaType, routeKey, userID).Scan(&compatible); checkErr != nil || !compatible {
 			continue
 		}
 		model, loadErr := s.loadModel(ctx, id)
@@ -1633,6 +1666,14 @@ func (s *Service) loadModelRouteModels(ctx context.Context, routeKey string) ([]
 	return models, nil
 }
 
+func orderedModelCandidateIDs(subscriptionIDs []string, primary string, fallbacks []string) []string {
+	result := make([]string, 0, len(subscriptionIDs)+len(fallbacks)+1)
+	result = append(result, subscriptionIDs...)
+	result = append(result, primary)
+	result = append(result, fallbacks...)
+	return result
+}
+
 func (s *Service) modelRouteEnabled(ctx context.Context, routeKey string) (bool, error) {
 	var enabled bool
 	err := s.db.QueryRowContext(ctx, `SELECT enabled FROM agent_media_routes WHERE route_key=$1`, routeKey).Scan(&enabled)
@@ -1642,8 +1683,8 @@ func (s *Service) modelRouteEnabled(ctx context.Context, routeKey string) (bool,
 	return enabled, err
 }
 
-func (s *Service) loadTextRouteModels(ctx context.Context, routeKey, companionID string) ([]Model, error) {
-	models, err := s.loadModelRouteModels(ctx, routeKey)
+func (s *Service) loadTextRouteModels(ctx context.Context, routeKey, companionID, userID string) ([]Model, error) {
+	models, err := s.loadModelRouteModels(ctx, routeKey, userID)
 	if err != nil || routeKey != "text_chat" || companionID == "" {
 		return models, err
 	}
@@ -1654,8 +1695,16 @@ func (s *Service) loadTextRouteModels(ctx context.Context, routeKey, companionID
 	if !override.Valid || strings.TrimSpace(override.String) == "" {
 		return models, nil
 	}
+	var planSpecificFirst bool
+	if len(models) > 0 {
+		_ = s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_model_subscription_plans WHERE model_id=$1)`, models[0].ID).Scan(&planSpecificFirst)
+	}
+	if planSpecificFirst {
+		return models, nil
+	}
 	var compatible bool
-	if err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_models WHERE id=$1 AND enabled=true AND capabilities ? 'text' AND configured_scenarios ? 'text_chat')`, override.String).Scan(&compatible); err != nil || !compatible {
+	if err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_models m WHERE id=$1 AND enabled=true AND capabilities ? 'text' AND configured_scenarios ? 'text_chat'
+		AND NOT EXISTS(SELECT 1 FROM ai_model_subscription_plans link WHERE link.model_id=m.id))`, override.String).Scan(&compatible); err != nil || !compatible {
 		return models, nil
 	}
 	overrideModel, err := s.loadModel(ctx, override.String)

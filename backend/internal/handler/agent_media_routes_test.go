@@ -112,6 +112,19 @@ func TestNormalizeModelScenariosRejectsUntestableAndDuplicateScenarios(t *testin
 	}
 }
 
+func TestNormalizeSubscriptionPlanIDs(t *testing.T) {
+	got, err := normalizeSubscriptionPlanIDs([]string{" plan-a ", "", "plan-b"})
+	if err != nil {
+		t.Fatalf("normalize subscription plans: %v", err)
+	}
+	if strings.Join(got, ",") != "plan-a,plan-b" {
+		t.Fatalf("subscription plans = %v", got)
+	}
+	if _, err := normalizeSubscriptionPlanIDs([]string{"plan-a", " plan-a "}); err == nil {
+		t.Fatal("expected duplicate subscription plan to be rejected")
+	}
+}
+
 func TestNormalizeModelScenariosAllowsVideoWithoutRequiringATestAdapter(t *testing.T) {
 	_, capabilities, err := normalizeModelScenarios([]string{"video_life_clip"})
 	if err != nil {
