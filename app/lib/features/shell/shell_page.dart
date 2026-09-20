@@ -139,22 +139,12 @@ class VitaTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final vita = context.vita;
     final dark = vita.brightness == Brightness.dark;
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: vita.glass.withValues(alpha: dark ? 0.28 : 0.38),
-            border: Border(
-              top: BorderSide(
-                color: vita.glassRing.withValues(alpha: 0.45),
-                width: 0.5,
-              ),
-            ),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
+    // Only the capsule below is glass. The surrounding strip (including the
+    // bottom safe area) stays transparent so page content runs edge-to-edge
+    // and remains touchable behind the floating bar.
+    return SafeArea(
+      top: false,
+      child: Padding(
               padding: EdgeInsets.fromLTRB(
                 _sidePadding,
                 _topGap,
@@ -268,10 +258,7 @@ class VitaTabBar extends StatelessWidget {
                 },
               ),
             ),
-          ),
-        ),
-      ),
-    );
+          );
   }
 }
 
