@@ -40,6 +40,8 @@ class VitaTranslations extends Translations {
       'settings.title': 'Settings',
       'settings.general': 'General',
       'settings.account': 'Account',
+      'settings.notifications': 'Device notifications',
+      'settings.notifications.subtitle': 'Allow Vita alerts in phone settings',
       'lang.title': 'Language',
       'lang.system': 'System default',
       'lang.english': 'English',
@@ -115,6 +117,8 @@ class VitaTranslations extends Translations {
       'settings.title': '设置',
       'settings.general': '通用',
       'settings.account': '账户',
+      'settings.notifications': '设备通知',
+      'settings.notifications.subtitle': '在系统设置中允许 Vita 发送通知',
       'lang.title': '语言',
       'lang.system': '跟随系统',
       // Language names are always shown in their own language.

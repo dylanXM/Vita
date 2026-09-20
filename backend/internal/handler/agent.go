@@ -327,62 +327,71 @@ func CompanionOptions(c *gin.Context) {
 	})
 }
 
-// AgentNotifications consumes in-app notification outbox entries. External
-// push channels can be added beside in_app without changing the message model.
-func AgentNotifications(c *gin.Context) {
+type pushTokenInput struct {
+	Token    string `json:"token" binding:"required"`
+	Platform string `json:"platform" binding:"required"`
+	DeviceID string `json:"device_id"`
+	Locale   string `json:"locale"`
+}
+
+func RegisterPushToken(c *gin.Context) {
+	var input pushTokenInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	input.Token = strings.TrimSpace(input.Token)
+	input.Platform = strings.ToLower(strings.TrimSpace(input.Platform))
+	if input.Token == "" || len(input.Token) > 4096 || (input.Platform != "ios" && input.Platform != "android") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid push token or platform"})
+		return
+	}
 	tx, err := db.Get().BeginTx(c.Request.Context(), nil)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load notifications"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register push token"})
 		return
 	}
 	defer tx.Rollback()
-
-	rows, err := tx.QueryContext(c.Request.Context(), `
-		SELECT o.id, o.companion_id, o.message_id, o.payload::text, o.created_at
-		FROM notification_outbox o
-		WHERE o.user_id=$1 AND o.channel='in_app' AND o.status='ready'
-		  AND o.available_at <= CURRENT_TIMESTAMP
-		ORDER BY o.created_at ASC LIMIT 3 FOR UPDATE SKIP LOCKED`, c.GetString("user_id"))
+	_, err = tx.ExecContext(c.Request.Context(), `
+		INSERT INTO device_push_tokens (id,user_id,token,platform,device_id,locale,enabled,last_seen_at)
+		VALUES ($1,$2,$3,$4,$5,$6,true,CURRENT_TIMESTAMP)
+		ON CONFLICT (token) DO UPDATE SET user_id=EXCLUDED.user_id,platform=EXCLUDED.platform,
+		device_id=EXCLUDED.device_id,locale=EXCLUDED.locale,enabled=true,
+		last_seen_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP`,
+		uuid.New().String(), c.GetString("user_id"), input.Token, input.Platform,
+		strings.TrimSpace(input.DeviceID), strings.TrimSpace(input.Locale))
+	if err == nil {
+		_, err = tx.ExecContext(c.Request.Context(), `
+			UPDATE notification_outbox SET available_at=CURRENT_TIMESTAMP,last_error=''
+			WHERE user_id=$1 AND channel='push' AND status='ready'
+			  AND created_at >= CURRENT_TIMESTAMP - INTERVAL '6 hours'`, c.GetString("user_id"))
+	}
+	if err == nil {
+		err = tx.Commit()
+	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load notifications"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register push token"})
 		return
 	}
-	type notification struct {
-		ID          string          `json:"id"`
-		CompanionID string          `json:"companion_id"`
-		MessageID   sql.NullString  `json:"-"`
-		Payload     json.RawMessage `json:"payload"`
-		CreatedAt   time.Time       `json:"created_at"`
+	c.JSON(http.StatusOK, gin.H{"registered": true})
+}
+
+func UnregisterPushToken(c *gin.Context) {
+	var input struct {
+		Token string `json:"token" binding:"required"`
 	}
-	items := make([]notification, 0)
-	for rows.Next() {
-		var item notification
-		var raw string
-		if err := rows.Scan(&item.ID, &item.CompanionID, &item.MessageID, &raw, &item.CreatedAt); err != nil {
-			rows.Close()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read notifications"})
-			return
-		}
-		item.Payload = json.RawMessage(raw)
-		items = append(items, item)
-	}
-	if err := rows.Close(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read notifications"})
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	for _, item := range items {
-		if _, err := tx.ExecContext(c.Request.Context(), `
-			UPDATE notification_outbox SET status='sent',sent_at=CURRENT_TIMESTAMP,attempts=attempts+1
-			WHERE id=$1`, item.ID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to acknowledge notifications"})
-			return
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to acknowledge notifications"})
+	_, err := db.Get().ExecContext(c.Request.Context(), `
+		UPDATE device_push_tokens SET enabled=false,updated_at=CURRENT_TIMESTAMP
+		WHERE user_id=$1 AND token=$2`, c.GetString("user_id"), strings.TrimSpace(input.Token))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to unregister push token"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	c.JSON(http.StatusOK, gin.H{"registered": false})
 }
 
 type adminCompanionInput struct {

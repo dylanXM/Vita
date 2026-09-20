@@ -68,9 +68,11 @@ type Config struct {
 	// AgentConfigKey encrypts provider API keys stored through the admin UI.
 	// Production should set a dedicated high-entropy value. Falling back to the
 	// JWT secret keeps local development compatible with existing environments.
-	AgentConfigKey string
-	AgentEnabled   bool
-	AgentTick      time.Duration
+	AgentConfigKey               string
+	AgentEnabled                 bool
+	AgentTick                    time.Duration
+	FirebaseProjectID            string
+	FirebaseServiceAccountBase64 string
 
 	// RevenueCatWebhookSecret verifies the Authorization header on the
 	// RevenueCat webhook (the "Shared Secret" shown in the RC dashboard).
@@ -120,9 +122,14 @@ func Load() *Config {
 		SMTPFrom:     getEnv("VITA_SMTP_FROM", ""),
 		SMTPFromName: getEnv("VITA_SMTP_FROM_NAME", "Vita"),
 
-		AgentConfigKey: getEnv("VITA_AGENT_CONFIG_KEY", getEnv("VITA_JWT_SECRET", "dev-secret-change-me-32-characters-min")),
-		AgentEnabled:   getEnv("VITA_AGENT_ENABLED", "true") == "true",
-		AgentTick:      durationEnv(getEnv("VITA_AGENT_TICK", "1m"), time.Minute),
+		AgentConfigKey:    getEnv("VITA_AGENT_CONFIG_KEY", getEnv("VITA_JWT_SECRET", "dev-secret-change-me-32-characters-min")),
+		AgentEnabled:      getEnv("VITA_AGENT_ENABLED", "true") == "true",
+		AgentTick:         durationEnv(getEnv("VITA_AGENT_TICK", "1m"), time.Minute),
+		FirebaseProjectID: getEnv("VITA_FIREBASE_PROJECT_ID", ""),
+		FirebaseServiceAccountBase64: getEnv(
+			"VITA_FIREBASE_SERVICE_ACCOUNT_BASE64",
+			getEnv("VITA_FCM_CREDENTIALS_JSON", ""),
+		),
 
 		RevenueCatWebhookSecret: getEnv("VITA_REVENUECAT_WEBHOOK_SECRET", ""),
 

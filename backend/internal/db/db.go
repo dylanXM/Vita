@@ -270,7 +270,7 @@ func migrate(db *sql.DB) error {
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			companion_id TEXT NOT NULL REFERENCES companions(id) ON DELETE CASCADE,
 			message_id TEXT REFERENCES messages(id) ON DELETE CASCADE,
-			channel TEXT NOT NULL DEFAULT 'in_app',
+			channel TEXT NOT NULL DEFAULT 'push',
 			payload JSONB NOT NULL DEFAULT '{}'::jsonb,
 			status TEXT NOT NULL DEFAULT 'pending',
 			attempts INTEGER NOT NULL DEFAULT 0,
@@ -280,6 +280,20 @@ func migrate(db *sql.DB) error {
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_outbox_message_channel ON notification_outbox(message_id, channel)`,
+		`ALTER TABLE notification_outbox ALTER COLUMN channel SET DEFAULT 'push'`,
+		`CREATE TABLE IF NOT EXISTS device_push_tokens (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			token TEXT NOT NULL UNIQUE,
+			platform TEXT NOT NULL CHECK (platform IN ('ios', 'android')),
+			device_id TEXT NOT NULL DEFAULT '',
+			locale TEXT NOT NULL DEFAULT '',
+			enabled BOOLEAN NOT NULL DEFAULT true,
+			last_seen_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_device_push_tokens_user ON device_push_tokens(user_id, enabled)`,
 		`CREATE TABLE IF NOT EXISTS agent_runs (
 			id TEXT PRIMARY KEY,
 			companion_id TEXT REFERENCES companions(id) ON DELETE SET NULL,

@@ -27,6 +27,7 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
   late final ChatController ctrl = Get.put(
     ChatController(companionId: widget.companionId, companionName: widget.name),
+    tag: widget.companionId,
   );
   final _input = TextEditingController();
   final _scroll = ScrollController();
@@ -35,6 +36,7 @@ class _ChatPageState extends State<ChatPage> {
   void dispose() {
     _input.dispose();
     _scroll.dispose();
+    Get.delete<ChatController>(tag: widget.companionId);
     super.dispose();
   }
 

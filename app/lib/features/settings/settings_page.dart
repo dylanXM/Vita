@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/settings_controller.dart';
 import '../../core/theme.dart';
@@ -57,6 +58,14 @@ class SettingsPage extends StatelessWidget {
                       duration: const Duration(milliseconds: 300),
                     ),
                   ),
+                ),
+                const Divider(indent: 52, height: 0.5),
+                VitaListTile(
+                  icon: Icons.notifications_outlined,
+                  title: 'settings.notifications'.tr,
+                  subtitle: 'settings.notifications.subtitle'.tr,
+                  borderRadius: BorderRadius.zero,
+                  onTap: openAppSettings,
                 ),
               ],
             ),

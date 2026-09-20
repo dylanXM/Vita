@@ -33,7 +33,11 @@ func main() {
 	}
 	defer dbClient.Close()
 
-	agentService, err := agent.NewService(dbClient, cfg.AgentConfigKey, cfg.MockGeneration)
+	pushClient, err := agent.NewFCMClient(cfg.FirebaseProjectID, cfg.FirebaseServiceAccountBase64)
+	if err != nil {
+		log.Fatalf("failed to initialize device push: %v", err)
+	}
+	agentService, err := agent.NewService(dbClient, cfg.AgentConfigKey, cfg.MockGeneration, pushClient)
 	if err != nil {
 		log.Fatalf("failed to initialize companion agent: %v", err)
 	}
@@ -113,7 +117,8 @@ func main() {
 			companions.DELETE("/:id", handler.DeleteCompanion)
 		}
 		api.GET("/companion-options", middleware.RequireAuth(), handler.CompanionOptions)
-		api.GET("/me/agent-notifications", middleware.RequireAuth(), handler.AgentNotifications)
+		api.POST("/me/push-tokens", middleware.RequireAuth(), handler.RegisterPushToken)
+		api.DELETE("/me/push-tokens", middleware.RequireAuth(), handler.UnregisterPushToken)
 
 		conversations := api.Group("/conversations")
 		{

@@ -3,6 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../core/api_client.dart';
 import '../../core/constants.dart';
+import '../../core/push_notification_service.dart';
 import '../../core/token_storage.dart';
 
 /// Auth state: email + password login, two-step email registration
@@ -80,12 +81,14 @@ class AuthController extends GetxController {
   }
 
   Future<void> fetchProfile() async {
-    profile.value = await ApiClient.instance.get('/v1/me') as Map<String, dynamic>?;
+    profile.value =
+        await ApiClient.instance.get('/v1/me') as Map<String, dynamic>?;
   }
 
   String get email => profile.value?['email'] as String? ?? '';
 
   Future<void> logout() async {
+    await PushNotificationService.instance.deactivate();
     await TokenStorage.clear();
     profile.value = null;
     Get.offAllNamed('/login');

@@ -82,7 +82,7 @@ Each event has a stable type, title, description, location, start/end time, emot
 
 When a shareable event becomes due, the engine evaluates daily limit, recent outbound frequency, relevance, novelty, emotion, and quiet hours. If allowed, it generates a natural text message, stores it in the existing conversation, creates a delivery-outbox record, and marks the event shared in one transaction.
 
-The outbox separates agent decisions from transport. Version 1 guarantees in-app delivery through message polling. Push adapters can later consume the same outbox without changing Life Engine or message schemas.
+The outbox separates agent decisions from transport. Life planning and contact decisions run on the backend and do not depend on the user or app being online. Version 1 writes the message to the conversation and creates an FCM push delivery; it does not rely on an app-only alert. Registered iOS and Android devices receive an operating-system notification while the app is backgrounded or terminated; tapping it opens the companion conversation. Push failures are retried with backoff, expired device tokens are disabled, and notifications older than six hours expire instead of surprising a newly registered device. The message remains available in the conversation even if no device can be reached.
 
 ## 7. Extensible message contract
 
@@ -116,9 +116,20 @@ Clients must render supported types and safely fall back to `content` for unknow
 5. Life Engine creates one bounded daily plan per companion and does not duplicate it on restart.
 6. Due shareable events become ordinary companion messages, capped per day.
 7. App fetches new proactive messages while active without requiring a chat resend.
-8. Message and event schemas can carry future media without a migration that replaces existing records.
-9. Automated tests cover provider adapters, structured-output parsing, prompt boundaries, and core validation.
+8. A signed-in device can register and refresh an FCM token; a due proactive message produces an OS notification while the app is backgrounded or terminated.
+9. Message and event schemas can carry future media without a migration that replaces existing records.
+10. Automated tests cover provider adapters, structured-output parsing, prompt boundaries, push payloads, and core validation.
 
 ## 10. Deployment compatibility
 
-Database changes are additive. Backend and admin can deploy together before the app update: legacy app creation payloads remain valid, legacy message readers continue to receive the original fields, and new response fields are additive. The later app release enables personality/portrait selection and live polling.
+Database changes are additive. Backend and admin can deploy together before the app update: legacy app creation payloads remain valid, legacy message readers continue to receive the original fields, and new response fields are additive. The later app release enables personality/portrait selection, device-token registration, notification permission, and push deep links.
+
+### Device-push prerequisites
+
+1. Create Android and iOS apps in one Firebase project using the release application ID and bundle ID.
+2. Enable the FCM HTTP v1 API. For iOS, enable Push Notifications and upload the Apple APNs authentication key to Firebase.
+3. Put the public Firebase app identifiers in `app/config/beta.json` and `app/config/prod.json`.
+4. Set backend `VITA_FIREBASE_PROJECT_ID` and `VITA_FIREBASE_SERVICE_ACCOUNT_BASE64`; the latter is the complete service-account JSON encoded with standard base64 and must remain a deployment secret.
+5. Apply the additive database migration before production startup because production currently disables automatic migrations.
+
+The app requests notification authorization only after sign-in and exposes a Settings shortcut to the operating-system notification settings. Firebase is used only as a push transport; Vita authentication remains unchanged.

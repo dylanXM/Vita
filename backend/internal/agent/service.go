@@ -24,6 +24,7 @@ type Service struct {
 	db     *sql.DB
 	box    *SecretBox
 	client *Client
+	push   *FCMClient
 	mock   bool
 }
 
@@ -82,12 +83,12 @@ type lifeSettings struct {
 	QuietEnd            int
 }
 
-func NewService(db *sql.DB, secret string, mock bool) (*Service, error) {
+func NewService(db *sql.DB, secret string, mock bool, push *FCMClient) (*Service, error) {
 	box, err := NewSecretBox(secret)
 	if err != nil {
 		return nil, err
 	}
-	return &Service{db: db, box: box, client: NewClient(), mock: mock}, nil
+	return &Service{db: db, box: box, client: NewClient(), push: push, mock: mock}, nil
 }
 
 func (s *Service) EncryptSecret(value string) (string, error) { return s.box.Encrypt(value) }
@@ -115,6 +116,9 @@ func (s *Service) runTick(ctx context.Context) {
 	}
 	if err := s.DispatchDueProactive(ctx); err != nil {
 		log.Printf("agent proactive dispatch: %v", err)
+	}
+	if err := s.DispatchPushOutbox(ctx); err != nil {
+		log.Printf("agent push dispatch: %v", err)
 	}
 }
 
@@ -408,7 +412,7 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct{ id, companion
 	outboxPayload, _ := json.Marshal(map[string]any{"title": event.name, "body": text, "message_id": messageID, "type": "text"})
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO notification_outbox (id, user_id, companion_id, message_id, channel, payload, status)
-		VALUES ($1,$2,$3,$4,'in_app',$5,'ready') ON CONFLICT (message_id, channel) DO NOTHING`,
+		VALUES ($1,$2,$3,$4,'push',$5,'ready') ON CONFLICT (message_id, channel) DO NOTHING`,
 		uuid.New().String(), event.userID, event.companionID, messageID, outboxPayload); err != nil {
 		return err
 	}
@@ -417,6 +421,136 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct{ id, companion
 	}
 	s.recordRun(ctx, event.companionID, "proactive", modelID, "succeeded", "")
 	return nil
+}
+
+// DispatchPushOutbox delivers proactive messages through FCM even when the
+// app process is suspended or terminated. Life generation and push transport
+// stay independent: provider outages never roll back a generated life event.
+func (s *Service) DispatchPushOutbox(ctx context.Context) error {
+	if s.push == nil {
+		return nil
+	}
+	if _, err := s.db.ExecContext(ctx, `
+		UPDATE notification_outbox SET status='expired',last_error='push delivery window expired'
+		WHERE channel='push' AND status IN ('ready','processing')
+		  AND created_at < CURRENT_TIMESTAMP - INTERVAL '6 hours'`); err != nil {
+		return err
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id,user_id,companion_id,COALESCE(message_id,''),payload::text,attempts
+		FROM notification_outbox
+		WHERE channel='push' AND status IN ('ready','processing') AND available_at <= CURRENT_TIMESTAMP AND attempts < 10
+		ORDER BY created_at ASC LIMIT 20`)
+	if err != nil {
+		return err
+	}
+	type item struct {
+		id, userID, companionID, messageID, payload string
+		attempts                                    int
+	}
+	var items []item
+	for rows.Next() {
+		var current item
+		if err := rows.Scan(&current.id, &current.userID, &current.companionID, &current.messageID, &current.payload, &current.attempts); err != nil {
+			rows.Close()
+			return err
+		}
+		items = append(items, current)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, current := range items {
+		claimed, err := s.db.ExecContext(ctx, `
+			UPDATE notification_outbox SET status='processing',available_at=CURRENT_TIMESTAMP + INTERVAL '5 minutes'
+			WHERE id=$1 AND status IN ('ready','processing') AND available_at <= CURRENT_TIMESTAMP`, current.id)
+		if err != nil {
+			return err
+		}
+		if count, _ := claimed.RowsAffected(); count == 0 {
+			continue
+		}
+		if err := s.dispatchPushItem(ctx, current.id, current.userID, current.companionID, current.messageID, current.payload, current.attempts); err != nil {
+			log.Printf("push outbox=%s: %v", current.id, err)
+		}
+	}
+	return nil
+}
+
+func (s *Service) dispatchPushItem(ctx context.Context, outboxID, userID, companionID, messageID, payloadRaw string, attempts int) error {
+	var payload struct {
+		Title string `json:"title"`
+		Body  string `json:"body"`
+		Type  string `json:"type"`
+	}
+	if err := json.Unmarshal([]byte(payloadRaw), &payload); err != nil {
+		_, _ = s.db.ExecContext(ctx, `UPDATE notification_outbox SET status='failed',last_error=$2 WHERE id=$1`, outboxID, "invalid payload")
+		return err
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT id,token FROM device_push_tokens WHERE user_id=$1 AND enabled=true`, userID)
+	if err != nil {
+		return err
+	}
+	type target struct{ id, token string }
+	var targets []target
+	for rows.Next() {
+		var current target
+		if err := rows.Scan(&current.id, &current.token); err != nil {
+			rows.Close()
+			return err
+		}
+		targets = append(targets, current)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if len(targets) == 0 {
+		_, err := s.db.ExecContext(ctx, `UPDATE notification_outbox SET status='ready',available_at=CURRENT_TIMESTAMP + INTERVAL '6 hours',last_error='no registered device' WHERE id=$1`, outboxID)
+		return err
+	}
+
+	successes := 0
+	invalidTokens := 0
+	var lastErr error
+	for _, target := range targets {
+		err := s.push.Send(ctx, PushMessage{
+			Token: target.token,
+			Title: payload.Title,
+			Body:  payload.Body,
+			Data: map[string]string{
+				"type":           payload.Type,
+				"route":          "companion_chat",
+				"companion_id":   companionID,
+				"companion_name": payload.Title,
+				"message_id":     messageID,
+			},
+		})
+		if err == nil {
+			successes++
+			continue
+		}
+		lastErr = err
+		var fcmErr *FCMError
+		if errors.As(err, &fcmErr) && fcmErr.Unregistered {
+			invalidTokens++
+			_, _ = s.db.ExecContext(ctx, `UPDATE device_push_tokens SET enabled=false,updated_at=CURRENT_TIMESTAMP WHERE id=$1`, target.id)
+		}
+	}
+	if successes > 0 {
+		_, err := s.db.ExecContext(ctx, `UPDATE notification_outbox SET status='sent',sent_at=CURRENT_TIMESTAMP,attempts=attempts+1,last_error='' WHERE id=$1 AND status='processing'`, outboxID)
+		return err
+	}
+	if invalidTokens == len(targets) {
+		_, err := s.db.ExecContext(ctx, `UPDATE notification_outbox SET status='failed',attempts=attempts+1,last_error='all device tokens are unregistered' WHERE id=$1`, outboxID)
+		return err
+	}
+	retryDelay := time.Duration(1<<min(attempts, 6)) * time.Minute
+	lastError := "push delivery failed"
+	if lastErr != nil {
+		lastError = truncate(lastErr.Error(), 1000)
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE notification_outbox SET status='ready',attempts=attempts+1,available_at=$2,last_error=$3 WHERE id=$1`, outboxID, time.Now().Add(retryDelay), lastError)
+	return err
 }
 
 func (s *Service) loadCompanionForConversation(ctx context.Context, conversationID, userID string) (companionContext, error) {

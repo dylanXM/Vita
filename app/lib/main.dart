@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import 'core/bootstrap.dart';
 import 'core/i18n/translations.dart';
+import 'core/push_notification_service.dart';
 import 'core/settings_controller.dart';
 import 'core/theme.dart';
 import 'features/auth/login_page.dart';
@@ -16,6 +17,7 @@ import 'features/shell/shell_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await PushNotificationService.instance.initialize();
   initControllers();
   // Wait for persisted language/theme preferences before the first frame
   // so the app boots directly into the user's settings.
