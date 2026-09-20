@@ -44,6 +44,7 @@ class ChatListPage extends StatelessWidget {
                 icon: Icon(Icons.add, color: context.vita.text, size: 26),
               ),
             ),
+            _ChatSearchBox(),
             Expanded(child: Obx(() => _buildBody(ctrl))),
           ],
         ),
@@ -52,6 +53,7 @@ class ChatListPage extends StatelessWidget {
   }
 
   Widget _buildBody(ChatListController ctrl) {
+    final list = ctrl.filtered;
     if (ctrl.loading.value && ctrl.companions.isEmpty) {
       return ListView.builder(
         padding: const EdgeInsets.only(bottom: 90),
@@ -66,16 +68,23 @@ class ChatListPage extends StatelessWidget {
         subtitle: 'chat.empty.sub'.tr,
       );
     }
+    if (list.isEmpty) {
+      return VitaEmpty(
+        icon: Icons.search,
+        title: 'contacts.noResults'.tr,
+        subtitle: 'contacts.noResultsSub'.tr,
+      );
+    }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(0, 4, 0, 90),
-      itemCount: ctrl.companions.length,
+      itemCount: list.length,
       separatorBuilder: (context, _) => Divider(
         height: 0.5,
         indent: 82,
         color: context.vita.divider,
       ),
       itemBuilder: (context, i) {
-        final c = ctrl.companions[i];
+        final c = list[i];
         final id = c['id'] as String? ?? '';
         final name = c['name'] as String? ?? 'chat.companion'.tr;
         final profileSubtitle = [
@@ -113,7 +122,8 @@ class ChatListPage extends StatelessWidget {
                 VitaAvatar(
                     name: name,
                     radius: 26,
-                    imageUrl: c['portrait_url'] as String?),
+                    imageUrl: c['portrait_url'] as String?,
+                    borderRadius: BorderRadius.circular(12)),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
@@ -172,6 +182,41 @@ class ChatListPage extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _ChatSearchBox extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final ctrl = ChatListController.to;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
+      child: TextField(
+        onChanged: (v) => ctrl.searchQuery.value = v,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: 'contacts.search'.tr,
+          hintStyle: TextStyle(color: context.vita.hint, fontSize: 14),
+          prefixIcon: Icon(Icons.search, size: 18, color: context.vita.hint),
+          filled: true,
+          fillColor: context.vita.surface,
+          contentPadding: const EdgeInsets.symmetric(vertical: 0),
+          isDense: true,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.zero,
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.zero,
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.zero,
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
     );
   }
 }

@@ -8,6 +8,7 @@ class ChatListController extends GetxController {
 
   final loading = false.obs;
   final companions = <Map<String, dynamic>>[].obs;
+  final searchQuery = ''.obs;
 
   @override
   void onInit() {
@@ -29,5 +30,15 @@ class ChatListController extends GetxController {
     } finally {
       loading.value = false;
     }
+  }
+
+  /// Filtered companions by name (case-insensitive).
+  List<Map<String, dynamic>> get filtered {
+    final q = searchQuery.value.trim().toLowerCase();
+    if (q.isEmpty) return List.of(companions);
+    return companions.where((c) {
+      final name = (c['name'] as String? ?? '').toLowerCase();
+      return name.contains(q);
+    }).toList();
   }
 }
