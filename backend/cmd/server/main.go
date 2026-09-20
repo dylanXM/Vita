@@ -193,6 +193,16 @@ func main() {
 				users.POST("/:id/grant-subscription", handler.AdminGrantSubscription)
 			}
 
+			adminCompanions := admin.Group("/companions")
+			{
+				adminCompanions.GET("/", handler.AdminListManagedCompanions)
+				adminCompanions.GET("/:id", handler.AdminGetManagedCompanion)
+				adminCompanions.PUT("/:id", handler.AdminUpdateManagedCompanion)
+				adminCompanions.DELETE("/:id", handler.AdminDeleteManagedCompanion)
+				adminCompanions.GET("/:id/conversations", handler.AdminListCompanionConversations)
+				adminCompanions.GET("/:id/conversations/:conversation_id/messages", handler.AdminListConversationMessages)
+			}
+
 			agentAdmin := admin.Group("/agent")
 			{
 				agentAdmin.GET("/config", handler.AdminAgentConfig)

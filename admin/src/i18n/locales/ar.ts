@@ -20,6 +20,7 @@ const ar = {
     dashboard: "لوحة التحكم",
     management: "الإدارة",
     users: "المستخدمون",
+    companions: "إدارة الشخصيات",
     agent: "رفيق الذكاء الاصطناعي", invitationSettings: "إعدادات رمز الدعوة",
     billing: "إدارة الفوترة", subscriptionPlans: "خطط الاشتراك", coinPacks: "حزم العملات", billingActivity: "المشتريات والسجل",
   },
@@ -141,6 +142,10 @@ const ar = {
     freeDefaultChatHours: "ساعات الدردشة المجانية للشخصية الافتراضية", defaultCompanion: "استخدام كشخصية افتراضية مجانية", defaultCompanionBadge: "افتراضي", makeDefaultCompanion: "تعيين كافتراضي", removeDefaultCompanion: "إلغاء الافتراضي",
     portraits: "صور الشخصيات", portraitsDesc: "الصور المتاحة عند الإنشاء الأولي.", portraitName: "اسم الصورة", imageUrl: "رابط الصورة", gender: "النوع", tags: "سمات الشخصية", addPortrait: "إضافة صورة",
     companions: "الشخصيات", companionsDesc: "إعداد الهوية والنموذج والحياة المستقلة يدوياً.", noCompanions: "لا توجد شخصيات.", companion: "الشخصية", name: "الاسم", city: "المدينة", occupation: "المهنة", model: "النموذج المعين", portrait: "الصورة", noPortrait: "بلا صورة", useDefault: "استخدام نموذج المحادثة الافتراضي", persona: "الشخصية والحدود", backstory: "الخلفية", speakingStyle: "أسلوب الكلام", habitsGoal: "العادات والهدف الحياتي", proactiveEnabled: "السماح بتواصل استباقي محدود", saveCompanion: "حفظ الشخصية", add: "إضافة", update: "تحديث", saved: "تم حفظ إعدادات الوكيل",
+  },
+
+  companions: {
+    title: "إدارة الشخصيات", desc: "عرض وإدارة الشخصيات التي أنشأها المستخدمون ومحادثاتها.", searchPlaceholder: "البحث بالاسم أو البريد…", allStatus: "كل الحالات", active: "نشط", inactive: "متوقف", proactive: "تواصل استباقي", empty: "لا توجد شخصيات.", companion: "الشخصية", owner: "المستخدم", status: "الحالة", chats: "المحادثات / الرسائل", total: "{{total}} شخصية", back: "العودة", notFound: "الشخصية غير موجودة.", profile: "ملف الشخصية", profileDesc: "إدارة الهوية والنموذج والصورة والشخصية والسلوك.", relationshipStage: "مرحلة العلاقة", interests: "الاهتمامات", lifeHabitsGoal: "العادات والهدف الحياتي", likes: "الإعجابات", dislikes: "عدم الإعجاب", roleEnabled: "تفعيل الشخصية", runtime: "حالة التشغيل", conversations: "المحادثات", messages: "الرسائل", memories: "الذكريات", lifeEvents: "أحداث الحياة", intimacy: "الألفة", enthusiasm: "الحماس", mood: "المزاج", energy: "الطاقة", createdUpdated: "أُنشئت {{created}} · حُدثت {{updated}}", voice: "وحدة الصوت", voiceDesc: "إعدادات محجوزة للرسائل الصوتية مستقبلاً.", voiceEnabled: "تفعيل الصوت", voiceConfig: "إعداد الصوت (JSON)", voiceNotice: "محجوز فقط؛ التطبيق الحالي يدعم النص فقط.", voiceJSONInvalid: "يجب أن يكون الإعداد JSON صالحاً.", saved: "تم حفظ الشخصية", deleted: "تم حذف الشخصية", deleteTitle: "حذف الشخصية", deleteDesc: "حذف {{name}} نهائياً مع كل المحادثات والرسائل والذكريات والأحداث؟", deleteConfirm: "حذف نهائي", chatHistory: "سجل المحادثة", chatHistoryDesc: "عرض المحادثات للقراءة فقط.", noConversations: "لا توجد محادثات.", conversation: "محادثة", noMessages: "لا توجد رسائل.", userAndRole: "المستخدم و{{name}}", user: "المستخدم", media: "فتح الوسائط", older: "أقدم", newer: "أحدث", viewUserCompanions: "عرض شخصيات المستخدم",
   },
 
   billing: {

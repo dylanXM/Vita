@@ -20,6 +20,7 @@ const pt = {
     dashboard: "Painel",
     management: "Gerenciamento",
     users: "Usuários",
+    companions: "Personagens",
     agent: "Companheiro IA", invitationSettings: "Configuração de convites",
     billing: "Faturação", subscriptionPlans: "Planos de assinatura", coinPacks: "Pacotes de moedas", billingActivity: "Compras e extrato",
   },
@@ -141,6 +142,10 @@ const pt = {
     freeDefaultChatHours: "Horas grátis do personagem padrão", defaultCompanion: "Usar como personagem padrão gratuito", defaultCompanionBadge: "Padrão", makeDefaultCompanion: "Definir padrão", removeDefaultCompanion: "Remover padrão",
     portraits: "Retratos do sistema", portraitsDesc: "Retratos disponíveis na criação inicial.", portraitName: "Nome do retrato", imageUrl: "URL da imagem", gender: "Tipo", tags: "Traços de personalidade", addPortrait: "Adicionar retrato",
     companions: "Personagens", companionsDesc: "Configure identidade, modelo e vida independente.", noCompanions: "Nenhum personagem encontrado.", companion: "Personagem", name: "Nome", city: "Cidade", occupation: "Profissão", model: "Modelo atribuído", portrait: "Retrato", noPortrait: "Sem retrato", useDefault: "Usar modelo de chat padrão", persona: "Personalidade e limites", backstory: "História", speakingStyle: "Estilo de fala", habitsGoal: "Hábitos (primeira linha) e objetivo de vida", proactiveEnabled: "Permitir contato proativo limitado", saveCompanion: "Salvar personagem", add: "Adicionar", update: "Atualizar", saved: "Configuração do agente salva",
+  },
+
+  companions: {
+    title: "Gerenciamento de personagens", desc: "Veja e gerencie personagens criados por usuários e suas conversas.", searchPlaceholder: "Buscar personagem ou e-mail…", allStatus: "Todos os status", active: "Ativo", inactive: "Inativo", proactive: "Proativo", empty: "Nenhum personagem encontrado.", companion: "Personagem", owner: "Usuário", status: "Status", chats: "Conversas / mensagens", total: "{{total}} personagens", back: "Voltar", notFound: "Personagem não encontrado.", profile: "Perfil", profileDesc: "Gerencie identidade, modelo, retrato, personalidade e comportamento.", relationshipStage: "Etapa do relacionamento", interests: "Interesses", lifeHabitsGoal: "Hábitos e objetivo de vida", likes: "Gostos", dislikes: "Aversões", roleEnabled: "Personagem ativo", runtime: "Estado de execução", conversations: "Conversas", messages: "Mensagens", memories: "Memórias", lifeEvents: "Eventos de vida", intimacy: "Intimidade", enthusiasm: "Entusiasmo", mood: "Humor", energy: "Energia", createdUpdated: "Criado {{created}} · Atualizado {{updated}}", voice: "Módulo de voz", voiceDesc: "Configuração reservada para futuras mensagens de voz.", voiceEnabled: "Ativar voz", voiceConfig: "Configuração de voz (JSON)", voiceNotice: "Apenas reservado; o App atual continua somente com texto.", voiceJSONInvalid: "A configuração deve ser um JSON válido.", saved: "Personagem salvo", deleted: "Personagem excluído", deleteTitle: "Excluir personagem", deleteDesc: "Excluir permanentemente {{name}} e todas as conversas, mensagens, memórias e eventos?", deleteConfirm: "Excluir permanentemente", chatHistory: "Histórico de conversa", chatHistoryDesc: "Visualização somente leitura das conversas.", noConversations: "Nenhuma conversa.", conversation: "Conversa", noMessages: "Nenhuma mensagem.", userAndRole: "Usuário e {{name}}", user: "Usuário", media: "Abrir mídia", older: "Anteriores", newer: "Recentes", viewUserCompanions: "Ver personagens deste usuário",
   },
 
   billing: {

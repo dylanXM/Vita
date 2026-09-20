@@ -371,6 +371,11 @@ func migrate(db *sql.DB) error {
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS life_enabled BOOLEAN NOT NULL DEFAULT true`,
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS friendship_active BOOLEAN NOT NULL DEFAULT true`,
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS subscription_paused_at TIMESTAMP`,
+		// Reserved for the upcoming voice-message capability. Keeping the
+		// provider-specific settings in JSON avoids another migration when the
+		// first TTS provider is selected; voice stays off for the text-only app.
+		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS voice_enabled BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS voice_config JSONB NOT NULL DEFAULT '{}'::jsonb`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_companions_default_portrait_user ON companions(user_id, portrait_id) WHERE is_default=true AND portrait_id IS NOT NULL`,
 		`CREATE TABLE IF NOT EXISTS default_companion_trials (
 			user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,

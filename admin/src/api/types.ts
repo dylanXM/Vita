@@ -286,8 +286,79 @@ export interface AdminCompanion {
   portrait_id: string | null;
   proactive_enabled: boolean;
   active: boolean;
+  voice_enabled: boolean;
+  voice_config: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
 
 export interface AdminCompanionInput extends Omit<AdminCompanion, "id" | "user_email" | "created_at" | "updated_at"> {}
+
+export interface ManagedCompanionListItem {
+  id: string;
+  user_id: string;
+  user_email: string;
+  environment: Environment;
+  name: string;
+  gender: string;
+  city: string;
+  occupation: string;
+  relationship_stage: string;
+  active: boolean;
+  proactive_enabled: boolean;
+  voice_enabled: boolean;
+  portrait_url: string;
+  conversations: number;
+  messages: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ManagedCompanionDetail extends AdminCompanion {
+  environment: Environment;
+  portrait_url: string;
+  model_name: string;
+  creation_source: string;
+  life_enabled: boolean;
+  friendship_active: boolean;
+  subscription_paused_at: string | null;
+  conversations: number;
+  messages: number;
+  memories: number;
+  life_events: number;
+  state: { mood: number; energy: number; stress: number; social_energy: number };
+  relationship: { intimacy: number; trust: number; familiarity: number; enthusiasm: number };
+}
+
+export interface ManagedCompanionList {
+  items: ManagedCompanionListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface AdminConversation {
+  id: string;
+  user_id: string;
+  companion_id: string;
+  message_count: number;
+  last_message: string;
+  last_message_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminMessage {
+  id: string;
+  conversation_id: string;
+  sender_type: "user" | "companion";
+  message_type: string;
+  content: string;
+  media_url: string;
+  payload: Record<string, unknown>;
+  source: string;
+  life_event_id: string;
+  delivery_status: string;
+  created_at: string;
+}

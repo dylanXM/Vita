@@ -399,32 +399,34 @@ func UnregisterPushToken(c *gin.Context) {
 }
 
 type adminCompanionInput struct {
-	UserID            string   `json:"user_id"`
-	Name              string   `json:"name" binding:"required"`
-	Gender            string   `json:"gender"`
-	Persona           string   `json:"persona"`
-	City              string   `json:"city"`
-	Occupation        string   `json:"occupation"`
-	Interests         string   `json:"interests"`
-	RelationshipStage string   `json:"relationship_stage"`
-	PersonalityTags   []string `json:"personality_tags"`
-	SpeakingStyle     string   `json:"speaking_style"`
-	Likes             string   `json:"likes"`
-	Dislikes          string   `json:"dislikes"`
-	LifeHabits        string   `json:"life_habits"`
-	LifeGoal          string   `json:"life_goal"`
-	Backstory         string   `json:"backstory"`
-	PortraitID        *string  `json:"portrait_id"`
-	ModelID           *string  `json:"model_id"`
-	ProactiveEnabled  *bool    `json:"proactive_enabled"`
-	Active            *bool    `json:"active"`
+	UserID            string          `json:"user_id"`
+	Name              string          `json:"name" binding:"required"`
+	Gender            string          `json:"gender"`
+	Persona           string          `json:"persona"`
+	City              string          `json:"city"`
+	Occupation        string          `json:"occupation"`
+	Interests         string          `json:"interests"`
+	RelationshipStage string          `json:"relationship_stage"`
+	PersonalityTags   []string        `json:"personality_tags"`
+	SpeakingStyle     string          `json:"speaking_style"`
+	Likes             string          `json:"likes"`
+	Dislikes          string          `json:"dislikes"`
+	LifeHabits        string          `json:"life_habits"`
+	LifeGoal          string          `json:"life_goal"`
+	Backstory         string          `json:"backstory"`
+	PortraitID        *string         `json:"portrait_id"`
+	ModelID           *string         `json:"model_id"`
+	ProactiveEnabled  *bool           `json:"proactive_enabled"`
+	Active            *bool           `json:"active"`
+	VoiceEnabled      *bool           `json:"voice_enabled"`
+	VoiceConfig       json.RawMessage `json:"voice_config"`
 }
 
 func AdminListCompanions(c *gin.Context) {
 	rows, err := db.Get().Query(`
 		SELECT c.id,c.user_id,u.email,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.city,''),COALESCE(c.occupation,''),
 		COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,
-		c.life_habits,c.life_goal,c.backstory,c.model_id,c.portrait_id,c.proactive_enabled,c.active,c.created_at,c.updated_at
+		c.life_habits,c.life_goal,c.backstory,c.model_id,c.portrait_id,c.proactive_enabled,c.active,c.voice_enabled,c.voice_config::text,c.created_at,c.updated_at
 		FROM companions c JOIN users u ON u.id=c.user_id ORDER BY c.created_at DESC`)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list companions"})
@@ -437,13 +439,14 @@ func AdminListCompanions(c *gin.Context) {
 		var speakingStyle, likes, dislikes, lifeHabits, lifeGoal, backstory string
 		var tags json.RawMessage
 		var modelID, portraitID sql.NullString
-		var proactive, active bool
+		var proactive, active, voiceEnabled bool
+		var voiceConfig json.RawMessage
 		var created, updated time.Time
-		if err := rows.Scan(&id, &userID, &email, &name, &gender, &persona, &city, &occupation, &interests, &relationshipStage, &tags, &speakingStyle, &likes, &dislikes, &lifeHabits, &lifeGoal, &backstory, &modelID, &portraitID, &proactive, &active, &created, &updated); err != nil {
+		if err := rows.Scan(&id, &userID, &email, &name, &gender, &persona, &city, &occupation, &interests, &relationshipStage, &tags, &speakingStyle, &likes, &dislikes, &lifeHabits, &lifeGoal, &backstory, &modelID, &portraitID, &proactive, &active, &voiceEnabled, &voiceConfig, &created, &updated); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read companions"})
 			return
 		}
-		items = append(items, gin.H{"id": id, "user_id": userID, "user_email": email, "name": name, "gender": gender, "persona": persona, "city": city, "occupation": occupation, "interests": interests, "relationship_stage": relationshipStage, "personality_tags": tags, "speaking_style": speakingStyle, "likes": likes, "dislikes": dislikes, "life_habits": lifeHabits, "life_goal": lifeGoal, "backstory": backstory, "model_id": nullString(modelID), "portrait_id": nullString(portraitID), "proactive_enabled": proactive, "active": active, "created_at": created, "updated_at": updated})
+		items = append(items, gin.H{"id": id, "user_id": userID, "user_email": email, "name": name, "gender": gender, "persona": persona, "city": city, "occupation": occupation, "interests": interests, "relationship_stage": relationshipStage, "personality_tags": tags, "speaking_style": speakingStyle, "likes": likes, "dislikes": dislikes, "life_habits": lifeHabits, "life_goal": lifeGoal, "backstory": backstory, "model_id": nullString(modelID), "portrait_id": nullString(portraitID), "proactive_enabled": proactive, "active": active, "voice_enabled": voiceEnabled, "voice_config": voiceConfig, "created_at": created, "updated_at": updated})
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
@@ -469,10 +472,22 @@ func saveAdminCompanion(c *gin.Context, id string) {
 	if input.Active != nil {
 		active = *input.Active
 	}
+	if len(input.VoiceConfig) > 0 && !json.Valid(input.VoiceConfig) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "voice_config must be valid JSON"})
+		return
+	}
 	if input.RelationshipStage == "" {
 		input.RelationshipStage = "stranger"
 	}
 	if id == "" {
+		voiceEnabled := false
+		if input.VoiceEnabled != nil {
+			voiceEnabled = *input.VoiceEnabled
+		}
+		voiceConfig := input.VoiceConfig
+		if len(voiceConfig) == 0 {
+			voiceConfig = json.RawMessage(`{}`)
+		}
 		id = uuid.New().String()
 		tx, err := db.Get().Begin()
 		if err != nil {
@@ -480,8 +495,8 @@ func saveAdminCompanion(c *gin.Context, id string) {
 			return
 		}
 		defer tx.Rollback()
-		_, err = tx.Exec(`INSERT INTO companions (id,user_id,name,gender,persona,city,occupation,interests,relationship_stage,personality_tags,speaking_style,likes,dislikes,life_habits,life_goal,backstory,portrait_id,model_id,creation_source,proactive_enabled,active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'admin',$19,$20)`,
-			id, input.UserID, input.Name, input.Gender, input.Persona, input.City, input.Occupation, input.Interests, input.RelationshipStage, tags, input.SpeakingStyle, input.Likes, input.Dislikes, input.LifeHabits, input.LifeGoal, input.Backstory, input.PortraitID, input.ModelID, proactive, active)
+		_, err = tx.Exec(`INSERT INTO companions (id,user_id,name,gender,persona,city,occupation,interests,relationship_stage,personality_tags,speaking_style,likes,dislikes,life_habits,life_goal,backstory,portrait_id,model_id,creation_source,proactive_enabled,active,voice_enabled,voice_config) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'admin',$19,$20,$21,$22)`,
+			id, input.UserID, input.Name, input.Gender, input.Persona, input.City, input.Occupation, input.Interests, input.RelationshipStage, tags, input.SpeakingStyle, input.Likes, input.Dislikes, input.LifeHabits, input.LifeGoal, input.Backstory, input.PortraitID, input.ModelID, proactive, active, voiceEnabled, voiceConfig)
 		if err == nil {
 			_, err = tx.Exec(`INSERT INTO relationship_states (companion_id) VALUES ($1) ON CONFLICT DO NOTHING`, id)
 		}
@@ -496,8 +511,12 @@ func saveAdminCompanion(c *gin.Context, id string) {
 			return
 		}
 	} else {
-		result, err := db.Get().Exec(`UPDATE companions SET name=$2,gender=$3,persona=$4,city=$5,occupation=$6,interests=$7,relationship_stage=$8,personality_tags=$9,speaking_style=$10,likes=$11,dislikes=$12,life_habits=$13,life_goal=$14,backstory=$15,portrait_id=$16,model_id=$17,proactive_enabled=$18,active=$19,updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
-			id, input.Name, input.Gender, input.Persona, input.City, input.Occupation, input.Interests, input.RelationshipStage, tags, input.SpeakingStyle, input.Likes, input.Dislikes, input.LifeHabits, input.LifeGoal, input.Backstory, input.PortraitID, input.ModelID, proactive, active)
+		var voiceConfig any
+		if len(input.VoiceConfig) > 0 {
+			voiceConfig = input.VoiceConfig
+		}
+		result, err := db.Get().Exec(`UPDATE companions SET name=$2,gender=$3,persona=$4,city=$5,occupation=$6,interests=$7,relationship_stage=$8,personality_tags=$9,speaking_style=$10,likes=$11,dislikes=$12,life_habits=$13,life_goal=$14,backstory=$15,portrait_id=$16,model_id=$17,proactive_enabled=$18,active=$19,voice_enabled=COALESCE($20,voice_enabled),voice_config=COALESCE($21,voice_config),updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
+			id, input.Name, input.Gender, input.Persona, input.City, input.Occupation, input.Interests, input.RelationshipStage, tags, input.SpeakingStyle, input.Likes, input.Dislikes, input.LifeHabits, input.LifeGoal, input.Backstory, input.PortraitID, input.ModelID, proactive, active, input.VoiceEnabled, voiceConfig)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to update companion"})
 			return

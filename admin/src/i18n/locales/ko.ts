@@ -20,6 +20,7 @@ const ko = {
     dashboard: "대시보드",
     management: "관리",
     users: "사용자",
+    companions: "캐릭터 관리",
     agent: "AI 컴패니언", invitationSettings: "초대 코드 설정",
     billing: "결제 관리", subscriptionPlans: "구독 플랜", coinPacks: "코인 팩", billingActivity: "구매 및 원장",
   },
@@ -141,6 +142,10 @@ const ko = {
     freeDefaultChatHours: "기본 캐릭터 무료 시간", defaultCompanion: "기본 무료 채팅 캐릭터로 사용", defaultCompanionBadge: "기본", makeDefaultCompanion: "기본으로 설정", removeDefaultCompanion: "기본 해제",
     portraits: "시스템 인물 이미지", portraitsDesc: "초기 생성에서 선택할 수 있는 인물 이미지입니다.", portraitName: "이미지 이름", imageUrl: "이미지 URL", gender: "유형", tags: "성격 태그", addPortrait: "이미지 추가",
     companions: "캐릭터 관리", companionsDesc: "정체성, 모델 및 독립 생활 행동을 수동 설정합니다.", noCompanions: "캐릭터가 없습니다.", companion: "캐릭터", name: "이름", city: "도시", occupation: "직업", model: "지정 모델", portrait: "인물 이미지", noPortrait: "이미지 없음", useDefault: "기본 채팅 모델 사용", persona: "성격과 경계", backstory: "배경", speakingStyle: "말투", habitsGoal: "생활 습관(첫 줄)과 인생 목표", proactiveEnabled: "제한된 선제 연락 허용", saveCompanion: "캐릭터 저장", add: "추가", update: "업데이트", saved: "에이전트 설정을 저장했습니다",
+  },
+
+  companions: {
+    title: "캐릭터 관리", desc: "사용자가 만든 캐릭터와 채팅 기록을 관리합니다.", searchPlaceholder: "캐릭터 또는 이메일 검색…", allStatus: "모든 상태", active: "활성", inactive: "비활성", proactive: "선제 연락", empty: "캐릭터가 없습니다.", companion: "캐릭터", owner: "사용자", status: "상태", chats: "대화 / 메시지", total: "총 {{total}}개", back: "목록으로", notFound: "캐릭터를 찾을 수 없습니다.", profile: "캐릭터 프로필", profileDesc: "정체성, 모델, 이미지, 성격과 행동을 관리합니다.", relationshipStage: "관계 단계", interests: "관심사", lifeHabitsGoal: "생활 습관과 인생 목표", likes: "좋아함", dislikes: "싫어함", roleEnabled: "캐릭터 활성화", runtime: "실행 상태", conversations: "대화", messages: "메시지", memories: "기억", lifeEvents: "생활 이벤트", intimacy: "친밀도", enthusiasm: "적극성", mood: "기분", energy: "에너지", createdUpdated: "생성 {{created}} · 수정 {{updated}}", voice: "음성 모듈", voiceDesc: "향후 음성 메시지를 위한 예약 설정입니다.", voiceEnabled: "음성 기능 활성화", voiceConfig: "음성 설정(JSON)", voiceNotice: "현재는 예약 기능이며 App은 텍스트만 지원합니다.", voiceJSONInvalid: "유효한 JSON이 필요합니다.", saved: "캐릭터를 저장했습니다", deleted: "캐릭터를 삭제했습니다", deleteTitle: "캐릭터 삭제", deleteDesc: "{{name}} 및 모든 대화, 메시지, 기억과 생활 이벤트를 영구 삭제할까요?", deleteConfirm: "영구 삭제", chatHistory: "채팅 기록", chatHistoryDesc: "사용자와 캐릭터의 대화를 읽기 전용으로 표시합니다.", noConversations: "대화가 없습니다.", conversation: "대화", noMessages: "메시지가 없습니다.", userAndRole: "사용자와 {{name}}", user: "사용자", media: "미디어 열기", older: "이전", newer: "최신", viewUserCompanions: "이 사용자의 캐릭터 보기",
   },
 
   billing: {

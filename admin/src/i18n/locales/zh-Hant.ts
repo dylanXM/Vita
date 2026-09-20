@@ -20,6 +20,7 @@ const zhHant = {
     dashboard: "儀表板",
     management: "管理",
     users: "使用者",
+    companions: "角色管理",
     agent: "AI 伴侶", invitationSettings: "邀請碼設定",
     billing: "計費管理", subscriptionPlans: "訂閱方案", coinPacks: "金幣包", billingActivity: "購買與流水",
   },
@@ -141,6 +142,10 @@ const zhHant = {
     freeDefaultChatHours: "預設角色免費時數", defaultCompanion: "設為預設免費聊天角色", defaultCompanionBadge: "預設角色", makeDefaultCompanion: "設為預設", removeDefaultCompanion: "取消預設",
     portraits: "系統人物形象", portraitsDesc: "使用者在本期建立流程中可選擇的人物形象。", portraitName: "形象名稱", imageUrl: "圖片位址", gender: "人物類型", tags: "性格標籤", addPortrait: "新增形象",
     companions: "人物管理", companionsDesc: "手動設定人物身分、模型和獨立生活行為。", noCompanions: "暫無人物。", companion: "人物", name: "姓名", city: "城市", occupation: "職業", model: "指定模型", portrait: "人物形象", noPortrait: "無人物形象", useDefault: "使用預設對話模型", persona: "人格與邊界", backstory: "人物背景", speakingStyle: "說話方式", habitsGoal: "生活習慣（首行）與人生目標", proactiveEnabled: "允許在限制範圍內主動聯絡", saveCompanion: "儲存人物", add: "新增", update: "更新", saved: "Agent 設定已儲存",
+  },
+
+  companions: {
+    title: "角色管理", desc: "查看並管理使用者建立的角色及聊天記錄。", searchPlaceholder: "搜尋角色或使用者信箱…", allStatus: "全部狀態", active: "已啟用", inactive: "已停用", proactive: "主動聯絡", empty: "暫無使用者建立的角色。", companion: "角色", owner: "所屬使用者", status: "狀態", chats: "對話 / 訊息", total: "共 {{total}} 個角色", back: "返回角色列表", notFound: "找不到該角色。", profile: "角色資料", profileDesc: "管理身分、模型、人物形象、性格與行為。", relationshipStage: "關係階段", interests: "興趣", lifeHabitsGoal: "生活習慣與人生目標", likes: "喜歡", dislikes: "不喜歡", roleEnabled: "啟用角色", runtime: "執行狀態", conversations: "對話", messages: "訊息", memories: "記憶", lifeEvents: "生活事件", intimacy: "親密度", enthusiasm: "積極性", mood: "心情", energy: "精力", createdUpdated: "建立 {{created}} · 更新 {{updated}}", voice: "語音模組", voiceDesc: "為後續語音訊息預留的角色設定。", voiceEnabled: "啟用語音能力", voiceConfig: "語音設定（JSON）", voiceNotice: "目前僅預留；App 仍只傳送文字。", voiceJSONInvalid: "語音設定必須是有效 JSON。", saved: "角色已儲存", deleted: "角色已刪除", deleteTitle: "刪除角色", deleteDesc: "永久刪除 {{name}} 及全部對話、訊息、記憶和生活事件？此操作無法復原。", deleteConfirm: "永久刪除", chatHistory: "聊天記錄", chatHistoryDesc: "唯讀查看使用者與角色的對話。", noConversations: "暫無對話。", conversation: "對話", noMessages: "暫無訊息。", userAndRole: "使用者與 {{name}}", user: "使用者", media: "開啟媒體", older: "較早", newer: "較新", viewUserCompanions: "查看該使用者的角色",
   },
 
   billing: {

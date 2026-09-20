@@ -20,6 +20,7 @@ const en = {
     dashboard: "Dashboard",
     management: "Management",
     users: "Users",
+    companions: "Characters",
     agent: "AI companion",
     invitationSettings: "Invitation settings",
     billing: "Billing",
@@ -207,6 +208,10 @@ const en = {
     add: "Add",
     update: "Update",
     saved: "Agent configuration saved",
+  },
+
+  companions: {
+    title: "Character management", desc: "Review and manage user-created characters and their conversations.", searchPlaceholder: "Search character or user email…", allStatus: "All statuses", active: "Active", inactive: "Inactive", proactive: "Proactive", empty: "No user-created characters found.", companion: "Character", owner: "Owner", status: "Status", chats: "Chats / messages", total: "{{total}} characters", back: "Back to characters", notFound: "Character not found.", profile: "Character profile", profileDesc: "Identity, model, portrait, personality and behavior settings.", relationshipStage: "Relationship stage", interests: "Interests", lifeHabitsGoal: "Life habits (first line) and life goal", likes: "Likes", dislikes: "Dislikes", roleEnabled: "Character enabled", runtime: "Runtime state", conversations: "Conversations", messages: "Messages", memories: "Memories", lifeEvents: "Life events", intimacy: "Intimacy", enthusiasm: "Enthusiasm", mood: "Mood", energy: "Energy", createdUpdated: "Created {{created}} · Updated {{updated}}", voice: "Voice module", voiceDesc: "Reserved character-level voice settings for a later voice-message release.", voiceEnabled: "Voice capability enabled", voiceConfig: "Voice configuration (JSON)", voiceNotice: "Reserved only: the current app remains text-only and will not send voice until the delivery pipeline is released.", voiceJSONInvalid: "Voice configuration must be valid JSON.", saved: "Character saved", deleted: "Character deleted", deleteTitle: "Delete character", deleteDesc: "Permanently delete {{name}} and all conversations, messages, memories and life events? This cannot be undone.", deleteConfirm: "Delete permanently", chatHistory: "Chat history", chatHistoryDesc: "Read-only view of conversations between the user and this character.", noConversations: "No conversations yet.", conversation: "Conversation", noMessages: "No messages yet.", userAndRole: "User and {{name}}", user: "User", media: "Open media", older: "Older", newer: "Newer", viewUserCompanions: "View this user's characters",
   },
 
   billing: {

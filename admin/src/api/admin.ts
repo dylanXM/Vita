@@ -29,6 +29,10 @@ import type {
   BillingList,
   BillingPagedList,
   Environment,
+  ManagedCompanionDetail,
+  ManagedCompanionList,
+  AdminConversation,
+  AdminMessage,
 } from "./types";
 
 /** Admin sign-in. The API also accepts a 6-digit code for the same accounts. */
@@ -135,4 +139,30 @@ export const agentApi = {
     http.post<{ id: string }>("/admin/agent/companions", body),
   updateCompanion: (id: string, body: AdminCompanionInput) =>
     http.put<{ id: string }>(`/admin/agent/companions/${id}`, body),
+};
+
+export interface CompanionFilters {
+  page?: number;
+  page_size?: number;
+  q?: string;
+  user_id?: string;
+  status?: "active" | "inactive";
+  environment?: Environment;
+}
+
+export const companionsApi = {
+  list: (params: CompanionFilters, signal?: AbortSignal) =>
+    http.get<ManagedCompanionList>("/admin/companions", { params, signal }),
+  get: (id: string, signal?: AbortSignal) =>
+    http.get<ManagedCompanionDetail>(`/admin/companions/${id}`, { signal }),
+  update: (id: string, body: AdminCompanionInput) =>
+    http.put<{ id: string }>(`/admin/companions/${id}`, body),
+  remove: (id: string) => http.del<{ message: string }>(`/admin/companions/${id}`),
+  conversations: (id: string, signal?: AbortSignal) =>
+    http.get<{ items: AdminConversation[] }>(`/admin/companions/${id}/conversations`, { signal }),
+  messages: (id: string, conversationID: string, page = 1, signal?: AbortSignal) =>
+    http.get<BillingPagedList<AdminMessage>>(
+      `/admin/companions/${id}/conversations/${conversationID}/messages`,
+      { params: { page, page_size: 50 }, signal },
+    ),
 };

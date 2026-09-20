@@ -20,6 +20,7 @@ const ja = {
     dashboard: "ダッシュボード",
     management: "管理",
     users: "ユーザー",
+    companions: "キャラクター管理",
     agent: "AIコンパニオン", invitationSettings: "招待コード設定",
     billing: "課金管理", subscriptionPlans: "サブスクリプションプラン", coinPacks: "コインパック", billingActivity: "購入と台帳",
   },
@@ -141,6 +142,10 @@ const ja = {
     freeDefaultChatHours: "既定キャラ無料時間", defaultCompanion: "既定の無料チャットキャラにする", defaultCompanionBadge: "既定", makeDefaultCompanion: "既定にする", removeDefaultCompanion: "既定を解除",
     portraits: "システム人物画像", portraitsDesc: "初期作成で選択できる人物画像です。", portraitName: "画像名", imageUrl: "画像URL", gender: "タイプ", tags: "性格タグ", addPortrait: "画像を追加",
     companions: "人物管理", companionsDesc: "人物、モデル、独立した生活行動を手動設定します。", noCompanions: "人物がいません。", companion: "人物", name: "名前", city: "都市", occupation: "職業", model: "割当モデル", portrait: "人物画像", noPortrait: "画像なし", useDefault: "既定チャットモデルを使用", persona: "人格と境界", backstory: "背景", speakingStyle: "話し方", habitsGoal: "習慣（1行目）と人生目標", proactiveEnabled: "制限内の自発連絡を許可", saveCompanion: "人物を保存", add: "追加", update: "更新", saved: "エージェント設定を保存しました",
+  },
+
+  companions: {
+    title: "キャラクター管理", desc: "ユーザー作成キャラクターとチャット履歴を管理します。", searchPlaceholder: "キャラクター名またはメールを検索…", allStatus: "すべての状態", active: "有効", inactive: "無効", proactive: "自発連絡", empty: "キャラクターがありません。", companion: "キャラクター", owner: "所有者", status: "状態", chats: "会話 / メッセージ", total: "{{total}} 件", back: "一覧に戻る", notFound: "キャラクターが見つかりません。", profile: "プロフィール", profileDesc: "身元、モデル、画像、人格と行動を管理します。", relationshipStage: "関係段階", interests: "興味", lifeHabitsGoal: "生活習慣と人生目標", likes: "好き", dislikes: "苦手", roleEnabled: "キャラクターを有効化", runtime: "実行状態", conversations: "会話", messages: "メッセージ", memories: "記憶", lifeEvents: "生活イベント", intimacy: "親密度", enthusiasm: "積極性", mood: "気分", energy: "体力", createdUpdated: "作成 {{created}} · 更新 {{updated}}", voice: "音声モジュール", voiceDesc: "将来の音声メッセージ用の予約設定です。", voiceEnabled: "音声機能を有効化", voiceConfig: "音声設定（JSON）", voiceNotice: "現在は予約のみで、App はテキストのみです。", voiceJSONInvalid: "有効なJSONを入力してください。", saved: "保存しました", deleted: "削除しました", deleteTitle: "キャラクターを削除", deleteDesc: "{{name}} と全会話、メッセージ、記憶、生活イベントを完全に削除しますか？", deleteConfirm: "完全に削除", chatHistory: "チャット履歴", chatHistoryDesc: "ユーザーとの会話を読み取り専用で表示します。", noConversations: "会話はありません。", conversation: "会話", noMessages: "メッセージはありません。", userAndRole: "ユーザーと{{name}}", user: "ユーザー", media: "メディアを開く", older: "以前", newer: "新しい", viewUserCompanions: "このユーザーのキャラクターを表示",
   },
 
   billing: {

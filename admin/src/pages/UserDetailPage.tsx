@@ -230,6 +230,18 @@ export function UserDetailPage() {
 
       <UserGrants user={u} />
 
+      <Card>
+        <CardHeader><CardTitle>{t("companions.title")}</CardTitle></CardHeader>
+        <CardContent>
+          <Button variant="outline" asChild>
+            <Link to={`/companions?user_id=${encodeURIComponent(u.id)}`}>
+              <Heart />
+              {t("companions.viewUserCompanions")}
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+
       <UserFormDialog
         open={editOpen}
         onOpenChange={setEditOpen}

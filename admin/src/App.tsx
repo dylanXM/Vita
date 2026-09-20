@@ -11,6 +11,8 @@ import { AgentPage } from "@/pages/AgentPage";
 import { CoinPacksPage, SubscriptionPlansPage } from "@/pages/BillingProductsPage";
 import { BillingActivityPage } from "@/pages/BillingActivityPage";
 import { InvitationSettingsPage } from "@/pages/InvitationSettingsPage";
+import { CompanionsPage } from "@/pages/CompanionsPage";
+import { CompanionDetailPage } from "@/pages/CompanionDetailPage";
 import { Button } from "@/components/ui/button";
 
 function RouteError() {
@@ -49,6 +51,8 @@ const router = createBrowserRouter([
       { path: "dashboard", element: <DashboardPage /> },
       { path: "users", element: <UsersPage /> },
       { path: "users/:id", element: <UserDetailPage /> },
+      { path: "companions", element: <CompanionsPage /> },
+      { path: "companions/:id", element: <CompanionDetailPage /> },
       { path: "agent", element: <AgentPage /> },
       { path: "subscription-plans", element: <SubscriptionPlansPage /> },
       { path: "coin-packs", element: <CoinPacksPage /> },
