@@ -108,8 +108,9 @@ func Health(c *gin.Context) {
 // --- Verification Code ---
 
 type SendCodeRequest struct {
-	Email   string `json:"email" binding:"required,email"`
-	Purpose string `json:"purpose"`
+	Email         string `json:"email" binding:"required,email"`
+	Purpose       string `json:"purpose"`
+	AcceptedLegal *bool  `json:"accepted_legal"`
 }
 
 type SendCodeResponse struct {
@@ -126,15 +127,24 @@ func SendCode(c *gin.Context) {
 	// Check if user exists (for login), or create new user (for register)
 	var userID, userRole string
 	err := db.Get().QueryRow(`SELECT id, COALESCE(role_id, 'user') FROM users WHERE email = $1`, req.Email).Scan(&userID, &userRole)
-	if err != nil {
-		// User doesn't exist, auto-register as user
+	if errors.Is(err, sql.ErrNoRows) {
+		acceptedAt, consentErr := registrationLegalAcceptance(req.AcceptedLegal)
+		if consentErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": consentErr.Error(), "code": "legal_consent_required"})
+			return
+		}
+		// A verification-code client may register only after explicit consent.
 		userID = uuid.New().String()
-		_, err = db.Get().Exec(`INSERT INTO users (id, email, role_id, environment) VALUES ($1, $2, 'user', $3)`, userID, req.Email, currentEnvironment())
+		_, err = db.Get().Exec(`INSERT INTO users (id,email,role_id,environment,legal_accepted_at,privacy_policy_version,terms_version)
+			VALUES ($1,$2,'user',$3,$4,$5,$6)`, userID, req.Email, currentEnvironment(), acceptedAt, privacyPolicyVersion, termsVersion)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 			return
 		}
 		userRole = "user"
+	} else if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load user"})
+		return
 	}
 
 	// Generate verification code
@@ -628,10 +638,31 @@ const registerCooldown = 60 * time.Second
 
 const pendingRegPrefix = "vita:reg:"
 
+const (
+	privacyPolicyVersion = "2026-09-20"
+	termsVersion         = "2026-09-20"
+)
+
+type pendingRegistration struct {
+	PasswordHash         string     `json:"password_hash"`
+	LegalAcceptedAt      *time.Time `json:"legal_accepted_at,omitempty"`
+	PrivacyPolicyVersion string     `json:"privacy_policy_version,omitempty"`
+	TermsVersion         string     `json:"terms_version,omitempty"`
+}
+
+func registrationLegalAcceptance(value *bool) (*time.Time, error) {
+	if value == nil || !*value {
+		return nil, errors.New("privacy policy and terms must be accepted")
+	}
+	now := time.Now().UTC()
+	return &now, nil
+}
+
 type AppRegisterRequest struct {
-	Email      string `json:"email" binding:"required,email"`
-	Password   string `json:"password" binding:"required,min=6"`
-	InviteCode string `json:"invite_code"`
+	Email         string `json:"email" binding:"required,email"`
+	Password      string `json:"password" binding:"required,min=6"`
+	InviteCode    string `json:"invite_code"`
+	AcceptedLegal *bool  `json:"accepted_legal"`
 }
 
 type AppRegisterVerifyRequest struct {
@@ -648,6 +679,11 @@ func AppRegister(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	acceptedAt, err := registrationLegalAcceptance(req.AcceptedLegal)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "code": "legal_consent_required"})
+		return
+	}
 
 	ctx := context.Background()
 	cooldownKey := "vcode:cooldown:" + req.Email
@@ -657,7 +693,7 @@ func AppRegister(c *gin.Context) {
 	}
 
 	var exists bool
-	err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`, req.Email).Scan(&exists)
+	err = db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`, req.Email).Scan(&exists)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check email"})
 		return
@@ -686,9 +722,15 @@ func AppRegister(c *gin.Context) {
 		return
 	}
 
-	// Remember the password until the code is verified (same window as the code).
+	// Remember the password and consent until the code is verified.
 	pendingKey := pendingRegPrefix + req.Email
-	if err := rdb.Set(ctx, pendingKey, hash, codeTTL).Err(); err != nil {
+	pending := pendingRegistration{PasswordHash: hash, LegalAcceptedAt: acceptedAt}
+	if acceptedAt != nil {
+		pending.PrivacyPolicyVersion = privacyPolicyVersion
+		pending.TermsVersion = termsVersion
+	}
+	pendingJSON, _ := json.Marshal(pending)
+	if err := rdb.Set(ctx, pendingKey, pendingJSON, codeTTL).Err(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start registration"})
 		return
 	}
@@ -743,8 +785,18 @@ func AppRegisterVerify(c *gin.Context) {
 	}
 
 	pendingKey := pendingRegPrefix + req.Email
-	hash, err := rdb.Get(ctx, pendingKey).Result()
-	if err != nil || hash == "" {
+	pendingRaw, err := rdb.Get(ctx, pendingKey).Result()
+	if err != nil || pendingRaw == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "registration expired, please request a new code"})
+		return
+	}
+	var pending pendingRegistration
+	if err := json.Unmarshal([]byte(pendingRaw), &pending); err != nil {
+		// Finish a verification already issued by an older Backend during a
+		// rolling deployment; new registration requests are strictly gated above.
+		pending.PasswordHash = pendingRaw
+	}
+	if pending.PasswordHash == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "registration expired, please request a new code"})
 		return
 	}
@@ -771,8 +823,10 @@ func AppRegisterVerify(c *gin.Context) {
 		inviterID = codeData["inviter_id"]
 	}
 	if _, err := db.Get().Exec(
-		`INSERT INTO users (id, email, role_id, password_hash, environment,invited_by_user_id) VALUES ($1, $2, 'user', $3, $4,$5)`,
-		userID, req.Email, hash, currentEnvironment(), inviterID); err != nil {
+		`INSERT INTO users (id,email,role_id,password_hash,environment,invited_by_user_id,legal_accepted_at,privacy_policy_version,terms_version)
+		 VALUES ($1,$2,'user',$3,$4,$5,$6,$7,$8)`,
+		userID, req.Email, pending.PasswordHash, currentEnvironment(), inviterID, pending.LegalAcceptedAt,
+		pending.PrivacyPolicyVersion, pending.TermsVersion); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 		return
 	}

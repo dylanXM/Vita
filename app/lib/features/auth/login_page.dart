@@ -41,8 +41,9 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _googleLogin() async {
     try {
-      await AuthController.to.loginWithGoogle();
-      Get.offAllNamed('/shell');
+      if (await AuthController.to.loginWithGoogle()) {
+        Get.offAllNamed('/shell');
+      }
     } catch (e) {
       Get.snackbar('auth.googleFailed'.tr, '$e');
     }

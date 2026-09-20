@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/constants.dart';
+import '../../core/legal_documents.dart';
 import '../../core/settings_controller.dart';
 import '../../core/supported_locales.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../auth/auth_controller.dart';
+import 'legal_document_page.dart';
 
 /// Settings — language, theme and sign out. Reached from the Me page.
 class SettingsPage extends StatelessWidget {
@@ -88,14 +88,14 @@ class SettingsPage extends StatelessWidget {
                   icon: Icons.privacy_tip_outlined,
                   title: 'settings.privacy'.tr,
                   borderRadius: BorderRadius.zero,
-                  onTap: () => _openLegal(privacyPolicyUrl),
+                  onTap: () => _openLegal(LegalDocumentType.privacy),
                 ),
                 const Divider(indent: 52, height: 0.5),
                 VitaListTile(
                   icon: Icons.description_outlined,
                   title: 'settings.terms'.tr,
                   borderRadius: BorderRadius.zero,
-                  onTap: () => _openLegal(termsOfServiceUrl),
+                  onTap: () => _openLegal(LegalDocumentType.terms),
                 ),
               ],
             ),
@@ -141,13 +141,12 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  Future<void> _openLegal(String rawUrl) async {
-    final uri = Uri.tryParse(rawUrl);
-    if (uri == null ||
-        !uri.hasScheme ||
-        !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      Get.snackbar('Vita', 'settings.linkUnavailable'.tr);
-    }
+  void _openLegal(LegalDocumentType type) {
+    Get.to(
+      () => LegalDocumentPage(type: type),
+      transition: Transition.cupertino,
+      duration: const Duration(milliseconds: 300),
+    );
   }
 
   void _confirmDeleteAccount(BuildContext context) {

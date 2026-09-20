@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 
 import '../../core/theme.dart';
 import 'auth_controller.dart';
+import 'registration_legal_consent.dart';
 
 /// Two-step registration, mirroring the login page layout:
 /// step 1 collects the email + password, step 2 the 6-digit code that the
@@ -26,6 +27,7 @@ class _RegisterPageState extends State<RegisterPage> {
   int _countdown = 0;
   int _step = 1;
   bool _obscurePassword = true;
+  bool _acceptedLegal = false;
 
   @override
   void dispose() {
@@ -56,12 +58,13 @@ class _RegisterPageState extends State<RegisterPage> {
 
   /// Step 1: submit email + password, the backend emails the code.
   Future<void> _sendCode() async {
-    if (!_emailValid || !_passwordValid) return;
+    if (!_emailValid || !_passwordValid || !_acceptedLegal) return;
     try {
       await AuthController.to.register(
         _email.text.trim(),
         _password.text,
         _inviteCode.text,
+        acceptedLegal: _acceptedLegal,
       );
       setState(() => _step = 2);
       _startCountdown();
@@ -79,6 +82,7 @@ class _RegisterPageState extends State<RegisterPage> {
         _email.text.trim(),
         _password.text,
         _inviteCode.text,
+        acceptedLegal: _acceptedLegal,
       );
       _startCountdown();
       Get.snackbar('auth.checkInbox'.tr,
@@ -97,6 +101,17 @@ class _RegisterPageState extends State<RegisterPage> {
       Get.offAllNamed('/shell');
     } catch (e) {
       Get.snackbar('auth.verificationFailed'.tr, '$e');
+    }
+  }
+
+  Future<void> _googleRegister() async {
+    if (!_acceptedLegal) return;
+    try {
+      if (await AuthController.to.loginWithGoogle(acceptedLegal: true)) {
+        Get.offAllNamed('/shell');
+      }
+    } catch (e) {
+      Get.snackbar('auth.googleFailed'.tr, '$e');
     }
   }
 
@@ -147,6 +162,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 const SizedBox(height: 36),
                 TextField(
                   controller: _email,
+                  onChanged: (_) => setState(() {}),
                   keyboardType: TextInputType.emailAddress,
                   autocorrect: false,
                   textInputAction: TextInputAction.next,
@@ -155,6 +171,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 const SizedBox(height: 14),
                 TextField(
                   controller: _password,
+                  onChanged: (_) => setState(() {}),
                   obscureText: _obscurePassword,
                   autocorrect: false,
                   onSubmitted: (_) => _sendCode(),
@@ -184,12 +201,19 @@ class _RegisterPageState extends State<RegisterPage> {
                     hintText: 'auth.inviteCodeOptional'.tr,
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 16),
+                RegistrationLegalConsent(
+                  accepted: _acceptedLegal,
+                  onChanged: (value) => setState(() => _acceptedLegal = value),
+                ),
+                const SizedBox(height: 20),
                 Obx(
                   () => ElevatedButton(
+                    key: const ValueKey('register-get-code-button'),
                     onPressed: (AuthController.to.loading.value ||
                             !_emailValid ||
-                            !_passwordValid)
+                            !_passwordValid ||
+                            !_acceptedLegal)
                         ? null
                         : _sendCode,
                     child: AuthController.to.loading.value
@@ -200,6 +224,44 @@ class _RegisterPageState extends State<RegisterPage> {
                                 strokeWidth: 2, color: Colors.white),
                           )
                         : Text('auth.getCode'.tr),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    const Expanded(child: Divider()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'auth.or'.tr,
+                        style: TextStyle(
+                          color: context.vita.subText.withValues(alpha: 0.8),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    const Expanded(child: Divider()),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Obx(
+                  () => OutlinedButton.icon(
+                    key: const ValueKey('register-google-button'),
+                    onPressed:
+                        AuthController.to.loading.value || !_acceptedLegal
+                            ? null
+                            : _googleRegister,
+                    icon: Icon(Icons.g_mobiledata,
+                        color: context.vita.text, size: 26),
+                    label: Text('auth.continueGoogle'.tr),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: context.vita.text,
+                      side: BorderSide(color: context.vita.divider),
+                      minimumSize: const Size.fromHeight(50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -250,6 +312,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                   child: TextField(
                     controller: _code,
+                    onChanged: (_) => setState(() {}),
                     keyboardType: TextInputType.number,
                     textAlign: TextAlign.center,
                     maxLength: 6,

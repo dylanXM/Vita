@@ -79,6 +79,9 @@ func Migrate(db *sql.DB) error {
 		// prod share one database, so the flag lives on the row, not per-server.
 		// Existing rows predate the flag — they are live production accounts.
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS environment TEXT NOT NULL DEFAULT 'prod'`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS legal_accepted_at TIMESTAMP`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_policy_version TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_version TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_locale TEXT NOT NULL DEFAULT 'en'`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_code TEXT`,
 		`UPDATE users SET invite_code=UPPER(SUBSTRING(MD5(id || email) FROM 1 FOR 10)) WHERE invite_code IS NULL OR invite_code=''`,

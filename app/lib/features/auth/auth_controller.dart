@@ -20,8 +20,8 @@ class AuthController extends GetxController {
 
   /// Starts registration: the backend checks the email, stores the password
   /// and emails a 6-digit code (60s resend cooldown).
-  Future<void> register(
-      String email, String password, String inviteCode) async {
+  Future<void> register(String email, String password, String inviteCode,
+      {required bool acceptedLegal}) async {
     loading.value = true;
     AnalyticsService.to
         .track('auth_register_started', category: 'auth', properties: {
@@ -34,6 +34,7 @@ class AuthController extends GetxController {
           'email': email,
           'password': password,
           'invite_code': inviteCode.trim().toUpperCase(),
+          'accepted_legal': acceptedLegal,
         },
       );
       AnalyticsService.to.track('auth_register_code_sent', category: 'auth');
@@ -90,14 +91,14 @@ class AuthController extends GetxController {
     }
   }
 
-  Future<void> loginWithGoogle() async {
+  Future<bool> loginWithGoogle({bool acceptedLegal = false}) async {
     loading.value = true;
     AnalyticsService.to.track('auth_login_started',
         category: 'auth', properties: {'method': 'google'});
     try {
       final google = GoogleSignIn(serverClientId: googleServerClientId);
       final account = await google.signIn();
-      if (account == null) return; // user cancelled
+      if (account == null) return false; // user cancelled
       final auth = await account.authentication;
       final idToken = auth.idToken;
       if (idToken == null) {
@@ -105,13 +106,14 @@ class AuthController extends GetxController {
       }
       final data = await ApiClient.instance.post(
         '/v1/auth/google',
-        data: {'id_token': idToken},
+        data: {'id_token': idToken, 'accepted_legal': acceptedLegal},
       );
       await _storeSession(data);
       await fetchProfile();
       AnalyticsService.to.track('auth_login_succeeded',
           category: 'auth', properties: {'method': 'google'});
       await AnalyticsService.to.flush();
+      return true;
     } catch (e) {
       AnalyticsService.to.track('auth_login_failed',
           category: 'auth', properties: {'method': 'google'});
