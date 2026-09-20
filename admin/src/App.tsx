@@ -16,6 +16,7 @@ import { CompanionDetailPage } from "@/pages/CompanionDetailPage";
 import { OnboardingPage } from "@/pages/OnboardingPage";
 import { WhatsNewPage } from "@/pages/WhatsNewPage";
 import { SocialLinksPage } from "@/pages/SocialLinksPage";
+import { CreditProductsPage } from "@/pages/CreditProductsPage";
 import { Button } from "@/components/ui/button";
 
 function RouteError() {
@@ -60,6 +61,7 @@ const router = createBrowserRouter([
       { path: "subscription-plans", element: <SubscriptionPlansPage /> },
       { path: "coin-packs", element: <CoinPacksPage /> },
       { path: "billing-activity", element: <BillingActivityPage /> },
+      { path: "credit-products", element: <CreditProductsPage /> },
       { path: "invitation-settings", element: <InvitationSettingsPage /> },
       { path: "onboarding", element: <OnboardingPage /> },
       { path: "whats-new", element: <WhatsNewPage /> },

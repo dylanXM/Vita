@@ -27,6 +27,7 @@ const en = {
     subscriptionPlans: "Subscription plans",
     coinPacks: "Coin packs",
     billingActivity: "Purchases & ledger",
+    creditProducts: "Credit experiences",
     appContent: "App content", onboarding: "Onboarding", whatsNew: "What's new", socialLinks: "Social media links",
   },
 
@@ -239,6 +240,8 @@ const en = {
     empty: "No records match these filters.", formDesc: "The environment and platform identify an independent store product configuration.",
     saved: "Billing product saved", deleted: "Billing product deleted", deleteConfirm: "Delete {{name}}?",
   },
+
+  creditProducts: { title: "Credit experiences", description: "Configure the server-side price and availability of companion experiences.", product: "Product", category: "Category", coins: "Coins", enabled: "Enabled", saved: "Credit product saved" },
 
   time: {
     justNow: "just now",

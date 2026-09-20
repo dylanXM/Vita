@@ -9,13 +9,11 @@ import 'package:record/record.dart';
 
 import '../../core/constants.dart';
 import '../../core/theme.dart';
-import '../../core/analytics_service.dart';
 import '../../shared/widgets.dart';
-import '../../core/api_client.dart';
-import '../billing/billing_controller.dart';
 import '../life/life_page.dart';
 import '../shell/shell_page.dart';
 import 'chat_controller.dart';
+import 'experience_sheet.dart';
 
 /// Chat detail page — message bubbles (user right / companion left),
 /// date separators and a WeChat-style input bar.
@@ -192,32 +190,17 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  Future<void> _sendGift(int coins) async {
-    try {
-      await ApiClient.instance.post(
-          '/v1/companions/${widget.companionId}/gifts',
-          data: {'coins': coins});
-      await BillingController.to.refreshCredits();
-      AnalyticsService.to.track('gift_sent',
-          category: 'billing',
-          properties: {'companion_id': widget.companionId, 'coins': coins});
-      Get.back();
-      Get.snackbar('gift.sent.title'.tr,
-          'gift.sent.message'.trParams({'coins': '$coins'}));
-    } on ApiException catch (e) {
-      AnalyticsService.to
-          .track('gift_send_failed', category: 'billing', properties: {
-        'companion_id': widget.companionId,
-        'coins': coins,
-        'reason': e.code ?? e.message
-      });
-      if (e.action == 'open_subscription') {
-        Get.back();
-        Get.toNamed('/subscription');
-      } else {
-        Get.snackbar('gift.failed'.tr, e.message);
-      }
-    }
+  void _showExperiences() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.vita.surface,
+      showDragHandle: true,
+      builder: (_) => ExperienceSheet(
+        companionId: widget.companionId,
+        onCompleted: ctrl.poll,
+      ),
+    );
   }
 
   void _showCompanionSheet() {
@@ -284,25 +267,18 @@ class _ChatPageState extends State<ChatPage> {
                   label: 'chat.relationship'.tr,
                   value: (c['relationship_stage'] as String?)?.toUpperCase() ??
                       ''),
-              if (c['is_default'] != true) ...[
-                const SizedBox(height: 16),
-                Text('gift.title'.tr,
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: context.vita.text)),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  children: [10, 50, 100]
-                      .map((coins) => OutlinedButton(
-                            onPressed: () => _sendGift(coins),
-                            child: Text(
-                                'gift.coins'.trParams({'coins': '$coins'})),
-                          ))
-                      .toList(),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonalIcon(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    _showExperiences();
+                  },
+                  icon: const Icon(Icons.auto_awesome_outlined),
+                  label: Text('experience.title'.tr),
                 ),
-              ],
+              ),
             ],
           ),
         ),
@@ -352,6 +328,11 @@ class _ChatPageState extends State<ChatPage> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'experience.title'.tr,
+            icon: Icon(Icons.auto_awesome_outlined, color: context.vita.green),
+            onPressed: ctrl.accessError.value == null ? _showExperiences : null,
+          ),
           IconButton(
             icon: Icon(Icons.more_horiz, color: context.vita.subText),
             onPressed: _showCompanionSheet,
@@ -573,6 +554,8 @@ class _ChatMessageBody extends StatelessWidget {
         ? Map<String, dynamic>.from(message['payload'] as Map)
         : const <String, dynamic>{};
     final mediaURL = message['media_url'] as String? ?? '';
+    final source = message['source'] as String? ?? '';
+    final displayContent = source.startsWith('paid_') ? content.tr : content;
     final children = <Widget>[];
     if (type == 'voice' && mediaURL.isNotEmpty) {
       children.add(InkWell(
@@ -597,9 +580,9 @@ class _ChatMessageBody extends StatelessWidget {
         ),
       ));
     }
-    if (content.isNotEmpty) {
+    if (displayContent.isNotEmpty) {
       if (children.isNotEmpty) children.add(const SizedBox(height: 7));
-      children.add(Text(content,
+      children.add(Text(displayContent,
           style: TextStyle(
               fontSize: type == 'voice' ? 13 : 16,
               color: type == 'voice' ? context.vita.subText : context.vita.text,

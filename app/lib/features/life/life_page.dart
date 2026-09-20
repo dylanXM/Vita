@@ -183,14 +183,14 @@ class LifePage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title,
+                      Text(title.tr,
                           style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
                               color: context.vita.text)),
                       if (desc.isNotEmpty) ...[
                         const SizedBox(height: 5),
-                        Text(desc,
+                        Text(desc.tr,
                             style: TextStyle(
                                 fontSize: 13,
                                 color: context.vita.subText,

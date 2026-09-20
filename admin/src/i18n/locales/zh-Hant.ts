@@ -22,7 +22,7 @@ const zhHant = {
     users: "使用者",
     companions: "角色管理",
     agent: "AI 伴侶", invitationSettings: "邀請碼設定",
-    billing: "計費管理", subscriptionPlans: "訂閱方案", coinPacks: "金幣包", billingActivity: "購買與流水", appContent: "App 內容", onboarding: "引導頁", whatsNew: "近期更新", socialLinks: "社群媒體連結",
+    billing: "計費管理", subscriptionPlans: "訂閱方案", coinPacks: "金幣包", billingActivity: "購買與流水", creditProducts: "金幣體驗", appContent: "App 內容", onboarding: "引導頁", whatsNew: "近期更新", socialLinks: "社群媒體連結",
   },
 
   login: {
@@ -158,6 +158,7 @@ const zhHant = {
     empty: "沒有符合篩選條件的記錄。", formDesc: "環境與平台共同確定一筆獨立的商店商品設定。", saved: "計費商品已儲存", deleted: "計費商品已刪除", deleteConfirm: "確定刪除 {{name}}？",
   },
 
+  creditProducts: { title: "金幣體驗", description: "設定角色增值體驗的伺服器價格與可用狀態。", product: "商品", category: "分類", coins: "金幣", enabled: "啟用", saved: "金幣商品已儲存" },
   time: {
     justNow: "剛剛",
     minutesAgo: "{{n}} 分鐘前",

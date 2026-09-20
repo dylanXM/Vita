@@ -22,7 +22,7 @@ const ja = {
     users: "ユーザー",
     companions: "キャラクター管理",
     agent: "AIコンパニオン", invitationSettings: "招待コード設定",
-    billing: "課金管理", subscriptionPlans: "サブスクリプションプラン", coinPacks: "コインパック", billingActivity: "購入と台帳", appContent: "アプリコンテンツ", onboarding: "オンボーディング", whatsNew: "新着情報", socialLinks: "SNSリンク",
+    billing: "課金管理", subscriptionPlans: "サブスクリプションプラン", coinPacks: "コインパック", billingActivity: "購入と台帳", creditProducts: "コイン体験", appContent: "アプリコンテンツ", onboarding: "オンボーディング", whatsNew: "新着情報", socialLinks: "SNSリンク",
   },
 
   login: {
@@ -158,6 +158,7 @@ const ja = {
     empty: "条件に一致する記録はありません。", formDesc: "環境とプラットフォームで独立したストア商品設定を識別します。", saved: "課金商品を保存しました", deleted: "課金商品を削除しました", deleteConfirm: "{{name}}を削除しますか？",
   },
 
+  creditProducts: { title: "コイン体験", description: "コンパニオン体験の価格と提供状態を設定します。", product: "商品", category: "カテゴリ", coins: "コイン", enabled: "有効", saved: "商品を保存しました" },
   time: {
     justNow: "たった今",
     minutesAgo: "{{n}} 分前",

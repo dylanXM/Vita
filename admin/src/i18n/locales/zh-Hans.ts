@@ -27,6 +27,7 @@ const zhHans = {
     subscriptionPlans: "订阅计划",
     coinPacks: "金币包",
     billingActivity: "购买与流水",
+    creditProducts: "金币体验",
     appContent: "App 内容", onboarding: "引导页", whatsNew: "近期更新", socialLinks: "社交媒体链接",
   },
 
@@ -239,6 +240,8 @@ const zhHans = {
     empty: "没有符合筛选条件的记录。", formDesc: "环境与平台共同确定一条独立的商店商品配置。",
     saved: "计费商品已保存", deleted: "计费商品已删除", deleteConfirm: "确定删除 {{name}}？",
   },
+
+  creditProducts: { title: "金币体验", description: "配置角色增值体验的服务端价格与可用状态。", product: "商品", category: "分类", coins: "金币", enabled: "启用", saved: "金币商品已保存" },
 
   time: {
     justNow: "刚刚",

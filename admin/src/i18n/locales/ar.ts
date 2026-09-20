@@ -22,7 +22,7 @@ const ar = {
     users: "المستخدمون",
     companions: "إدارة الشخصيات",
     agent: "رفيق الذكاء الاصطناعي", invitationSettings: "إعدادات رمز الدعوة",
-    billing: "إدارة الفوترة", subscriptionPlans: "خطط الاشتراك", coinPacks: "حزم العملات", billingActivity: "المشتريات والسجل", appContent: "محتوى التطبيق", onboarding: "صفحات الترحيب", whatsNew: "ما الجديد", socialLinks: "روابط التواصل الاجتماعي",
+    billing: "إدارة الفوترة", subscriptionPlans: "خطط الاشتراك", coinPacks: "حزم العملات", billingActivity: "المشتريات والسجل", creditProducts: "تجارب العملات", appContent: "محتوى التطبيق", onboarding: "صفحات الترحيب", whatsNew: "ما الجديد", socialLinks: "روابط التواصل الاجتماعي",
   },
 
   login: {
@@ -158,6 +158,7 @@ const ar = {
     empty: "لا توجد سجلات تطابق عوامل التصفية.", formDesc: "تحدد البيئة والمنصة إعداد منتج متجر مستقلًا.", saved: "تم حفظ منتج الفوترة", deleted: "تم حذف منتج الفوترة", deleteConfirm: "حذف {{name}}؟",
   },
 
+  creditProducts: { title: "تجارب العملات", description: "إعداد سعر وتوفر تجارب الرفيق.", product: "المنتج", category: "الفئة", coins: "العملات", enabled: "مفعّل", saved: "تم حفظ المنتج" },
   time: {
     justNow: "الآن",
     minutesAgo: "قبل {{n}} دقيقة",

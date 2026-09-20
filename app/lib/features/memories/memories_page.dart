@@ -176,7 +176,7 @@ class MemoriesPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(content,
+                    Text(content.tr,
                         style: TextStyle(
                             fontSize: 15,
                             color: context.vita.text,
@@ -196,20 +196,22 @@ class MemoriesPage extends StatelessWidget {
                   ],
                 ),
               ),
-              PopupMenuButton<String>(
-                onSelected: (action) {
-                  if (action == 'edit') {
-                    _editMemory(context, ctrl, m);
-                  } else if (action == 'delete') {
-                    _deleteMemory(context, ctrl, m);
-                  }
-                },
-                itemBuilder: (_) => [
-                  PopupMenuItem(value: 'edit', child: Text('memories.edit'.tr)),
-                  PopupMenuItem(
-                      value: 'delete', child: Text('memories.delete'.tr)),
-                ],
-              ),
+              if (m['readonly'] != true)
+                PopupMenuButton<String>(
+                  onSelected: (action) {
+                    if (action == 'edit') {
+                      _editMemory(context, ctrl, m);
+                    } else if (action == 'delete') {
+                      _deleteMemory(context, ctrl, m);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                        value: 'edit', child: Text('memories.edit'.tr)),
+                    PopupMenuItem(
+                        value: 'delete', child: Text('memories.delete'.tr)),
+                  ],
+                ),
             ],
           ),
         );

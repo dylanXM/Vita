@@ -16,6 +16,7 @@ import (
 
 	"vita/internal/agent"
 	"vita/internal/config"
+	"vita/internal/credits"
 	"vita/internal/db"
 	"vita/internal/handler"
 	"vita/internal/mail"
@@ -44,6 +45,20 @@ func main() {
 	handler.InitAgent(agentService)
 	agentCtx, stopAgent := context.WithCancel(context.Background())
 	defer stopAgent()
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-agentCtx.Done():
+				return
+			case <-ticker.C:
+				if err := credits.RefundStale(agentCtx, dbClient, 10*time.Minute); err != nil {
+					log.Printf("credit reservation recovery: %v", err)
+				}
+			}
+		}
+	}()
 	if cfg.AgentEnabled {
 		go agentService.Run(agentCtx, cfg.AgentTick)
 	}
@@ -116,6 +131,8 @@ func main() {
 			companions.PUT("/:id", handler.UpdateCompanion)
 			companions.DELETE("/:id", handler.DeleteCompanion)
 			companions.POST("/:id/gifts", handler.TransferCoinsToCompanion)
+			companions.GET("/:id/experiences", handler.ListCompanionExperiences)
+			companions.POST("/:id/experiences/:product_key", handler.PurchaseCompanionExperience)
 		}
 		api.GET("/companion-options", middleware.RequireAuth(), handler.CompanionOptions)
 		api.POST("/me/push-tokens", middleware.RequireAuth(), handler.RegisterPushToken)
@@ -183,6 +200,8 @@ func main() {
 			admin.DELETE("/coin-packs/:id", handler.AdminDeleteCoinPack)
 			admin.GET("/purchases", handler.AdminListPurchases)
 			admin.GET("/credit-ledger", handler.AdminListCreditLedger)
+			admin.GET("/credit-products", handler.AdminListCreditProducts)
+			admin.PUT("/credit-products/:product_key", handler.AdminUpdateCreditProduct)
 			admin.GET("/invitation-settings", handler.AdminGetInvitationSettings)
 			admin.PUT("/invitation-settings", handler.AdminUpdateInvitationSettings)
 			admin.GET("/onboarding", handler.AdminGetOnboarding)

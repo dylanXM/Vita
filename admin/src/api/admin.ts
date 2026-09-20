@@ -39,6 +39,7 @@ import type {
   WhatsNewCampaign,
   MobilePlatform,
   SocialMediaLinksConfig,
+  CreditProduct,
 } from "./types";
 
 /** Admin sign-in. The API also accepts a 6-digit code for the same accounts. */
@@ -117,6 +118,13 @@ export const purchasesApi = {
 export const creditLedgerApi = {
   list: (params: BillingFilters, signal?: AbortSignal) =>
     http.get<BillingPagedList<CreditLedgerEntry>>("/admin/credit-ledger", { params, signal }),
+};
+
+export const creditProductsApi = {
+  list: (environment: Environment, signal?: AbortSignal) =>
+    http.get<BillingList<CreditProduct>>("/admin/credit-products", { params: { environment }, signal }),
+  update: (environment: Environment, key: string, body: Pick<CreditProduct, "coins" | "enabled" | "sort_order">) =>
+    http.put<BillingList<CreditProduct>>(`/admin/credit-products/${key}`, body, { params: { environment } }),
 };
 
 export const invitationApi = {

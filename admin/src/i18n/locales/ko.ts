@@ -22,7 +22,7 @@ const ko = {
     users: "사용자",
     companions: "캐릭터 관리",
     agent: "AI 컴패니언", invitationSettings: "초대 코드 설정",
-    billing: "결제 관리", subscriptionPlans: "구독 플랜", coinPacks: "코인 팩", billingActivity: "구매 및 원장", appContent: "앱 콘텐츠", onboarding: "온보딩", whatsNew: "새 소식", socialLinks: "소셜 미디어 링크",
+    billing: "결제 관리", subscriptionPlans: "구독 플랜", coinPacks: "코인 팩", billingActivity: "구매 및 원장", creditProducts: "코인 경험", appContent: "앱 콘텐츠", onboarding: "온보딩", whatsNew: "새 소식", socialLinks: "소셜 미디어 링크",
   },
 
   login: {
@@ -158,6 +158,7 @@ const ko = {
     empty: "필터와 일치하는 기록이 없습니다.", formDesc: "환경과 플랫폼이 독립적인 스토어 상품 설정을 식별합니다.", saved: "결제 상품이 저장되었습니다", deleted: "결제 상품이 삭제되었습니다", deleteConfirm: "{{name}}을(를) 삭제하시겠습니까?",
   },
 
+  creditProducts: { title: "코인 경험", description: "컴패니언 경험의 가격과 사용 가능 여부를 설정합니다.", product: "상품", category: "카테고리", coins: "코인", enabled: "활성", saved: "상품이 저장되었습니다" },
   time: {
     justNow: "방금",
     minutesAgo: "{{n}}분 전",

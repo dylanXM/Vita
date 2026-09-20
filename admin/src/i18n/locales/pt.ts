@@ -22,7 +22,7 @@ const pt = {
     users: "Usuários",
     companions: "Personagens",
     agent: "Companheiro IA", invitationSettings: "Configuração de convites",
-    billing: "Faturação", subscriptionPlans: "Planos de assinatura", coinPacks: "Pacotes de moedas", billingActivity: "Compras e extrato", appContent: "Conteúdo do app", onboarding: "Integração", whatsNew: "Novidades", socialLinks: "Redes sociais",
+    billing: "Faturação", subscriptionPlans: "Planos de assinatura", coinPacks: "Pacotes de moedas", billingActivity: "Compras e extrato", creditProducts: "Experiências com moedas", appContent: "Conteúdo do app", onboarding: "Integração", whatsNew: "Novidades", socialLinks: "Redes sociais",
   },
 
   login: {
@@ -158,6 +158,7 @@ const pt = {
     empty: "Nenhum registo corresponde aos filtros.", formDesc: "O ambiente e a plataforma identificam uma configuração independente da loja.", saved: "Produto guardado", deleted: "Produto eliminado", deleteConfirm: "Eliminar {{name}}?",
   },
 
+  creditProducts: { title: "Experiências com moedas", description: "Configure o preço e a disponibilidade das experiências do companheiro.", product: "Produto", category: "Categoria", coins: "Moedas", enabled: "Ativo", saved: "Produto guardado" },
   time: {
     justNow: "agora mesmo",
     minutesAgo: "há {{n}}min",

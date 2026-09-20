@@ -71,6 +71,7 @@ type companionContext struct {
 	Enthusiasm        int
 	VoiceEnabled      bool
 	VoiceConfig       string
+	EquippedOutfit    string
 }
 
 type lifePlanEvent struct {
@@ -337,6 +338,131 @@ func (s *Service) TranscribeMedia(ctx context.Context, mediaID, userID, companio
 		filename = "voice.mp3"
 	}
 	return s.client.TranscribeAudio(ctx, model, filename, mimeType, data)
+}
+
+// GenerateRequestedLifePhoto creates a paid, user-requested photo anchored to
+// the companion's most recent real life event. It never invents a location or
+// activity outside the Life timeline.
+func (s *Service) GenerateRequestedLifePhoto(ctx context.Context, userID, companionID string) (*SavedMessage, error) {
+	var eventID, eventType, name, appearance, outfit, title, description, location, emotion, payloadRaw string
+	err := s.db.QueryRowContext(ctx, `SELECT e.id,COALESCE(e.event_type,''),c.name,COALESCE(c.appearance,''),COALESCE((SELECT p.metadata->>'style' FROM credit_products p WHERE p.environment=u.environment AND p.product_key=c.equipped_outfit_key),''),
+		COALESCE(e.title,''),COALESCE(e.description,''),COALESCE(e.location,''),COALESCE(e.emotion,''),e.payload::text
+		FROM life_events e JOIN companions c ON c.id=e.companion_id JOIN users u ON u.id=c.user_id
+		WHERE e.companion_id=$1 AND c.user_id=$2 AND c.active=true AND e.status='active'
+		AND e.start_time<=CURRENT_TIMESTAMP AND e.end_time>=CURRENT_TIMESTAMP
+		ORDER BY e.start_time DESC LIMIT 1`, companionID, userID).Scan(
+		&eventID, &eventType, &name, &appearance, &outfit, &title, &description, &location, &emotion, &payloadRaw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("no current life event is available for a photo")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if eventType == "sleep" {
+		return nil, fmt.Errorf("the companion is asleep and cannot take a photo now")
+	}
+	settings, err := s.loadLifeSettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !settings.ImageModelID.Valid {
+		return nil, fmt.Errorf("no image model configured")
+	}
+	model, err := s.loadModel(ctx, settings.ImageModelID.String)
+	if err != nil {
+		return nil, err
+	}
+	prompt := fmt.Sprintf("A candid phone photo from %s's current day. Current event: %s — %s. Current location: %s. Mood: %s. Appearance continuity: %s. Outfit selection: %s. Natural light, believable everyday details, one coherent scene, no text, no watermark, no collage.",
+		name, title, description, location, emotion, appearance, outfit)
+	imageURL, err := s.client.GenerateImage(ctx, model, GenerateImageRequest{Prompt: prompt, Size: "1024x1024"})
+	if err != nil {
+		s.recordRun(ctx, companionID, "requested_life_photo", model.ID, "failed", err.Error())
+		return nil, err
+	}
+	s.recordRun(ctx, companionID, "requested_life_photo", model.ID, "succeeded", "")
+	payload := map[string]any{}
+	_ = json.Unmarshal([]byte(payloadRaw), &payload)
+	media := stringSlice(payload["media_urls"])
+	media = append(media, imageURL)
+	payload["media_urls"] = media
+	payload["photo_source"] = "user_request"
+	encoded, _ := json.Marshal(payload)
+	if _, err := s.db.ExecContext(ctx, `UPDATE life_events SET payload=$2 WHERE id=$1`, eventID, encoded); err != nil {
+		return nil, err
+	}
+	conversationID, err := s.getOrCreateConversation(ctx, userID, companionID)
+	if err != nil {
+		return nil, err
+	}
+	message, err := s.insertMessage(ctx, conversationID, "assistant", "image_text", description, "paid_photo", eventID,
+		map[string]any{"media_urls": []string{imageURL}, "requested": true})
+	if err != nil {
+		return nil, err
+	}
+	message.MediaURL = imageURL
+	_, err = s.db.ExecContext(ctx, `UPDATE messages SET media_url=$2 WHERE id=$1`, message.ID, imageURL)
+	return message, err
+}
+
+// SpeakLatestReply converts the latest text response into audio. Charging is
+// handled by the caller and can therefore be refunded if speech generation
+// fails before this method updates the message.
+func (s *Service) SpeakLatestReply(ctx context.Context, userID, companionID string) (*SavedMessage, error) {
+	conversationID, err := s.getOrCreateConversation(ctx, userID, companionID)
+	if err != nil {
+		return nil, err
+	}
+	var message SavedMessage
+	var payloadRaw string
+	err = s.db.QueryRowContext(ctx, `SELECT id,conversation_id,sender_type,message_type,COALESCE(content,''),COALESCE(media_url,''),payload::text,source,COALESCE(life_event_id,''),delivery_status,created_at
+		FROM messages WHERE conversation_id=$1 AND sender_type='assistant' AND COALESCE(content,'')<>''
+		ORDER BY created_at DESC LIMIT 1`, conversationID).Scan(&message.ID, &message.ConversationID,
+		&message.SenderType, &message.MessageType, &message.Content, &message.MediaURL, &payloadRaw,
+		&message.Source, &message.LifeEventID, &message.DeliveryStatus, &message.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("no companion reply is available for speech")
+	}
+	if err != nil {
+		return nil, err
+	}
+	_ = json.Unmarshal([]byte(payloadRaw), &message.Payload)
+	if message.MessageType == "voice" && message.MediaURL != "" {
+		return nil, fmt.Errorf("the latest reply already has voice")
+	}
+	model, err := s.loadRoutedModel(ctx, companionID, "speech")
+	if err != nil {
+		return nil, err
+	}
+	voice := "alloy"
+	var voiceConfigRaw string
+	_ = s.db.QueryRowContext(ctx, `SELECT voice_config::text FROM companions WHERE id=$1 AND user_id=$2`, companionID, userID).Scan(&voiceConfigRaw)
+	voiceConfig := map[string]any{}
+	_ = json.Unmarshal([]byte(voiceConfigRaw), &voiceConfig)
+	if configured, ok := voiceConfig["voice"].(string); ok && strings.TrimSpace(configured) != "" {
+		voice = strings.TrimSpace(configured)
+	}
+	audio, mimeType, err := s.client.GenerateSpeech(ctx, model, message.Content, voice)
+	if err != nil {
+		s.recordRun(ctx, companionID, "paid_speech", model.ID, "failed", err.Error())
+		return nil, err
+	}
+	mediaID := uuid.New().String()
+	if _, err := s.db.ExecContext(ctx, `INSERT INTO media_assets(id,user_id,kind,mime_type,data,size_bytes) VALUES($1,$2,'audio',$3,$4,$5)`, mediaID, userID, mimeType, audio, len(audio)); err != nil {
+		return nil, err
+	}
+	message.MessageType = "voice"
+	message.MediaURL = "/v1/media/" + mediaID
+	message.Payload["paid_voice"] = true
+	encoded, _ := json.Marshal(message.Payload)
+	if _, err := s.db.ExecContext(ctx, `UPDATE messages SET message_type='voice',media_url=$2,payload=$3 WHERE id=$1`, message.ID, message.MediaURL, encoded); err != nil {
+		return nil, err
+	}
+	s.recordRun(ctx, companionID, "paid_speech", model.ID, "succeeded", "")
+	return &message, nil
+}
+
+func (s *Service) GetOrCreateConversation(ctx context.Context, userID, companionID string) (string, error) {
+	return s.getOrCreateConversation(ctx, userID, companionID)
 }
 
 func (s *Service) CurrentStatus(ctx context.Context, companionID, userID string) (CompanionStatus, error) {
@@ -1342,13 +1468,13 @@ func (s *Service) loadCompanionForConversation(ctx context.Context, conversation
 		SELECT c.id, c.name, COALESCE(c.gender, ''), COALESCE(c.persona, ''), COALESCE(c.city, ''),
 		       COALESCE(c.occupation, ''), COALESCE(c.interests, ''), COALESCE(c.relationship_stage, 'stranger'),
 		       c.personality_tags::text, c.speaking_style, c.likes, c.dislikes, c.life_habits, c.life_goal, c.backstory,
-		       c.voice_enabled,c.voice_config::text
+		       c.voice_enabled,c.voice_config::text,COALESCE((SELECT p.metadata->>'style' FROM credit_products p JOIN users u ON u.environment=p.environment WHERE u.id=c.user_id AND p.product_key=c.equipped_outfit_key),'')
 		FROM conversations v JOIN companions c ON c.id = v.companion_id
 		WHERE v.id = $1 AND v.user_id = $2 AND c.active = true`, conversationID, userID).Scan(
 		&profile.ID, &profile.Name, &profile.Gender, &profile.Persona, &profile.City, &profile.Occupation,
 		&profile.Interests, &profile.RelationshipStage, &profile.PersonalityTags, &profile.SpeakingStyle,
 		&profile.Likes, &profile.Dislikes, &profile.LifeHabits, &profile.LifeGoal, &profile.Backstory,
-		&profile.VoiceEnabled, &profile.VoiceConfig,
+		&profile.VoiceEnabled, &profile.VoiceConfig, &profile.EquippedOutfit,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return profile, fmt.Errorf("conversation not found")
@@ -1389,11 +1515,12 @@ Identity:
 - Likes: %s; dislikes: %s
 - Habits: %s; life goal: %s
 - Backstory/persona: %s %s
+- Current outfit selection: %s
 
 Recent life: %s
 Important memories: %s`, companionSystemBoundary, profile.Name, profile.Gender, profile.RelationshipStage,
 		profile.City, profile.Occupation, profile.Interests, profile.PersonalityTags, profile.SpeakingStyle,
-		profile.Likes, profile.Dislikes, profile.LifeHabits, profile.LifeGoal, profile.Backstory, profile.Persona,
+		profile.Likes, profile.Dislikes, profile.LifeHabits, profile.LifeGoal, profile.Backstory, profile.Persona, profile.EquippedOutfit,
 		strings.Join(life, " | "), strings.Join(memories, " | "))
 }
 

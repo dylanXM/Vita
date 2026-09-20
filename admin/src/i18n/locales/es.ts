@@ -22,7 +22,7 @@ const es = {
     users: "Usuarios",
     companions: "Personajes",
     agent: "Compañero IA", invitationSettings: "Configuración de invitaciones",
-    billing: "Facturación", subscriptionPlans: "Planes de suscripción", coinPacks: "Paquetes de monedas", billingActivity: "Compras y movimientos", appContent: "Contenido de la app", onboarding: "Introducción", whatsNew: "Novedades", socialLinks: "Redes sociales",
+    billing: "Facturación", subscriptionPlans: "Planes de suscripción", coinPacks: "Paquetes de monedas", billingActivity: "Compras y movimientos", creditProducts: "Experiencias con monedas", appContent: "Contenido de la app", onboarding: "Introducción", whatsNew: "Novedades", socialLinks: "Redes sociales",
   },
 
   login: {
@@ -158,6 +158,7 @@ const es = {
     empty: "No hay registros para estos filtros.", formDesc: "El entorno y la plataforma identifican una configuración independiente de tienda.", saved: "Producto guardado", deleted: "Producto eliminado", deleteConfirm: "¿Eliminar {{name}}?",
   },
 
+  creditProducts: { title: "Experiencias con monedas", description: "Configura el precio y la disponibilidad de las experiencias del compañero.", product: "Producto", category: "Categoría", coins: "Monedas", enabled: "Activo", saved: "Producto guardado" },
   time: {
     justNow: "ahora mismo",
     minutesAgo: "hace {{n}} min",

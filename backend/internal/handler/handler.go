@@ -1305,6 +1305,19 @@ func GetMemories(c *gin.Context) {
 		}
 		memories = append(memories, gin.H{"id": id, "type": kind, "content": content, "importance": importance, "event_time": nullTime(eventTime), "metadata": metadata, "created_at": created})
 	}
+	keepsakeRows, keepsakeErr := db.Get().Query(`SELECT k.id,k.title,k.content,k.payload::text,k.created_at
+		FROM companion_keepsakes k JOIN companions c ON c.id=k.companion_id
+		WHERE k.companion_id=$1 AND c.user_id=$2 ORDER BY k.created_at DESC`, c.Param("id"), c.GetString("user_id"))
+	if keepsakeErr == nil {
+		defer keepsakeRows.Close()
+		for keepsakeRows.Next() {
+			var id, title, content, payload string
+			var created time.Time
+			if keepsakeRows.Scan(&id, &title, &content, &payload, &created) == nil {
+				memories = append([]gin.H{{"id": id, "type": "keepsake", "title": title, "content": content, "importance": 100, "event_time": created, "metadata": payload, "created_at": created, "readonly": true}}, memories...)
+			}
+		}
+	}
 	c.JSON(http.StatusOK, gin.H{"memories": memories})
 }
 

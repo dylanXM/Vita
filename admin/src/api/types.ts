@@ -168,6 +168,18 @@ export interface CreditLedgerEntry {
   created_at: string;
 }
 
+export interface CreditProduct {
+  key: string;
+  category: "gift" | "photo" | "voice" | "date" | "keepsake" | "outfit" | "call";
+  name_key: string;
+  description_key: string;
+  emoji: string;
+  coins: number;
+  enabled: boolean;
+  sort_order: number;
+  metadata: Record<string, unknown>;
+}
+
 export interface BillingList<T> {
   items: T[];
 }

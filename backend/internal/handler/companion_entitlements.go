@@ -1,15 +1,18 @@
 package handler
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"vita/internal/credits"
 	"vita/internal/db"
 )
 
@@ -39,54 +42,42 @@ func TransferCoinsToCompanion(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "companion not found"})
 		return
 	}
-	tx, err := db.Get().Begin()
+	legacyProductKey := map[int]string{10: "legacy_gift_10", 50: "legacy_gift_50", 100: "legacy_gift_100"}[input.Coins]
+	if legacyProductKey == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "this legacy gift amount is no longer available", "code": "product_unavailable"})
+		return
+	}
+	idempotencyKey := strings.TrimSpace(c.GetHeader("X-Idempotency-Key"))
+	if idempotencyKey == "" {
+		idempotencyKey = "legacy-gift-" + uuid.New().String()
+	}
+	reservation, err := credits.Reserve(c.Request.Context(), db.Get(), credits.ReserveParams{
+		UserID: userID, CompanionID: companionID, Environment: currentEnvironment(), Platform: requestPlatform(c),
+		ProductKey: legacyProductKey, IdempotencyKey: idempotencyKey, ReferenceType: "legacy_gift",
+	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start transfer"})
+		writeSpendError(c, err)
 		return
 	}
-	defer tx.Rollback()
-	var balance int
-	if err := tx.QueryRow(`SELECT credits_balance FROM users WHERE id=$1 FOR UPDATE`, userID).Scan(&balance); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load balance"})
+	if reservation.Idempotent {
+		c.JSON(http.StatusOK, gin.H{"balance": reservation.Balance, "coins": reservation.Product.Coins, "result": reservation.Result, "idempotent": true})
 		return
 	}
-	if balance < input.Coins {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "insufficient credits", "code": "insufficient_credits"})
+	result, referenceID, err := fulfillCatalogGift(c.Request.Context(), userID, companionID, reservation.Product)
+	if err != nil {
+		settlementCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = credits.Refund(settlementCtx, db.Get(), reservation.ID, err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send gift", "refunded": true})
 		return
 	}
-	newBalance := balance - input.Coins
-	intimacyDelta := min(10, 1+input.Coins/100)
-	enthusiasmDelta := min(25, 1+input.Coins/50)
-	if _, err := tx.Exec(`UPDATE users SET credits_balance=$1,updated_at=CURRENT_TIMESTAMP WHERE id=$2`, newBalance, userID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to transfer credits"})
+	settlementCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := credits.Complete(settlementCtx, db.Get(), reservation.ID, referenceID, result); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "gift completed but settlement could not be recorded"})
 		return
 	}
-	description := "gift-to-companion:" + companionID
-	if _, err := tx.Exec(`INSERT INTO credit_transactions(id,user_id,amount,balance_after,kind,description,platform,environment)
-		VALUES($1,$2,$3,$4,'transfer',$5,$6,$7)`, uuid.New().String(), userID, -input.Coins, newBalance,
-		description, requestPlatform(c), currentEnvironment()); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record transfer"})
-		return
-	}
-	if _, err := tx.Exec(`INSERT INTO companion_gifts(id,user_id,companion_id,coins,intimacy_delta,enthusiasm_delta)
-		VALUES($1,$2,$3,$4,$5,$6)`, uuid.New().String(), userID, companionID, input.Coins, intimacyDelta, enthusiasmDelta); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record gift"})
-		return
-	}
-	if _, err := tx.Exec(`INSERT INTO relationship_states(companion_id,intimacy,trust,familiarity,enthusiasm)
-		VALUES($1,$2,1,1,$3) ON CONFLICT(companion_id) DO UPDATE SET
-		intimacy=LEAST(100,relationship_states.intimacy+$2),trust=LEAST(100,relationship_states.trust+1),
-		familiarity=LEAST(100,relationship_states.familiarity+1),enthusiasm=LEAST(100,relationship_states.enthusiasm+$3),
-		updated_at=CURRENT_TIMESTAMP`, companionID, intimacyDelta, enthusiasmDelta); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update relationship"})
-		return
-	}
-	if err := tx.Commit(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to commit transfer"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"balance": newBalance, "coins": input.Coins,
-		"intimacy_delta": intimacyDelta, "enthusiasm_delta": enthusiasmDelta})
+	c.JSON(http.StatusOK, gin.H{"balance": reservation.Balance, "coins": reservation.Product.Coins, "result": result})
 }
 
 func userHasActiveSubscription(userID string) (bool, error) {

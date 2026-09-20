@@ -31,7 +31,7 @@ class ApiClient {
       BaseOptions(
         baseUrl: vitaApiBaseUrl,
         connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 90),
         headers: const {'Content-Type': 'application/json'},
       ),
     );
