@@ -415,7 +415,7 @@ export interface AdminConversation {
 export interface AdminMessage {
   id: string;
   conversation_id: string;
-  sender_type: "user" | "companion";
+  sender_type: "user" | "assistant" | "companion";
   message_type: string;
   content: string;
   media_url: string;
