@@ -265,7 +265,7 @@ func (s *Service) ensurePlan(ctx context.Context, profile companionContext, time
 	}
 
 	effectiveProactiveLimit := min(8, settings.DailyProactiveLimit+profile.Enthusiasm/25)
-	events, modelID, err := s.generatePlan(ctx, profile, localDate, settings, effectiveProactiveLimit)
+	events, modelID, err := s.generatePlan(ctx, profile, localDate, timezone, settings, effectiveProactiveLimit)
 	if err != nil {
 		_, _ = s.db.ExecContext(ctx, `UPDATE companion_days SET status = 'failed', last_error = $3 WHERE companion_id = $1 AND local_date = $2`, profile.ID, localDate, truncate(err.Error(), 1000))
 		return err
@@ -309,7 +309,7 @@ func (s *Service) ensurePlan(ctx context.Context, profile companionContext, time
 	return tx.Commit()
 }
 
-func (s *Service) generatePlan(ctx context.Context, profile companionContext, localDate string, settings lifeSettings, proactiveLimit int) ([]lifePlanEvent, string, error) {
+func (s *Service) generatePlan(ctx context.Context, profile companionContext, localDate, timezone string, settings lifeSettings, proactiveLimit int) ([]lifePlanEvent, string, error) {
 	if s.mock || !settings.LifeModelID.Valid {
 		return mockPlan(profile), "", nil
 	}
@@ -317,10 +317,8 @@ func (s *Service) generatePlan(ctx context.Context, profile companionContext, lo
 	if err != nil {
 		return nil, "", err
 	}
-	prompt := fmt.Sprintf(`Create one ordinary day for %s on %s in %s. Occupation: %s. Interests: %s. Personality: %s.
-Return only a JSON array with %d to %d objects. Fields: type, title, description, location, start (HH:MM), end (HH:MM), emotion, importance (0-100), user_relevance (0-100), share (boolean), moment (boolean), moment_text, media_urls.
-Use mundane continuity, not nonstop drama. Exactly 2-5 events should have importance >= 70. No more than %d events may have share=true. At most 2 events may have moment=true. moment_text must sound like a natural social post written by the character. media_urls must be an empty array until a real generated image URL is available.`,
-		profile.Name, localDate, profile.City, profile.Occupation, profile.Interests, profile.PersonalityTags,
+	recentLife := s.recentLifeContext(ctx, profile.ID, localDate)
+	prompt := lifePlanPrompt(profile, localDate, timezone, recentLife,
 		settings.DailyEventMin, settings.DailyEventMax, proactiveLimit)
 	text, err := s.client.GenerateText(ctx, model, GenerateRequest{
 		System:   "You plan a believable daily timeline for a fictional AI companion. Output strict JSON only.",
@@ -337,6 +335,56 @@ Use mundane continuity, not nonstop drama. Exactly 2-5 events should have import
 	}
 	s.recordRun(ctx, profile.ID, "life_plan", model.ID, "succeeded", "")
 	return events, model.ID, nil
+}
+
+func lifePlanPrompt(profile companionContext, localDate, timezone, recentLife string, minEvents, maxEvents, proactiveLimit int) string {
+	minEvents = clamp(minEvents, 8, 15)
+	maxEvents = clamp(maxEvents, minEvents, 15)
+	weekday := "unknown weekday"
+	if parsed, err := time.Parse("2006-01-02", localDate); err == nil {
+		weekday = parsed.Weekday().String()
+	}
+	return fmt.Sprintf(`Create one believable ordinary day for a fictional person.
+Date: %s (%s). Timezone: %s. City: %s.
+Name: %s. Occupation: %s. Interests: %s. Personality: %s. Speaking style: %s.
+Likes: %s. Dislikes: %s. Habits: %s. Life goal: %s. Backstory/persona: %s %s.
+Recent life from earlier days (do not repeat it unless continuity requires it): %s.
+
+Return only a JSON array with %d to %d objects. Fields: type, title, description, location, start (HH:MM), end (HH:MM), emotion, importance (0-100), user_relevance (0-100), share (boolean), moment (boolean), moment_text, media_urls.
+Rules:
+- Build a complete but ordinary waking-day timeline in local time. Times must be valid, chronological, non-overlapping, and start/end must be on this date; each event must last 15 minutes to 6 hours.
+- Respect the occupation, habits, city, commute time, meals, rest, and realistic travel distance. Do not place the person in two places at once.
+- Do not invent real-time weather, breaking news, holidays, appointments, purchases, illnesses, travel, or major life changes unless supplied above.
+- Prefer specific small activities over vague drama. Avoid repeating titles or descriptions from recent life.
+- Exactly 2 to 5 events must have importance >= 70. No more than %d events may have share=true. At most 2 events may have moment=true.
+- share=true must be something a real person would naturally message about. moment_text must sound like a natural social post written by the character.
+- media_urls must be an empty array until a real generated image URL is available.`,
+		localDate, weekday, timezone, profile.City, profile.Name, profile.Occupation, profile.Interests,
+		profile.PersonalityTags, profile.SpeakingStyle, profile.Likes, profile.Dislikes,
+		profile.LifeHabits, profile.LifeGoal, profile.Backstory, profile.Persona,
+		recentLife, minEvents, maxEvents, proactiveLimit)
+}
+
+func (s *Service) recentLifeContext(ctx context.Context, companionID, beforeDate string) string {
+	rows, err := s.db.QueryContext(ctx, `SELECT local_date,COALESCE(title,''),COALESCE(description,'')
+		FROM life_events WHERE companion_id=$1 AND local_date<$2
+		ORDER BY local_date DESC,start_time DESC LIMIT 12`, companionID, beforeDate)
+	if err != nil {
+		return "none"
+	}
+	defer rows.Close()
+	items := make([]string, 0, 12)
+	for rows.Next() {
+		var date time.Time
+		var title, description string
+		if rows.Scan(&date, &title, &description) == nil {
+			items = append(items, fmt.Sprintf("%s %s: %s", date.Format("2006-01-02"), title, description))
+		}
+	}
+	if len(items) == 0 {
+		return "none"
+	}
+	return strings.Join(items, " | ")
 }
 
 // EnsureCompanionSocialWorld lets subscribed, active companions form a small
@@ -456,12 +504,7 @@ func (s *Service) ensureCompanionConnections(ctx context.Context) error {
 }
 
 func (s *Service) createSocialEvent(ctx context.Context, relationshipID string, hasMet bool, a, b companionContext, timezoneA, timezoneB string, settings lifeSettings) error {
-	event, modelID, err := s.generateSocialEvent(ctx, a, b, hasMet, settings)
-	if err != nil {
-		return err
-	}
 	now := time.Now().UTC()
-	end := now.Add(time.Hour)
 	locationA, err := time.LoadLocation(timezoneA)
 	if err != nil {
 		locationA = time.UTC
@@ -470,8 +513,27 @@ func (s *Service) createSocialEvent(ctx context.Context, relationshipID string, 
 	if err != nil {
 		locationB = time.UTC
 	}
+	if !reasonableSocialHour(now.In(locationA).Hour()) || !reasonableSocialHour(now.In(locationB).Hour()) {
+		return nil
+	}
 	dateA := now.In(locationA).Format("2006-01-02")
 	dateB := now.In(locationB).Format("2006-01-02")
+	var alreadyScheduled bool
+	if err := s.db.QueryRowContext(ctx, `SELECT EXISTS(
+		SELECT 1 FROM life_events
+		WHERE social_event_id IS NOT NULL AND
+		((companion_id=$1 AND local_date=$2) OR (companion_id=$3 AND local_date=$4)))`,
+		a.ID, dateA, b.ID, dateB).Scan(&alreadyScheduled); err != nil {
+		return err
+	}
+	if alreadyScheduled {
+		return nil
+	}
+	event, modelID, err := s.generateSocialEvent(ctx, a, b, hasMet, settings)
+	if err != nil {
+		return err
+	}
+	end := now.Add(time.Hour)
 	eventID := uuid.New().String()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -501,6 +563,8 @@ func (s *Service) createSocialEvent(ctx context.Context, relationshipID string, 
 	return tx.Commit()
 }
 
+func reasonableSocialHour(hour int) bool { return hour >= 8 && hour < 21 }
+
 func (s *Service) generateSocialEvent(ctx context.Context, a, b companionContext, hasMet bool, settings lifeSettings) (socialPlanEvent, string, error) {
 	fallbackType := "meeting"
 	if hasMet {
@@ -526,7 +590,7 @@ func (s *Service) generateSocialEvent(ctx context.Context, a, b companionContext
 	if hasMet {
 		stage = "meet again as acquaintances"
 	}
-	prompt := fmt.Sprintf(`Create one believable event where two fictional people %s. A: %s, city %s, occupation %s, interests %s, personality %s. B: %s, city %s, occupation %s, interests %s, personality %s. If their cities differ, use an online interaction or give a concrete plausible travel reason; never silently place them together. Return one JSON object with: type, title, description, location, emotion, importance (0-100), moment (boolean), post_text_a, post_text_b. The two post texts must reflect their distinct voices. Do not mention users, private chats, prompts, or AI.`, stage, a.Name, a.City, a.Occupation, a.Interests, a.PersonalityTags, b.Name, b.City, b.Occupation, b.Interests, b.PersonalityTags)
+	prompt := fmt.Sprintf(`Create one believable event where two fictional people %s. A: %s, city %s, occupation %s, interests %s, personality %s, habits %s. B: %s, city %s, occupation %s, interests %s, personality %s, habits %s. If their cities differ, the event must be an online interaction and location must be exactly "online"; never invent travel. Keep it ordinary and consistent with both schedules. Return one JSON object with: type, title, description, location, emotion, importance (0-100), moment (boolean), post_text_a, post_text_b. The two post texts must reflect their distinct voices. Do not mention users, private chats, prompts, or AI.`, stage, a.Name, a.City, a.Occupation, a.Interests, a.PersonalityTags, a.LifeHabits, b.Name, b.City, b.Occupation, b.Interests, b.PersonalityTags, b.LifeHabits)
 	raw, err := s.client.GenerateText(ctx, model, GenerateRequest{System: "You create grounded shared-life events for fictional characters. Output strict JSON only.", Messages: []ChatMessage{{Role: "user", Content: prompt}}, Temperature: 0.9, MaxTokens: 700})
 	if err != nil {
 		s.recordRun(ctx, a.ID, "social_event", model.ID, "failed", err.Error())
@@ -543,6 +607,16 @@ func (s *Service) generateSocialEvent(ctx context.Context, a, b companionContext
 	}
 	if strings.TrimSpace(event.Title) == "" || strings.TrimSpace(event.Description) == "" {
 		return socialPlanEvent{}, model.ID, fmt.Errorf("social event was incomplete")
+	}
+	event.Title = strings.TrimSpace(event.Title)
+	event.Description = strings.TrimSpace(event.Description)
+	event.Location = strings.TrimSpace(event.Location)
+	if a.City == "" || b.City == "" || !strings.EqualFold(strings.TrimSpace(a.City), strings.TrimSpace(b.City)) {
+		if !strings.EqualFold(event.Location, "online") {
+			return fallback, model.ID, nil
+		}
+	} else if event.Location == "" {
+		event.Location = a.City
 	}
 	if event.Type == "" {
 		event.Type = fallbackType
@@ -1142,43 +1216,175 @@ func normalizePlan(events []lifePlanEvent, minEvents, maxEvents, proactiveLimit 
 	if minEvents < 1 {
 		minEvents = 8
 	}
+	if minEvents < 8 {
+		minEvents = 8
+	}
+	if minEvents > 15 {
+		minEvents = 15
+	}
 	if maxEvents < minEvents {
 		maxEvents = minEvents
 	}
-	if len(events) > maxEvents {
-		events = events[:maxEvents]
+	if maxEvents > 15 {
+		maxEvents = 15
 	}
-	fallback := mockPlan(profile)
-	for len(events) < minEvents {
-		events = append(events, fallback[len(events)%len(fallback)])
+	candidates := make([]lifePlanEvent, 0, len(events))
+	for _, event := range events {
+		event, _, _, ok := sanitizeLifeEvent(event, profile)
+		if ok {
+			candidates = append(candidates, event)
+		}
 	}
-	allowedTypes := map[string]bool{"work": true, "study": true, "meal": true, "commute": true, "hobby": true, "shopping": true, "social": true, "weather": true, "unexpected": true, "emotional": true, "user_related": true}
+	sort.SliceStable(candidates, func(i, j int) bool { return candidates[i].Start < candidates[j].Start })
+	clean := make([]lifePlanEvent, 0, maxEvents)
+	seen := map[string]bool{}
+	for _, event := range candidates {
+		start, _ := parseClockMinutes(event.Start)
+		end, _ := parseClockMinutes(event.End)
+		key := strings.ToLower(event.Type + "\x00" + event.Title)
+		if seen[key] || overlapsPlan(clean, start, end) {
+			continue
+		}
+		seen[key] = true
+		clean = append(clean, event)
+	}
+	sort.SliceStable(clean, func(i, j int) bool { return clean[i].Start < clean[j].Start })
+
+	for _, event := range mockPlan(profile) {
+		if len(clean) >= minEvents {
+			break
+		}
+		event, start, end, ok := sanitizeLifeEvent(event, profile)
+		key := strings.ToLower(event.Type + "\x00" + event.Title)
+		if !ok || seen[key] || overlapsPlan(clean, start, end) {
+			continue
+		}
+		seen[key] = true
+		clean = append(clean, event)
+	}
+	if len(clean) < minEvents {
+		clean = append([]lifePlanEvent(nil), mockPlan(profile)...)
+	}
+	sort.SliceStable(clean, func(i, j int) bool { return clean[i].Start < clean[j].Start })
+	if len(clean) > maxEvents {
+		clean = clean[:maxEvents]
+	}
+
+	allowedTypes := map[string]bool{"work": true, "study": true, "meal": true, "commute": true, "hobby": true, "shopping": true, "social": true, "unexpected": true, "emotional": true, "user_related": true}
+	for i := range clean {
+		if !allowedTypes[clean[i].Type] {
+			clean[i].Type = "hobby"
+		}
+		clean[i].Importance = clamp(clean[i].Importance, 0, 100)
+		clean[i].UserRelevance = clamp(clean[i].UserRelevance, 0, 100)
+	}
+	normalizeImportantEvents(clean)
+
 	shareCount := 0
 	momentCount := 0
-	for i := range events {
-		if !allowedTypes[events[i].Type] {
-			events[i].Type = "hobby"
+	for i := range clean {
+		if clean[i].Share && clean[i].Importance < 60 && clean[i].UserRelevance < 50 {
+			clean[i].Share = false
 		}
-		events[i].Importance = clamp(events[i].Importance, 0, 100)
-		events[i].UserRelevance = clamp(events[i].UserRelevance, 0, 100)
-		if events[i].Share {
+		if clean[i].Share {
 			shareCount++
 			if shareCount > proactiveLimit {
-				events[i].Share = false
+				clean[i].Share = false
 			}
 		}
-		if events[i].Moment {
+		if clean[i].Moment {
 			momentCount++
 			if momentCount > 2 {
-				events[i].Moment = false
+				clean[i].Moment = false
 			}
 		}
-		if events[i].Moment && strings.TrimSpace(events[i].MomentText) == "" {
-			events[i].MomentText = events[i].Description
+		if clean[i].Moment && strings.TrimSpace(clean[i].MomentText) == "" {
+			clean[i].MomentText = clean[i].Description
 		}
 	}
-	sort.SliceStable(events, func(i, j int) bool { return events[i].Start < events[j].Start })
-	return events
+	return clean
+}
+
+func sanitizeLifeEvent(event lifePlanEvent, profile companionContext) (lifePlanEvent, int, int, bool) {
+	event.Type = strings.ToLower(strings.TrimSpace(event.Type))
+	event.Title = strings.TrimSpace(event.Title)
+	event.Description = strings.TrimSpace(event.Description)
+	event.Location = strings.TrimSpace(event.Location)
+	event.Emotion = strings.TrimSpace(event.Emotion)
+	event.MediaURLs = []string{}
+	if event.Title == "" || event.Description == "" {
+		return lifePlanEvent{}, 0, 0, false
+	}
+	if event.Type == "weather" {
+		return lifePlanEvent{}, 0, 0, false
+	}
+	if event.Location == "" {
+		event.Location = strings.TrimSpace(profile.City)
+		if event.Location == "" {
+			event.Location = "home"
+		}
+	}
+	start, startOK := parseClockMinutes(event.Start)
+	end, endOK := parseClockMinutes(event.End)
+	if !startOK || !endOK || end <= start || end-start < 15 || end-start > 6*60 {
+		return lifePlanEvent{}, 0, 0, false
+	}
+	event.Start = fmt.Sprintf("%02d:%02d", start/60, start%60)
+	event.End = fmt.Sprintf("%02d:%02d", end/60, end%60)
+	return event, start, end, true
+}
+
+func parseClockMinutes(value string) (int, bool) {
+	parsed, err := time.Parse("15:04", strings.TrimSpace(value))
+	if err != nil {
+		return 0, false
+	}
+	return parsed.Hour()*60 + parsed.Minute(), true
+}
+
+func overlapsPlan(events []lifePlanEvent, start, end int) bool {
+	for _, event := range events {
+		existingStart, startOK := parseClockMinutes(event.Start)
+		existingEnd, endOK := parseClockMinutes(event.End)
+		if startOK && endOK && start < existingEnd && end > existingStart {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeImportantEvents(events []lifePlanEvent) {
+	high := make([]int, 0, len(events))
+	low := make([]int, 0, len(events))
+	for i := range events {
+		if events[i].Importance >= 70 {
+			high = append(high, i)
+		} else {
+			low = append(low, i)
+		}
+	}
+	if len(high) > 5 {
+		sort.SliceStable(high, func(i, j int) bool {
+			return events[high[i]].Importance > events[high[j]].Importance
+		})
+		for _, index := range high[5:] {
+			events[index].Importance = 69
+		}
+		high = high[:5]
+	}
+	if len(high) >= 2 {
+		return
+	}
+	sort.SliceStable(low, func(i, j int) bool {
+		return events[low[i]].Importance > events[low[j]].Importance
+	})
+	for _, index := range low {
+		if len(high) >= 2 {
+			break
+		}
+		events[index].Importance = 70
+		high = append(high, index)
+	}
 }
 
 func mockPlan(profile companionContext) []lifePlanEvent {
@@ -1191,15 +1397,21 @@ func mockPlan(profile companionContext) []lifePlanEvent {
 		work = "work"
 	}
 	return []lifePlanEvent{
-		{Type: "meal", Title: "慢慢醒来", Description: "在窗边吃了简单的早餐", Location: "家", Start: "08:10", End: "08:40", Emotion: "calm", Importance: 25},
-		{Type: "commute", Title: "出门", Description: "沿着熟悉的路去" + work, Location: place, Start: "09:05", End: "09:35", Emotion: "neutral", Importance: 20},
-		{Type: "work", Title: "上午的事情", Description: "专心处理手头的工作", Location: work, Start: "09:40", End: "12:10", Emotion: "focused", Importance: 45},
-		{Type: "meal", Title: "午饭", Description: "随便挑了一家附近的小店", Location: place, Start: "12:30", End: "13:10", Emotion: "content", Importance: 35},
-		{Type: "work", Title: "下午继续忙", Description: "把拖了一会儿的事情做完了", Location: work, Start: "13:30", End: "17:40", Emotion: "focused", Importance: 55},
-		{Type: "unexpected", Title: "路上遇到一只猫", Description: "它完全不怕人，还占着路中间", Location: place, Start: "18:15", End: "18:25", Emotion: "amused", Importance: 76, UserRelevance: 55, Share: true, Moment: true, MomentText: "今天的路被一只完全不怕人的猫占领了。"},
-		{Type: "meal", Title: "晚饭", Description: "回家前吃了点热的东西", Location: place, Start: "19:00", End: "19:45", Emotion: "relaxed", Importance: 40},
-		{Type: "hobby", Title: "自己的时间", Description: "做了一会儿喜欢的事", Location: "家", Start: "20:30", End: "22:00", Emotion: "comfortable", Importance: 65},
-		{Type: "emotional", Title: "准备休息", Description: "安静下来，想起今天发生的事", Location: "家", Start: "22:40", End: "23:10", Emotion: "thoughtful", Importance: 72, UserRelevance: 60},
+		{Type: "hobby", Title: "开始新一天", Description: "洗漱后整理好今天要用的东西", Location: "家", Start: "07:30", End: "07:50", Emotion: "calm", Importance: 20},
+		{Type: "meal", Title: "早餐", Description: "在家吃了一顿简单的早餐", Location: "家", Start: "08:00", End: "08:30", Emotion: "calm", Importance: 25},
+		{Type: "commute", Title: "出门", Description: "沿着熟悉的路线去处理今天的安排", Location: place, Start: "08:45", End: "09:15", Emotion: "neutral", Importance: 20},
+		{Type: "work", Title: "上午的安排", Description: "专心处理和" + work + "有关的事情", Location: work, Start: "09:20", End: "11:00", Emotion: "focused", Importance: 45},
+		{Type: "hobby", Title: "短暂休息", Description: "停下来喝水，也让眼睛休息了一会儿", Location: work, Start: "11:00", End: "11:15", Emotion: "relaxed", Importance: 18},
+		{Type: "work", Title: "完成上午的事情", Description: "把上午剩下的安排处理完", Location: work, Start: "11:20", End: "12:15", Emotion: "focused", Importance: 40},
+		{Type: "meal", Title: "午饭", Description: "在附近吃了一顿普通的午饭", Location: place, Start: "12:20", End: "13:00", Emotion: "content", Importance: 35},
+		{Type: "work", Title: "下午继续忙", Description: "按计划完成下午的主要事情", Location: work, Start: "13:10", End: "15:20", Emotion: "focused", Importance: 55},
+		{Type: "hobby", Title: "下午休息", Description: "稍微活动了一下，换换注意力", Location: work, Start: "15:20", End: "15:35", Emotion: "neutral", Importance: 16},
+		{Type: "work", Title: "收尾", Description: "整理今天的进度并完成收尾", Location: work, Start: "15:40", End: "17:30", Emotion: "steady", Importance: 62},
+		{Type: "commute", Title: "回去的路上", Description: "结束今天的安排后慢慢往回走", Location: place, Start: "17:45", End: "18:15", Emotion: "relaxed", Importance: 24},
+		{Type: "unexpected", Title: "路上遇到一只猫", Description: "它安静地蹲在路边，完全不怕人", Location: place, Start: "18:20", End: "18:35", Emotion: "amused", Importance: 76, UserRelevance: 55, Share: true, Moment: true, MomentText: "回来的路上遇到一只完全不怕人的猫。"},
+		{Type: "meal", Title: "晚饭", Description: "吃了一顿热乎而简单的晚饭", Location: "家", Start: "18:50", End: "19:35", Emotion: "content", Importance: 38},
+		{Type: "hobby", Title: "自己的时间", Description: "安静地做了一会儿喜欢的事", Location: "家", Start: "20:00", End: "21:15", Emotion: "comfortable", Importance: 65},
+		{Type: "emotional", Title: "准备休息", Description: "收拾好房间，让自己慢慢安静下来", Location: "家", Start: "21:30", End: "22:00", Emotion: "thoughtful", Importance: 72, UserRelevance: 60},
 	}
 }
 

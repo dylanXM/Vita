@@ -17,9 +17,9 @@ func TestParseLifePlanFromFence(t *testing.T) {
 
 func TestNormalizePlanCapsSharesAndCount(t *testing.T) {
 	events := []lifePlanEvent{
-		{Type: "meal", Start: "09:00", Share: true, Moment: true},
-		{Type: "unknown", Start: "08:00", Share: true, Moment: true},
-		{Type: "hobby", Start: "10:00", Moment: true},
+		{Type: "meal", Title: "Breakfast", Description: "Ate breakfast", Location: "home", Start: "09:00", End: "09:30", Importance: 65, Share: true, Moment: true},
+		{Type: "unknown", Title: "Morning", Description: "Prepared for the day", Location: "home", Start: "08:00", End: "08:30", Importance: 75, Share: true, Moment: true},
+		{Type: "hobby", Title: "Reading", Description: "Read a chapter", Location: "home", Start: "10:00", End: "10:30", Moment: true},
 	}
 	got := normalizePlan(events, 8, 10, 1, companionContext{Name: "Mia"})
 	if len(got) != 8 {
@@ -43,6 +43,83 @@ func TestNormalizePlanCapsSharesAndCount(t *testing.T) {
 	}
 	if got[0].Type != "hobby" {
 		t.Fatalf("unknown type was not normalized: %#v", got[0])
+	}
+}
+
+func TestNormalizePlanEnforcesCommonSenseShape(t *testing.T) {
+	events := []lifePlanEvent{
+		{Type: "work", Title: "Valid work", Description: "Finished a report", Location: "office", Start: "09:00", End: "11:00", Importance: 95, MediaURLs: []string{"https://invented.example/image.jpg"}},
+		{Type: "meal", Title: "Overlapping meal", Description: "Ate lunch", Location: "cafe", Start: "10:30", End: "11:30", Importance: 90},
+		{Type: "hobby", Title: "Impossible clock", Description: "Read", Location: "home", Start: "27:00", End: "28:00", Importance: 80},
+		{Type: "hobby", Title: "Too long", Description: "Read", Location: "home", Start: "12:00", End: "20:00", Importance: 80},
+		{Type: "meal", Title: "", Description: "Missing title", Location: "home", Start: "18:00", End: "18:30"},
+		{Type: "weather", Title: "Invented weather", Description: "Claimed it was raining", Location: "Tokyo", Start: "06:00", End: "06:30"},
+	}
+	got := normalizePlan(events, 8, 15, 2, companionContext{Name: "Mia", City: "Tokyo"})
+	if len(got) < 8 || len(got) > 15 {
+		t.Fatalf("event count = %d", len(got))
+	}
+	high := 0
+	for i, event := range got {
+		start, startOK := parseClockMinutes(event.Start)
+		end, endOK := parseClockMinutes(event.End)
+		if !startOK || !endOK || end <= start || end-start < 15 || end-start > 360 {
+			t.Fatalf("invalid duration: %#v", event)
+		}
+		if event.Title == "" || event.Description == "" || event.Location == "" {
+			t.Fatalf("incomplete event: %#v", event)
+		}
+		if event.Importance >= 70 {
+			high++
+		}
+		if i > 0 {
+			previousEnd, _ := parseClockMinutes(got[i-1].End)
+			if start < previousEnd {
+				t.Fatalf("overlap: %#v then %#v", got[i-1], event)
+			}
+		}
+	}
+	if high < 2 || high > 5 {
+		t.Fatalf("high-importance events = %d", high)
+	}
+	for _, event := range got {
+		if event.Title == "Overlapping meal" || event.Title == "Impossible clock" || event.Title == "Too long" || event.Title == "Invented weather" {
+			t.Fatalf("invalid event survived normalization: %#v", event)
+		}
+		if len(event.MediaURLs) != 0 {
+			t.Fatalf("unverified media URL survived normalization: %#v", event)
+		}
+	}
+}
+
+func TestLifePlanPromptCarriesIdentityAndContinuity(t *testing.T) {
+	prompt := lifePlanPrompt(companionContext{
+		Name: "Mia", City: "Tokyo", Occupation: "designer", Interests: "photography",
+		PersonalityTags: "thoughtful", SpeakingStyle: "concise", Likes: "coffee",
+		Dislikes: "crowds", LifeHabits: "morning walk", LifeGoal: "open a studio",
+		Backstory: "moved recently", Persona: "independent",
+	}, "2026-09-20", "Asia/Tokyo", "2026-09-19 gallery visit", 8, 24, 3)
+	for _, expected := range []string{
+		"Asia/Tokyo", "morning walk", "open a studio", "moved recently",
+		"2026-09-19 gallery visit", "non-overlapping", "Do not invent real-time weather",
+		"8 to 15 objects",
+	} {
+		if !strings.Contains(prompt, expected) {
+			t.Fatalf("prompt missing %q", expected)
+		}
+	}
+}
+
+func TestReasonableSocialHour(t *testing.T) {
+	for _, hour := range []int{8, 12, 20} {
+		if !reasonableSocialHour(hour) {
+			t.Fatalf("hour %d should be allowed", hour)
+		}
+	}
+	for _, hour := range []int{0, 7, 21, 23} {
+		if reasonableSocialHour(hour) {
+			t.Fatalf("hour %d should be blocked", hour)
+		}
 	}
 }
 

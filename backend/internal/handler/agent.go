@@ -250,7 +250,7 @@ func AdminUpdateAgentSettings(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if input.DailyEventMin < 1 || input.DailyEventMax < input.DailyEventMin || input.DailyEventMax > 24 ||
+	if input.DailyEventMin < 8 || input.DailyEventMax < input.DailyEventMin || input.DailyEventMax > 15 ||
 		input.DailyProactiveLimit < 0 || input.DailyProactiveLimit > 8 ||
 		input.QuietHoursStart < 0 || input.QuietHoursStart > 23 || input.QuietHoursEnd < 0 || input.QuietHoursEnd > 23 ||
 		input.FreeDefaultChatHours < 1 || input.FreeDefaultChatHours > 720 {

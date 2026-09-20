@@ -187,15 +187,15 @@ function SettingsSection({ models, initial, onSaved }: { models: AIModel[]; init
       <CardHeader><CardTitle>{t("agent.routing")}</CardTitle><CardDescription>{t("agent.routingDesc")}</CardDescription></CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 md:grid-cols-3"><Field label={t("agent.chatModel")}>{modelSelect(form.chat_model_id, (v) => setForm({ ...form, chat_model_id: v }))}</Field><Field label={t("agent.lifeModel")}>{modelSelect(form.life_model_id, (v) => setForm({ ...form, life_model_id: v }))}</Field><Field label={t("agent.proactiveModel")}>{modelSelect(form.proactive_model_id, (v) => setForm({ ...form, proactive_model_id: v }))}</Field></div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6"><NumberField label={t("agent.eventMin")} value={form.daily_event_min} onChange={(v) => setForm({ ...form, daily_event_min: v })} /><NumberField label={t("agent.eventMax")} value={form.daily_event_max} onChange={(v) => setForm({ ...form, daily_event_max: v })} /><NumberField label={t("agent.proactiveLimit")} value={form.daily_proactive_limit} onChange={(v) => setForm({ ...form, daily_proactive_limit: v })} /><NumberField label={t("agent.quietStart")} value={form.quiet_hours_start} onChange={(v) => setForm({ ...form, quiet_hours_start: v })} /><NumberField label={t("agent.quietEnd")} value={form.quiet_hours_end} onChange={(v) => setForm({ ...form, quiet_hours_end: v })} /><NumberField label={t("agent.freeDefaultChatHours")} value={form.free_default_chat_hours} onChange={(v) => setForm({ ...form, free_default_chat_hours: v })} /></div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6"><NumberField label={t("agent.eventMin")} value={form.daily_event_min} min={8} max={15} onChange={(v) => setForm({ ...form, daily_event_min: v })} /><NumberField label={t("agent.eventMax")} value={form.daily_event_max} min={8} max={15} onChange={(v) => setForm({ ...form, daily_event_max: v })} /><NumberField label={t("agent.proactiveLimit")} value={form.daily_proactive_limit} min={0} max={8} onChange={(v) => setForm({ ...form, daily_proactive_limit: v })} /><NumberField label={t("agent.quietStart")} value={form.quiet_hours_start} min={0} max={23} onChange={(v) => setForm({ ...form, quiet_hours_start: v })} /><NumberField label={t("agent.quietEnd")} value={form.quiet_hours_end} min={0} max={23} onChange={(v) => setForm({ ...form, quiet_hours_end: v })} /><NumberField label={t("agent.freeDefaultChatHours")} value={form.free_default_chat_hours} min={1} max={720} onChange={(v) => setForm({ ...form, free_default_chat_hours: v })} /></div>
         <Button onClick={() => save.mutate()} disabled={save.isPending}><Save />{t("agent.saveSettings")}</Button>
       </CardContent>
     </Card>
   );
 }
 
-function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
-  return <Field label={label}><Input type="number" value={value} onChange={(e) => onChange(Number(e.target.value))} /></Field>;
+function NumberField({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
+  return <Field label={label}><Input type="number" value={value} min={min} max={max} onChange={(e) => onChange(Number(e.target.value))} /></Field>;
 }
 
 function PortraitSection({ portraits, onSaved }: { portraits: CompanionPortrait[]; onSaved: () => void }) {
