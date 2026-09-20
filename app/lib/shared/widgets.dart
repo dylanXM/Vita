@@ -386,16 +386,22 @@ class VitaEmpty extends StatelessWidget {
 class VitaListTile extends StatelessWidget {
   const VitaListTile({
     super.key,
-    required this.icon,
+    this.icon,
+    this.customIcon,
     required this.title,
     this.subtitle,
     this.onTap,
     this.trailing,
     this.iconColor,
     this.borderRadius,
-  });
+  }) : assert(icon != null || customIcon != null,
+            'Either icon or customIcon must be provided');
 
-  final IconData icon;
+  final IconData? icon;
+
+  /// Optional fully custom leading widget (e.g. a colored SVG). When set, it
+  /// replaces the default [Icon] rendered inside the 30x30 tile badge.
+  final Widget? customIcon;
   final String title;
   final String? subtitle;
   final Widget? trailing;
@@ -419,10 +425,10 @@ class VitaListTile extends StatelessWidget {
                 width: 30,
                 height: 30,
                 decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.1),
+                  color: customIcon == null ? accent.withValues(alpha: 0.1) : Colors.transparent,
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: Icon(icon, color: accent, size: 18),
+                child: customIcon ?? Icon(icon, color: accent, size: 18),
               ),
               const SizedBox(width: 12),
               Expanded(

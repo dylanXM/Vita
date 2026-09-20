@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 
 import '../../core/analytics_service.dart';
@@ -64,7 +65,11 @@ class ExplorePage extends StatelessWidget {
               child: Column(
                 children: [
                   VitaListTile(
-                    icon: Icons.dynamic_feed_outlined,
+                    customIcon: SvgPicture.asset(
+                      'assets/icons/menu_moments.svg',
+                      width: 18,
+                      height: 18,
+                    ),
                     title: 'explore.moments'.tr,
                     borderRadius: BorderRadius.zero,
                     onTap: () => Get.to(
@@ -75,7 +80,11 @@ class ExplorePage extends StatelessWidget {
                   ),
                   const Divider(indent: 52, height: 0.5),
                   VitaListTile(
-                    icon: Icons.auto_stories_outlined,
+                    customIcon: SvgPicture.asset(
+                      'assets/icons/menu_memories.svg',
+                      width: 18,
+                      height: 18,
+                    ),
                     title: 'explore.memories'.tr,
                     borderRadius: BorderRadius.zero,
                     onTap: () => Get.to(
@@ -104,14 +113,10 @@ class MomentsPage extends StatelessWidget {
     final controller = ExploreController.to;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
+      appBar: AppBar(title: Text('explore.moments'.tr)),
       body: SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            VitaTabHeader(title: 'explore.moments'.tr),
-            Expanded(child: _MomentsFeed(controller: controller)),
-          ],
-        ),
+        child: _MomentsFeed(controller: controller),
       ),
     );
   }

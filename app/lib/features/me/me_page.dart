@@ -118,7 +118,11 @@ class MePage extends StatelessWidget {
                 child: Column(
                   children: [
                     VitaListTile(
-                      icon: Icons.workspace_premium_outlined,
+                      customIcon: SvgPicture.asset(
+                        'assets/icons/menu_subscribe.svg',
+                        width: 18,
+                        height: 18,
+                      ),
                       title: 'me.plus.title'.tr,
                       subtitle: billing.isSubscribed
                           ? 'me.plus.active'.trParams({
@@ -137,7 +141,11 @@ class MePage extends StatelessWidget {
                     ),
                     const Divider(indent: 52, height: 0.5),
                     VitaListTile(
-                      icon: Icons.toll_outlined,
+                      customIcon: SvgPicture.asset(
+                        'assets/icons/menu_credits.svg',
+                        width: 18,
+                        height: 18,
+                      ),
                       title: 'me.credits'.tr,
                       subtitle: 'me.credits.available'.trParams({
                         'n': '${billing.balance.value}',
@@ -162,7 +170,11 @@ class MePage extends StatelessWidget {
                 child: Column(
                   children: [
                     VitaListTile(
-                      icon: Icons.card_giftcard_outlined,
+                      customIcon: SvgPicture.asset(
+                        'assets/icons/menu_invite.svg',
+                        width: 18,
+                        height: 18,
+                      ),
                       title: 'me.inviteCode'.tr,
                       subtitle: inviteCode.isEmpty ? '—' : inviteCode,
                       borderRadius: BorderRadius.zero,
@@ -180,14 +192,22 @@ class MePage extends StatelessWidget {
                     ),
                     const Divider(indent: 52, height: 0.5),
                     VitaListTile(
-                      icon: Icons.star_outline,
+                      customIcon: SvgPicture.asset(
+                        'assets/icons/menu_rate.svg',
+                        width: 18,
+                        height: 18,
+                      ),
                       title: 'me.rate'.tr,
                       borderRadius: BorderRadius.zero,
                       onTap: _rateApp,
                     ),
                     const Divider(indent: 52, height: 0.5),
                     VitaListTile(
-                      icon: Icons.mail_outline,
+                      customIcon: SvgPicture.asset(
+                        'assets/icons/menu_contact.svg',
+                        width: 18,
+                        height: 18,
+                      ),
                       title: 'me.contact'.tr,
                       subtitle: supportEmail,
                       borderRadius: BorderRadius.zero,
@@ -195,7 +215,11 @@ class MePage extends StatelessWidget {
                     ),
                     const Divider(indent: 52, height: 0.5),
                     VitaListTile(
-                      icon: Icons.settings_outlined,
+                      customIcon: SvgPicture.asset(
+                        'assets/icons/menu_settings.svg',
+                        width: 18,
+                        height: 18,
+                      ),
                       title: 'me.settings'.tr,
                       borderRadius: BorderRadius.zero,
                       onTap: () {

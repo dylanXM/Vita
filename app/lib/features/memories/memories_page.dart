@@ -88,13 +88,10 @@ class MemoriesPage extends StatelessWidget {
     final ctrl = MemoriesController.to;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
+      appBar: AppBar(title: Text('memories.title'.tr)),
       body: SafeArea(
         bottom: false,
         child: Column(children: [
-          VitaTabHeader(
-            title: 'memories.title'.tr,
-            subtitle: 'memories.subtitle'.tr,
-          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
