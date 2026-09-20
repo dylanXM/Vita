@@ -6,6 +6,7 @@ import '../../shared/widgets.dart';
 import '../companion/companion_create_page.dart';
 import '../billing/billing_controller.dart';
 import 'chat_list_controller.dart';
+import 'chat_list_presentation.dart';
 import 'chat_page.dart';
 
 /// Chat tab — a continuous conversation list with familiar message-app rhythm.
@@ -76,18 +77,33 @@ class ChatListPage extends StatelessWidget {
         final c = ctrl.companions[i];
         final id = c['id'] as String? ?? '';
         final name = c['name'] as String? ?? 'chat.companion'.tr;
-        final subtitle = [
+        final profileSubtitle = [
           c['city'] as String?,
           c['occupation'] as String?,
         ].where((e) => e != null && e.isNotEmpty).join(' · ');
         final friendshipActive = c['friendship_active'] != false;
+        final presentation = ChatListPresentation.from(c);
+        final subtitle = !friendshipActive
+            ? 'chat.notFriends'.tr
+            : presentation.preview(
+                fallback: profileSubtitle.isEmpty
+                    ? 'chat.distant'.tr
+                    : profileSubtitle,
+                voiceLabel: 'chat.voiceMessage'.tr,
+                photoLabel: 'chat.photoMessage'.tr,
+              );
+        final time =
+            presentation.timeLabel(DateTime.now(), 'common.yesterday'.tr);
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () => Get.to(
-            () => ChatPage(companionId: id, name: name, companion: c),
-            transition: Transition.cupertino,
-            duration: const Duration(milliseconds: 300),
-          ),
+          onTap: () async {
+            await Get.to(
+              () => ChatPage(companionId: id, name: name, companion: c),
+              transition: Transition.cupertino,
+              duration: const Duration(milliseconds: 300),
+            );
+            await ctrl.load();
+          },
           child: Container(
             color: context.vita.surface,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -109,11 +125,7 @@ class ChatListPage extends StatelessWidget {
                               color: context.vita.text)),
                       const SizedBox(height: 3),
                       Text(
-                        !friendshipActive
-                            ? 'chat.notFriends'.tr
-                            : subtitle.isEmpty
-                                ? 'chat.distant'.tr
-                                : subtitle,
+                        subtitle,
                         style: TextStyle(
                             fontSize: 13, color: context.vita.subText),
                         maxLines: 1,
@@ -122,8 +134,38 @@ class ChatListPage extends StatelessWidget {
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right,
-                    size: 20, color: context.vita.chevron),
+                if (time.isNotEmpty || presentation.unreadCount > 0) ...[
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (time.isNotEmpty)
+                        Text(time,
+                            style: TextStyle(
+                                fontSize: 11, color: context.vita.subText)),
+                      if (presentation.unreadCount > 0) ...[
+                        const SizedBox(height: 6),
+                        Container(
+                          constraints:
+                              const BoxConstraints(minWidth: 18, minHeight: 18),
+                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: context.vita.red,
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          child: Text(
+                            presentation.unreadCount > 99
+                                ? '99+'
+                                : '${presentation.unreadCount}',
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 10, height: 1.1),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
               ],
             ),
           ),

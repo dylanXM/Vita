@@ -313,6 +313,7 @@ func migrate(db *sql.DB) error {
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
+		`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_read_at TIMESTAMP`,
 		`CREATE TABLE IF NOT EXISTS messages (
 			id TEXT PRIMARY KEY,
 			conversation_id TEXT NOT NULL REFERENCES conversations(id),
@@ -322,6 +323,8 @@ func migrate(db *sql.DB) error {
 			media_url TEXT,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
+		`CREATE INDEX IF NOT EXISTS idx_conversations_user_companion ON conversations(user_id,companion_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_messages_conversation_created ON messages(conversation_id,created_at DESC)`,
 		`CREATE TABLE IF NOT EXISTS memories (
 			id TEXT PRIMARY KEY,
 			companion_id TEXT NOT NULL REFERENCES companions(id),

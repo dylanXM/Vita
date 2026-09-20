@@ -47,6 +47,7 @@ class VitaTranslations extends Translations {
       'chat.voice': 'Voice message',
       'chat.voiceStop': 'Stop and send',
       'chat.voiceMessage': 'Voice message',
+      'chat.photoMessage': 'Photo',
       'subscription.required.title': 'Subscription required',
       'subscription.required.create':
           'Subscribe before creating your own companion.',
@@ -307,6 +308,7 @@ class VitaTranslations extends Translations {
       'chat.voice': '语音消息',
       'chat.voiceStop': '停止并发送',
       'chat.voiceMessage': '语音消息',
+      'chat.photoMessage': '图片',
       'subscription.required.title': '需要订阅',
       'subscription.required.create': '订阅后才能创建自己的角色。',
       'subscription.continue': '继续订阅',

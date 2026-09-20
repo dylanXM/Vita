@@ -12,6 +12,7 @@ import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../life/life_page.dart';
 import '../shell/shell_page.dart';
+import '../auth/auth_controller.dart';
 import 'chat_controller.dart';
 import 'chat_message_content.dart';
 import 'experience_sheet.dart';
@@ -292,48 +293,13 @@ class _ChatPageState extends State<ChatPage> {
     return Scaffold(
       backgroundColor: context.vita.pageBg,
       appBar: AppBar(
-        titleSpacing: 4,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new,
               size: 20, color: context.vita.text),
           onPressed: () => Get.back(),
         ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            VitaAvatar(
-                name: widget.name,
-                radius: 17,
-                imageUrl: widget.companion?['portrait_url'] as String?),
-            const SizedBox(width: 9),
-            Obx(() => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(widget.name,
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: context.vita.text)),
-                    if (ctrl.companionStatus.value.isNotEmpty)
-                      Text(
-                          ctrl.companionBusy.value
-                              ? ctrl.companionStatus.value
-                              : 'chat.available'.tr,
-                          style: TextStyle(
-                              fontSize: 11, color: context.vita.subText),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                  ],
-                )),
-          ],
-        ),
+        title: Text(widget.name),
         actions: [
-          IconButton(
-            tooltip: 'experience.title'.tr,
-            icon: Icon(Icons.auto_awesome_outlined, color: context.vita.green),
-            onPressed: ctrl.accessError.value == null ? _showExperiences : null,
-          ),
           IconButton(
             icon: Icon(Icons.more_horiz, color: context.vita.subText),
             onPressed: _showCompanionSheet,
@@ -449,6 +415,10 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 ),
               ),
+              if (isUser) ...[
+                const SizedBox(width: 10),
+                VitaAvatar(name: AuthController.to.email, radius: 20),
+              ],
             ],
           ),
         ),

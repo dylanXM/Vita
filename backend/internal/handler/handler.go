@@ -815,6 +815,10 @@ type Companion struct {
 	CanChat              bool       `json:"can_chat"`
 	RequiresSubscription bool       `json:"requires_subscription"`
 	TrialExpiresAt       *time.Time `json:"trial_expires_at,omitempty"`
+	LastMessage          string     `json:"last_message,omitempty"`
+	LastMessageType      string     `json:"last_message_type,omitempty"`
+	LastMessageAt        *time.Time `json:"last_message_at,omitempty"`
+	UnreadCount          int        `json:"unread_count"`
 	CreatedAt            time.Time  `json:"created_at"`
 	UpdatedAt            time.Time  `json:"updated_at"`
 }
@@ -922,7 +926,24 @@ func ListCompanions(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to prepare default companions"})
 		return
 	}
-	rows, err := db.Get().Query(`SELECT c.id,c.user_id,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.appearance,''),COALESCE(c.city,''),COALESCE(c.occupation,''),COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.portrait_id,COALESCE(p.image_url,''),c.model_id,c.creation_source,c.proactive_enabled,c.active,c.is_default,c.life_enabled,c.friendship_active,c.created_at,c.updated_at FROM companions c LEFT JOIN companion_portraits p ON p.id=c.portrait_id WHERE c.user_id=$1 AND c.active=true ORDER BY c.is_default DESC,c.created_at DESC`, userID)
+	rows, err := db.Get().Query(`SELECT c.id,c.user_id,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.appearance,''),COALESCE(c.city,''),COALESCE(c.occupation,''),COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.portrait_id,COALESCE(p.image_url,''),c.model_id,c.creation_source,c.proactive_enabled,c.active,c.is_default,c.life_enabled,c.friendship_active,c.created_at,c.updated_at,
+		COALESCE(latest.content,''),COALESCE(latest.message_type,'text'),latest.created_at,COALESCE(unread.count,0)
+		FROM companions c
+		LEFT JOIN companion_portraits p ON p.id=c.portrait_id
+		LEFT JOIN LATERAL (
+			SELECT m.content,m.message_type,m.created_at
+			FROM conversations conversation JOIN messages m ON m.conversation_id=conversation.id
+			WHERE conversation.user_id=$1 AND conversation.companion_id=c.id
+			ORDER BY m.created_at DESC LIMIT 1
+		) latest ON true
+		LEFT JOIN LATERAL (
+			SELECT COUNT(*) AS count
+			FROM conversations conversation JOIN messages m ON m.conversation_id=conversation.id
+			WHERE conversation.user_id=$1 AND conversation.companion_id=c.id
+			  AND m.sender_type='assistant' AND m.created_at>COALESCE(conversation.last_read_at,conversation.created_at)
+		) unread ON true
+		WHERE c.user_id=$1 AND c.active=true
+		ORDER BY latest.created_at DESC NULLS LAST,c.is_default DESC,c.created_at DESC`, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list companions"})
 		return
@@ -933,12 +954,14 @@ func ListCompanions(c *gin.Context) {
 		var comp Companion
 		var tags string
 		var portraitID, modelID sql.NullString
-		if err := rows.Scan(&comp.ID, &comp.UserID, &comp.Name, &comp.Gender, &comp.Persona, &comp.Appearance, &comp.City, &comp.Occupation, &comp.Interests, &comp.RelationshipStage, &tags, &comp.SpeakingStyle, &comp.Likes, &comp.Dislikes, &comp.LifeHabits, &comp.LifeGoal, &comp.Backstory, &portraitID, &comp.PortraitURL, &modelID, &comp.CreationSource, &comp.ProactiveEnabled, &comp.Active, &comp.IsDefault, &comp.LifeEnabled, &comp.FriendshipActive, &comp.CreatedAt, &comp.UpdatedAt); err != nil {
+		var lastMessageAt sql.NullTime
+		if err := rows.Scan(&comp.ID, &comp.UserID, &comp.Name, &comp.Gender, &comp.Persona, &comp.Appearance, &comp.City, &comp.Occupation, &comp.Interests, &comp.RelationshipStage, &tags, &comp.SpeakingStyle, &comp.Likes, &comp.Dislikes, &comp.LifeHabits, &comp.LifeGoal, &comp.Backstory, &portraitID, &comp.PortraitURL, &modelID, &comp.CreationSource, &comp.ProactiveEnabled, &comp.Active, &comp.IsDefault, &comp.LifeEnabled, &comp.FriendshipActive, &comp.CreatedAt, &comp.UpdatedAt, &comp.LastMessage, &comp.LastMessageType, &lastMessageAt, &comp.UnreadCount); err != nil {
 			continue
 		}
 		_ = json.Unmarshal([]byte(tags), &comp.PersonalityTags)
 		comp.PortraitID = nullString(portraitID)
 		comp.ModelID = nullString(modelID)
+		comp.LastMessageAt = nullTime(lastMessageAt)
 		decorateCompanionAccess(userID, &comp)
 		companions = append(companions, comp)
 	}
@@ -1123,6 +1146,7 @@ func GetMessages(c *gin.Context) {
 		m = map[string]interface{}{"id": id, "conversation_id": conversationID, "sender_type": senderType, "message_type": messageType, "content": content, "media_url": mediaURL, "payload": payload, "source": source, "life_event_id": lifeEventID, "delivery_status": deliveryStatus, "created_at": created}
 		messages = append(messages, m)
 	}
+	_, _ = db.Get().Exec(`UPDATE conversations SET last_read_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$2`, conversationID, userID)
 	c.JSON(http.StatusOK, messages)
 }
 

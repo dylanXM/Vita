@@ -171,6 +171,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'chat.voice': 'Mensaje de voz',
     'chat.voiceStop': 'Detener y enviar',
     'chat.voiceMessage': 'Mensaje de voz',
+    'chat.photoMessage': 'Foto',
     'subscription.active': 'Tu plan está activo',
     'subscription.hero': 'Más vida, más recuerdos, más de ella.',
     'subscription.description':
@@ -428,6 +429,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'chat.voice': 'Mensagem de voz',
     'chat.voiceStop': 'Parar e enviar',
     'chat.voiceMessage': 'Mensagem de voz',
+    'chat.photoMessage': 'Foto',
     'subscription.active': 'Seu plano está ativo',
     'subscription.hero': 'Mais vida, mais memórias, mais dela.',
     'subscription.description':
@@ -675,6 +677,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'chat.voice': '音声メッセージ',
     'chat.voiceStop': '停止して送信',
     'chat.voiceMessage': '音声メッセージ',
+    'chat.photoMessage': '写真',
     'subscription.active': 'プランは有効です',
     'subscription.hero': 'もっと日常を、もっと思い出を、もっと彼女を。',
     'subscription.description': 'プレミアム画像や音声などに使えるクレジットが毎月含まれます。',
@@ -915,6 +918,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'chat.voice': '음성 메시지',
     'chat.voiceStop': '중지하고 보내기',
     'chat.voiceMessage': '음성 메시지',
+    'chat.photoMessage': '사진',
     'subscription.active': '플랜을 이용 중입니다',
     'subscription.hero': '더 많은 일상과 추억, 그리고 더 가까운 관계.',
     'subscription.description': '프리미엄 이미지와 음성 등에 사용할 수 있는 크레딧이 매월 포함됩니다.',
@@ -1154,6 +1158,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'chat.voice': 'رسالة صوتية',
     'chat.voiceStop': 'إيقاف وإرسال',
     'chat.voiceMessage': 'رسالة صوتية',
+    'chat.photoMessage': 'صورة',
     'subscription.active': 'خطتك نشطة',
     'subscription.hero': 'المزيد من الحياة والذكريات والقرب.',
     'subscription.description':
@@ -1396,6 +1401,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'chat.voice': '語音訊息',
     'chat.voiceStop': '停止並傳送',
     'chat.voiceMessage': '語音訊息',
+    'chat.photoMessage': '圖片',
     'subscription.active': '你的訂閱已生效',
     'subscription.hero': '更多生活、更多回憶，也更了解她。',
     'subscription.description': '訂閱每月包含積分，可用於進階圖片、語音及更多功能。',
