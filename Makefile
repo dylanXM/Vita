@@ -286,11 +286,10 @@ endif
 # Override by exporting PUB_HOSTED_URL / FLUTTER_STORAGE_BASE_URL before make.
 PUB_HOSTED_URL ?= https://pub.flutter-io.cn
 FLUTTER_STORAGE_BASE_URL ?= https://storage.flutter-io.cn
-# Accelerate GitHub clones (e.g. firebase-ios-sdk, which CocoaPods pulls via a
-# git source) through a China mirror. Uses env-only git config so the global
-# ~/.gitconfig is untouched; override GITHUB_PROXY_PREFIX as needed.
-GITHUB_PROXY_PREFIX ?= https://ghfast.top/
-FLUTTER_ENV = PUB_HOSTED_URL=$(PUB_HOSTED_URL) FLUTTER_STORAGE_BASE_URL=$(FLUTTER_STORAGE_BASE_URL) GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=url.$(GITHUB_PROXY_PREFIX)https://github.com/.insteadOf GIT_CONFIG_VALUE_0=https://github.com/ GIT_CONFIG_KEY_1=url.$(GITHUB_PROXY_PREFIX)https://raw.githubusercontent.com/.insteadOf GIT_CONFIG_VALUE_1=https://raw.githubusercontent.com/
+# GitHub clones (e.g. firebase-ios-sdk pulled by CocoaPods via a git source) go
+# through the machine's local proxy, configured globally in ~/.gitconfig as
+# http.https://github.com.proxy -- nothing project-specific needed here.
+FLUTTER_ENV = PUB_HOSTED_URL=$(PUB_HOSTED_URL) FLUTTER_STORAGE_BASE_URL=$(FLUTTER_STORAGE_BASE_URL)
 
 app-prepare-dirs:
 	mkdir -p app/build/ios/SourcePackages app/build/macos/SourcePackages app/.cocoapods-local app/.home
