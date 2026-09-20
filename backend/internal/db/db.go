@@ -241,9 +241,11 @@ func migrate(db *sql.DB) error {
 			intimacy INTEGER DEFAULT 0,
 			trust INTEGER DEFAULT 0,
 			familiarity INTEGER DEFAULT 0,
+			enthusiasm INTEGER NOT NULL DEFAULT 0,
 			shared_history TEXT,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
+		`ALTER TABLE relationship_states ADD COLUMN IF NOT EXISTS enthusiasm INTEGER NOT NULL DEFAULT 0`,
 		`CREATE TABLE IF NOT EXISTS companion_states (
 			companion_id TEXT PRIMARY KEY REFERENCES companions(id),
 			mood INTEGER DEFAULT 50,
@@ -283,8 +285,10 @@ func migrate(db *sql.DB) error {
 			daily_proactive_limit INTEGER NOT NULL DEFAULT 4,
 			quiet_hours_start INTEGER NOT NULL DEFAULT 23,
 			quiet_hours_end INTEGER NOT NULL DEFAULT 8,
+			free_default_chat_hours INTEGER NOT NULL DEFAULT 24,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
+		`ALTER TABLE agent_settings ADD COLUMN IF NOT EXISTS free_default_chat_hours INTEGER NOT NULL DEFAULT 24`,
 		`INSERT INTO agent_settings (id) VALUES ('default') ON CONFLICT (id) DO NOTHING`,
 		`CREATE TABLE IF NOT EXISTS companion_portraits (
 			id TEXT PRIMARY KEY,
@@ -292,17 +296,20 @@ func migrate(db *sql.DB) error {
 			image_url TEXT NOT NULL,
 			gender TEXT NOT NULL DEFAULT 'custom',
 			personality_tags JSONB NOT NULL DEFAULT '[]'::jsonb,
+			is_default BOOLEAN NOT NULL DEFAULT false,
 			enabled BOOLEAN NOT NULL DEFAULT true,
 			sort_order INTEGER NOT NULL DEFAULT 0,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
+		`ALTER TABLE companion_portraits ADD COLUMN IF NOT EXISTS is_default BOOLEAN NOT NULL DEFAULT false`,
 		`INSERT INTO companion_portraits (id,name,image_url,gender,personality_tags,enabled,sort_order) VALUES
 			('system-mia','Mia','asset://assets/companions/mia.png','girlfriend','["warm","independent","thoughtful"]'::jsonb,true,10),
 			('system-nora','Nora','asset://assets/companions/nora.png','girlfriend','["witty","curious","outgoing"]'::jsonb,true,20),
 			('system-leo','Leo','asset://assets/companions/leo.png','boyfriend','["calm","creative","independent"]'::jsonb,true,30),
 			('system-kai','Kai','asset://assets/companions/kai.png','boyfriend','["thoughtful","playful","ambitious"]'::jsonb,true,40)
 		ON CONFLICT (id) DO UPDATE SET image_url=EXCLUDED.image_url, personality_tags=EXCLUDED.personality_tags`,
+		`UPDATE companion_portraits SET is_default=true WHERE id='system-mia' AND NOT EXISTS (SELECT 1 FROM companion_portraits WHERE is_default=true)`,
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS model_id TEXT REFERENCES ai_models(id) ON DELETE SET NULL`,
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS personality_tags JSONB NOT NULL DEFAULT '[]'::jsonb`,
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS speaking_style TEXT NOT NULL DEFAULT ''`,
@@ -315,6 +322,27 @@ func migrate(db *sql.DB) error {
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS creation_source TEXT NOT NULL DEFAULT 'tags_portrait'`,
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS proactive_enabled BOOLEAN NOT NULL DEFAULT true`,
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true`,
+		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS is_default BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS life_enabled BOOLEAN NOT NULL DEFAULT true`,
+		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS friendship_active BOOLEAN NOT NULL DEFAULT true`,
+		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS subscription_paused_at TIMESTAMP`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_companions_default_portrait_user ON companions(user_id, portrait_id) WHERE is_default=true AND portrait_id IS NOT NULL`,
+		`CREATE TABLE IF NOT EXISTS default_companion_trials (
+			user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+			started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			expires_at TIMESTAMP NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE IF NOT EXISTS companion_gifts (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			companion_id TEXT NOT NULL REFERENCES companions(id) ON DELETE CASCADE,
+			coins INTEGER NOT NULL CHECK (coins > 0),
+			intimacy_delta INTEGER NOT NULL DEFAULT 0,
+			enthusiasm_delta INTEGER NOT NULL DEFAULT 0,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_companion_gifts_companion ON companion_gifts(companion_id, created_at DESC)`,
 		`ALTER TABLE messages ADD COLUMN IF NOT EXISTS payload JSONB NOT NULL DEFAULT '{}'::jsonb`,
 		`ALTER TABLE messages ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'user'`,
 		`ALTER TABLE messages ADD COLUMN IF NOT EXISTS life_event_id TEXT`,

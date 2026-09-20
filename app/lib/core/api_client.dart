@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import 'constants.dart';
 import 'token_storage.dart';
@@ -7,7 +8,10 @@ import 'token_storage.dart';
 /// errors into a user-friendly [ApiException].
 class ApiException implements Exception {
   final String message;
-  ApiException(this.message);
+  final String? code;
+  final String? action;
+  final int? statusCode;
+  ApiException(this.message, {this.code, this.action, this.statusCode});
 
   @override
   String toString() => message;
@@ -36,6 +40,11 @@ class ApiClient {
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+          options.headers['X-Vita-Platform'] = switch (defaultTargetPlatform) {
+            TargetPlatform.iOS || TargetPlatform.macOS => 'ios',
+            TargetPlatform.android => 'android',
+            _ => 'web',
+          };
           handler.next(options);
         },
       ),
@@ -48,7 +57,7 @@ class ApiClient {
       final r = await dio.get(path, queryParameters: query);
       return r.data;
     } on DioException catch (e) {
-      throw ApiException(_message(e));
+      throw _exception(e);
     }
   }
 
@@ -57,7 +66,7 @@ class ApiClient {
       final r = await dio.post(path, data: data);
       return r.data;
     } on DioException catch (e) {
-      throw ApiException(_message(e));
+      throw _exception(e);
     }
   }
 
@@ -66,7 +75,7 @@ class ApiClient {
       final r = await dio.delete(path, data: data);
       return r.data;
     } on DioException catch (e) {
-      throw ApiException(_message(e));
+      throw _exception(e);
     }
   }
 
@@ -81,5 +90,15 @@ class ApiClient {
       return 'Cannot reach server';
     }
     return 'Request failed (${e.response?.statusCode ?? 'network'})';
+  }
+
+  ApiException _exception(DioException e) {
+    final data = e.response?.data;
+    return ApiException(
+      _message(e),
+      code: data is Map ? data['code'] as String? : null,
+      action: data is Map ? data['action'] as String? : null,
+      statusCode: e.response?.statusCode,
+    );
   }
 }

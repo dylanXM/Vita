@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../companion/companion_create_page.dart';
+import '../billing/billing_controller.dart';
 import 'chat_list_controller.dart';
 import 'chat_page.dart';
 
@@ -32,11 +33,19 @@ class ChatListPage extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: IconButton(
-                  onPressed: () => Get.to(
-                    () => const CompanionCreatePage(),
-                    transition: Transition.cupertino,
-                    duration: const Duration(milliseconds: 300),
-                  ),
+                  onPressed: () {
+                    if (!BillingController.to.isSubscribed) {
+                      Get.snackbar('subscription.required.title'.tr,
+                          'subscription.required.create'.tr);
+                      Get.toNamed('/subscription');
+                      return;
+                    }
+                    Get.to(
+                      () => const CompanionCreatePage(),
+                      transition: Transition.cupertino,
+                      duration: const Duration(milliseconds: 300),
+                    );
+                  },
                   icon: Icon(Icons.person_add_alt_1,
                       color: context.vita.green, size: 21),
                 ),
@@ -76,6 +85,7 @@ class ChatListPage extends StatelessWidget {
           c['city'] as String?,
           c['occupation'] as String?,
         ].where((e) => e != null && e.isNotEmpty).join(' · ');
+        final friendshipActive = c['friendship_active'] != false;
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => Get.to(
@@ -109,7 +119,11 @@ class ChatListPage extends StatelessWidget {
                               color: context.vita.text)),
                       const SizedBox(height: 3),
                       Text(
-                        subtitle.isEmpty ? 'chat.distant'.tr : subtitle,
+                        !friendshipActive
+                            ? 'chat.notFriends'.tr
+                            : subtitle.isEmpty
+                                ? 'chat.distant'.tr
+                                : subtitle,
                         style: TextStyle(
                             fontSize: 13, color: context.vita.subText),
                         maxLines: 1,

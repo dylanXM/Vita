@@ -3,6 +3,7 @@ import 'package:purchases_flutter/purchases_flutter.dart';
 
 import '../../core/api_client.dart';
 import '../../core/constants.dart';
+import '../chat/chat_list_controller.dart';
 
 /// Billing state: RevenueCat (mobile subscriptions + credit packs), Stripe
 /// (web/admin side) and the server-side credit balance / entitlement sync.
@@ -60,9 +61,11 @@ class BillingController extends GetxController {
   Future<void> refreshSubscription() async {
     try {
       final data = await ApiClient.instance.get('/v1/me/subscription');
-      subscription.value =
-          data['subscription'] == null ? null : Map<String, dynamic>.from(data['subscription'] as Map);
-      entitlements.assignAll(List<String>.from(data['entitlements'] as List? ?? []));
+      subscription.value = data['subscription'] == null
+          ? null
+          : Map<String, dynamic>.from(data['subscription'] as Map);
+      entitlements
+          .assignAll(List<String>.from(data['entitlements'] as List? ?? []));
     } catch (_) {
       // keep last known values
     }
@@ -74,9 +77,10 @@ class BillingController extends GetxController {
   Future<void> purchasePackage(Package pkg) async {
     busy.value = true;
     try {
-      await Purchases.purchasePackage(pkg);
+      await Purchases.purchase(PurchaseParams.package(pkg));
       await refreshSubscription();
       await refreshCredits();
+      await ChatListController.to.load();
       Get.snackbar('Vita', 'Purchase successful');
     } catch (e) {
       // RevenueCat errors include the user cancelling the sheet; only surface
@@ -96,6 +100,7 @@ class BillingController extends GetxController {
       await Purchases.restorePurchases();
       await refreshSubscription();
       await refreshCredits();
+      await ChatListController.to.load();
       Get.snackbar('Vita', 'Purchases restored');
     } catch (e) {
       Get.snackbar('Restore failed', '$e');

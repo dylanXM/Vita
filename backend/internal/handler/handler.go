@@ -741,31 +741,37 @@ func RefreshToken(c *gin.Context) {
 // --- Companion Routes ---
 
 type Companion struct {
-	ID                string    `json:"id"`
-	UserID            string    `json:"user_id"`
-	Name              string    `json:"name"`
-	Gender            string    `json:"gender"`
-	Persona           string    `json:"persona"`
-	Appearance        string    `json:"appearance"`
-	City              string    `json:"city"`
-	Occupation        string    `json:"occupation"`
-	Interests         string    `json:"interests"`
-	RelationshipStage string    `json:"relationship_stage"`
-	PersonalityTags   []string  `json:"personality_tags"`
-	SpeakingStyle     string    `json:"speaking_style"`
-	Likes             string    `json:"likes"`
-	Dislikes          string    `json:"dislikes"`
-	LifeHabits        string    `json:"life_habits"`
-	LifeGoal          string    `json:"life_goal"`
-	Backstory         string    `json:"backstory"`
-	PortraitID        *string   `json:"portrait_id"`
-	PortraitURL       string    `json:"portrait_url"`
-	ModelID           *string   `json:"model_id"`
-	CreationSource    string    `json:"creation_source"`
-	ProactiveEnabled  bool      `json:"proactive_enabled"`
-	Active            bool      `json:"active"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                   string     `json:"id"`
+	UserID               string     `json:"user_id"`
+	Name                 string     `json:"name"`
+	Gender               string     `json:"gender"`
+	Persona              string     `json:"persona"`
+	Appearance           string     `json:"appearance"`
+	City                 string     `json:"city"`
+	Occupation           string     `json:"occupation"`
+	Interests            string     `json:"interests"`
+	RelationshipStage    string     `json:"relationship_stage"`
+	PersonalityTags      []string   `json:"personality_tags"`
+	SpeakingStyle        string     `json:"speaking_style"`
+	Likes                string     `json:"likes"`
+	Dislikes             string     `json:"dislikes"`
+	LifeHabits           string     `json:"life_habits"`
+	LifeGoal             string     `json:"life_goal"`
+	Backstory            string     `json:"backstory"`
+	PortraitID           *string    `json:"portrait_id"`
+	PortraitURL          string     `json:"portrait_url"`
+	ModelID              *string    `json:"model_id"`
+	CreationSource       string     `json:"creation_source"`
+	ProactiveEnabled     bool       `json:"proactive_enabled"`
+	Active               bool       `json:"active"`
+	IsDefault            bool       `json:"is_default"`
+	LifeEnabled          bool       `json:"life_enabled"`
+	FriendshipActive     bool       `json:"friendship_active"`
+	CanChat              bool       `json:"can_chat"`
+	RequiresSubscription bool       `json:"requires_subscription"`
+	TrialExpiresAt       *time.Time `json:"trial_expires_at,omitempty"`
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
 }
 
 type CreateCompanionRequest struct {
@@ -795,6 +801,15 @@ func CreateCompanion(c *gin.Context) {
 	}
 	companionID := uuid.New().String()
 	userID := c.GetString("user_id")
+	subscribed, err := userHasActiveSubscription(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check subscription"})
+		return
+	}
+	if !subscribed {
+		subscriptionRequired(c, "companion_creation_requires_subscription", "Subscribe to create your own companion")
+		return
+	}
 	if len(req.PersonalityTags) > 8 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "choose no more than 8 personality tags"})
 		return
@@ -834,6 +849,7 @@ func CreateCompanion(c *gin.Context) {
 		SpeakingStyle: req.SpeakingStyle, Likes: req.Likes, Dislikes: req.Dislikes,
 		LifeHabits: req.LifeHabits, LifeGoal: req.LifeGoal, Backstory: req.Backstory,
 		PortraitID: req.PortraitID, CreationSource: "tags_portrait", ProactiveEnabled: true, Active: true,
+		LifeEnabled: true, FriendshipActive: true, CanChat: true,
 	})
 }
 
@@ -842,8 +858,8 @@ func GetCompanion(c *gin.Context) {
 	var comp Companion
 	var tags string
 	var portraitID, modelID sql.NullString
-	err := db.Get().QueryRow(`SELECT c.id,c.user_id,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.appearance,''),COALESCE(c.city,''),COALESCE(c.occupation,''),COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.portrait_id,COALESCE(p.image_url,''),c.model_id,c.creation_source,c.proactive_enabled,c.active,c.created_at,c.updated_at FROM companions c LEFT JOIN companion_portraits p ON p.id=c.portrait_id WHERE c.id=$1 AND c.user_id=$2`, id, c.GetString("user_id")).Scan(
-		&comp.ID, &comp.UserID, &comp.Name, &comp.Gender, &comp.Persona, &comp.Appearance, &comp.City, &comp.Occupation, &comp.Interests, &comp.RelationshipStage, &tags, &comp.SpeakingStyle, &comp.Likes, &comp.Dislikes, &comp.LifeHabits, &comp.LifeGoal, &comp.Backstory, &portraitID, &comp.PortraitURL, &modelID, &comp.CreationSource, &comp.ProactiveEnabled, &comp.Active, &comp.CreatedAt, &comp.UpdatedAt)
+	err := db.Get().QueryRow(`SELECT c.id,c.user_id,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.appearance,''),COALESCE(c.city,''),COALESCE(c.occupation,''),COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.portrait_id,COALESCE(p.image_url,''),c.model_id,c.creation_source,c.proactive_enabled,c.active,c.is_default,c.life_enabled,c.friendship_active,c.created_at,c.updated_at FROM companions c LEFT JOIN companion_portraits p ON p.id=c.portrait_id WHERE c.id=$1 AND c.user_id=$2`, id, c.GetString("user_id")).Scan(
+		&comp.ID, &comp.UserID, &comp.Name, &comp.Gender, &comp.Persona, &comp.Appearance, &comp.City, &comp.Occupation, &comp.Interests, &comp.RelationshipStage, &tags, &comp.SpeakingStyle, &comp.Likes, &comp.Dislikes, &comp.LifeHabits, &comp.LifeGoal, &comp.Backstory, &portraitID, &comp.PortraitURL, &modelID, &comp.CreationSource, &comp.ProactiveEnabled, &comp.Active, &comp.IsDefault, &comp.LifeEnabled, &comp.FriendshipActive, &comp.CreatedAt, &comp.UpdatedAt)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "companion not found"})
 		return
@@ -851,11 +867,17 @@ func GetCompanion(c *gin.Context) {
 	_ = json.Unmarshal([]byte(tags), &comp.PersonalityTags)
 	comp.PortraitID = nullString(portraitID)
 	comp.ModelID = nullString(modelID)
+	decorateCompanionAccess(c.GetString("user_id"), &comp)
 	c.JSON(http.StatusOK, comp)
 }
 
 func ListCompanions(c *gin.Context) {
-	rows, err := db.Get().Query(`SELECT c.id,c.user_id,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.appearance,''),COALESCE(c.city,''),COALESCE(c.occupation,''),COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.portrait_id,COALESCE(p.image_url,''),c.model_id,c.creation_source,c.proactive_enabled,c.active,c.created_at,c.updated_at FROM companions c LEFT JOIN companion_portraits p ON p.id=c.portrait_id WHERE c.user_id=$1 AND c.active=true ORDER BY c.created_at DESC`, c.GetString("user_id"))
+	userID := c.GetString("user_id")
+	if err := ensureDefaultCompanions(userID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to prepare default companions"})
+		return
+	}
+	rows, err := db.Get().Query(`SELECT c.id,c.user_id,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.appearance,''),COALESCE(c.city,''),COALESCE(c.occupation,''),COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.portrait_id,COALESCE(p.image_url,''),c.model_id,c.creation_source,c.proactive_enabled,c.active,c.is_default,c.life_enabled,c.friendship_active,c.created_at,c.updated_at FROM companions c LEFT JOIN companion_portraits p ON p.id=c.portrait_id WHERE c.user_id=$1 AND c.active=true ORDER BY c.is_default DESC,c.created_at DESC`, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list companions"})
 		return
@@ -866,12 +888,13 @@ func ListCompanions(c *gin.Context) {
 		var comp Companion
 		var tags string
 		var portraitID, modelID sql.NullString
-		if err := rows.Scan(&comp.ID, &comp.UserID, &comp.Name, &comp.Gender, &comp.Persona, &comp.Appearance, &comp.City, &comp.Occupation, &comp.Interests, &comp.RelationshipStage, &tags, &comp.SpeakingStyle, &comp.Likes, &comp.Dislikes, &comp.LifeHabits, &comp.LifeGoal, &comp.Backstory, &portraitID, &comp.PortraitURL, &modelID, &comp.CreationSource, &comp.ProactiveEnabled, &comp.Active, &comp.CreatedAt, &comp.UpdatedAt); err != nil {
+		if err := rows.Scan(&comp.ID, &comp.UserID, &comp.Name, &comp.Gender, &comp.Persona, &comp.Appearance, &comp.City, &comp.Occupation, &comp.Interests, &comp.RelationshipStage, &tags, &comp.SpeakingStyle, &comp.Likes, &comp.Dislikes, &comp.LifeHabits, &comp.LifeGoal, &comp.Backstory, &portraitID, &comp.PortraitURL, &modelID, &comp.CreationSource, &comp.ProactiveEnabled, &comp.Active, &comp.IsDefault, &comp.LifeEnabled, &comp.FriendshipActive, &comp.CreatedAt, &comp.UpdatedAt); err != nil {
 			continue
 		}
 		_ = json.Unmarshal([]byte(tags), &comp.PersonalityTags)
 		comp.PortraitID = nullString(portraitID)
 		comp.ModelID = nullString(modelID)
+		decorateCompanionAccess(userID, &comp)
 		companions = append(companions, comp)
 	}
 	c.JSON(http.StatusOK, companions)
@@ -945,10 +968,34 @@ func SendMessage(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "this version supports text messages only"})
 		return
 	}
-	var owns bool
-	if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM conversations WHERE id=$1 AND user_id=$2)`, conversationID, userID).Scan(&owns); err != nil || !owns {
+	var companionID string
+	var isDefault bool
+	if err := db.Get().QueryRow(`SELECT cp.id,cp.is_default FROM conversations cv JOIN companions cp ON cp.id=cv.companion_id WHERE cv.id=$1 AND cv.user_id=$2 AND cp.active=true`, conversationID, userID).Scan(&companionID, &isDefault); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
 		return
+	}
+	if isDefault {
+		allowed, expires, err := defaultChatAccess(userID, true)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check free chat access"})
+			return
+		}
+		if !allowed {
+			subscriptionRequired(c, "default_chat_trial_expired", "The free default-companion chat period has ended. Subscribe to continue")
+			return
+		}
+		_ = expires
+	} else {
+		subscribed, err := userHasActiveSubscription(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check subscription"})
+			return
+		}
+		if !subscribed {
+			_ = syncUserCompanionEntitlement(userID, false)
+			subscriptionRequired(c, "friendship_inactive", "You are no longer friends, so messages cannot be sent. Subscribe to reconnect")
+			return
+		}
 	}
 	createdAt := time.Now().UTC()
 	query := `INSERT INTO messages (id,conversation_id,sender_type,message_type,content,payload,source,delivery_status,created_at) VALUES ($1,$2,'user',$3,$4,'{}'::jsonb,'user','delivered',$5)`
@@ -1022,8 +1069,9 @@ func GetOrCreateConversation(c *gin.Context) {
 	}
 
 	var ownerID string
+	var isDefault bool
 	if err := db.Get().QueryRow(
-		`SELECT user_id FROM companions WHERE id = $1`, req.CompanionID).Scan(&ownerID); err != nil {
+		`SELECT user_id,is_default FROM companions WHERE id = $1 AND active=true`, req.CompanionID).Scan(&ownerID, &isDefault); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "companion not found"})
 		return
 	}
@@ -1031,13 +1079,41 @@ func GetOrCreateConversation(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "companion does not belong to user"})
 		return
 	}
+	canSend := true
+	accessCode := ""
+	if isDefault {
+		allowed, expires, err := defaultChatAccess(userID, true)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start free chat access"})
+			return
+		}
+		if !allowed {
+			canSend = false
+			accessCode = "default_chat_trial_expired"
+		}
+		if expires != nil {
+			c.Header("X-Vita-Trial-Expires-At", expires.Format(time.RFC3339))
+		}
+	}
+	if !isDefault {
+		active, accessErr := userHasActiveSubscription(userID)
+		if accessErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check subscription"})
+			return
+		}
+		if !active {
+			canSend = false
+			accessCode = "friendship_inactive"
+			_ = syncUserCompanionEntitlement(userID, false)
+		}
+	}
 
 	var conversationID string
 	err := db.Get().QueryRow(
 		`SELECT id FROM conversations WHERE user_id = $1 AND companion_id = $2 LIMIT 1`,
 		userID, req.CompanionID).Scan(&conversationID)
 	if err == nil {
-		c.JSON(http.StatusOK, gin.H{"conversation_id": conversationID})
+		c.JSON(http.StatusOK, gin.H{"conversation_id": conversationID, "can_send": canSend, "access_code": accessCode})
 		return
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
@@ -1052,11 +1128,14 @@ func GetOrCreateConversation(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create conversation"})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"conversation_id": conversationID})
+	c.JSON(http.StatusCreated, gin.H{"conversation_id": conversationID, "can_send": canSend, "access_code": accessCode})
 }
 
 func GetTodayLife(c *gin.Context) {
 	companionID := c.Param("id")
+	if !requireCompanionLifeAccess(c, companionID) {
+		return
+	}
 	var timezone string
 	if err := db.Get().QueryRow(`SELECT COALESCE(u.timezone,'UTC') FROM companions c JOIN users u ON u.id=c.user_id WHERE c.id=$1 AND c.user_id=$2`, companionID, c.GetString("user_id")).Scan(&timezone); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "companion not found"})
@@ -1100,6 +1179,9 @@ func GetTodayLife(c *gin.Context) {
 
 func GetLifeEvents(c *gin.Context) {
 	companionID := c.Param("id")
+	if !requireCompanionLifeAccess(c, companionID) {
+		return
+	}
 	rows, err := db.Get().Query(`SELECT e.id,COALESCE(e.event_type,''),COALESCE(e.title,''),COALESCE(e.description,''),COALESCE(e.location,''),e.start_time,e.end_time,COALESCE(e.emotion,''),e.importance,e.user_relevance,e.shareability,e.payload::text,e.generation_source,e.shared_at FROM life_events e JOIN companions c ON c.id=e.companion_id WHERE e.companion_id=$1 AND c.user_id=$2 ORDER BY e.start_time DESC LIMIT 200`, companionID, c.GetString("user_id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get life events"})

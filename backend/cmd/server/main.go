@@ -115,6 +115,7 @@ func main() {
 			companions.GET("/", handler.ListCompanions)
 			companions.PUT("/:id", handler.UpdateCompanion)
 			companions.DELETE("/:id", handler.DeleteCompanion)
+			companions.POST("/:id/gifts", handler.TransferCoinsToCompanion)
 		}
 		api.GET("/companion-options", middleware.RequireAuth(), handler.CompanionOptions)
 		api.POST("/me/push-tokens", middleware.RequireAuth(), handler.RegisterPushToken)

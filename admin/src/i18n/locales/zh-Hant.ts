@@ -136,6 +136,7 @@ const zhHant = {
     providers: "模型服務", providersDesc: "支援 OpenAI-compatible 與 Anthropic；金鑰只寫並加密儲存。", providerName: "名稱", providerType: "類型", baseUrl: "服務位址", apiKey: "API 金鑰", keepSecret: "留空則保留目前金鑰", defaultEndpoint: "預設服務位址", keyConfigured: "已設定金鑰", keyMissing: "未設定金鑰", noProviders: "尚未設定模型服務。", provider: "模型服務",
     models: "模型", modelsDesc: "登記 AI 伴侶可使用的遠端模型識別碼。", modelId: "遠端模型 ID", displayName: "顯示名稱", noModels: "尚未設定模型。",
     routing: "Agent 路由與 Life Engine", routingDesc: "為不同任務指定模型，並限制自主活動頻率。", chatModel: "對話模型", lifeModel: "生活規劃模型", proactiveModel: "主動訊息模型", selectModel: "請選擇…", eventMin: "每日事件下限", eventMax: "每日事件上限", proactiveLimit: "每日主動訊息上限", quietStart: "勿擾開始", quietEnd: "勿擾結束", saveSettings: "儲存路由",
+    freeDefaultChatHours: "預設角色免費時數", defaultCompanion: "設為預設免費聊天角色", defaultCompanionBadge: "預設角色", makeDefaultCompanion: "設為預設", removeDefaultCompanion: "取消預設",
     portraits: "系統人物形象", portraitsDesc: "使用者在本期建立流程中可選擇的人物形象。", portraitName: "形象名稱", imageUrl: "圖片位址", gender: "人物類型", tags: "性格標籤", addPortrait: "新增形象",
     companions: "人物管理", companionsDesc: "手動設定人物身分、模型和獨立生活行為。", noCompanions: "暫無人物。", companion: "人物", name: "姓名", city: "城市", occupation: "職業", model: "指定模型", portrait: "人物形象", noPortrait: "無人物形象", useDefault: "使用預設對話模型", persona: "人格與邊界", backstory: "人物背景", speakingStyle: "說話方式", habitsGoal: "生活習慣（首行）與人生目標", proactiveEnabled: "允許在限制範圍內主動聯絡", saveCompanion: "儲存人物", add: "新增", update: "更新", saved: "Agent 設定已儲存",
   },

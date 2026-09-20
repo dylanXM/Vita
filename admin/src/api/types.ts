@@ -209,6 +209,7 @@ export interface AgentSettings {
   daily_proactive_limit: number;
   quiet_hours_start: number;
   quiet_hours_end: number;
+  free_default_chat_hours: number;
 }
 
 export interface CompanionPortrait {
@@ -217,6 +218,7 @@ export interface CompanionPortrait {
   image_url: string;
   gender: string;
   personality_tags: string[];
+  is_default: boolean;
   enabled: boolean;
   sort_order: number;
 }

@@ -58,6 +58,7 @@ type companionContext struct {
 	LifeHabits        string
 	LifeGoal          string
 	Backstory         string
+	Enthusiasm        int
 }
 
 type lifePlanEvent struct {
@@ -170,9 +171,13 @@ func (s *Service) EnsureDailyPlans(ctx context.Context) error {
 		       COALESCE(c.city, ''), COALESCE(c.occupation, ''), COALESCE(c.interests, ''),
 		       COALESCE(c.relationship_stage, 'stranger'), c.personality_tags::text,
 		       c.speaking_style, c.likes, c.dislikes, c.life_habits, c.life_goal, c.backstory,
+		       COALESCE(r.enthusiasm,0),
 		       COALESCE(u.timezone, 'UTC')
 		FROM companions c JOIN users u ON u.id = c.user_id
-		WHERE c.active = true`)
+		LEFT JOIN relationship_states r ON r.companion_id=c.id
+		WHERE c.active = true AND c.life_enabled=true AND c.is_default=false
+		AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active'
+		  AND (s.current_period_end IS NULL OR s.current_period_end > CURRENT_TIMESTAMP))`)
 	if err != nil {
 		return fmt.Errorf("list companions for life planning: %w", err)
 	}
@@ -189,7 +194,8 @@ func (s *Service) EnsureDailyPlans(ctx context.Context) error {
 			&current.profile.City, &current.profile.Occupation, &current.profile.Interests,
 			&current.profile.RelationshipStage, &current.profile.PersonalityTags,
 			&current.profile.SpeakingStyle, &current.profile.Likes, &current.profile.Dislikes,
-			&current.profile.LifeHabits, &current.profile.LifeGoal, &current.profile.Backstory, &current.tz,
+			&current.profile.LifeHabits, &current.profile.LifeGoal, &current.profile.Backstory,
+			&current.profile.Enthusiasm, &current.tz,
 		); err != nil {
 			return err
 		}
@@ -232,12 +238,13 @@ func (s *Service) ensurePlan(ctx context.Context, profile companionContext, time
 		return nil
 	}
 
-	events, modelID, err := s.generatePlan(ctx, profile, localDate, settings)
+	effectiveProactiveLimit := min(8, settings.DailyProactiveLimit+profile.Enthusiasm/25)
+	events, modelID, err := s.generatePlan(ctx, profile, localDate, settings, effectiveProactiveLimit)
 	if err != nil {
 		_, _ = s.db.ExecContext(ctx, `UPDATE companion_days SET status = 'failed', last_error = $3 WHERE companion_id = $1 AND local_date = $2`, profile.ID, localDate, truncate(err.Error(), 1000))
 		return err
 	}
-	events = normalizePlan(events, settings.DailyEventMin, settings.DailyEventMax, settings.DailyProactiveLimit, profile)
+	events = normalizePlan(events, settings.DailyEventMin, settings.DailyEventMax, effectiveProactiveLimit, profile)
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -270,7 +277,7 @@ func (s *Service) ensurePlan(ctx context.Context, profile companionContext, time
 	return tx.Commit()
 }
 
-func (s *Service) generatePlan(ctx context.Context, profile companionContext, localDate string, settings lifeSettings) ([]lifePlanEvent, string, error) {
+func (s *Service) generatePlan(ctx context.Context, profile companionContext, localDate string, settings lifeSettings, proactiveLimit int) ([]lifePlanEvent, string, error) {
 	if s.mock || !settings.LifeModelID.Valid {
 		return mockPlan(profile), "", nil
 	}
@@ -282,7 +289,7 @@ func (s *Service) generatePlan(ctx context.Context, profile companionContext, lo
 Return only a JSON array with %d to %d objects. Fields: type, title, description, location, start (HH:MM), end (HH:MM), emotion, importance (0-100), user_relevance (0-100), share (boolean).
 Use mundane continuity, not nonstop drama. Exactly 2-5 events should have importance >= 70. No more than %d events may have share=true.`,
 		profile.Name, localDate, profile.City, profile.Occupation, profile.Interests, profile.PersonalityTags,
-		settings.DailyEventMin, settings.DailyEventMax, settings.DailyProactiveLimit)
+		settings.DailyEventMin, settings.DailyEventMax, proactiveLimit)
 	text, err := s.client.GenerateText(ctx, model, GenerateRequest{
 		System:   "You plan a believable daily timeline for a fictional AI companion. Output strict JSON only.",
 		Messages: []ChatMessage{{Role: "user", Content: prompt}}, Temperature: 0.85, MaxTokens: 2200,
@@ -308,23 +315,30 @@ func (s *Service) DispatchDueProactive(ctx context.Context) error {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT e.id, e.companion_id, c.user_id, c.name, COALESCE(c.city, ''),
 		       COALESCE(e.title, ''), COALESCE(e.description, ''), COALESCE(e.location, ''),
-		       COALESCE(u.timezone, 'UTC')
+		       COALESCE(u.timezone, 'UTC'), COALESCE(r.enthusiasm,0)
 		FROM life_events e
 		JOIN companions c ON c.id = e.companion_id
 		JOIN users u ON u.id = c.user_id
+		LEFT JOIN relationship_states r ON r.companion_id=c.id
 		WHERE e.shareability = true AND e.shared_at IS NULL AND e.status = 'active'
 		  AND e.start_time <= CURRENT_TIMESTAMP AND c.active = true AND c.proactive_enabled = true
+		  AND c.life_enabled=true AND c.is_default=false
+		  AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active'
+		    AND (s.current_period_end IS NULL OR s.current_period_end > CURRENT_TIMESTAMP))
 		  AND c.created_at <= CURRENT_TIMESTAMP - INTERVAL '1 hour'
 		ORDER BY e.start_time ASC LIMIT 50`)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
-	type dueEvent struct{ id, companionID, userID, name, city, title, description, location, timezone string }
+	type dueEvent struct {
+		id, companionID, userID, name, city, title, description, location, timezone string
+		enthusiasm                                                                  int
+	}
 	var due []dueEvent
 	for rows.Next() {
 		var event dueEvent
-		if err := rows.Scan(&event.id, &event.companionID, &event.userID, &event.name, &event.city, &event.title, &event.description, &event.location, &event.timezone); err != nil {
+		if err := rows.Scan(&event.id, &event.companionID, &event.userID, &event.name, &event.city, &event.title, &event.description, &event.location, &event.timezone, &event.enthusiasm); err != nil {
 			return err
 		}
 		due = append(due, event)
@@ -337,7 +351,10 @@ func (s *Service) DispatchDueProactive(ctx context.Context) error {
 	return rows.Err()
 }
 
-func (s *Service) dispatchEvent(ctx context.Context, event struct{ id, companionID, userID, name, city, title, description, location, timezone string }, settings lifeSettings) error {
+func (s *Service) dispatchEvent(ctx context.Context, event struct {
+	id, companionID, userID, name, city, title, description, location, timezone string
+	enthusiasm                                                                  int
+}, settings lifeSettings) error {
 	location, err := time.LoadLocation(event.timezone)
 	if err != nil {
 		location = time.UTC
@@ -354,7 +371,8 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct{ id, companion
 		WHERE c.companion_id = $1 AND m.source = 'proactive' AND m.created_at >= $2 AND m.created_at < $3`, event.companionID, dayStart, dayEnd).Scan(&sentToday); err != nil {
 		return err
 	}
-	if sentToday >= settings.DailyProactiveLimit {
+	effectiveLimit := min(8, settings.DailyProactiveLimit+event.enthusiasm/25)
+	if sentToday >= effectiveLimit {
 		return nil
 	}
 	var lastProactive sql.NullTime
@@ -363,7 +381,11 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct{ id, companion
 		WHERE c.companion_id = $1 AND m.source = 'proactive'`, event.companionID).Scan(&lastProactive); err != nil {
 		return err
 	}
-	if lastProactive.Valid && time.Since(lastProactive.Time) < 2*time.Hour {
+	minimumGap := 2*time.Hour - time.Duration(event.enthusiasm)*time.Minute
+	if minimumGap < 30*time.Minute {
+		minimumGap = 30 * time.Minute
+	}
+	if lastProactive.Valid && time.Since(lastProactive.Time) < minimumGap {
 		return nil
 	}
 	conversationID, err := s.getOrCreateConversation(ctx, event.userID, event.companionID)

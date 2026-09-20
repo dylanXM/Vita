@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
+import '../../core/api_client.dart';
+import '../billing/billing_controller.dart';
 import 'chat_controller.dart';
 
 /// Chat detail page — message bubbles (user right / companion left),
@@ -33,6 +35,14 @@ class _ChatPageState extends State<ChatPage> {
   final _scroll = ScrollController();
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.companion?['friendship_active'] == false) {
+      ctrl.accessError.value = 'friendship_inactive';
+    }
+  }
+
+  @override
   void dispose() {
     _input.dispose();
     _scroll.dispose();
@@ -41,6 +51,10 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _send() {
+    if (ctrl.accessError.value != null) {
+      Get.toNamed('/subscription');
+      return;
+    }
     final text = _input.text;
     ctrl.send(text).then((_) {
       _input.clear();
@@ -50,6 +64,25 @@ class _ChatPageState extends State<ChatPage> {
         }
       });
     });
+  }
+
+  Future<void> _sendGift(int coins) async {
+    try {
+      await ApiClient.instance.post(
+          '/v1/companions/${widget.companionId}/gifts',
+          data: {'coins': coins});
+      await BillingController.to.refreshCredits();
+      Get.back();
+      Get.snackbar('gift.sent.title'.tr,
+          'gift.sent.message'.trParams({'coins': '$coins'}));
+    } on ApiException catch (e) {
+      if (e.action == 'open_subscription') {
+        Get.back();
+        Get.toNamed('/subscription');
+      } else {
+        Get.snackbar('gift.failed'.tr, e.message);
+      }
+    }
   }
 
   void _showCompanionSheet() {
@@ -116,6 +149,25 @@ class _ChatPageState extends State<ChatPage> {
                   label: 'Relationship',
                   value: (c['relationship_stage'] as String?)?.toUpperCase() ??
                       ''),
+              if (c['is_default'] != true) ...[
+                const SizedBox(height: 16),
+                Text('gift.title'.tr,
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: context.vita.text)),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  children: [10, 50, 100]
+                      .map((coins) => OutlinedButton(
+                            onPressed: () => _sendGift(coins),
+                            child: Text(
+                                'gift.coins'.trParams({'coins': '$coins'})),
+                          ))
+                      .toList(),
+                ),
+              ],
             ],
           ),
         ),
@@ -158,8 +210,28 @@ class _ChatPageState extends State<ChatPage> {
       ),
       body: Column(
         children: [
+          Obx(() => ctrl.accessError.value == null
+              ? const SizedBox.shrink()
+              : Container(
+                  width: double.infinity,
+                  color: context.vita.greenTint,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(children: [
+                    Expanded(
+                        child: Text(
+                      ctrl.accessError.value == 'friendship_inactive'
+                          ? 'chat.notFriendsDetail'.tr
+                          : 'chat.trialExpired'.tr,
+                      style: TextStyle(fontSize: 13, color: context.vita.text),
+                    )),
+                    TextButton(
+                        onPressed: () => Get.toNamed('/subscription'),
+                        child: Text('subscription.continue'.tr)),
+                  ]),
+                )),
           Expanded(child: Obx(() => _buildMessages(ctrl))),
-          _buildInputBar(),
+          Obx(() => _buildInputBar(locked: ctrl.accessError.value != null)),
         ],
       ),
     );
@@ -267,7 +339,7 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  Widget _buildInputBar() {
+  Widget _buildInputBar({required bool locked}) {
     return Container(
       color: context.vita.surface,
       padding: EdgeInsets.fromLTRB(
@@ -277,6 +349,7 @@ class _ChatPageState extends State<ChatPage> {
           Expanded(
             child: TextField(
               controller: _input,
+              enabled: !locked,
               minLines: 1,
               maxLines: 4,
               textInputAction: TextInputAction.send,
@@ -284,7 +357,7 @@ class _ChatPageState extends State<ChatPage> {
               style: TextStyle(
                   fontSize: 16, color: context.vita.text, height: 1.4),
               decoration: InputDecoration(
-                hintText: 'Message',
+                hintText: locked ? 'chat.cannotSend'.tr : 'Message',
                 hintStyle: TextStyle(color: context.vita.hint, fontSize: 15),
                 filled: true,
                 fillColor: context.vita.pageBg,
@@ -304,7 +377,7 @@ class _ChatPageState extends State<ChatPage> {
           ),
           const SizedBox(width: 10),
           GestureDetector(
-            onTap: _send,
+            onTap: locked ? () => Get.toNamed('/subscription') : _send,
             child: Container(
               width: 40,
               height: 40,

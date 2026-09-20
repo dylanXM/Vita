@@ -101,6 +101,14 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
       ChatListController.to.load();
       Get.snackbar(
           'companion.create.success'.tr, 'companion.create.successMessage'.tr);
+    } on ApiException catch (e) {
+      if (e.action == 'open_subscription') {
+        Get.snackbar('subscription.required.title'.tr,
+            'subscription.required.create'.tr);
+        Get.offNamed('/subscription');
+      } else {
+        Get.snackbar('companion.create.failed'.tr, e.message);
+      }
     } catch (e) {
       Get.snackbar('companion.create.failed'.tr, '$e');
     } finally {

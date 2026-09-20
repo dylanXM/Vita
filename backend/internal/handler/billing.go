@@ -257,7 +257,14 @@ func upsertSubscription(userID, provider, providerRef, productID, entitlement, s
 		return nil, err
 	}
 
-	return loadSubscription(provider, providerRef)
+	subscription, err := loadSubscription(provider, providerRef)
+	if err != nil {
+		return nil, err
+	}
+	if active, accessErr := userHasActiveSubscription(userID); accessErr == nil {
+		_ = syncUserCompanionEntitlement(userID, active)
+	}
+	return subscription, nil
 }
 
 func loadSubscription(provider, providerRef string) (*Subscription, error) {
@@ -279,6 +286,9 @@ func loadSubscription(provider, providerRef string) (*Subscription, error) {
 // entitlements it grants.
 func GetMySubscription(c *gin.Context) {
 	userID := c.GetString("user_id")
+	if active, accessErr := userHasActiveSubscription(userID); accessErr == nil {
+		_ = syncUserCompanionEntitlement(userID, active)
+	}
 
 	var s Subscription
 	err := db.Get().QueryRow(
@@ -423,7 +433,7 @@ func processRevenueCatEvent(ev *revenueCatEvent) {
 			}
 		}
 	case "CANCELLATION":
-		status = "active"
+		status = "cancelled"
 		willRenew = false
 	case "EXPIRATION":
 		status = "expired"
@@ -817,8 +827,9 @@ func processStripeInvoicePaid(obj json.RawMessage) {
 
 func processStripeSubscriptionEvent(eventType string, obj json.RawMessage) {
 	var sub struct {
-		ID     string `json:"id"`
-		Status string `json:"status"`
+		ID                string `json:"id"`
+		Status            string `json:"status"`
+		CancelAtPeriodEnd bool   `json:"cancel_at_period_end"`
 	}
 	if err := json.Unmarshal(obj, &sub); err != nil || sub.ID == "" {
 		return
@@ -841,10 +852,20 @@ func processStripeSubscriptionEvent(eventType string, obj json.RawMessage) {
 	if eventType == "customer.subscription.deleted" {
 		status = "expired"
 		willRenew = false
+	} else if sub.CancelAtPeriodEnd {
+		status = "cancelled"
+		willRenew = false
 	}
-	_, _ = db.Get().Exec(
-		`UPDATE subscriptions SET status = $1, will_renew = $2, updated_at = CURRENT_TIMESTAMP WHERE provider = 'stripe' AND provider_ref = $3`,
-		status, willRenew, sub.ID)
+	var userID string
+	err := db.Get().QueryRow(
+		`UPDATE subscriptions SET status = $1, will_renew = $2, updated_at = CURRENT_TIMESTAMP
+		 WHERE provider = 'stripe' AND provider_ref = $3 RETURNING user_id`,
+		status, willRenew, sub.ID).Scan(&userID)
+	if err == nil {
+		if active, accessErr := userHasActiveSubscription(userID); accessErr == nil {
+			_ = syncUserCompanionEntitlement(userID, active)
+		}
+	}
 }
 
 // stripeRequest performs a REST call to the Stripe API (no SDK dependency).

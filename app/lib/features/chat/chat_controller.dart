@@ -15,6 +15,7 @@ class ChatController extends GetxController {
   final loading = false.obs;
   final sending = false.obs;
   final messages = <Map<String, dynamic>>[].obs;
+  final accessError = RxnString();
   String? _conversationId;
   Timer? _pollTimer;
   bool _polling = false;
@@ -34,11 +35,16 @@ class ChatController extends GetxController {
   Future<void> load() async {
     loading.value = true;
     try {
+      accessError.value = null;
       final conv = await ApiClient.instance.post(
         '/v1/conversations',
         data: {'companion_id': companionId},
       );
       _conversationId = conv['conversation_id'] as String?;
+      if (conv['can_send'] == false) {
+        accessError.value =
+            conv['access_code'] as String? ?? 'subscription_required';
+      }
       if (_conversationId != null) {
         final data = await ApiClient.instance
             .get('/v1/conversations/$_conversationId/messages');
@@ -52,7 +58,10 @@ class ChatController extends GetxController {
         _pollTimer ??=
             Timer.periodic(const Duration(seconds: 15), (_) => poll());
       }
-    } catch (_) {
+    } on ApiException catch (e) {
+      if (e.action == 'open_subscription') {
+        accessError.value = e.code ?? 'subscription_required';
+      }
       // chat stays usable; send() reports failures
     } finally {
       loading.value = false;
@@ -107,6 +116,12 @@ class ChatController extends GetxController {
         if (companionMessage is Map) {
           _addIfNew(Map<String, dynamic>.from(companionMessage));
         }
+      }
+    } on ApiException catch (e) {
+      if (e.action == 'open_subscription') {
+        accessError.value = e.code ?? 'subscription_required';
+      } else {
+        rethrow;
       }
     } finally {
       sending.value = false;

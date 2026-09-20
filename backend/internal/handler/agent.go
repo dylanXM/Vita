@@ -45,14 +45,15 @@ type adminModel struct {
 }
 
 type agentSettingsResponse struct {
-	ChatModelID         *string `json:"chat_model_id"`
-	LifeModelID         *string `json:"life_model_id"`
-	ProactiveModelID    *string `json:"proactive_model_id"`
-	DailyEventMin       int     `json:"daily_event_min"`
-	DailyEventMax       int     `json:"daily_event_max"`
-	DailyProactiveLimit int     `json:"daily_proactive_limit"`
-	QuietHoursStart     int     `json:"quiet_hours_start"`
-	QuietHoursEnd       int     `json:"quiet_hours_end"`
+	ChatModelID          *string `json:"chat_model_id"`
+	LifeModelID          *string `json:"life_model_id"`
+	ProactiveModelID     *string `json:"proactive_model_id"`
+	DailyEventMin        int     `json:"daily_event_min"`
+	DailyEventMax        int     `json:"daily_event_max"`
+	DailyProactiveLimit  int     `json:"daily_proactive_limit"`
+	QuietHoursStart      int     `json:"quiet_hours_start"`
+	QuietHoursEnd        int     `json:"quiet_hours_end"`
+	FreeDefaultChatHours int     `json:"free_default_chat_hours"`
 }
 
 type portraitResponse struct {
@@ -61,6 +62,7 @@ type portraitResponse struct {
 	ImageURL        string          `json:"image_url"`
 	Gender          string          `json:"gender"`
 	PersonalityTags json.RawMessage `json:"personality_tags"`
+	IsDefault       bool            `json:"is_default"`
 	Enabled         bool            `json:"enabled"`
 	SortOrder       int             `json:"sort_order"`
 }
@@ -249,15 +251,16 @@ func AdminUpdateAgentSettings(c *gin.Context) {
 	}
 	if input.DailyEventMin < 1 || input.DailyEventMax < input.DailyEventMin || input.DailyEventMax > 24 ||
 		input.DailyProactiveLimit < 0 || input.DailyProactiveLimit > 8 ||
-		input.QuietHoursStart < 0 || input.QuietHoursStart > 23 || input.QuietHoursEnd < 0 || input.QuietHoursEnd > 23 {
+		input.QuietHoursStart < 0 || input.QuietHoursStart > 23 || input.QuietHoursEnd < 0 || input.QuietHoursEnd > 23 ||
+		input.FreeDefaultChatHours < 1 || input.FreeDefaultChatHours > 720 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid agent limits"})
 		return
 	}
 	_, err := db.Get().Exec(`
 		UPDATE agent_settings SET chat_model_id=$1,life_model_id=$2,proactive_model_id=$3,
 		daily_event_min=$4,daily_event_max=$5,daily_proactive_limit=$6,quiet_hours_start=$7,quiet_hours_end=$8,
-		updated_at=CURRENT_TIMESTAMP WHERE id='default'`, input.ChatModelID, input.LifeModelID, input.ProactiveModelID,
-		input.DailyEventMin, input.DailyEventMax, input.DailyProactiveLimit, input.QuietHoursStart, input.QuietHoursEnd)
+		free_default_chat_hours=$9,updated_at=CURRENT_TIMESTAMP WHERE id='default'`, input.ChatModelID, input.LifeModelID, input.ProactiveModelID,
+		input.DailyEventMin, input.DailyEventMax, input.DailyProactiveLimit, input.QuietHoursStart, input.QuietHoursEnd, input.FreeDefaultChatHours)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save agent settings"})
 		return
@@ -271,6 +274,7 @@ type portraitInput struct {
 	ImageURL        string   `json:"image_url" binding:"required"`
 	Gender          string   `json:"gender"`
 	PersonalityTags []string `json:"personality_tags"`
+	IsDefault       bool     `json:"is_default"`
 	Enabled         *bool    `json:"enabled"`
 	SortOrder       int      `json:"sort_order"`
 }
@@ -294,11 +298,11 @@ func upsertPortrait(c *gin.Context, id string) {
 	}
 	var err error
 	if c.Request.Method == http.MethodPost {
-		_, err = db.Get().Exec(`INSERT INTO companion_portraits (id,name,image_url,gender,personality_tags,enabled,sort_order) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-			id, input.Name, input.ImageURL, input.Gender, tags, enabled, input.SortOrder)
+		_, err = db.Get().Exec(`INSERT INTO companion_portraits (id,name,image_url,gender,personality_tags,is_default,enabled,sort_order) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+			id, input.Name, input.ImageURL, input.Gender, tags, input.IsDefault, enabled, input.SortOrder)
 	} else {
-		_, err = db.Get().Exec(`UPDATE companion_portraits SET name=$2,image_url=$3,gender=$4,personality_tags=$5,enabled=$6,sort_order=$7,updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
-			id, input.Name, input.ImageURL, input.Gender, tags, enabled, input.SortOrder)
+		_, err = db.Get().Exec(`UPDATE companion_portraits SET name=$2,image_url=$3,gender=$4,personality_tags=$5,is_default=$6,enabled=$7,sort_order=$8,updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
+			id, input.Name, input.ImageURL, input.Gender, tags, input.IsDefault, enabled, input.SortOrder)
 	}
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save portrait"})
@@ -545,7 +549,7 @@ func loadAdminModels() ([]adminModel, error) {
 func loadAgentSettings() (agentSettingsResponse, error) {
 	var output agentSettingsResponse
 	var chat, life, proactive sql.NullString
-	err := db.Get().QueryRow(`SELECT chat_model_id,life_model_id,proactive_model_id,daily_event_min,daily_event_max,daily_proactive_limit,quiet_hours_start,quiet_hours_end FROM agent_settings WHERE id='default'`).Scan(&chat, &life, &proactive, &output.DailyEventMin, &output.DailyEventMax, &output.DailyProactiveLimit, &output.QuietHoursStart, &output.QuietHoursEnd)
+	err := db.Get().QueryRow(`SELECT chat_model_id,life_model_id,proactive_model_id,daily_event_min,daily_event_max,daily_proactive_limit,quiet_hours_start,quiet_hours_end,free_default_chat_hours FROM agent_settings WHERE id='default'`).Scan(&chat, &life, &proactive, &output.DailyEventMin, &output.DailyEventMax, &output.DailyProactiveLimit, &output.QuietHoursStart, &output.QuietHoursEnd, &output.FreeDefaultChatHours)
 	output.ChatModelID = nullString(chat)
 	output.LifeModelID = nullString(life)
 	output.ProactiveModelID = nullString(proactive)
@@ -553,7 +557,7 @@ func loadAgentSettings() (agentSettingsResponse, error) {
 }
 
 func loadPortraits(enabledOnly bool) ([]portraitResponse, error) {
-	query := `SELECT id,name,image_url,gender,personality_tags::text,enabled,sort_order FROM companion_portraits`
+	query := `SELECT id,name,image_url,gender,personality_tags::text,is_default,enabled,sort_order FROM companion_portraits`
 	if enabledOnly {
 		query += ` WHERE enabled=true`
 	}
@@ -567,7 +571,7 @@ func loadPortraits(enabledOnly bool) ([]portraitResponse, error) {
 	for rows.Next() {
 		var item portraitResponse
 		var raw string
-		if err := rows.Scan(&item.ID, &item.Name, &item.ImageURL, &item.Gender, &raw, &item.Enabled, &item.SortOrder); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.ImageURL, &item.Gender, &raw, &item.IsDefault, &item.Enabled, &item.SortOrder); err != nil {
 			return nil, err
 		}
 		item.PersonalityTags = json.RawMessage(raw)
