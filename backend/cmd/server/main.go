@@ -165,6 +165,16 @@ func main() {
 		{
 			admin.GET("/stats", handler.AdminStats)
 			admin.GET("/environment", handler.AdminEnvironment)
+			admin.GET("/subscription-plans", handler.AdminListSubscriptionPlans)
+			admin.POST("/subscription-plans", handler.AdminCreateSubscriptionPlan)
+			admin.PUT("/subscription-plans/:id", handler.AdminUpdateSubscriptionPlan)
+			admin.DELETE("/subscription-plans/:id", handler.AdminDeleteSubscriptionPlan)
+			admin.GET("/coin-packs", handler.AdminListCoinPacks)
+			admin.POST("/coin-packs", handler.AdminCreateCoinPack)
+			admin.PUT("/coin-packs/:id", handler.AdminUpdateCoinPack)
+			admin.DELETE("/coin-packs/:id", handler.AdminDeleteCoinPack)
+			admin.GET("/purchases", handler.AdminListPurchases)
+			admin.GET("/credit-ledger", handler.AdminListCreditLedger)
 
 			users := admin.Group("/users")
 			{

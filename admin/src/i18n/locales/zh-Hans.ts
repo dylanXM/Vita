@@ -21,6 +21,10 @@ const zhHans = {
     management: "管理",
     users: "用户",
     agent: "AI 伴侣",
+    billing: "计费管理",
+    subscriptionPlans: "订阅计划",
+    coinPacks: "金币包",
+    billingActivity: "购买与流水",
   },
 
   login: {
@@ -189,6 +193,24 @@ const zhHans = {
     add: "添加",
     update: "更新",
     saved: "Agent 配置已保存",
+  },
+
+  billing: {
+    plansTitle: "订阅计划", plansDesc: "按平台和环境分别配置订阅商品。",
+    packsTitle: "金币包", packsDesc: "按平台和环境分别配置一次性金币商品。",
+    activityTitle: "购买与流水", activityDesc: "查看指定平台与环境中的购买记录和金币变动。",
+    addPlan: "新增订阅计划", addPack: "新增金币包", purchases: "购买记录", ledger: "金币流水",
+    environment: "环境", allPlatforms: "全部平台", platformLabel: "平台",
+    env: { dev: "dev（开发）", beta: "beta（预发布）", prod: "prod（生产）" },
+    platform: { ios: "iOS", android: "Android", web: "网页", system: "系统" },
+    name: "名称", key: "标识", coins: "金币", price: "价格（美元）", period: "周期", productId: "商店商品 ID",
+    periods: { week: "每周", month: "每月", year: "每年" },
+    status: "状态", actions: "操作", enabled: "启用", disabled: "停用", popular: "热门",
+    edit: "编辑", delete: "删除", save: "保存", cancel: "取消", sortOrder: "排序",
+    user: "用户", kind: "类型", amount: "实付金额", time: "时间", change: "变动", balance: "余额", description: "说明",
+    kinds: { subscription: "订阅", coin_pack: "金币包" },
+    empty: "没有符合筛选条件的记录。", formDesc: "环境与平台共同确定一条独立的商店商品配置。",
+    saved: "计费商品已保存", deleted: "计费商品已删除", deleteConfirm: "确定删除 {{name}}？",
   },
 
   time: {

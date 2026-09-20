@@ -19,6 +19,13 @@ import type {
   AdminCompanion,
   AdminCompanionInput,
   CompanionPortrait,
+  BillingPlatform,
+  BillingProduct,
+  BillingPurchase,
+  CreditLedgerEntry,
+  BillingList,
+  BillingPagedList,
+  Environment,
 } from "./types";
 
 /** Admin sign-in. The API also accepts a 6-digit code for the same accounts. */
@@ -53,6 +60,42 @@ export const envApi = {
 
 export const healthApi = {
   get: (signal?: AbortSignal) => http.get<HealthResponse>("/health", { signal }),
+};
+
+export interface BillingFilters {
+  environment: Environment;
+  platform?: BillingPlatform | "system";
+  page?: number;
+  page_size?: number;
+}
+
+export const subscriptionPlansApi = {
+  list: (params: Pick<BillingFilters, "environment" | "platform">, signal?: AbortSignal) =>
+    http.get<BillingList<BillingProduct>>("/admin/subscription-plans", { params, signal }),
+  create: (body: Omit<BillingProduct, "id">) =>
+    http.post<BillingProduct>("/admin/subscription-plans", body),
+  update: (id: string, body: Omit<BillingProduct, "id">) =>
+    http.put<BillingProduct>(`/admin/subscription-plans/${id}`, body),
+  remove: (id: string) => http.del<{ message: string }>(`/admin/subscription-plans/${id}`),
+};
+
+export const coinPacksApi = {
+  list: (params: Pick<BillingFilters, "environment" | "platform">, signal?: AbortSignal) =>
+    http.get<BillingList<BillingProduct>>("/admin/coin-packs", { params, signal }),
+  create: (body: Omit<BillingProduct, "id">) => http.post<BillingProduct>("/admin/coin-packs", body),
+  update: (id: string, body: Omit<BillingProduct, "id">) =>
+    http.put<BillingProduct>(`/admin/coin-packs/${id}`, body),
+  remove: (id: string) => http.del<{ message: string }>(`/admin/coin-packs/${id}`),
+};
+
+export const purchasesApi = {
+  list: (params: BillingFilters, signal?: AbortSignal) =>
+    http.get<BillingPagedList<BillingPurchase>>("/admin/purchases", { params, signal }),
+};
+
+export const creditLedgerApi = {
+  list: (params: BillingFilters, signal?: AbortSignal) =>
+    http.get<BillingPagedList<CreditLedgerEntry>>("/admin/credit-ledger", { params, signal }),
 };
 
 export const agentApi = {

@@ -21,6 +21,7 @@ const zhHant = {
     management: "管理",
     users: "使用者",
     agent: "AI 伴侶",
+    billing: "計費管理", subscriptionPlans: "訂閱方案", coinPacks: "金幣包", billingActivity: "購買與流水",
   },
 
   login: {
@@ -137,6 +138,16 @@ const zhHant = {
     routing: "Agent 路由與 Life Engine", routingDesc: "為不同任務指定模型，並限制自主活動頻率。", chatModel: "對話模型", lifeModel: "生活規劃模型", proactiveModel: "主動訊息模型", selectModel: "請選擇…", eventMin: "每日事件下限", eventMax: "每日事件上限", proactiveLimit: "每日主動訊息上限", quietStart: "勿擾開始", quietEnd: "勿擾結束", saveSettings: "儲存路由",
     portraits: "系統人物形象", portraitsDesc: "使用者在本期建立流程中可選擇的人物形象。", portraitName: "形象名稱", imageUrl: "圖片位址", gender: "人物類型", tags: "性格標籤", addPortrait: "新增形象",
     companions: "人物管理", companionsDesc: "手動設定人物身分、模型和獨立生活行為。", noCompanions: "暫無人物。", companion: "人物", name: "姓名", city: "城市", occupation: "職業", model: "指定模型", portrait: "人物形象", noPortrait: "無人物形象", useDefault: "使用預設對話模型", persona: "人格與邊界", backstory: "人物背景", speakingStyle: "說話方式", habitsGoal: "生活習慣（首行）與人生目標", proactiveEnabled: "允許在限制範圍內主動聯絡", saveCompanion: "儲存人物", add: "新增", update: "更新", saved: "Agent 設定已儲存",
+  },
+
+  billing: {
+    plansTitle: "訂閱方案", plansDesc: "依平台和環境分別設定訂閱商品。", packsTitle: "金幣包", packsDesc: "依平台和環境分別設定一次性金幣商品。", activityTitle: "購買與流水", activityDesc: "查看指定平台與環境中的購買記錄和金幣變動。",
+    addPlan: "新增訂閱方案", addPack: "新增金幣包", purchases: "購買記錄", ledger: "金幣流水", environment: "環境", allPlatforms: "全部平台", platformLabel: "平台",
+    env: { dev: "dev（開發）", beta: "beta（預發佈）", prod: "prod（正式）" }, platform: { ios: "iOS", android: "Android", web: "網頁", system: "系統" },
+    name: "名稱", key: "識別碼", coins: "金幣", price: "價格（美元）", period: "週期", productId: "商店商品 ID", periods: { week: "每週", month: "每月", year: "每年" },
+    status: "狀態", actions: "操作", enabled: "啟用", disabled: "停用", popular: "熱門", edit: "編輯", delete: "刪除", save: "儲存", cancel: "取消", sortOrder: "排序",
+    user: "使用者", kind: "類型", amount: "實付金額", time: "時間", change: "變動", balance: "餘額", description: "說明", kinds: { subscription: "訂閱", coin_pack: "金幣包" },
+    empty: "沒有符合篩選條件的記錄。", formDesc: "環境與平台共同確定一筆獨立的商店商品設定。", saved: "計費商品已儲存", deleted: "計費商品已刪除", deleteConfirm: "確定刪除 {{name}}？",
   },
 
   time: {

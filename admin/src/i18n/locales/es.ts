@@ -21,6 +21,7 @@ const es = {
     management: "Gestión",
     users: "Usuarios",
     agent: "Compañero IA",
+    billing: "Facturación", subscriptionPlans: "Planes de suscripción", coinPacks: "Paquetes de monedas", billingActivity: "Compras y movimientos",
   },
 
   login: {
@@ -137,6 +138,16 @@ const es = {
     routing: "Enrutamiento y Life Engine", routingDesc: "Elige modelos por tarea y limita la actividad autónoma.", chatModel: "Modelo de chat", lifeModel: "Modelo de planificación", proactiveModel: "Modelo de mensaje proactivo", selectModel: "Seleccionar…", eventMin: "Eventos mínimos", eventMax: "Eventos máximos", proactiveLimit: "Límite proactivo diario", quietStart: "Silencio inicia", quietEnd: "Silencio termina", saveSettings: "Guardar enrutamiento",
     portraits: "Retratos del sistema", portraitsDesc: "Retratos disponibles durante la creación inicial.", portraitName: "Nombre del retrato", imageUrl: "URL de imagen", gender: "Tipo", tags: "Rasgos de personalidad", addPortrait: "Añadir retrato",
     companions: "Personajes", companionsDesc: "Configura identidad, modelo y vida independiente.", noCompanions: "No hay personajes.", companion: "Personaje", name: "Nombre", city: "Ciudad", occupation: "Profesión", model: "Modelo asignado", portrait: "Retrato", noPortrait: "Sin retrato", useDefault: "Usar modelo de chat predeterminado", persona: "Personalidad y límites", backstory: "Historia", speakingStyle: "Forma de hablar", habitsGoal: "Hábitos (primera línea) y meta vital", proactiveEnabled: "Permitir contacto proactivo limitado", saveCompanion: "Guardar personaje", add: "Añadir", update: "Actualizar", saved: "Configuración del agente guardada",
+  },
+
+  billing: {
+    plansTitle: "Planes de suscripción", plansDesc: "Configura suscripciones por plataforma y entorno.", packsTitle: "Paquetes de monedas", packsDesc: "Configura paquetes únicos por plataforma y entorno.", activityTitle: "Compras y movimientos", activityDesc: "Consulta compras y movimientos de monedas en la plataforma y el entorno seleccionados.",
+    addPlan: "Añadir plan", addPack: "Añadir paquete", purchases: "Compras", ledger: "Movimientos de monedas", environment: "Entorno", allPlatforms: "Todas las plataformas", platformLabel: "Plataforma",
+    env: { dev: "dev (desarrollo)", beta: "beta (preproducción)", prod: "prod (producción)" }, platform: { ios: "iOS", android: "Android", web: "Web", system: "Sistema" },
+    name: "Nombre", key: "Clave", coins: "Monedas", price: "Precio (USD)", period: "Periodo", productId: "ID de producto de tienda", periods: { week: "Semanal", month: "Mensual", year: "Anual" },
+    status: "Estado", actions: "Acciones", enabled: "Activo", disabled: "Inactivo", popular: "Popular", edit: "Editar", delete: "Eliminar", save: "Guardar", cancel: "Cancelar", sortOrder: "Orden",
+    user: "Usuario", kind: "Tipo", amount: "Importe pagado", time: "Fecha", change: "Cambio", balance: "Saldo", description: "Descripción", kinds: { subscription: "Suscripción", coin_pack: "Paquete de monedas" },
+    empty: "No hay registros para estos filtros.", formDesc: "El entorno y la plataforma identifican una configuración independiente de tienda.", saved: "Producto guardado", deleted: "Producto eliminado", deleteConfirm: "¿Eliminar {{name}}?",
   },
 
   time: {

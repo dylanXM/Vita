@@ -21,6 +21,7 @@ const ja = {
     management: "管理",
     users: "ユーザー",
     agent: "AIコンパニオン",
+    billing: "課金管理", subscriptionPlans: "サブスクリプションプラン", coinPacks: "コインパック", billingActivity: "購入と台帳",
   },
 
   login: {
@@ -137,6 +138,16 @@ const ja = {
     routing: "エージェントルーティングとLife Engine", routingDesc: "各タスクのモデルと自律活動の上限を設定します。", chatModel: "チャットモデル", lifeModel: "生活計画モデル", proactiveModel: "自発メッセージモデル", selectModel: "選択…", eventMin: "イベント最小数", eventMax: "イベント最大数", proactiveLimit: "1日の自発連絡上限", quietStart: "静音開始", quietEnd: "静音終了", saveSettings: "ルーティングを保存",
     portraits: "システム人物画像", portraitsDesc: "初期作成で選択できる人物画像です。", portraitName: "画像名", imageUrl: "画像URL", gender: "タイプ", tags: "性格タグ", addPortrait: "画像を追加",
     companions: "人物管理", companionsDesc: "人物、モデル、独立した生活行動を手動設定します。", noCompanions: "人物がいません。", companion: "人物", name: "名前", city: "都市", occupation: "職業", model: "割当モデル", portrait: "人物画像", noPortrait: "画像なし", useDefault: "既定チャットモデルを使用", persona: "人格と境界", backstory: "背景", speakingStyle: "話し方", habitsGoal: "習慣（1行目）と人生目標", proactiveEnabled: "制限内の自発連絡を許可", saveCompanion: "人物を保存", add: "追加", update: "更新", saved: "エージェント設定を保存しました",
+  },
+
+  billing: {
+    plansTitle: "サブスクリプションプラン", plansDesc: "プラットフォームと環境ごとにサブスクリプション商品を設定します。", packsTitle: "コインパック", packsDesc: "プラットフォームと環境ごとに買い切りコイン商品を設定します。", activityTitle: "購入と台帳", activityDesc: "選択したプラットフォームと環境の購入・コイン変動を確認します。",
+    addPlan: "プランを追加", addPack: "コインパックを追加", purchases: "購入", ledger: "コイン台帳", environment: "環境", allPlatforms: "すべてのプラットフォーム", platformLabel: "プラットフォーム",
+    env: { dev: "dev（開発）", beta: "beta（ベータ）", prod: "prod（本番）" }, platform: { ios: "iOS", android: "Android", web: "Web", system: "システム" },
+    name: "名前", key: "キー", coins: "コイン", price: "価格（USD）", period: "期間", productId: "ストア商品 ID", periods: { week: "週次", month: "月次", year: "年次" },
+    status: "状態", actions: "操作", enabled: "有効", disabled: "無効", popular: "人気", edit: "編集", delete: "削除", save: "保存", cancel: "キャンセル", sortOrder: "並び順",
+    user: "ユーザー", kind: "種類", amount: "支払額", time: "日時", change: "増減", balance: "残高", description: "説明", kinds: { subscription: "サブスクリプション", coin_pack: "コインパック" },
+    empty: "条件に一致する記録はありません。", formDesc: "環境とプラットフォームで独立したストア商品設定を識別します。", saved: "課金商品を保存しました", deleted: "課金商品を削除しました", deleteConfirm: "{{name}}を削除しますか？",
   },
 
   time: {

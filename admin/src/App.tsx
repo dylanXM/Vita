@@ -8,6 +8,8 @@ import { UsersPage } from "@/pages/UsersPage";
 import { UserDetailPage } from "@/pages/UserDetailPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { AgentPage } from "@/pages/AgentPage";
+import { CoinPacksPage, SubscriptionPlansPage } from "@/pages/BillingProductsPage";
+import { BillingActivityPage } from "@/pages/BillingActivityPage";
 import { Button } from "@/components/ui/button";
 
 function RouteError() {
@@ -47,6 +49,9 @@ const router = createBrowserRouter([
       { path: "users", element: <UsersPage /> },
       { path: "users/:id", element: <UserDetailPage /> },
       { path: "agent", element: <AgentPage /> },
+      { path: "subscription-plans", element: <SubscriptionPlansPage /> },
+      { path: "coin-packs", element: <CoinPacksPage /> },
+      { path: "billing-activity", element: <BillingActivityPage /> },
     ],
   },
   { path: "*", element: <NotFoundPage /> },

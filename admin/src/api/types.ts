@@ -98,6 +98,66 @@ export interface AdminUserInput {
   environment?: Environment;
 }
 
+export type BillingPlatform = "ios" | "android" | "web";
+
+export interface BillingProduct {
+  id: string;
+  key: string;
+  name: string;
+  environment: Environment;
+  platform: BillingPlatform;
+  coins: number;
+  price_usd: number;
+  period?: "week" | "month" | "year";
+  product_id: string;
+  popular?: boolean;
+  enabled: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface BillingPurchase {
+  id: string;
+  transaction_id: string;
+  user_id: string;
+  user_email: string;
+  kind: "subscription" | "coin_pack";
+  provider: string;
+  platform: BillingPlatform | "system";
+  environment: Environment;
+  product_id: string;
+  amount_minor: number | null;
+  currency: string;
+  credits: number;
+  status: string;
+  purchased_at: string;
+}
+
+export interface CreditLedgerEntry {
+  id: string;
+  user_id: string;
+  user_email: string;
+  amount: number;
+  balance_after: number;
+  kind: string;
+  description: string;
+  platform: BillingPlatform | "system";
+  environment: Environment;
+  created_at: string;
+}
+
+export interface BillingList<T> {
+  items: T[];
+}
+
+export interface BillingPagedList<T> extends BillingList<T> {
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
 export type AIProviderKind = "openai" | "anthropic";
 
 export interface AIProvider {

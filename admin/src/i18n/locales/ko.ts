@@ -21,6 +21,7 @@ const ko = {
     management: "관리",
     users: "사용자",
     agent: "AI 컴패니언",
+    billing: "결제 관리", subscriptionPlans: "구독 플랜", coinPacks: "코인 팩", billingActivity: "구매 및 원장",
   },
 
   login: {
@@ -137,6 +138,16 @@ const ko = {
     routing: "에이전트 라우팅 및 Life Engine", routingDesc: "작업별 모델과 자율 활동 한도를 설정합니다.", chatModel: "채팅 모델", lifeModel: "생활 계획 모델", proactiveModel: "선제 메시지 모델", selectModel: "선택…", eventMin: "이벤트 최소", eventMax: "이벤트 최대", proactiveLimit: "일일 선제 연락 한도", quietStart: "방해 금지 시작", quietEnd: "방해 금지 종료", saveSettings: "라우팅 저장",
     portraits: "시스템 인물 이미지", portraitsDesc: "초기 생성에서 선택할 수 있는 인물 이미지입니다.", portraitName: "이미지 이름", imageUrl: "이미지 URL", gender: "유형", tags: "성격 태그", addPortrait: "이미지 추가",
     companions: "캐릭터 관리", companionsDesc: "정체성, 모델 및 독립 생활 행동을 수동 설정합니다.", noCompanions: "캐릭터가 없습니다.", companion: "캐릭터", name: "이름", city: "도시", occupation: "직업", model: "지정 모델", portrait: "인물 이미지", noPortrait: "이미지 없음", useDefault: "기본 채팅 모델 사용", persona: "성격과 경계", backstory: "배경", speakingStyle: "말투", habitsGoal: "생활 습관(첫 줄)과 인생 목표", proactiveEnabled: "제한된 선제 연락 허용", saveCompanion: "캐릭터 저장", add: "추가", update: "업데이트", saved: "에이전트 설정을 저장했습니다",
+  },
+
+  billing: {
+    plansTitle: "구독 플랜", plansDesc: "플랫폼과 환경별로 구독 상품을 설정합니다.", packsTitle: "코인 팩", packsDesc: "플랫폼과 환경별로 일회성 코인 상품을 설정합니다.", activityTitle: "구매 및 원장", activityDesc: "선택한 플랫폼과 환경의 구매 및 코인 변동을 확인합니다.",
+    addPlan: "플랜 추가", addPack: "코인 팩 추가", purchases: "구매", ledger: "코인 원장", environment: "환경", allPlatforms: "모든 플랫폼", platformLabel: "플랫폼",
+    env: { dev: "dev(개발)", beta: "beta(베타)", prod: "prod(운영)" }, platform: { ios: "iOS", android: "Android", web: "웹", system: "시스템" },
+    name: "이름", key: "키", coins: "코인", price: "가격(USD)", period: "기간", productId: "스토어 상품 ID", periods: { week: "주간", month: "월간", year: "연간" },
+    status: "상태", actions: "작업", enabled: "활성", disabled: "비활성", popular: "인기", edit: "편집", delete: "삭제", save: "저장", cancel: "취소", sortOrder: "정렬 순서",
+    user: "사용자", kind: "유형", amount: "결제 금액", time: "시간", change: "변동", balance: "잔액", description: "설명", kinds: { subscription: "구독", coin_pack: "코인 팩" },
+    empty: "필터와 일치하는 기록이 없습니다.", formDesc: "환경과 플랫폼이 독립적인 스토어 상품 설정을 식별합니다.", saved: "결제 상품이 저장되었습니다", deleted: "결제 상품이 삭제되었습니다", deleteConfirm: "{{name}}을(를) 삭제하시겠습니까?",
   },
 
   time: {

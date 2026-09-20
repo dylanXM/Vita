@@ -21,6 +21,7 @@ const ar = {
     management: "الإدارة",
     users: "المستخدمون",
     agent: "رفيق الذكاء الاصطناعي",
+    billing: "إدارة الفوترة", subscriptionPlans: "خطط الاشتراك", coinPacks: "حزم العملات", billingActivity: "المشتريات والسجل",
   },
 
   login: {
@@ -137,6 +138,16 @@ const ar = {
     routing: "التوجيه ومحرك الحياة", routingDesc: "اختر نموذجاً لكل مهمة وحدد النشاط الذاتي.", chatModel: "نموذج المحادثة", lifeModel: "نموذج تخطيط الحياة", proactiveModel: "نموذج الرسائل الاستباقية", selectModel: "اختر…", eventMin: "الحد الأدنى للأحداث", eventMax: "الحد الأقصى للأحداث", proactiveLimit: "حد التواصل اليومي", quietStart: "بدء الهدوء", quietEnd: "نهاية الهدوء", saveSettings: "حفظ التوجيه",
     portraits: "صور الشخصيات", portraitsDesc: "الصور المتاحة عند الإنشاء الأولي.", portraitName: "اسم الصورة", imageUrl: "رابط الصورة", gender: "النوع", tags: "سمات الشخصية", addPortrait: "إضافة صورة",
     companions: "الشخصيات", companionsDesc: "إعداد الهوية والنموذج والحياة المستقلة يدوياً.", noCompanions: "لا توجد شخصيات.", companion: "الشخصية", name: "الاسم", city: "المدينة", occupation: "المهنة", model: "النموذج المعين", portrait: "الصورة", noPortrait: "بلا صورة", useDefault: "استخدام نموذج المحادثة الافتراضي", persona: "الشخصية والحدود", backstory: "الخلفية", speakingStyle: "أسلوب الكلام", habitsGoal: "العادات والهدف الحياتي", proactiveEnabled: "السماح بتواصل استباقي محدود", saveCompanion: "حفظ الشخصية", add: "إضافة", update: "تحديث", saved: "تم حفظ إعدادات الوكيل",
+  },
+
+  billing: {
+    plansTitle: "خطط الاشتراك", plansDesc: "إعداد منتجات الاشتراك حسب المنصة والبيئة.", packsTitle: "حزم العملات", packsDesc: "إعداد حزم العملات لمرة واحدة حسب المنصة والبيئة.", activityTitle: "المشتريات والسجل", activityDesc: "مراجعة المشتريات وحركات العملات للمنصة والبيئة المحددتين.",
+    addPlan: "إضافة خطة", addPack: "إضافة حزمة", purchases: "المشتريات", ledger: "سجل العملات", environment: "البيئة", allPlatforms: "كل المنصات", platformLabel: "المنصة",
+    env: { dev: "dev (تطوير)", beta: "beta (تجريبي)", prod: "prod (إنتاج)" }, platform: { ios: "iOS", android: "Android", web: "الويب", system: "النظام" },
+    name: "الاسم", key: "المفتاح", coins: "العملات", price: "السعر (USD)", period: "الفترة", productId: "معرّف منتج المتجر", periods: { week: "أسبوعي", month: "شهري", year: "سنوي" },
+    status: "الحالة", actions: "الإجراءات", enabled: "مفعّل", disabled: "معطّل", popular: "شائع", edit: "تعديل", delete: "حذف", save: "حفظ", cancel: "إلغاء", sortOrder: "الترتيب",
+    user: "المستخدم", kind: "النوع", amount: "المبلغ المدفوع", time: "الوقت", change: "التغيير", balance: "الرصيد", description: "الوصف", kinds: { subscription: "اشتراك", coin_pack: "حزمة عملات" },
+    empty: "لا توجد سجلات تطابق عوامل التصفية.", formDesc: "تحدد البيئة والمنصة إعداد منتج متجر مستقلًا.", saved: "تم حفظ منتج الفوترة", deleted: "تم حذف منتج الفوترة", deleteConfirm: "حذف {{name}}؟",
   },
 
   time: {

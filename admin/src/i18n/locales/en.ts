@@ -21,6 +21,10 @@ const en = {
     management: "Management",
     users: "Users",
     agent: "AI companion",
+    billing: "Billing",
+    subscriptionPlans: "Subscription plans",
+    coinPacks: "Coin packs",
+    billingActivity: "Purchases & ledger",
   },
 
   login: {
@@ -189,6 +193,24 @@ const en = {
     add: "Add",
     update: "Update",
     saved: "Agent configuration saved",
+  },
+
+  billing: {
+    plansTitle: "Subscription plans", plansDesc: "Configure subscription products separately by platform and environment.",
+    packsTitle: "Coin packs", packsDesc: "Configure one-time coin products separately by platform and environment.",
+    activityTitle: "Purchases & ledger", activityDesc: "Review purchases and coin movements within the selected platform and environment.",
+    addPlan: "Add plan", addPack: "Add coin pack", purchases: "Purchases", ledger: "Coin ledger",
+    environment: "Environment", allPlatforms: "All platforms", platformLabel: "Platform",
+    env: { dev: "dev (development)", beta: "beta (pre-release)", prod: "prod (production)" },
+    platform: { ios: "iOS", android: "Android", web: "Web", system: "System" },
+    name: "Name", key: "Key", coins: "Coins", price: "Price (USD)", period: "Period", productId: "Store product ID",
+    periods: { week: "Weekly", month: "Monthly", year: "Yearly" },
+    status: "Status", actions: "Actions", enabled: "Enabled", disabled: "Disabled", popular: "Popular",
+    edit: "Edit", delete: "Delete", save: "Save", cancel: "Cancel", sortOrder: "Sort order",
+    user: "User", kind: "Kind", amount: "Paid amount", time: "Time", change: "Change", balance: "Balance", description: "Description",
+    kinds: { subscription: "Subscription", coin_pack: "Coin pack" },
+    empty: "No records match these filters.", formDesc: "The environment and platform identify an independent store product configuration.",
+    saved: "Billing product saved", deleted: "Billing product deleted", deleteConfirm: "Delete {{name}}?",
   },
 
   time: {

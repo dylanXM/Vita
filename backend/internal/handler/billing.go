@@ -134,9 +134,10 @@ func ConsumeCredits(c *gin.Context) {
 		return
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO credit_transactions (id, user_id, amount, balance_after, kind, description)
-		 VALUES ($1, $2, $3, $4, 'consume', $5)`,
-		uuid.New().String(), userID, -req.Amount, newBalance, req.Description); err != nil {
+		`INSERT INTO credit_transactions (id, user_id, amount, balance_after, kind, description, platform, environment)
+		 VALUES ($1, $2, $3, $4, 'consume', $5, $6, $7)`,
+		uuid.New().String(), userID, -req.Amount, newBalance, req.Description,
+		requestPlatform(c), currentEnvironment()); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record transaction"})
 		return
 	}
@@ -151,6 +152,10 @@ func ConsumeCredits(c *gin.Context) {
 // non-empty, an identical grant is skipped (webhook retry safety). Returns the
 // resulting balance.
 func grantCredits(userID string, amount int, kind, dedupeKey string) (int, error) {
+	return grantCreditsForPlatform(userID, amount, kind, dedupeKey, "system")
+}
+
+func grantCreditsForPlatform(userID string, amount int, kind, dedupeKey, platform string) (int, error) {
 	if amount == 0 {
 		var bal int
 		err := db.Get().QueryRow(
@@ -191,15 +196,24 @@ func grantCredits(userID string, amount int, kind, dedupeKey string) (int, error
 		desc = "credits granted"
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO credit_transactions (id, user_id, amount, balance_after, kind, description)
-		 VALUES ($1, $2, $3, $4, $5, $6)`,
-		uuid.New().String(), userID, amount, bal, kind, desc); err != nil {
+		`INSERT INTO credit_transactions (id, user_id, amount, balance_after, kind, description, platform, environment)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		uuid.New().String(), userID, amount, bal, kind, desc, platform, currentEnvironment()); err != nil {
 		return 0, err
 	}
 	if err := tx.Commit(); err != nil {
 		return 0, err
 	}
 	return bal, nil
+}
+
+func requestPlatform(c *gin.Context) string {
+	switch strings.ToLower(strings.TrimSpace(c.GetHeader("X-Vita-Platform"))) {
+	case "ios", "android", "web":
+		return strings.ToLower(strings.TrimSpace(c.GetHeader("X-Vita-Platform")))
+	default:
+		return "system"
+	}
 }
 
 // ============================= Subscriptions =============================
@@ -219,25 +233,27 @@ type Subscription struct {
 
 // upsertSubscription inserts or updates a subscription identified by
 // (provider, provider_ref). Returns the row.
-func upsertSubscription(userID, provider, providerRef, productID, entitlement, status string,
+func upsertSubscription(userID, provider, providerRef, productID, entitlement, status, platform string,
 	periodStart, periodEnd *time.Time, willRenew bool) (*Subscription, error) {
 
 	if _, err := db.Get().Exec(
 		`INSERT INTO subscriptions
-		   (id, user_id, provider, provider_ref, product_id, entitlement, status,
+		   (id, user_id, provider, provider_ref, product_id, entitlement, status, platform, environment,
 		    current_period_start, current_period_end, will_renew, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)
 		 ON CONFLICT (provider, provider_ref) DO UPDATE SET
 		   user_id = EXCLUDED.user_id,
-		   product_id = EXCLUDED.product_id,
-		   entitlement = EXCLUDED.entitlement,
+		   product_id = CASE WHEN EXCLUDED.product_id <> '' THEN EXCLUDED.product_id ELSE subscriptions.product_id END,
+		   entitlement = CASE WHEN EXCLUDED.entitlement <> '' THEN EXCLUDED.entitlement ELSE subscriptions.entitlement END,
 		   status = EXCLUDED.status,
+		   platform = EXCLUDED.platform,
+		   environment = EXCLUDED.environment,
 		   current_period_start = EXCLUDED.current_period_start,
 		   current_period_end = EXCLUDED.current_period_end,
 		   will_renew = EXCLUDED.will_renew,
 		   updated_at = CURRENT_TIMESTAMP`,
-		uuid.New().String(), userID, provider, providerRef, productID, entitlement, status,
-		periodStart, periodEnd, willRenew); err != nil {
+		uuid.New().String(), userID, provider, providerRef, productID, entitlement, status, platform,
+		currentEnvironment(), periodStart, periodEnd, willRenew); err != nil {
 		return nil, err
 	}
 
@@ -358,13 +374,25 @@ func processRevenueCatEvent(ev *revenueCatEvent) {
 		return
 	}
 
+	platform := platformFromRevenueCatStore(ev.Store)
+	purchasedAt := time.Now()
+	if ev.PurchasedAtMS > 0 {
+		purchasedAt = time.UnixMilli(ev.PurchasedAtMS)
+	}
+	purchaseRef := fmt.Sprintf("%s:%d", ev.OriginalTransactionID, ev.PurchasedAtMS)
+
 	// Consumables: grant credits for product ids like "credits_500".
 	if ev.Type == "NON_RENEWING_PURCHASE" || ev.Type == "INITIAL_PURCHASE" {
-		if amount := creditsFromProductID(ev.ProductID); amount > 0 {
+		amount, configured := configuredProductCredits("coin_packs", ev.ProductID, platform)
+		if !configured {
+			amount = creditsFromProductID(ev.ProductID)
+		}
+		if amount > 0 {
 			dedupe := fmt.Sprintf("rc-purchase:%s:%d", ev.OriginalTransactionID, ev.PurchasedAtMS)
-			if _, err := grantCredits(userID, amount, "purchase", dedupe); err != nil {
+			if _, err := grantCreditsForPlatform(userID, amount, "purchase", dedupe, platform); err != nil {
 				fmt.Printf("revenuecat: failed to grant credits for %s: %v\n", userID, err)
 			}
+			recordPurchase(userID, purchaseRef, "coin_pack", "revenuecat", platform, ev.ProductID, nil, "", amount, "paid", purchasedAt)
 			return
 		}
 	}
@@ -384,9 +412,13 @@ func processRevenueCatEvent(ev *revenueCatEvent) {
 		willRenew = true
 		// Grant monthly credits on real (non-trial) purchase / renewal. A trial
 		// becomes a purchase on the RENEWAL that follows it.
-		if billingCfg.SubscriptionCreditsMonthly > 0 && ev.PeriodType != "TRIAL" {
+		credits, configured := configuredProductCredits("subscription_plans", ev.ProductID, platform)
+		if !configured {
+			credits = billingCfg.SubscriptionCreditsMonthly
+		}
+		if credits > 0 && ev.PeriodType != "TRIAL" {
 			dedupe := fmt.Sprintf("rc-subscription:%s:%d", ref, ev.PurchasedAtMS)
-			if _, err := grantCredits(userID, billingCfg.SubscriptionCreditsMonthly, "grant", dedupe); err != nil {
+			if _, err := grantCreditsForPlatform(userID, credits, "grant", dedupe, platform); err != nil {
 				fmt.Printf("revenuecat: failed to grant monthly credits for %s: %v\n", userID, err)
 			}
 		}
@@ -415,8 +447,67 @@ func processRevenueCatEvent(ev *revenueCatEvent) {
 	}
 
 	if _, err := upsertSubscription(userID, "revenuecat", ref, ev.ProductID, entitlement,
-		status, periodStart, periodEnd, willRenew); err != nil {
+		status, platform, periodStart, periodEnd, willRenew); err != nil {
 		fmt.Printf("revenuecat: failed to upsert subscription for %s: %v\n", userID, err)
+	}
+	if ev.Type == "INITIAL_PURCHASE" || ev.Type == "RENEWAL" {
+		credits, configured := configuredProductCredits("subscription_plans", ev.ProductID, platform)
+		if !configured {
+			credits = billingCfg.SubscriptionCreditsMonthly
+		}
+		recordPurchase(userID, purchaseRef, "subscription", "revenuecat", platform, ev.ProductID,
+			nil, "", credits, "paid", purchasedAt)
+	}
+}
+
+func configuredProductCredits(table, productID, platform string) (int, bool) {
+	if productID == "" || (table != "coin_packs" && table != "subscription_plans") {
+		return 0, false
+	}
+	coinColumn := "coins"
+	if table == "subscription_plans" {
+		coinColumn = "coins_granted"
+	}
+	var credits int
+	err := db.Get().QueryRow(`SELECT `+coinColumn+` FROM `+table+
+		` WHERE environment=$1 AND platform=$2 AND product_id=$3 AND enabled=true LIMIT 1`,
+		currentEnvironment(), platform, productID).Scan(&credits)
+	if err != nil {
+		return 0, false
+	}
+	return credits, true
+}
+
+func platformFromRevenueCatStore(store string) string {
+	switch strings.ToUpper(strings.TrimSpace(store)) {
+	case "APP_STORE", "MAC_APP_STORE":
+		return "ios"
+	case "PLAY_STORE", "AMAZON":
+		return "android"
+	case "STRIPE":
+		return "web"
+	default:
+		return "system"
+	}
+}
+
+func recordPurchase(userID, transactionID, kind, provider, platform, productID string, amountMinor *int64,
+	currency string, credits int, status string, purchasedAt time.Time) {
+	if userID == "" || transactionID == "" {
+		return
+	}
+	_, err := db.Get().Exec(
+		`INSERT INTO billing_purchases
+		 (id, user_id, transaction_id, kind, provider, platform, environment, product_id,
+		  amount_minor, currency, credits, status, purchased_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		 ON CONFLICT (provider, transaction_id) DO UPDATE SET
+		  status = EXCLUDED.status, amount_minor = COALESCE(EXCLUDED.amount_minor, billing_purchases.amount_minor),
+		  currency = CASE WHEN EXCLUDED.currency <> '' THEN EXCLUDED.currency ELSE billing_purchases.currency END`,
+		uuid.New().String(), userID, transactionID, kind, provider, platform, currentEnvironment(), productID,
+		amountMinor, strings.ToUpper(currency), credits, status, purchasedAt)
+	if err != nil {
+		fmt.Printf("billing: failed to record purchase %s: %v\n", transactionID, err)
 	}
 }
 
@@ -443,7 +534,7 @@ func creditsFromProductID(productID string) int {
 // store policy for in-app digital goods.
 
 type CreateCheckoutRequest struct {
-	Plan string `json:"plan" binding:"required,oneof=plus premium"`
+	Plan string `json:"plan" binding:"required"`
 }
 
 // CreateStripeCheckout creates a Stripe Checkout Session for the current user.
@@ -460,9 +551,25 @@ func CreateStripeCheckout(c *gin.Context) {
 		return
 	}
 
-	priceID := billingCfg.StripePricePlus
-	if req.Plan == "premium" {
-		priceID = billingCfg.StripePricePremium
+	var priceID string
+	err := db.Get().QueryRow(`SELECT product_id FROM subscription_plans
+		WHERE environment=$1 AND platform='web' AND key=$2 AND enabled=true LIMIT 1`,
+		currentEnvironment(), req.Plan).Scan(&priceID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		// Keep legacy Stripe checkout working during an additive deployment
+		// before the product-catalog migration has reached the shared database.
+		fmt.Printf("billing: subscription plan lookup unavailable: %v\n", err)
+	}
+	if priceID == "" {
+		switch req.Plan {
+		case "plus":
+			priceID = billingCfg.StripePricePlus
+		case "premium":
+			priceID = billingCfg.StripePricePremium
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "unknown subscription plan"})
+			return
+		}
 	}
 	if priceID == "" {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "stripe price not configured"})
@@ -545,6 +652,9 @@ type stripeSession struct {
 	Subscription      string            `json:"subscription"`
 	Metadata          map[string]string `json:"metadata"`
 	Customer          string            `json:"customer"`
+	AmountTotal       int64             `json:"amount_total"`
+	Currency          string            `json:"currency"`
+	PaymentStatus     string            `json:"payment_status"`
 }
 
 func processStripeSessionCompleted(obj json.RawMessage) {
@@ -594,16 +704,22 @@ func processStripeSessionCompleted(obj json.RawMessage) {
 	}
 
 	if _, err := upsertSubscription(userID, "stripe", stripeSub.ID, productID, plan,
-		status, nil, &periodEnd, true); err != nil {
+		status, "web", nil, &periodEnd, true); err != nil {
 		fmt.Printf("stripe: failed to upsert subscription: %v\n", err)
 		return
 	}
 
 	// One-time grant on first completion of the subscription.
+	credits, configured := configuredProductCredits("subscription_plans", productID, "web")
+	if !configured {
+		credits = billingCfg.SubscriptionCreditsMonthly
+	}
 	dedupe := "stripe-subscription:" + stripeSub.ID + ":initial"
-	if _, err := grantCredits(userID, billingCfg.SubscriptionCreditsMonthly, "grant", dedupe); err != nil {
+	if _, err := grantCreditsForPlatform(userID, credits, "grant", dedupe, "web"); err != nil {
 		fmt.Printf("stripe: failed to grant credits: %v\n", err)
 	}
+	recordPurchase(userID, session.ID, "subscription", "stripe", "web", productID,
+		&session.AmountTotal, session.Currency, credits, session.PaymentStatus, time.Now())
 }
 
 type stripeInvoice struct {
@@ -613,8 +729,13 @@ type stripeInvoice struct {
 	Paid          bool   `json:"paid"`
 	Customer      string `json:"customer"`
 	CustomerEmail string `json:"customer_email"`
+	AmountPaid    int64  `json:"amount_paid"`
+	Currency      string `json:"currency"`
 	Lines         struct {
 		Data []struct {
+			Price struct {
+				ID string `json:"id"`
+			} `json:"price"`
 			Period struct {
 				Start int64 `json:"start"`
 				End   int64 `json:"end"`
@@ -671,17 +792,27 @@ func processStripeInvoicePaid(obj json.RawMessage) {
 		subPeriodEnd = &t
 	}
 	periodStart := time.Now()
+	productID := ""
 	if len(inv.Lines.Data) > 0 && inv.Lines.Data[0].Period.Start > 0 {
 		periodStart = time.Unix(inv.Lines.Data[0].Period.Start, 0)
 	}
-	if _, err := upsertSubscription(userIDResolved, "stripe", inv.Subscription, "", "",
-		"active", &periodStart, subPeriodEnd, true); err != nil {
+	if len(inv.Lines.Data) > 0 {
+		productID = inv.Lines.Data[0].Price.ID
+	}
+	if _, err := upsertSubscription(userIDResolved, "stripe", inv.Subscription, productID, "",
+		"active", "web", &periodStart, subPeriodEnd, true); err != nil {
 		return
 	}
 	dedupe := "stripe-subscription:" + inv.Subscription + ":" + inv.ID
-	if _, err := grantCredits(userIDResolved, billingCfg.SubscriptionCreditsMonthly, "grant", dedupe); err != nil {
+	credits, configured := configuredProductCredits("subscription_plans", productID, "web")
+	if !configured {
+		credits = billingCfg.SubscriptionCreditsMonthly
+	}
+	if _, err := grantCreditsForPlatform(userIDResolved, credits, "grant", dedupe, "web"); err != nil {
 		fmt.Printf("stripe: failed to grant renewal credits: %v\n", err)
 	}
+	recordPurchase(userIDResolved, inv.ID, "subscription", "stripe", "web", productID,
+		&inv.AmountPaid, inv.Currency, credits, "paid", periodStart)
 }
 
 func processStripeSubscriptionEvent(eventType string, obj json.RawMessage) {
