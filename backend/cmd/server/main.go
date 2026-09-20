@@ -216,6 +216,11 @@ func main() {
 			admin.DELETE("/whats-new/:id", handler.AdminDeleteWhatsNew)
 			admin.GET("/social-links", handler.AdminGetSocialMediaLinks)
 			admin.PUT("/social-links", handler.AdminUpdateSocialMediaLinks)
+			admin.GET("/legal-documents", handler.AdminListLegalDocuments)
+			admin.POST("/legal-documents", handler.AdminCreateLegalDocument)
+			admin.PUT("/legal-documents/:id", handler.AdminUpdateLegalDocument)
+			admin.POST("/legal-documents/:id/activate", handler.AdminActivateLegalDocument)
+			admin.DELETE("/legal-documents/:id", handler.AdminDeleteLegalDocument)
 
 			users := admin.Group("/users")
 			{

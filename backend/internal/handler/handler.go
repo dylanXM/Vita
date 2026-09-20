@@ -108,9 +108,11 @@ func Health(c *gin.Context) {
 // --- Verification Code ---
 
 type SendCodeRequest struct {
-	Email         string `json:"email" binding:"required,email"`
-	Purpose       string `json:"purpose"`
-	AcceptedLegal *bool  `json:"accepted_legal"`
+	Email                string `json:"email" binding:"required,email"`
+	Purpose              string `json:"purpose"`
+	AcceptedLegal        *bool  `json:"accepted_legal"`
+	PrivacyPolicyVersion string `json:"privacy_policy_version"`
+	TermsVersion         string `json:"terms_version"`
 }
 
 type SendCodeResponse struct {
@@ -128,15 +130,16 @@ func SendCode(c *gin.Context) {
 	var userID, userRole string
 	err := db.Get().QueryRow(`SELECT id, COALESCE(role_id, 'user') FROM users WHERE email = $1`, req.Email).Scan(&userID, &userRole)
 	if errors.Is(err, sql.ErrNoRows) {
-		acceptedAt, consentErr := registrationLegalAcceptance(req.AcceptedLegal)
+		acceptedAt, consentErr := legalAcceptance(req.AcceptedLegal, req.PrivacyPolicyVersion, req.TermsVersion)
 		if consentErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": consentErr.Error(), "code": "legal_consent_required"})
+			writeLegalAcceptanceError(c, consentErr)
 			return
 		}
 		// A verification-code client may register only after explicit consent.
 		userID = uuid.New().String()
 		_, err = db.Get().Exec(`INSERT INTO users (id,email,role_id,environment,legal_accepted_at,privacy_policy_version,terms_version)
-			VALUES ($1,$2,'user',$3,$4,$5,$6)`, userID, req.Email, currentEnvironment(), acceptedAt, privacyPolicyVersion, termsVersion)
+			VALUES ($1,$2,'user',$3,$4,$5,$6)`, userID, req.Email, currentEnvironment(), acceptedAt,
+			strings.TrimSpace(req.PrivacyPolicyVersion), strings.TrimSpace(req.TermsVersion))
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 			return
@@ -638,11 +641,6 @@ const registerCooldown = 60 * time.Second
 
 const pendingRegPrefix = "vita:reg:"
 
-const (
-	privacyPolicyVersion = "2026-09-20"
-	termsVersion         = "2026-09-20"
-)
-
 type pendingRegistration struct {
 	PasswordHash         string     `json:"password_hash"`
 	LegalAcceptedAt      *time.Time `json:"legal_accepted_at,omitempty"`
@@ -652,17 +650,19 @@ type pendingRegistration struct {
 
 func registrationLegalAcceptance(value *bool) (*time.Time, error) {
 	if value == nil || !*value {
-		return nil, errors.New("privacy policy and terms must be accepted")
+		return nil, errLegalConsentRequired
 	}
 	now := time.Now().UTC()
 	return &now, nil
 }
 
 type AppRegisterRequest struct {
-	Email         string `json:"email" binding:"required,email"`
-	Password      string `json:"password" binding:"required,min=6"`
-	InviteCode    string `json:"invite_code"`
-	AcceptedLegal *bool  `json:"accepted_legal"`
+	Email                string `json:"email" binding:"required,email"`
+	Password             string `json:"password" binding:"required,min=6"`
+	InviteCode           string `json:"invite_code"`
+	AcceptedLegal        *bool  `json:"accepted_legal"`
+	PrivacyPolicyVersion string `json:"privacy_policy_version"`
+	TermsVersion         string `json:"terms_version"`
 }
 
 type AppRegisterVerifyRequest struct {
@@ -679,9 +679,9 @@ func AppRegister(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	acceptedAt, err := registrationLegalAcceptance(req.AcceptedLegal)
+	acceptedAt, err := legalAcceptance(req.AcceptedLegal, req.PrivacyPolicyVersion, req.TermsVersion)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "code": "legal_consent_required"})
+		writeLegalAcceptanceError(c, err)
 		return
 	}
 
@@ -724,11 +724,8 @@ func AppRegister(c *gin.Context) {
 
 	// Remember the password and consent until the code is verified.
 	pendingKey := pendingRegPrefix + req.Email
-	pending := pendingRegistration{PasswordHash: hash, LegalAcceptedAt: acceptedAt}
-	if acceptedAt != nil {
-		pending.PrivacyPolicyVersion = privacyPolicyVersion
-		pending.TermsVersion = termsVersion
-	}
+	pending := pendingRegistration{PasswordHash: hash, LegalAcceptedAt: acceptedAt,
+		PrivacyPolicyVersion: strings.TrimSpace(req.PrivacyPolicyVersion), TermsVersion: strings.TrimSpace(req.TermsVersion)}
 	pendingJSON, _ := json.Marshal(pending)
 	if err := rdb.Set(ctx, pendingKey, pendingJSON, codeTTL).Err(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start registration"})

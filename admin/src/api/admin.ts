@@ -42,6 +42,9 @@ import type {
   CreditProduct,
   MediaModelRoute,
   MediaModelRoutesResponse,
+  LegalDocument,
+  LegalDocumentInput,
+  LegalDocumentType,
 } from "./types";
 
 /** Admin sign-in. The API also accepts a 6-digit code for the same accounts. */
@@ -159,6 +162,21 @@ export const socialLinksApi = {
   save: (environment: Environment, body: Pick<SocialMediaLinksConfig,
     "social_instagram_url" | "social_tiktok_url" | "social_x_url" | "social_discord_url">) =>
     http.put<SocialMediaLinksConfig>("/admin/social-links", body, { params: { environment } }),
+};
+
+export const legalDocumentsApi = {
+  list: (environment: Environment, documentType: LegalDocumentType, signal?: AbortSignal) =>
+    http.get<{ items: LegalDocument[] }>("/admin/legal-documents", {
+      params: { environment, document_type: documentType }, signal,
+    }),
+  create: (body: LegalDocumentInput) =>
+    http.post<LegalDocument>("/admin/legal-documents", body),
+  update: (id: string, body: LegalDocumentInput) =>
+    http.put<LegalDocument>(`/admin/legal-documents/${id}`, body),
+  activate: (id: string) =>
+    http.post<LegalDocument>(`/admin/legal-documents/${id}/activate`),
+  remove: (id: string) =>
+    http.del<{ message: string }>(`/admin/legal-documents/${id}`),
 };
 
 export const agentApi = {

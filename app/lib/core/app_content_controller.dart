@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_client.dart';
+import 'legal_documents.dart';
 
 class LocalizedCopy {
   const LocalizedCopy(this.values);
@@ -187,6 +188,13 @@ class AppContentController extends GetxController {
   );
   WhatsNewCampaignContent? whatsNew;
   final socialLinks = const SocialMediaLinks().obs;
+  final legalDocuments = <LegalDocumentType, LegalDocument>{}.obs;
+
+  LegalDocument? legalDocument(LegalDocumentType type) => legalDocuments[type];
+
+  bool get hasCurrentLegalDocuments =>
+      legalDocument(LegalDocumentType.privacy)?.isUsable == true &&
+      legalDocument(LegalDocumentType.terms)?.isUsable == true;
 
   Future<void> load() async {
     try {
@@ -195,6 +203,7 @@ class AppContentController extends GetxController {
       final onboardingRaw = raw['onboarding'];
       final whatsNewRaw = raw['whats_new'];
       final socialLinksRaw = raw['social_links'];
+      final legalDocumentsRaw = raw['legal_documents'];
       if (onboardingRaw is Map) {
         onboarding =
             OnboardingContent.from(Map<String, dynamic>.from(onboardingRaw));
@@ -206,6 +215,15 @@ class AppContentController extends GetxController {
       if (socialLinksRaw is Map) {
         socialLinks.value =
             SocialMediaLinks.from(Map<String, dynamic>.from(socialLinksRaw));
+      }
+      if (legalDocumentsRaw is Map) {
+        final parsed = <LegalDocumentType, LegalDocument>{};
+        for (final value in legalDocumentsRaw.values) {
+          if (value is! Map) continue;
+          final document = LegalDocument.from(Map<String, dynamic>.from(value));
+          if (document.isUsable) parsed[document.type] = document;
+        }
+        legalDocuments.assignAll(parsed);
       }
     } catch (_) {
       // Content is remotely managed but must never block app startup.

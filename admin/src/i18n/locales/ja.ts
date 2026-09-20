@@ -22,7 +22,7 @@ const ja = {
     users: "ユーザー",
     companions: "キャラクター管理",
     agent: "AIコンパニオン", mediaModels: "モデルルーティング", invitationSettings: "招待コード設定",
-    billing: "課金管理", subscriptionPlans: "サブスクリプションプラン", coinPacks: "コインパック", billingActivity: "購入と台帳", creditProducts: "コイン体験", appContent: "アプリコンテンツ", onboarding: "オンボーディング", whatsNew: "新着情報", socialLinks: "SNSリンク",
+    billing: "課金管理", subscriptionPlans: "サブスクリプションプラン", coinPacks: "コインパック", billingActivity: "購入と台帳", creditProducts: "コイン体験", appContent: "アプリコンテンツ", onboarding: "オンボーディング", whatsNew: "新着情報", socialLinks: "SNSリンク", legalDocuments: "法的文書",
   },
 
   login: {
@@ -169,6 +169,7 @@ const ja = {
   content: { enabled: "有効", disabled: "無効", save: "保存", saved: "保存しました", cancel: "キャンセル", deleted: "削除しました", name: "名前", status: "状態", schedule: "配信期間", operator: "操作者", actions: "操作", identifier: "識別子", icon: "アイコン", imageUrl: "画像 URL", title: "タイトル", body: "説明", startsAt: "開始日時", endsAt: "終了日時" },
   onboarding: { title: "オンボーディング", desc: "環境とプラットフォーム別に初回案内を設定します。", settings: "配信設定", settingsDesc: "リビジョンは QA とコンテンツ管理用です。各端末では一度だけ表示されます。", revision: "リビジョン", page: "ページ {{n}}", addPage: "ページを追加" },
   social: { title: "SNSリンク", desc: "Vitaアプリに表示する公式アカウントを設定します。", cardTitle: "Vitaをフォロー", cardDesc: "選択した環境では設定済みのリンクだけが表示されます。", hint: "完全なhttpまたはhttps URLを入力してください。空欄にすると非表示になります。", save: "リンクを保存", saved: "SNSリンクを保存しました" },
+  legal: { title: "法的文書", desc: "環境ごとに英語のポリシーと利用規約を管理します。", privacy: "プライバシー", terms: "利用規約", create: "新規バージョン", edit: "下書きを編集", delete: "削除", activate: "有効にする", version: "バージョン", summary: "概要", content: "英語本文", updatedAt: "更新日時", effective: "有効", historical: "履歴", draft: "下書き", empty: "バージョンがありません。", immutableHint: "公開済みバージョンは永久に読み取り専用で削除できません。", englishOnly: "アプリには最新の有効な英語版のみ表示されます。", activated: "有効版を更新しました", deleted: "下書きを削除しました", saved: "下書きを保存しました", deleteConfirm: "この下書きを削除しますか？" },
   whatsNew: { title: "新着情報", desc: "環境、プラットフォーム、バージョン、期間ごとに更新キャンペーンを配信します。", create: "キャンペーン作成", edit: "キャンペーン編集", version: "最小アプリバージョン", action: "CTA アクション", actionValue: "ルートまたは URL", actionLabel: "CTA ラベル", deleteConfirm: "このキャンペーンを削除しますか？", empty: "キャンペーンはありません。" },
 };
 

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,8 +65,10 @@ type GoogleClaims struct {
 }
 
 type GoogleLoginRequest struct {
-	IDToken       string `json:"id_token" binding:"required"`
-	AcceptedLegal *bool  `json:"accepted_legal"`
+	IDToken              string `json:"id_token" binding:"required"`
+	AcceptedLegal        *bool  `json:"accepted_legal"`
+	PrivacyPolicyVersion string `json:"privacy_policy_version"`
+	TermsVersion         string `json:"terms_version"`
 }
 
 type GoogleLoginResponse struct {
@@ -102,9 +105,9 @@ func GoogleLogin(c *gin.Context) {
 		`SELECT id, COALESCE(role_id, 'user') FROM users WHERE email = $1`, claims.Email).
 		Scan(&userID, &role)
 	if errors.Is(err, sql.ErrNoRows) {
-		acceptedAt, consentErr := registrationLegalAcceptance(req.AcceptedLegal)
+		acceptedAt, consentErr := legalAcceptance(req.AcceptedLegal, req.PrivacyPolicyVersion, req.TermsVersion)
 		if consentErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": consentErr.Error(), "code": "legal_consent_required"})
+			writeLegalAcceptanceError(c, consentErr)
 			return
 		}
 		userID = uuid.New().String()
@@ -112,7 +115,8 @@ func GoogleLogin(c *gin.Context) {
 		if _, err := db.Get().Exec(
 			`INSERT INTO users (id,email,role_id,environment,legal_accepted_at,privacy_policy_version,terms_version)
 			 VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-			userID, claims.Email, role, currentEnvironment(), acceptedAt, privacyPolicyVersion, termsVersion); err != nil {
+			userID, claims.Email, role, currentEnvironment(), acceptedAt,
+			strings.TrimSpace(req.PrivacyPolicyVersion), strings.TrimSpace(req.TermsVersion)); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 			return
 		}

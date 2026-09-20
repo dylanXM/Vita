@@ -22,7 +22,7 @@ const ko = {
     users: "사용자",
     companions: "캐릭터 관리",
     agent: "AI 컴패니언", mediaModels: "모델 라우팅", invitationSettings: "초대 코드 설정",
-    billing: "결제 관리", subscriptionPlans: "구독 플랜", coinPacks: "코인 팩", billingActivity: "구매 및 원장", creditProducts: "코인 경험", appContent: "앱 콘텐츠", onboarding: "온보딩", whatsNew: "새 소식", socialLinks: "소셜 미디어 링크",
+    billing: "결제 관리", subscriptionPlans: "구독 플랜", coinPacks: "코인 팩", billingActivity: "구매 및 원장", creditProducts: "코인 경험", appContent: "앱 콘텐츠", onboarding: "온보딩", whatsNew: "새 소식", socialLinks: "소셜 미디어 링크", legalDocuments: "법적 문서",
   },
 
   login: {
@@ -169,6 +169,7 @@ const ko = {
   content: { enabled: "활성", disabled: "비활성", save: "저장", saved: "저장됨", cancel: "취소", deleted: "삭제됨", name: "이름", status: "상태", schedule: "노출 기간", operator: "작업자", actions: "작업", identifier: "식별자", icon: "아이콘", imageUrl: "이미지 URL", title: "제목", body: "설명", startsAt: "시작 시간", endsAt: "종료 시간" },
   onboarding: { title: "온보딩", desc: "환경과 플랫폼별 첫 실행 안내를 설정합니다.", settings: "노출 설정", settingsDesc: "리비전은 QA와 콘텐츠 관리에 사용되며 기기당 한 번 완료됩니다.", revision: "리비전", page: "페이지 {{n}}", addPage: "페이지 추가" },
   social: { title: "소셜 미디어 링크", desc: "Vita 앱에 표시할 공식 계정을 설정합니다.", cardTitle: "Vita 팔로우", cardDesc: "선택한 환경에는 설정된 링크만 표시됩니다.", hint: "전체 http 또는 https URL을 입력하세요. 비워 두면 해당 플랫폼이 숨겨집니다.", save: "링크 저장", saved: "소셜 미디어 링크를 저장했습니다" },
+  legal: { title: "법적 문서", desc: "환경별 영문 개인정보 처리방침과 이용약관을 관리합니다.", privacy: "개인정보 처리방침", terms: "이용약관", create: "새 버전", edit: "초안 편집", delete: "삭제", activate: "적용", version: "버전", summary: "요약", content: "영문 본문", updatedAt: "업데이트", effective: "적용 중", historical: "이전 버전", draft: "초안", empty: "버전이 없습니다.", immutableHint: "게시된 버전은 영구 읽기 전용이며 삭제할 수 없습니다.", englishOnly: "앱에는 최신 적용 영문 버전만 표시됩니다.", activated: "적용 버전을 업데이트했습니다", deleted: "초안을 삭제했습니다", saved: "초안을 저장했습니다", deleteConfirm: "이 초안을 삭제할까요?" },
   whatsNew: { title: "새 소식", desc: "환경, 플랫폼, 버전, 기간별 업데이트 캠페인을 만듭니다.", create: "캠페인 만들기", edit: "캠페인 편집", version: "최소 앱 버전", action: "CTA 작업", actionValue: "경로 또는 URL", actionLabel: "CTA 문구", deleteConfirm: "이 캠페인을 삭제할까요?", empty: "캠페인이 없습니다." },
 };
 

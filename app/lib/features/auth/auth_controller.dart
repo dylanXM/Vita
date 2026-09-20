@@ -21,7 +21,9 @@ class AuthController extends GetxController {
   /// Starts registration: the backend checks the email, stores the password
   /// and emails a 6-digit code (60s resend cooldown).
   Future<void> register(String email, String password, String inviteCode,
-      {required bool acceptedLegal}) async {
+      {required bool acceptedLegal,
+      required String privacyPolicyVersion,
+      required String termsVersion}) async {
     loading.value = true;
     AnalyticsService.to
         .track('auth_register_started', category: 'auth', properties: {
@@ -35,6 +37,8 @@ class AuthController extends GetxController {
           'password': password,
           'invite_code': inviteCode.trim().toUpperCase(),
           'accepted_legal': acceptedLegal,
+          'privacy_policy_version': privacyPolicyVersion,
+          'terms_version': termsVersion,
         },
       );
       AnalyticsService.to.track('auth_register_code_sent', category: 'auth');
@@ -91,7 +95,11 @@ class AuthController extends GetxController {
     }
   }
 
-  Future<bool> loginWithGoogle({bool acceptedLegal = false}) async {
+  Future<bool> loginWithGoogle({
+    bool acceptedLegal = false,
+    String privacyPolicyVersion = '',
+    String termsVersion = '',
+  }) async {
     loading.value = true;
     AnalyticsService.to.track('auth_login_started',
         category: 'auth', properties: {'method': 'google'});
@@ -106,7 +114,12 @@ class AuthController extends GetxController {
       }
       final data = await ApiClient.instance.post(
         '/v1/auth/google',
-        data: {'id_token': idToken, 'accepted_legal': acceptedLegal},
+        data: {
+          'id_token': idToken,
+          'accepted_legal': acceptedLegal,
+          'privacy_policy_version': privacyPolicyVersion,
+          'terms_version': termsVersion,
+        },
       );
       await _storeSession(data);
       await fetchProfile();

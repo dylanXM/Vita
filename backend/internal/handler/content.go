@@ -150,6 +150,11 @@ func AppContent(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load app content"})
 		return
 	}
+	legalDocuments, err := activeLegalDocuments(environment)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load app content"})
+		return
+	}
 
 	var campaign *whatsNewCampaign
 	rows, err := db.Get().Query(`SELECT id,name,environment,platform,min_app_version,enabled,starts_at,ends_at,pages,updated_by,created_at,updated_at
@@ -168,9 +173,10 @@ func AppContent(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"onboarding":   onboarding,
-		"whats_new":    campaign,
-		"social_links": socialLinks,
+		"onboarding":      onboarding,
+		"whats_new":       campaign,
+		"social_links":    socialLinks,
+		"legal_documents": legalDocumentsForApp(legalDocuments),
 	})
 }
 

@@ -22,7 +22,7 @@ const zhHant = {
     users: "使用者",
     companions: "角色管理",
     agent: "AI 伴侶", mediaModels: "模型路由", invitationSettings: "邀請碼設定",
-    billing: "計費管理", subscriptionPlans: "訂閱方案", coinPacks: "金幣包", billingActivity: "購買與流水", creditProducts: "金幣體驗", appContent: "App 內容", onboarding: "引導頁", whatsNew: "近期更新", socialLinks: "社群媒體連結",
+    billing: "計費管理", subscriptionPlans: "訂閱方案", coinPacks: "金幣包", billingActivity: "購買與流水", creditProducts: "金幣體驗", appContent: "App 內容", onboarding: "引導頁", whatsNew: "近期更新", socialLinks: "社群媒體連結", legalDocuments: "協議管理",
   },
 
   login: {
@@ -169,6 +169,7 @@ const zhHant = {
   content: { enabled: "已啟用", disabled: "已停用", save: "儲存", saved: "已儲存", cancel: "取消", deleted: "已刪除", name: "名稱", status: "狀態", schedule: "投放時間", operator: "操作人", actions: "操作", identifier: "頁面識別碼", icon: "圖示", imageUrl: "圖片網址", title: "標題", body: "說明", startsAt: "開始時間", endsAt: "結束時間" },
   onboarding: { title: "引導頁", desc: "按環境與平台設定首次啟動引導內容。", settings: "投放設定", settingsDesc: "版本號用於測試和內容協作；每台裝置只完成一次首次引導。", revision: "內容版本", page: "第 {{n}} 頁", addPage: "新增頁面" },
   social: { title: "社群媒體連結", desc: "設定 Vita App 中顯示的官方社群帳號。", cardTitle: "關注 Vita", cardDesc: "只在所選環境的「我的」頁面顯示已設定的平台。", hint: "請填寫完整的 http 或 https 連結；留空即可隱藏對應平台。", save: "儲存連結", saved: "社群媒體連結已儲存" },
+  legal: { title: "協議管理", desc: "依環境管理英文隱私政策與使用者協議。", privacy: "隱私政策", terms: "使用者協議", create: "新增版本", edit: "編輯草稿", delete: "刪除", activate: "設為生效", version: "版本", summary: "摘要", content: "英文正文", updatedAt: "更新時間", effective: "生效中", historical: "歷史版本", draft: "草稿", empty: "目前沒有版本。", immutableHint: "已發布版本永久唯讀且不可刪除；變更須建立新版本。", englishOnly: "App 僅顯示最新生效的英文版本。", activated: "已更新生效版本", deleted: "草稿已刪除", saved: "草稿已儲存", deleteConfirm: "確定刪除此草稿？" },
   whatsNew: { title: "近期更新", desc: "按環境、平台、版本和時間投放更新活動。", create: "新增活動", edit: "編輯活動", version: "最低 App 版本", action: "按鈕動作", actionValue: "頁面路由或網址", actionLabel: "按鈕文字", deleteConfirm: "確定刪除此活動？", empty: "目前範圍沒有活動。" },
 };
 

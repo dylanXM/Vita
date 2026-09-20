@@ -5,6 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../core/theme.dart';
+import '../../core/app_content_controller.dart';
+import '../../core/api_client.dart';
+import '../../core/legal_documents.dart';
 import 'auth_controller.dart';
 import 'registration_legal_consent.dart';
 
@@ -28,6 +31,14 @@ class _RegisterPageState extends State<RegisterPage> {
   int _step = 1;
   bool _obscurePassword = true;
   bool _acceptedLegal = false;
+
+  @override
+  void initState() {
+    super.initState();
+    AppContentController.to.load().whenComplete(() {
+      if (mounted) setState(() {});
+    });
+  }
 
   @override
   void dispose() {
@@ -56,38 +67,69 @@ class _RegisterPageState extends State<RegisterPage> {
     });
   }
 
+  Future<void> _refreshLegalAfterError(Object error) async {
+    if (error is! ApiException ||
+        (error.code != 'legal_version_changed' &&
+            error.code != 'legal_documents_unavailable')) {
+      return;
+    }
+    AppContentController.to.legalDocuments.clear();
+    await AppContentController.to.load();
+    if (mounted) setState(() => _acceptedLegal = false);
+  }
+
   /// Step 1: submit email + password, the backend emails the code.
   Future<void> _sendCode() async {
-    if (!_emailValid || !_passwordValid || !_acceptedLegal) return;
+    final privacy =
+        AppContentController.to.legalDocument(LegalDocumentType.privacy);
+    final terms =
+        AppContentController.to.legalDocument(LegalDocumentType.terms);
+    if (!_emailValid ||
+        !_passwordValid ||
+        !_acceptedLegal ||
+        privacy == null ||
+        terms == null) {
+      return;
+    }
     try {
       await AuthController.to.register(
         _email.text.trim(),
         _password.text,
         _inviteCode.text,
         acceptedLegal: _acceptedLegal,
+        privacyPolicyVersion: privacy.version,
+        termsVersion: terms.version,
       );
       setState(() => _step = 2);
       _startCountdown();
       Get.snackbar('auth.checkInbox'.tr,
           'auth.codeSentTo'.trParams({'email': _email.text.trim()}));
     } catch (e) {
+      await _refreshLegalAfterError(e);
       Get.snackbar('auth.sendCodeFailed'.tr, '$e');
     }
   }
 
   /// Step 2: resend (re-issues the code, 60s server cooldown).
   Future<void> _resendCode() async {
+    final privacy =
+        AppContentController.to.legalDocument(LegalDocumentType.privacy)!;
+    final terms =
+        AppContentController.to.legalDocument(LegalDocumentType.terms)!;
     try {
       await AuthController.to.register(
         _email.text.trim(),
         _password.text,
         _inviteCode.text,
         acceptedLegal: _acceptedLegal,
+        privacyPolicyVersion: privacy.version,
+        termsVersion: terms.version,
       );
       _startCountdown();
       Get.snackbar('auth.checkInbox'.tr,
           'auth.codeSentTo'.trParams({'email': _email.text.trim()}));
     } catch (e) {
+      await _refreshLegalAfterError(e);
       Get.snackbar('auth.sendCodeFailed'.tr, '$e');
     }
   }
@@ -105,12 +147,21 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _googleRegister() async {
-    if (!_acceptedLegal) return;
+    final privacy =
+        AppContentController.to.legalDocument(LegalDocumentType.privacy);
+    final terms =
+        AppContentController.to.legalDocument(LegalDocumentType.terms);
+    if (!_acceptedLegal || privacy == null || terms == null) return;
     try {
-      if (await AuthController.to.loginWithGoogle(acceptedLegal: true)) {
+      if (await AuthController.to.loginWithGoogle(
+        acceptedLegal: true,
+        privacyPolicyVersion: privacy.version,
+        termsVersion: terms.version,
+      )) {
         Get.offAllNamed('/shell');
       }
     } catch (e) {
+      await _refreshLegalAfterError(e);
       Get.snackbar('auth.googleFailed'.tr, '$e');
     }
   }
@@ -206,6 +257,15 @@ class _RegisterPageState extends State<RegisterPage> {
                   accepted: _acceptedLegal,
                   onChanged: (value) => setState(() => _acceptedLegal = value),
                 ),
+                if (!AppContentController.to.hasCurrentLegalDocuments) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'legal.unavailable'.tr,
+                    textAlign: TextAlign.center,
+                    style:
+                        TextStyle(color: context.vita.subText, fontSize: 12.5),
+                  ),
+                ],
                 const SizedBox(height: 20),
                 Obx(
                   () => ElevatedButton(
@@ -213,7 +273,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     onPressed: (AuthController.to.loading.value ||
                             !_emailValid ||
                             !_passwordValid ||
-                            !_acceptedLegal)
+                            !_acceptedLegal ||
+                            !AppContentController.to.hasCurrentLegalDocuments)
                         ? null
                         : _sendCode,
                     child: AuthController.to.loading.value
@@ -247,10 +308,11 @@ class _RegisterPageState extends State<RegisterPage> {
                 Obx(
                   () => OutlinedButton.icon(
                     key: const ValueKey('register-google-button'),
-                    onPressed:
-                        AuthController.to.loading.value || !_acceptedLegal
-                            ? null
-                            : _googleRegister,
+                    onPressed: AuthController.to.loading.value ||
+                            !_acceptedLegal ||
+                            !AppContentController.to.hasCurrentLegalDocuments
+                        ? null
+                        : _googleRegister,
                     icon: Icon(Icons.g_mobiledata,
                         color: context.vita.text, size: 26),
                     label: Text('auth.continueGoogle'.tr),

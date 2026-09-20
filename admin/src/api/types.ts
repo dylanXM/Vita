@@ -277,6 +277,26 @@ export interface SocialMediaLinksConfig {
   updated_at: string;
 }
 
+export type LegalDocumentType = "privacy" | "terms";
+
+export interface LegalDocument {
+  id: string;
+  environment: Environment;
+  document_type: LegalDocumentType;
+  version: string;
+  title: string;
+  summary: string;
+  content: string;
+  is_effective: boolean;
+  published_at: string | null;
+  updated_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type LegalDocumentInput = Pick<LegalDocument,
+  "environment" | "document_type" | "version" | "title" | "summary" | "content">;
+
 export type AIProviderKind = "openai" | "anthropic";
 
 export interface AIProvider {

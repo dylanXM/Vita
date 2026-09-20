@@ -22,13 +22,19 @@ void main() {
     }
   });
 
-  test('privacy policy and terms cover every supported locale', () {
-    final tags = vitaSupportedLocales.map(vitaLocaleTag).toSet();
-    expect(privacyDocuments.keys.toSet(), tags);
-    expect(termsDocuments.keys.toSet(), tags);
-    for (final tag in tags) {
-      expect(privacyDocuments[tag]!.body, isNotEmpty);
-      expect(termsDocuments[tag]!.body, isNotEmpty);
-    }
+  test('legal document parses the backend English version and update time', () {
+    final document = LegalDocument.from({
+      'id': 'privacy-v2',
+      'document_type': 'privacy',
+      'version': 'v2',
+      'title': 'Privacy Policy',
+      'summary': 'Summary',
+      'content': 'English content',
+      'updated_at': '2026-09-20T10:30:00Z',
+    });
+    expect(document.type, LegalDocumentType.privacy);
+    expect(document.version, 'v2');
+    expect(document.body, 'English content');
+    expect(document.isUsable, isTrue);
   });
 }

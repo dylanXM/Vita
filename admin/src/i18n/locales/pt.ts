@@ -22,7 +22,7 @@ const pt = {
     users: "Usuários",
     companions: "Personagens",
     agent: "Companheiro IA", mediaModels: "Roteamento de modelos", invitationSettings: "Configuração de convites",
-    billing: "Faturação", subscriptionPlans: "Planos de assinatura", coinPacks: "Pacotes de moedas", billingActivity: "Compras e extrato", creditProducts: "Experiências com moedas", appContent: "Conteúdo do app", onboarding: "Integração", whatsNew: "Novidades", socialLinks: "Redes sociais",
+    billing: "Faturação", subscriptionPlans: "Planos de assinatura", coinPacks: "Pacotes de moedas", billingActivity: "Compras e extrato", creditProducts: "Experiências com moedas", appContent: "Conteúdo do app", onboarding: "Integração", whatsNew: "Novidades", socialLinks: "Redes sociais", legalDocuments: "Documentos legais",
   },
 
   login: {
@@ -169,6 +169,7 @@ const pt = {
   content: { enabled: "Ativo", disabled: "Inativo", save: "Guardar", saved: "Guardado", cancel: "Cancelar", deleted: "Eliminado", name: "Nome", status: "Estado", schedule: "Agenda", operator: "Operador", actions: "Ações", identifier: "Identificador", icon: "Ícone", imageUrl: "URL da imagem", title: "Título", body: "Descrição", startsAt: "Início", endsAt: "Fim" },
   onboarding: { title: "Integração", desc: "Configure a introdução inicial por ambiente e plataforma.", settings: "Definições de entrega", settingsDesc: "A revisão serve para QA; cada dispositivo conclui a integração uma vez.", revision: "Revisão", page: "Página {{n}}", addPage: "Adicionar página" },
   social: { title: "Redes sociais", desc: "Configure as contas oficiais apresentadas no app Vita.", cardTitle: "Siga o Vita", cardDesc: "Apenas os links configurados aparecem no ambiente selecionado.", hint: "Use uma URL http ou https completa. Deixe em branco para ocultar a plataforma.", save: "Guardar links", saved: "Links guardados" },
+  legal: { title: "Documentos legais", desc: "Gerencie a política e os termos em inglês por ambiente.", privacy: "Privacidade", terms: "Termos", create: "Nova versão", edit: "Editar rascunho", delete: "Excluir", activate: "Ativar", version: "Versão", summary: "Resumo", content: "Conteúdo em inglês", updatedAt: "Atualizado", effective: "Vigente", historical: "Histórico", draft: "Rascunho", empty: "Nenhuma versão.", immutableHint: "Versões publicadas são permanentes e somente leitura.", englishOnly: "O app mostra apenas a versão inglesa vigente mais recente.", activated: "Versão vigente atualizada", deleted: "Rascunho excluído", saved: "Rascunho salvo", deleteConfirm: "Excluir este rascunho?" },
   whatsNew: { title: "Novidades", desc: "Crie campanhas por ambiente, plataforma, versão e período.", create: "Nova campanha", edit: "Editar campanha", version: "Versão mínima", action: "Ação CTA", actionValue: "Rota ou URL", actionLabel: "Texto CTA", deleteConfirm: "Eliminar esta campanha?", empty: "Sem campanhas." },
 };
 
