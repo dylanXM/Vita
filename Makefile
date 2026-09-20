@@ -281,42 +281,53 @@ else
 FLUTTER_CMD = flutter
 endif
 
+# China mirrors for pub packages and Flutter engine artifacts so that
+# `flutter pub get` / `flutter precache` are reachable from mainland China.
+# Override by exporting PUB_HOSTED_URL / FLUTTER_STORAGE_BASE_URL before make.
+PUB_HOSTED_URL ?= https://pub.flutter-io.cn
+FLUTTER_STORAGE_BASE_URL ?= https://storage.flutter-io.cn
+# Accelerate GitHub clones (e.g. firebase-ios-sdk, which CocoaPods pulls via a
+# git source) through a China mirror. Uses env-only git config so the global
+# ~/.gitconfig is untouched; override GITHUB_PROXY_PREFIX as needed.
+GITHUB_PROXY_PREFIX ?= https://ghfast.top/
+FLUTTER_ENV = PUB_HOSTED_URL=$(PUB_HOSTED_URL) FLUTTER_STORAGE_BASE_URL=$(FLUTTER_STORAGE_BASE_URL) GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=url.$(GITHUB_PROXY_PREFIX)https://github.com/.insteadOf GIT_CONFIG_VALUE_0=https://github.com/ GIT_CONFIG_KEY_1=url.$(GITHUB_PROXY_PREFIX)https://raw.githubusercontent.com/.insteadOf GIT_CONFIG_VALUE_1=https://raw.githubusercontent.com/
+
 app-prepare-dirs:
 	mkdir -p app/build/ios/SourcePackages app/build/macos/SourcePackages app/.cocoapods-local app/.home
 
 app-run: app-prepare-dirs
 	@cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; }
-	cd app && PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" $(FLUTTER_CMD) run --dart-define-from-file=config/dev.json
+	cd app && $(FLUTTER_ENV) PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" $(FLUTTER_CMD) run --dart-define-from-file=config/dev.json
 
 app-run-beta: app-prepare-dirs
 	@cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; }
-	cd app && PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" $(FLUTTER_CMD) run --dart-define-from-file=config/beta.json
+	cd app && $(FLUTTER_ENV) PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" $(FLUTTER_CMD) run --dart-define-from-file=config/beta.json
 
 app-run-prod: app-prepare-dirs
 	@cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; }
-	cd app && PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" $(FLUTTER_CMD) run --dart-define-from-file=config/prod.json
+	cd app && $(FLUTTER_ENV) PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" $(FLUTTER_CMD) run --dart-define-from-file=config/prod.json
 
 app-dev: app-run
 
 app-build-apk-beta: app-prepare-dirs
 	@cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; }
-	cd app && $(FLUTTER_CMD) build apk --release --dart-define-from-file=config/beta.json
+	cd app && $(FLUTTER_ENV) $(FLUTTER_CMD) build apk --release --dart-define-from-file=config/beta.json
 
 app-build-apk: app-prepare-dirs
 	@cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; }
-	cd app && $(FLUTTER_CMD) build apk --release --dart-define-from-file=config/prod.json
+	cd app && $(FLUTTER_ENV) $(FLUTTER_CMD) build apk --release --dart-define-from-file=config/prod.json
 
 app-build-ios-beta: app-prepare-dirs
 	@cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; }
-	cd app && PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" $(FLUTTER_CMD) build ios --release --no-codesign --dart-define-from-file=config/beta.json
+	cd app && $(FLUTTER_ENV) PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" $(FLUTTER_CMD) build ios --release --no-codesign --dart-define-from-file=config/beta.json
 
 app-build-ios: app-prepare-dirs
 	@cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; }
-	cd app && PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" $(FLUTTER_CMD) build ios --release --no-codesign --dart-define-from-file=config/prod.json
+	cd app && $(FLUTTER_ENV) PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" $(FLUTTER_CMD) build ios --release --no-codesign --dart-define-from-file=config/prod.json
 
 app-check: app-prepare-dirs
 	@cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; }
-	cd app && $(FLUTTER_CMD) analyze
+	cd app && $(FLUTTER_ENV) $(FLUTTER_CMD) analyze
 
 app-gen:
 	@cd app && ./scripts/gen_api.sh 2>/dev/null || echo "API generation skipped"

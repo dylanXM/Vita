@@ -12,7 +12,7 @@ import (
 func TestCORSAllowsConfiguredOriginAndRejectsOthers(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
-	engine.Use(CORS([]string{"https://admin.example.com"}))
+	engine.Use(CORS([]string{"https://admin.example.com"}, false))
 	engine.GET("/", func(c *gin.Context) { c.Status(http.StatusNoContent) })
 
 	allowed := httptest.NewRecorder()
@@ -29,6 +29,40 @@ func TestCORSAllowsConfiguredOriginAndRejectsOthers(t *testing.T) {
 	engine.ServeHTTP(denied, request)
 	if denied.Code != http.StatusForbidden {
 		t.Fatalf("unconfigured origin status = %d; want %d", denied.Code, http.StatusForbidden)
+	}
+}
+
+func TestCORSDevModeAllowsLocalhostAnyPort(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	engine.Use(CORS(nil, true))
+	engine.GET("/", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+
+	for _, origin := range []string{
+		"http://localhost:5173",
+		"http://localhost:5174",
+		"http://127.0.0.1:3000",
+		"http://localhost",
+	} {
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/", nil)
+		request.Header.Set("Origin", origin)
+		engine.ServeHTTP(response, request)
+		if response.Code != http.StatusNoContent {
+			t.Fatalf("dev origin %q status = %d; want %d", origin, response.Code, http.StatusNoContent)
+		}
+		if got := response.Header().Get("Access-Control-Allow-Origin"); got != origin {
+			t.Fatalf("dev origin %q ACAO = %q", origin, got)
+		}
+	}
+
+	// Non-localhost origins must still be rejected even in dev mode.
+	denied := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.Header.Set("Origin", "https://attacker.example")
+	engine.ServeHTTP(denied, request)
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("non-localhost dev origin status = %d; want %d", denied.Code, http.StatusForbidden)
 	}
 }
 
