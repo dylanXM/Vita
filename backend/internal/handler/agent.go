@@ -203,7 +203,7 @@ func upsertModel(c *gin.Context, id string) {
 		input.Capabilities = []string{"text"}
 	}
 	for _, capability := range input.Capabilities {
-		if capability != "text" && capability != "image" && capability != "audio" {
+		if capability != "text" && capability != "image" && capability != "audio" && capability != "video" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported model capability"})
 			return
 		}
@@ -235,7 +235,159 @@ func upsertModel(c *gin.Context, id string) {
 	c.JSON(http.StatusNotFound, gin.H{"error": "model not found"})
 }
 
+type mediaModelRoute struct {
+	RouteKey         string   `json:"route_key"`
+	MediaType        string   `json:"media_type"`
+	Enabled          bool     `json:"enabled"`
+	PrimaryModelID   *string  `json:"primary_model_id"`
+	FallbackModelIDs []string `json:"fallback_model_ids"`
+}
+
+var mediaRouteTypes = map[string]string{
+	"image_life_photo":      "image",
+	"image_requested_photo": "image",
+	"audio_transcription":   "audio",
+	"audio_speech":          "audio",
+	"video_life_clip":       "video",
+	"video_realtime_avatar": "video",
+}
+
+func AdminListMediaModelRoutes(c *gin.Context) {
+	routes, err := loadMediaModelRoutes()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load media model routes"})
+		return
+	}
+	models, err := loadAdminModels()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load models"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"routes": routes, "models": models})
+}
+
+func AdminUpdateMediaModelRoutes(c *gin.Context) {
+	var input struct {
+		Routes []mediaModelRoute `json:"routes" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid media model routes"})
+		return
+	}
+	seen := map[string]bool{}
+	for i := range input.Routes {
+		route := &input.Routes[i]
+		if route.PrimaryModelID != nil {
+			modelID := strings.TrimSpace(*route.PrimaryModelID)
+			if modelID == "" {
+				route.PrimaryModelID = nil
+			} else {
+				route.PrimaryModelID = &modelID
+			}
+		}
+		fallbacks := make([]string, 0, len(route.FallbackModelIDs))
+		for _, modelID := range route.FallbackModelIDs {
+			if modelID = strings.TrimSpace(modelID); modelID != "" {
+				fallbacks = append(fallbacks, modelID)
+			}
+		}
+		route.FallbackModelIDs = fallbacks
+		expectedType, ok := mediaRouteTypes[route.RouteKey]
+		if !ok || route.MediaType != expectedType || seen[route.RouteKey] || len(route.FallbackModelIDs) > 5 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid media model route"})
+			return
+		}
+		seen[route.RouteKey] = true
+		if route.Enabled && (route.PrimaryModelID == nil || strings.TrimSpace(*route.PrimaryModelID) == "") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "enabled routes require a default model"})
+			return
+		}
+		modelIDs := append([]string{}, route.FallbackModelIDs...)
+		if route.PrimaryModelID != nil {
+			modelIDs = append([]string{*route.PrimaryModelID}, modelIDs...)
+		}
+		unique := map[string]bool{}
+		for _, modelID := range modelIDs {
+			modelID = strings.TrimSpace(modelID)
+			if modelID == "" || unique[modelID] {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "media route models must be unique"})
+				return
+			}
+			unique[modelID] = true
+			var valid bool
+			if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM ai_models WHERE id=$1 AND enabled=true AND capabilities ? $2)`, modelID, expectedType).Scan(&valid); err != nil || !valid {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "a selected model does not support " + expectedType})
+				return
+			}
+		}
+	}
+	if len(seen) != len(mediaRouteTypes) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "all media model routes are required"})
+		return
+	}
+	tx, err := db.Get().BeginTx(c.Request.Context(), nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save media model routes"})
+		return
+	}
+	defer tx.Rollback()
+	for _, route := range input.Routes {
+		fallbacks, _ := json.Marshal(route.FallbackModelIDs)
+		if _, err := tx.ExecContext(c.Request.Context(), `UPDATE agent_media_routes SET enabled=$2,primary_model_id=$3,fallback_model_ids=$4,updated_at=CURRENT_TIMESTAMP WHERE route_key=$1`, route.RouteKey, route.Enabled, route.PrimaryModelID, fallbacks); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save media model routes"})
+			return
+		}
+	}
+	if _, err := tx.ExecContext(c.Request.Context(), `UPDATE agent_settings SET
+		image_model_id=(SELECT primary_model_id FROM agent_media_routes WHERE route_key='image_life_photo'),
+		transcription_model_id=(SELECT primary_model_id FROM agent_media_routes WHERE route_key='audio_transcription'),
+		speech_model_id=(SELECT primary_model_id FROM agent_media_routes WHERE route_key='audio_speech'),updated_at=CURRENT_TIMESTAMP
+		WHERE id='default'`); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to sync legacy media settings"})
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save media model routes"})
+		return
+	}
+	AdminListMediaModelRoutes(c)
+}
+
+func loadMediaModelRoutes() ([]mediaModelRoute, error) {
+	rows, err := db.Get().Query(`SELECT route_key,media_type,enabled,primary_model_id,fallback_model_ids::text
+		FROM agent_media_routes ORDER BY media_type,route_key`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	routes := make([]mediaModelRoute, 0, len(mediaRouteTypes))
+	for rows.Next() {
+		var route mediaModelRoute
+		var primary sql.NullString
+		var fallbacks string
+		if err := rows.Scan(&route.RouteKey, &route.MediaType, &route.Enabled, &primary, &fallbacks); err != nil {
+			return nil, err
+		}
+		route.PrimaryModelID = nullString(primary)
+		_ = json.Unmarshal([]byte(fallbacks), &route.FallbackModelIDs)
+		routes = append(routes, route)
+	}
+	return routes, rows.Err()
+}
+
 func AdminDeleteModel(c *gin.Context) {
+	var usedByMediaRoute bool
+	if err := db.Get().QueryRow(`SELECT EXISTS(
+		SELECT 1 FROM agent_media_routes
+		WHERE primary_model_id=$1 OR fallback_model_ids ? $1
+	)`, c.Param("id")).Scan(&usedByMediaRoute); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check model usage"})
+		return
+	}
+	if usedByMediaRoute {
+		c.JSON(http.StatusConflict, gin.H{"error": "model is still used by a media route"})
+		return
+	}
 	result, err := db.Get().Exec(`DELETE FROM ai_models WHERE id = $1`, c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "model is still in use"})
@@ -262,13 +414,36 @@ func AdminUpdateAgentSettings(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid agent limits"})
 		return
 	}
-	_, err := db.Get().Exec(`
+	tx, err := db.Get().BeginTx(c.Request.Context(), nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save agent settings"})
+		return
+	}
+	defer tx.Rollback()
+	_, err = tx.ExecContext(c.Request.Context(), `
 		UPDATE agent_settings SET chat_model_id=$1,life_model_id=$2,proactive_model_id=$3,image_model_id=$4,transcription_model_id=$5,speech_model_id=$6,
 		daily_event_min=$7,daily_event_max=$8,daily_proactive_limit=$9,daily_life_photo_limit=$10,quiet_hours_start=$11,quiet_hours_end=$12,
 		free_default_chat_hours=$13,updated_at=CURRENT_TIMESTAMP WHERE id='default'`, input.ChatModelID, input.LifeModelID, input.ProactiveModelID, input.ImageModelID, input.TranscriptionModelID, input.SpeechModelID,
 		input.DailyEventMin, input.DailyEventMax, input.DailyProactiveLimit, input.DailyLifePhotoLimit, input.QuietHoursStart, input.QuietHoursEnd, input.FreeDefaultChatHours)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save agent settings"})
+		return
+	}
+	legacyRoutes := []struct {
+		key     string
+		modelID *string
+	}{
+		{"image_life_photo", input.ImageModelID}, {"image_requested_photo", input.ImageModelID},
+		{"audio_transcription", input.TranscriptionModelID}, {"audio_speech", input.SpeechModelID},
+	}
+	for _, route := range legacyRoutes {
+		if _, err := tx.ExecContext(c.Request.Context(), `UPDATE agent_media_routes SET primary_model_id=$2,enabled=($2 IS NOT NULL),updated_at=CURRENT_TIMESTAMP WHERE route_key=$1`, route.key, route.modelID); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to sync media model routes"})
+			return
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save agent settings"})
 		return
 	}
 	settings, _ := loadAgentSettings()

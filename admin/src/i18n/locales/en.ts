@@ -22,6 +22,7 @@ const en = {
     users: "Users",
     companions: "Characters",
     agent: "AI companion",
+    mediaModels: "Media model routing",
     invitationSettings: "Invitation settings",
     billing: "Billing",
     subscriptionPlans: "Subscription plans",
@@ -168,7 +169,7 @@ const en = {
     modelId: "Remote model ID",
     displayName: "Display name",
     noModels: "No models configured.",
-	"capability.text": "Text", "capability.image": "Image", "capability.audio": "Audio",
+	"capability.text": "Text", "capability.image": "Image", "capability.audio": "Audio", "capability.video": "Video",
     routing: "Agent routing and Life Engine",
     routingDesc: "Choose the model for each job and bound autonomous activity.",
     chatModel: "Chat model",
@@ -241,6 +242,7 @@ const en = {
     saved: "Billing product saved", deleted: "Billing product deleted", deleteConfirm: "Delete {{name}}?",
   },
 
+  mediaModels: { title: "Media model routing", description: "Choose optional default and ordered fallback models for each character media behavior.", save: "Save routing", saved: "Media model routing saved", enabled: "Behavior enabled", defaultModel: "Default model", fallbackModels: "Fallback models", addFallback: "Add fallback", noFallback: "No fallback model. Failures will stop here.", notSelected: "Not selected", noCompatibleModels: "Create and enable a compatible model on the AI companion page first.", "type.image": "Image", "type.image.desc": "Models that create visual moments from the character's established life.", "type.audio": "Audio", "type.audio.desc": "Models that understand user audio or give the character a voice.", "type.video": "Video", "type.video.desc": "Optional models for asynchronous life clips and real-time avatar sessions.", "route.image_life_photo": "Automatic life photos", "route.image_life_photo.desc": "Creates selected photos from due Life events.", "route.image_requested_photo": "User-requested photos", "route.image_requested_photo.desc": "Creates paid photos anchored to the current Life event.", "route.audio_transcription": "User voice transcription", "route.audio_transcription.desc": "Turns incoming voice messages into text for the character.", "route.audio_speech": "Character speech synthesis", "route.audio_speech.desc": "Turns character replies into playable voice messages.", "route.video_life_clip": "Life short videos", "route.video_life_clip.desc": "Model route reserved for asynchronous videos based on Life events.", "route.video_realtime_avatar": "Real-time video avatar", "route.video_realtime_avatar.desc": "Model route reserved for real-time avatar and video call sessions." },
   creditProducts: { title: "Credit experiences", description: "Configure the server-side price and availability of companion experiences.", product: "Product", category: "Category", coins: "Coins", enabled: "Enabled", saved: "Credit product saved" },
 
   time: {

@@ -22,6 +22,7 @@ const zhHans = {
     users: "用户",
     companions: "角色管理",
     agent: "AI 伴侣",
+    mediaModels: "媒体模型路由",
     invitationSettings: "邀请码配置",
     billing: "计费管理",
     subscriptionPlans: "订阅计划",
@@ -168,7 +169,7 @@ const zhHans = {
     modelId: "远端模型 ID",
     displayName: "显示名称",
     noModels: "尚未配置模型。",
-	"capability.text": "文本", "capability.image": "图片", "capability.audio": "语音",
+	"capability.text": "文本", "capability.image": "图片", "capability.audio": "语音", "capability.video": "视频",
     routing: "Agent 路由与 Life Engine",
     routingDesc: "为不同任务指定模型，并限制自主活动频率。",
     chatModel: "对话模型",
@@ -241,6 +242,7 @@ const zhHans = {
     saved: "计费商品已保存", deleted: "计费商品已删除", deleteConfirm: "确定删除 {{name}}？",
   },
 
+  mediaModels: { title: "媒体模型路由", description: "为角色的每种媒体行为分别配置可选的默认模型与有序备选模型。", save: "保存路由", saved: "媒体模型路由已保存", enabled: "启用该行为", defaultModel: "默认模型", fallbackModels: "备选模型", addFallback: "添加备选", noFallback: "未设置备选模型，默认模型失败后将停止。", notSelected: "未选择", noCompatibleModels: "请先在 AI 伴侣页面创建并启用支持该能力的模型。", "type.image": "图片", "type.image.desc": "根据角色已经发生的生活生成视觉内容。", "type.audio": "音频", "type.audio.desc": "理解用户语音，或让角色使用语音表达。", "type.video": "视频", "type.video.desc": "可选配置生活短视频与实时数字人会话模型。", "route.image_life_photo": "自动生活照片", "route.image_life_photo.desc": "为已发生且适合分享的 Life 事件生成照片。", "route.image_requested_photo": "用户请求照片", "route.image_requested_photo.desc": "根据角色当前 Life 事件生成付费照片。", "route.audio_transcription": "用户语音识别", "route.audio_transcription.desc": "把用户发送的语音转成角色可理解的文字。", "route.audio_speech": "角色语音合成", "route.audio_speech.desc": "把角色回复转换成可播放的语音。", "route.video_life_clip": "生活短视频", "route.video_life_clip.desc": "为基于 Life 事件的异步短视频预留模型路由。", "route.video_realtime_avatar": "实时视频数字人", "route.video_realtime_avatar.desc": "为实时数字人及视频通话预留模型路由。" },
   creditProducts: { title: "金币体验", description: "配置角色增值体验的服务端价格与可用状态。", product: "商品", category: "分类", coins: "金币", enabled: "启用", saved: "金币商品已保存" },
 
   time: {

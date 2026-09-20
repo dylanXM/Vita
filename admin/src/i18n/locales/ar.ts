@@ -21,7 +21,7 @@ const ar = {
     management: "الإدارة",
     users: "المستخدمون",
     companions: "إدارة الشخصيات",
-    agent: "رفيق الذكاء الاصطناعي", invitationSettings: "إعدادات رمز الدعوة",
+    agent: "رفيق الذكاء الاصطناعي", mediaModels: "نماذج الوسائط", invitationSettings: "إعدادات رمز الدعوة",
     billing: "إدارة الفوترة", subscriptionPlans: "خطط الاشتراك", coinPacks: "حزم العملات", billingActivity: "المشتريات والسجل", creditProducts: "تجارب العملات", appContent: "محتوى التطبيق", onboarding: "صفحات الترحيب", whatsNew: "ما الجديد", socialLinks: "روابط التواصل الاجتماعي",
   },
 
@@ -137,7 +137,7 @@ const ar = {
   agent: {
     title: "وكيل رفيق الذكاء الاصطناعي", desc: "إعداد مزودي النماذج والتوجيه وتوليد الحياة والشخصيات.",
     providers: "المزودون", providersDesc: "يدعم OpenAI المتوافق وAnthropic. المفاتيح للكتابة فقط ومشفرة.", providerName: "الاسم", providerType: "النوع", baseUrl: "الرابط الأساسي", apiKey: "مفتاح API", keepSecret: "اتركه فارغاً للاحتفاظ بالمفتاح الحالي", defaultEndpoint: "النقطة الافتراضية", keyConfigured: "المفتاح مضبوط", keyMissing: "المفتاح مفقود", noProviders: "لا يوجد مزودون.", provider: "المزود",
-    models: "النماذج", modelsDesc: "سجل معرفات النماذج التي يستخدمها الوكلاء.", modelId: "معرف النموذج", displayName: "اسم العرض", noModels: "لا توجد نماذج.", "capability.text": "نص", "capability.image": "صورة", "capability.audio": "صوت",
+    models: "النماذج", modelsDesc: "سجل معرفات النماذج التي يستخدمها الوكلاء.", modelId: "معرف النموذج", displayName: "اسم العرض", noModels: "لا توجد نماذج.", "capability.text": "نص", "capability.image": "صورة", "capability.audio": "صوت", "capability.video": "فيديو",
     routing: "التوجيه ومحرك الحياة", routingDesc: "اختر نموذجاً لكل مهمة وحدد النشاط الذاتي.", chatModel: "نموذج المحادثة", lifeModel: "نموذج تخطيط الحياة", proactiveModel: "نموذج الرسائل الاستباقية", imageModel: "نموذج صور الحياة", transcriptionModel: "نموذج تحويل الكلام إلى نص", speechModel: "نموذج تحويل النص إلى كلام", selectModel: "اختر…", eventMin: "الحد الأدنى للأحداث", eventMax: "الحد الأقصى للأحداث", proactiveLimit: "حد التواصل اليومي", photoLimit: "حد الصور اليومي", quietStart: "بدء الهدوء", quietEnd: "نهاية الهدوء", saveSettings: "حفظ التوجيه",
     freeDefaultChatHours: "ساعات الدردشة المجانية للشخصية الافتراضية", defaultCompanion: "استخدام كشخصية افتراضية مجانية", defaultCompanionBadge: "افتراضي", makeDefaultCompanion: "تعيين كافتراضي", removeDefaultCompanion: "إلغاء الافتراضي",
     portraits: "صور الشخصيات", portraitsDesc: "الصور المتاحة عند الإنشاء الأولي.", portraitName: "اسم الصورة", imageUrl: "رابط الصورة", gender: "النوع", tags: "سمات الشخصية", addPortrait: "إضافة صورة",
@@ -158,6 +158,7 @@ const ar = {
     empty: "لا توجد سجلات تطابق عوامل التصفية.", formDesc: "تحدد البيئة والمنصة إعداد منتج متجر مستقلًا.", saved: "تم حفظ منتج الفوترة", deleted: "تم حذف منتج الفوترة", deleteConfirm: "حذف {{name}}؟",
   },
 
+  mediaModels: { title: "توجيه نماذج الوسائط", description: "اضبط نموذجًا افتراضيًا اختياريًا ونماذج بديلة مرتبة لكل سلوك وسائط.", save: "حفظ التوجيه", saved: "تم حفظ توجيه الوسائط", enabled: "تفعيل السلوك", defaultModel: "النموذج الافتراضي", fallbackModels: "النماذج البديلة", addFallback: "إضافة بديل", noFallback: "لا توجد نماذج بديلة.", notSelected: "غير محدد", noCompatibleModels: "أنشئ نموذجًا متوافقًا وفعّله أولًا.", "type.image": "صورة", "type.image.desc": "محتوى مرئي مبني على حياة الشخصية.", "type.audio": "صوت", "type.audio.desc": "فهم صوت المستخدم أو منح الشخصية صوتًا.", "type.video": "فيديو", "type.video.desc": "مقاطع الحياة وجلسات الشخصية الفورية الاختيارية.", "route.image_life_photo": "صور الحياة التلقائية", "route.image_life_photo.desc": "إنشاء صور من أحداث Life التي وقعت.", "route.image_requested_photo": "الصور المطلوبة", "route.image_requested_photo.desc": "إنشاء صور مدفوعة مبنية على الحدث الحالي.", "route.audio_transcription": "نسخ صوت المستخدم", "route.audio_transcription.desc": "تحويل الرسائل الصوتية إلى نص.", "route.audio_speech": "تركيب صوت الشخصية", "route.audio_speech.desc": "تحويل ردود الشخصية إلى صوت.", "route.video_life_clip": "مقاطع Life القصيرة", "route.video_life_clip.desc": "مسار محجوز لفيديوهات أحداث Life غير المتزامنة.", "route.video_realtime_avatar": "شخصية فيديو فورية", "route.video_realtime_avatar.desc": "مسار محجوز للشخصيات ومكالمات الفيديو الفورية." },
   creditProducts: { title: "تجارب العملات", description: "إعداد سعر وتوفر تجارب الرفيق.", product: "المنتج", category: "الفئة", coins: "العملات", enabled: "مفعّل", saved: "تم حفظ المنتج" },
   time: {
     justNow: "الآن",

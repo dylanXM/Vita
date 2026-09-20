@@ -21,7 +21,7 @@ const es = {
     management: "Gestión",
     users: "Usuarios",
     companions: "Personajes",
-    agent: "Compañero IA", invitationSettings: "Configuración de invitaciones",
+    agent: "Compañero IA", mediaModels: "Modelos multimedia", invitationSettings: "Configuración de invitaciones",
     billing: "Facturación", subscriptionPlans: "Planes de suscripción", coinPacks: "Paquetes de monedas", billingActivity: "Compras y movimientos", creditProducts: "Experiencias con monedas", appContent: "Contenido de la app", onboarding: "Introducción", whatsNew: "Novedades", socialLinks: "Redes sociales",
   },
 
@@ -137,7 +137,7 @@ const es = {
   agent: {
     title: "Agente de compañero IA", desc: "Configura proveedores, enrutamiento, generación de vida y personajes.",
     providers: "Proveedores", providersDesc: "OpenAI compatible y Anthropic. Las claves son de solo escritura y cifradas.", providerName: "Nombre", providerType: "Tipo", baseUrl: "URL base", apiKey: "Clave API", keepSecret: "Deja vacío para conservar la clave", defaultEndpoint: "Endpoint predeterminado", keyConfigured: "Clave configurada", keyMissing: "Falta la clave", noProviders: "No hay proveedores.", provider: "Proveedor",
-    models: "Modelos", modelsDesc: "Registra los modelos remotos disponibles para los agentes.", modelId: "ID del modelo", displayName: "Nombre visible", noModels: "No hay modelos.", "capability.text": "Texto", "capability.image": "Imagen", "capability.audio": "Audio",
+    models: "Modelos", modelsDesc: "Registra los modelos remotos disponibles para los agentes.", modelId: "ID del modelo", displayName: "Nombre visible", noModels: "No hay modelos.", "capability.text": "Texto", "capability.image": "Imagen", "capability.audio": "Audio", "capability.video": "Vídeo",
     routing: "Enrutamiento y Life Engine", routingDesc: "Elige modelos por tarea y limita la actividad autónoma.", chatModel: "Modelo de chat", lifeModel: "Modelo de planificación", proactiveModel: "Modelo de mensaje proactivo", imageModel: "Modelo de fotos de Life", transcriptionModel: "Modelo de voz a texto", speechModel: "Modelo de texto a voz", selectModel: "Seleccionar…", eventMin: "Eventos mínimos", eventMax: "Eventos máximos", proactiveLimit: "Límite proactivo diario", photoLimit: "Límite diario de fotos", quietStart: "Silencio inicia", quietEnd: "Silencio termina", saveSettings: "Guardar enrutamiento",
     freeDefaultChatHours: "Horas gratis del personaje predeterminado", defaultCompanion: "Usar como personaje gratuito predeterminado", defaultCompanionBadge: "Predeterminado", makeDefaultCompanion: "Hacer predeterminado", removeDefaultCompanion: "Quitar predeterminado",
     portraits: "Retratos del sistema", portraitsDesc: "Retratos disponibles durante la creación inicial.", portraitName: "Nombre del retrato", imageUrl: "URL de imagen", gender: "Tipo", tags: "Rasgos de personalidad", addPortrait: "Añadir retrato",
@@ -158,6 +158,7 @@ const es = {
     empty: "No hay registros para estos filtros.", formDesc: "El entorno y la plataforma identifican una configuración independiente de tienda.", saved: "Producto guardado", deleted: "Producto eliminado", deleteConfirm: "¿Eliminar {{name}}?",
   },
 
+  mediaModels: { title: "Enrutamiento de modelos multimedia", description: "Configura un modelo predeterminado opcional y modelos alternativos ordenados para cada comportamiento multimedia.", save: "Guardar rutas", saved: "Rutas multimedia guardadas", enabled: "Comportamiento activo", defaultModel: "Modelo predeterminado", fallbackModels: "Modelos alternativos", addFallback: "Añadir alternativo", noFallback: "No hay modelos alternativos.", notSelected: "Sin seleccionar", noCompatibleModels: "Primero crea y activa un modelo compatible.", "type.image": "Imagen", "type.image.desc": "Contenido visual basado en la vida del personaje.", "type.audio": "Audio", "type.audio.desc": "Comprende la voz del usuario o da voz al personaje.", "type.video": "Vídeo", "type.video.desc": "Vídeos de vida y sesiones de avatar en tiempo real opcionales.", "route.image_life_photo": "Fotos de vida automáticas", "route.image_life_photo.desc": "Genera fotos de eventos de Life ocurridos.", "route.image_requested_photo": "Fotos solicitadas", "route.image_requested_photo.desc": "Genera fotos de pago basadas en el evento actual.", "route.audio_transcription": "Transcripción de voz", "route.audio_transcription.desc": "Convierte los mensajes de voz en texto.", "route.audio_speech": "Síntesis de voz", "route.audio_speech.desc": "Convierte las respuestas del personaje en audio.", "route.video_life_clip": "Vídeos cortos de Life", "route.video_life_clip.desc": "Ruta reservada para vídeos asíncronos de eventos de Life.", "route.video_realtime_avatar": "Avatar de vídeo en tiempo real", "route.video_realtime_avatar.desc": "Ruta reservada para avatares y videollamadas en tiempo real." },
   creditProducts: { title: "Experiencias con monedas", description: "Configura el precio y la disponibilidad de las experiencias del compañero.", product: "Producto", category: "Categoría", coins: "Monedas", enabled: "Activo", saved: "Producto guardado" },
   time: {
     justNow: "ahora mismo",

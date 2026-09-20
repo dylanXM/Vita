@@ -175,12 +175,12 @@ func (s *Service) runTick(ctx context.Context) {
 // all retain the same provenance instead of showing unrelated AI pictures.
 func (s *Service) GenerateDueLifePhotos(ctx context.Context) error {
 	settings, err := s.loadLifeSettings(ctx)
-	if err != nil || s.mock || !settings.ImageModelID.Valid || settings.DailyLifePhotoLimit <= 0 {
+	if err != nil || s.mock || settings.DailyLifePhotoLimit <= 0 {
 		return err
 	}
-	model, err := s.loadModel(ctx, settings.ImageModelID.String)
+	models, err := s.loadMediaRouteModels(ctx, "image_life_photo")
 	if err != nil {
-		return err
+		return nil
 	}
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT e.id,e.companion_id,c.name,COALESCE(c.appearance,''),COALESCE(c.city,''),
@@ -222,9 +222,8 @@ func (s *Service) GenerateDueLifePhotos(ctx context.Context) error {
 			continue
 		}
 		prompt := fmt.Sprintf("A candid, realistic everyday photo from %s's life in %s. Event: %s — %s. Location: %s. Mood: %s. Appearance continuity: %s. Natural phone-camera composition, ordinary lived-in details, no text, no watermark, no collage.", item.name, item.city, item.title, item.description, item.location, item.emotion, item.appearance)
-		imageURL, imageErr := s.client.GenerateImage(ctx, model, GenerateImageRequest{Prompt: prompt, Size: "1024x1024"})
+		imageURL, model, imageErr := s.generateImageWithFallback(ctx, item.companionID, "life_photo", models, GenerateImageRequest{Prompt: prompt, Size: "1024x1024"})
 		if imageErr != nil {
-			s.recordRun(ctx, item.companionID, "life_photo", model.ID, "failed", imageErr.Error())
 			continue
 		}
 		payload := map[string]any{}
@@ -298,14 +297,14 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 		return nil, err
 	}
 	if profile.VoiceEnabled {
-		if audioModel, modelErr := s.loadRoutedModel(ctx, profile.ID, "speech"); modelErr == nil {
+		if audioModels, modelErr := s.loadMediaRouteModels(ctx, "audio_speech"); modelErr == nil {
 			voice := "alloy"
 			voiceConfig := map[string]any{}
 			_ = json.Unmarshal([]byte(profile.VoiceConfig), &voiceConfig)
 			if configured, ok := voiceConfig["voice"].(string); ok && strings.TrimSpace(configured) != "" {
 				voice = strings.TrimSpace(configured)
 			}
-			if audio, mimeType, speechErr := s.client.GenerateSpeech(ctx, audioModel, text, voice); speechErr == nil {
+			if audio, mimeType, _, speechErr := s.generateSpeechWithFallback(ctx, profile.ID, "reply_speech", audioModels, text, voice); speechErr == nil {
 				mediaID := uuid.New().String()
 				if _, storeErr := s.db.ExecContext(ctx, `INSERT INTO media_assets(id,user_id,kind,mime_type,data,size_bytes) VALUES($1,$2,'audio',$3,$4,$5)`, mediaID, userID, mimeType, audio, len(audio)); storeErr == nil {
 					reply.MessageType = "voice"
@@ -322,7 +321,7 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 }
 
 func (s *Service) TranscribeMedia(ctx context.Context, mediaID, userID, companionID string) (string, error) {
-	model, err := s.loadRoutedModel(ctx, companionID, "transcription")
+	models, err := s.loadMediaRouteModels(ctx, "audio_transcription")
 	if err != nil {
 		return "", err
 	}
@@ -337,7 +336,7 @@ func (s *Service) TranscribeMedia(ctx context.Context, mediaID, userID, companio
 	} else if strings.Contains(mimeType, "mpeg") {
 		filename = "voice.mp3"
 	}
-	return s.client.TranscribeAudio(ctx, model, filename, mimeType, data)
+	return s.transcribeWithFallback(ctx, companionID, models, filename, mimeType, data)
 }
 
 // GenerateRequestedLifePhoto creates a paid, user-requested photo anchored to
@@ -361,22 +360,14 @@ func (s *Service) GenerateRequestedLifePhoto(ctx context.Context, userID, compan
 	if eventType == "sleep" {
 		return nil, fmt.Errorf("the companion is asleep and cannot take a photo now")
 	}
-	settings, err := s.loadLifeSettings(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if !settings.ImageModelID.Valid {
-		return nil, fmt.Errorf("no image model configured")
-	}
-	model, err := s.loadModel(ctx, settings.ImageModelID.String)
+	models, err := s.loadMediaRouteModels(ctx, "image_requested_photo")
 	if err != nil {
 		return nil, err
 	}
 	prompt := fmt.Sprintf("A candid phone photo from %s's current day. Current event: %s — %s. Current location: %s. Mood: %s. Appearance continuity: %s. Outfit selection: %s. Natural light, believable everyday details, one coherent scene, no text, no watermark, no collage.",
 		name, title, description, location, emotion, appearance, outfit)
-	imageURL, err := s.client.GenerateImage(ctx, model, GenerateImageRequest{Prompt: prompt, Size: "1024x1024"})
+	imageURL, model, err := s.generateImageWithFallback(ctx, companionID, "requested_life_photo", models, GenerateImageRequest{Prompt: prompt, Size: "1024x1024"})
 	if err != nil {
-		s.recordRun(ctx, companionID, "requested_life_photo", model.ID, "failed", err.Error())
 		return nil, err
 	}
 	s.recordRun(ctx, companionID, "requested_life_photo", model.ID, "succeeded", "")
@@ -429,7 +420,7 @@ func (s *Service) SpeakLatestReply(ctx context.Context, userID, companionID stri
 	if message.MessageType == "voice" && message.MediaURL != "" {
 		return nil, fmt.Errorf("the latest reply already has voice")
 	}
-	model, err := s.loadRoutedModel(ctx, companionID, "speech")
+	models, err := s.loadMediaRouteModels(ctx, "audio_speech")
 	if err != nil {
 		return nil, err
 	}
@@ -441,9 +432,8 @@ func (s *Service) SpeakLatestReply(ctx context.Context, userID, companionID stri
 	if configured, ok := voiceConfig["voice"].(string); ok && strings.TrimSpace(configured) != "" {
 		voice = strings.TrimSpace(configured)
 	}
-	audio, mimeType, err := s.client.GenerateSpeech(ctx, model, message.Content, voice)
+	audio, mimeType, model, err := s.generateSpeechWithFallback(ctx, companionID, "paid_speech", models, message.Content, voice)
 	if err != nil {
-		s.recordRun(ctx, companionID, "paid_speech", model.ID, "failed", err.Error())
 		return nil, err
 	}
 	mediaID := uuid.New().String()
@@ -1568,6 +1558,99 @@ func (s *Service) loadRoutedModel(ctx context.Context, companionID, route string
 		return Model{}, fmt.Errorf("no %s model configured", route)
 	}
 	return s.loadModel(ctx, modelID.String)
+}
+
+func (s *Service) loadMediaRouteModels(ctx context.Context, routeKey string) ([]Model, error) {
+	var enabled bool
+	var primary sql.NullString
+	var fallbackRaw, mediaType string
+	err := s.db.QueryRowContext(ctx, `SELECT enabled,primary_model_id,fallback_model_ids::text,media_type
+		FROM agent_media_routes WHERE route_key=$1`, routeKey).Scan(&enabled, &primary, &fallbackRaw, &mediaType)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("media behavior %s is not configured", routeKey)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !enabled || !primary.Valid || strings.TrimSpace(primary.String) == "" {
+		return nil, fmt.Errorf("media behavior %s is not configured", routeKey)
+	}
+	ids := []string{primary.String}
+	var fallbacks []string
+	_ = json.Unmarshal([]byte(fallbackRaw), &fallbacks)
+	ids = append(ids, fallbacks...)
+	models := make([]Model, 0, len(ids))
+	seen := map[string]bool{}
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		var compatible bool
+		if checkErr := s.db.QueryRowContext(ctx, `SELECT EXISTS(
+			SELECT 1 FROM ai_models WHERE id=$1 AND enabled=true AND capabilities ? $2
+		)`, id, mediaType).Scan(&compatible); checkErr != nil || !compatible {
+			continue
+		}
+		model, loadErr := s.loadModel(ctx, id)
+		if loadErr == nil {
+			models = append(models, model)
+		}
+	}
+	if len(models) == 0 {
+		return nil, fmt.Errorf("media behavior %s has no available models", routeKey)
+	}
+	return models, nil
+}
+
+func (s *Service) generateImageWithFallback(ctx context.Context, companionID, runKind string, models []Model, request GenerateImageRequest) (string, Model, error) {
+	var lastErr error
+	for _, model := range models {
+		output, err := s.client.GenerateImage(ctx, model, request)
+		if err == nil {
+			return output, model, nil
+		}
+		lastErr = err
+		s.recordRun(ctx, companionID, runKind, model.ID, "failed", err.Error())
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no image model is available")
+	}
+	return "", Model{}, lastErr
+}
+
+func (s *Service) generateSpeechWithFallback(ctx context.Context, companionID, runKind string, models []Model, text, voice string) ([]byte, string, Model, error) {
+	var lastErr error
+	for _, model := range models {
+		audio, mimeType, err := s.client.GenerateSpeech(ctx, model, text, voice)
+		if err == nil {
+			return audio, mimeType, model, nil
+		}
+		lastErr = err
+		s.recordRun(ctx, companionID, runKind, model.ID, "failed", err.Error())
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no speech model is available")
+	}
+	return nil, "", Model{}, lastErr
+}
+
+func (s *Service) transcribeWithFallback(ctx context.Context, companionID string, models []Model, filename, mimeType string, data []byte) (string, error) {
+	var lastErr error
+	for _, model := range models {
+		text, err := s.client.TranscribeAudio(ctx, model, filename, mimeType, data)
+		if err == nil {
+			s.recordRun(ctx, companionID, "transcription", model.ID, "succeeded", "")
+			return text, nil
+		}
+		lastErr = err
+		s.recordRun(ctx, companionID, "transcription", model.ID, "failed", err.Error())
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no transcription model is available")
+	}
+	return "", lastErr
 }
 
 func (s *Service) loadModel(ctx context.Context, id string) (Model, error) {

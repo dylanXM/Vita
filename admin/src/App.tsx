@@ -17,6 +17,7 @@ import { OnboardingPage } from "@/pages/OnboardingPage";
 import { WhatsNewPage } from "@/pages/WhatsNewPage";
 import { SocialLinksPage } from "@/pages/SocialLinksPage";
 import { CreditProductsPage } from "@/pages/CreditProductsPage";
+import { MediaModelsPage } from "@/pages/MediaModelsPage";
 import { Button } from "@/components/ui/button";
 
 function RouteError() {
@@ -58,6 +59,7 @@ const router = createBrowserRouter([
       { path: "companions", element: <CompanionsPage /> },
       { path: "companions/:id", element: <CompanionDetailPage /> },
       { path: "agent", element: <AgentPage /> },
+      { path: "media-models", element: <MediaModelsPage /> },
       { path: "subscription-plans", element: <SubscriptionPlansPage /> },
       { path: "coin-packs", element: <CoinPacksPage /> },
       { path: "billing-activity", element: <BillingActivityPage /> },

@@ -21,7 +21,7 @@ const zhHant = {
     management: "管理",
     users: "使用者",
     companions: "角色管理",
-    agent: "AI 伴侶", invitationSettings: "邀請碼設定",
+    agent: "AI 伴侶", mediaModels: "媒體模型路由", invitationSettings: "邀請碼設定",
     billing: "計費管理", subscriptionPlans: "訂閱方案", coinPacks: "金幣包", billingActivity: "購買與流水", creditProducts: "金幣體驗", appContent: "App 內容", onboarding: "引導頁", whatsNew: "近期更新", socialLinks: "社群媒體連結",
   },
 
@@ -137,7 +137,7 @@ const zhHant = {
   agent: {
     title: "AI 伴侶 Agent", desc: "設定模型服務、Agent 路由、生活事件生成和具體人物。",
     providers: "模型服務", providersDesc: "支援 OpenAI-compatible 與 Anthropic；金鑰只寫並加密儲存。", providerName: "名稱", providerType: "類型", baseUrl: "服務位址", apiKey: "API 金鑰", keepSecret: "留空則保留目前金鑰", defaultEndpoint: "預設服務位址", keyConfigured: "已設定金鑰", keyMissing: "未設定金鑰", noProviders: "尚未設定模型服務。", provider: "模型服務",
-    models: "模型", modelsDesc: "登記 AI 伴侶可使用的遠端模型識別碼。", modelId: "遠端模型 ID", displayName: "顯示名稱", noModels: "尚未設定模型。", "capability.text": "文字", "capability.image": "圖片", "capability.audio": "語音",
+    models: "模型", modelsDesc: "登記 AI 伴侶可使用的遠端模型識別碼。", modelId: "遠端模型 ID", displayName: "顯示名稱", noModels: "尚未設定模型。", "capability.text": "文字", "capability.image": "圖片", "capability.audio": "語音", "capability.video": "影片",
     routing: "Agent 路由與 Life Engine", routingDesc: "為不同任務指定模型，並限制自主活動頻率。", chatModel: "對話模型", lifeModel: "生活規劃模型", proactiveModel: "主動訊息模型", imageModel: "生活照片模型", transcriptionModel: "語音轉文字模型", speechModel: "文字轉語音模型", selectModel: "請選擇…", eventMin: "每日事件下限", eventMax: "每日事件上限", proactiveLimit: "每日主動訊息上限", photoLimit: "每日照片上限", quietStart: "勿擾開始", quietEnd: "勿擾結束", saveSettings: "儲存路由",
     freeDefaultChatHours: "預設角色免費時數", defaultCompanion: "設為預設免費聊天角色", defaultCompanionBadge: "預設角色", makeDefaultCompanion: "設為預設", removeDefaultCompanion: "取消預設",
     portraits: "系統人物形象", portraitsDesc: "使用者在本期建立流程中可選擇的人物形象。", portraitName: "形象名稱", imageUrl: "圖片位址", gender: "人物類型", tags: "性格標籤", addPortrait: "新增形象",
@@ -158,6 +158,7 @@ const zhHant = {
     empty: "沒有符合篩選條件的記錄。", formDesc: "環境與平台共同確定一筆獨立的商店商品設定。", saved: "計費商品已儲存", deleted: "計費商品已刪除", deleteConfirm: "確定刪除 {{name}}？",
   },
 
+  mediaModels: { title: "媒體模型路由", description: "為每種角色媒體行為設定可選的預設與有序備選模型。", save: "儲存路由", saved: "媒體模型路由已儲存", enabled: "啟用行為", defaultModel: "預設模型", fallbackModels: "備選模型", addFallback: "新增備選", noFallback: "未設定備選模型。", notSelected: "未選擇", noCompatibleModels: "請先建立並啟用相容模型。", "type.image": "圖片", "type.image.desc": "根據角色生活產生視覺內容。", "type.audio": "音訊", "type.audio.desc": "理解使用者語音或合成角色聲音。", "type.video": "影片", "type.video.desc": "生活短片與即時數位人模型。", "route.image_life_photo": "自動生活照片", "route.image_life_photo.desc": "從已發生的 Life 事件產生照片。", "route.image_requested_photo": "使用者要求照片", "route.image_requested_photo.desc": "依目前 Life 事件產生付費照片。", "route.audio_transcription": "使用者語音辨識", "route.audio_transcription.desc": "將語音訊息轉成文字。", "route.audio_speech": "角色語音合成", "route.audio_speech.desc": "將角色回覆轉成語音。", "route.video_life_clip": "生活短影片", "route.video_life_clip.desc": "非同步 Life 事件短影片路由。", "route.video_realtime_avatar": "即時影片數位人", "route.video_realtime_avatar.desc": "即時數位人與視訊通話路由。" },
   creditProducts: { title: "金幣體驗", description: "設定角色增值體驗的伺服器價格與可用狀態。", product: "商品", category: "分類", coins: "金幣", enabled: "啟用", saved: "金幣商品已儲存" },
   time: {
     justNow: "剛剛",

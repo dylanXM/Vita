@@ -40,6 +40,8 @@ import type {
   MobilePlatform,
   SocialMediaLinksConfig,
   CreditProduct,
+  MediaModelRoute,
+  MediaModelRoutesResponse,
 } from "./types";
 
 /** Admin sign-in. The API also accepts a 6-digit code for the same accounts. */
@@ -170,6 +172,10 @@ export const agentApi = {
   updateModel: (id: string, body: AIModelInput) =>
     http.put<AIModel>(`/admin/agent/models/${id}`, body),
   removeModel: (id: string) => http.del<{ message: string }>(`/admin/agent/models/${id}`),
+  mediaRoutes: (signal?: AbortSignal) =>
+    http.get<MediaModelRoutesResponse>("/admin/agent/media-routes", { signal }),
+  saveMediaRoutes: (routes: MediaModelRoute[]) =>
+    http.put<MediaModelRoutesResponse>("/admin/agent/media-routes", { routes }),
   createPortrait: (body: Omit<CompanionPortrait, "id">) =>
     http.post<CompanionPortrait>("/admin/agent/portraits", body),
   updatePortrait: (id: string, body: Omit<CompanionPortrait, "id">) =>

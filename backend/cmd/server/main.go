@@ -248,6 +248,8 @@ func main() {
 				agentAdmin.POST("/models", handler.AdminCreateModel)
 				agentAdmin.PUT("/models/:id", handler.AdminUpdateModel)
 				agentAdmin.DELETE("/models/:id", handler.AdminDeleteModel)
+				agentAdmin.GET("/media-routes", handler.AdminListMediaModelRoutes)
+				agentAdmin.PUT("/media-routes", handler.AdminUpdateMediaModelRoutes)
 				agentAdmin.POST("/portraits", handler.AdminCreatePortrait)
 				agentAdmin.PUT("/portraits/:id", handler.AdminUpdatePortrait)
 				agentAdmin.GET("/companions", handler.AdminListCompanions)

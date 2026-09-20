@@ -21,7 +21,7 @@ const ja = {
     management: "管理",
     users: "ユーザー",
     companions: "キャラクター管理",
-    agent: "AIコンパニオン", invitationSettings: "招待コード設定",
+    agent: "AIコンパニオン", mediaModels: "メディアモデル", invitationSettings: "招待コード設定",
     billing: "課金管理", subscriptionPlans: "サブスクリプションプラン", coinPacks: "コインパック", billingActivity: "購入と台帳", creditProducts: "コイン体験", appContent: "アプリコンテンツ", onboarding: "オンボーディング", whatsNew: "新着情報", socialLinks: "SNSリンク",
   },
 
@@ -137,7 +137,7 @@ const ja = {
   agent: {
     title: "AIコンパニオンエージェント", desc: "モデル、エージェントルーティング、生活生成、人物を設定します。",
     providers: "プロバイダー", providersDesc: "OpenAI互換とAnthropic。APIキーは書き込み専用で暗号化されます。", providerName: "名前", providerType: "種類", baseUrl: "ベースURL", apiKey: "APIキー", keepSecret: "空欄で現在のキーを保持", defaultEndpoint: "既定エンドポイント", keyConfigured: "キー設定済み", keyMissing: "キー未設定", noProviders: "プロバイダーがありません。", provider: "プロバイダー",
-    models: "モデル", modelsDesc: "コンパニオンが利用するモデルIDを登録します。", modelId: "モデルID", displayName: "表示名", noModels: "モデルがありません。", "capability.text": "テキスト", "capability.image": "画像", "capability.audio": "音声",
+    models: "モデル", modelsDesc: "コンパニオンが利用するモデルIDを登録します。", modelId: "モデルID", displayName: "表示名", noModels: "モデルがありません。", "capability.text": "テキスト", "capability.image": "画像", "capability.audio": "音声", "capability.video": "動画",
     routing: "エージェントルーティングとLife Engine", routingDesc: "各タスクのモデルと自律活動の上限を設定します。", chatModel: "チャットモデル", lifeModel: "生活計画モデル", proactiveModel: "自発メッセージモデル", imageModel: "生活写真モデル", transcriptionModel: "音声文字起こしモデル", speechModel: "音声合成モデル", selectModel: "選択…", eventMin: "イベント最小数", eventMax: "イベント最大数", proactiveLimit: "1日の自発連絡上限", photoLimit: "1日の写真上限", quietStart: "静音開始", quietEnd: "静音終了", saveSettings: "ルーティングを保存",
     freeDefaultChatHours: "既定キャラ無料時間", defaultCompanion: "既定の無料チャットキャラにする", defaultCompanionBadge: "既定", makeDefaultCompanion: "既定にする", removeDefaultCompanion: "既定を解除",
     portraits: "システム人物画像", portraitsDesc: "初期作成で選択できる人物画像です。", portraitName: "画像名", imageUrl: "画像URL", gender: "タイプ", tags: "性格タグ", addPortrait: "画像を追加",
@@ -158,6 +158,7 @@ const ja = {
     empty: "条件に一致する記録はありません。", formDesc: "環境とプラットフォームで独立したストア商品設定を識別します。", saved: "課金商品を保存しました", deleted: "課金商品を削除しました", deleteConfirm: "{{name}}を削除しますか？",
   },
 
+  mediaModels: { title: "メディアモデルルーティング", description: "各メディア動作に任意の既定モデルと優先順付き代替モデルを設定します。", save: "ルーティングを保存", saved: "メディアルーティングを保存しました", enabled: "動作を有効化", defaultModel: "既定モデル", fallbackModels: "代替モデル", addFallback: "代替を追加", noFallback: "代替モデルはありません。", notSelected: "未選択", noCompatibleModels: "先に互換モデルを作成して有効にしてください。", "type.image": "画像", "type.image.desc": "キャラクターの生活に基づくビジュアルを生成します。", "type.audio": "音声", "type.audio.desc": "ユーザー音声を理解し、キャラクターに声を与えます。", "type.video": "動画", "type.video.desc": "任意の生活動画とリアルタイムアバターセッションです。", "route.image_life_photo": "自動生活写真", "route.image_life_photo.desc": "発生済みのLifeイベントから写真を生成します。", "route.image_requested_photo": "リクエスト写真", "route.image_requested_photo.desc": "現在のイベントに基づく有料写真を生成します。", "route.audio_transcription": "ユーザー音声認識", "route.audio_transcription.desc": "音声メッセージをテキストに変換します。", "route.audio_speech": "キャラクター音声合成", "route.audio_speech.desc": "キャラクターの返信を音声に変換します。", "route.video_life_clip": "Lifeショート動画", "route.video_life_clip.desc": "Lifeイベントの非同期動画用に予約されたルートです。", "route.video_realtime_avatar": "リアルタイム動画アバター", "route.video_realtime_avatar.desc": "リアルタイムアバターとビデオ通話用に予約されたルートです。" },
   creditProducts: { title: "コイン体験", description: "コンパニオン体験の価格と提供状態を設定します。", product: "商品", category: "カテゴリ", coins: "コイン", enabled: "有効", saved: "商品を保存しました" },
   time: {
     justNow: "たった今",

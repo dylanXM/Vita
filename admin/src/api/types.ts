@@ -305,7 +305,7 @@ export interface AIModel {
   provider_name: string;
   model_name: string;
   display_name: string;
-  capabilities: Array<"text" | "image" | "audio">;
+  capabilities: Array<"text" | "image" | "audio" | "video">;
   enabled: boolean;
   created_at: string;
   updated_at: string;
@@ -315,7 +315,7 @@ export interface AIModelInput {
   provider_id: string;
   model_name: string;
   display_name: string;
-  capabilities: Array<"text" | "image" | "audio">;
+  capabilities: Array<"text" | "image" | "audio" | "video">;
   enabled: boolean;
 }
 
@@ -351,6 +351,21 @@ export interface AgentConfig {
   models: AIModel[];
   settings: AgentSettings;
   portraits: CompanionPortrait[];
+}
+
+export type MediaModelType = "image" | "audio" | "video";
+
+export interface MediaModelRoute {
+  route_key: "image_life_photo" | "image_requested_photo" | "audio_transcription" | "audio_speech" | "video_life_clip" | "video_realtime_avatar";
+  media_type: MediaModelType;
+  enabled: boolean;
+  primary_model_id: string | null;
+  fallback_model_ids: string[];
+}
+
+export interface MediaModelRoutesResponse {
+  routes: MediaModelRoute[];
+  models: AIModel[];
 }
 
 export interface AdminCompanion {
