@@ -89,23 +89,23 @@ class _NavItem {
 const List<_NavItem> _kTabs = [
   _NavItem(
     labelKey: 'tab.chat',
-    icon: Icons.chat_bubble_outline,
-    activeIcon: Icons.chat_bubble,
+    icon: Icons.forum_outlined,
+    activeIcon: Icons.forum_rounded,
   ),
   _NavItem(
     labelKey: 'tab.life',
-    icon: Icons.photo_library_outlined,
-    activeIcon: Icons.photo_library,
+    icon: Icons.explore_outlined,
+    activeIcon: Icons.explore,
   ),
   _NavItem(
     labelKey: 'tab.memories',
-    icon: Icons.star_border,
-    activeIcon: Icons.star,
+    icon: Icons.bookmark_border_rounded,
+    activeIcon: Icons.bookmark_rounded,
   ),
   _NavItem(
     labelKey: 'tab.me',
-    icon: Icons.person_outline,
-    activeIcon: Icons.person,
+    icon: Icons.person_outline_rounded,
+    activeIcon: Icons.person_rounded,
   ),
 ];
 
@@ -313,7 +313,7 @@ class _TabButtonState extends State<_TabButton> {
                 height: VitaTabBar._symbolBox,
                 child: Icon(
                   widget.selected ? widget.item.activeIcon : widget.item.icon,
-                  size: 20,
+                  size: 22,
                   color: widget.selected ? tint : vita.tabInactive,
                 ),
               ),
