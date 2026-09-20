@@ -49,15 +49,15 @@ class VitaAvatar extends StatelessWidget {
   }
 }
 
-/// White rounded card with the standard Vita shadow.
+/// Flat white section used by WeChat-style grouped pages.
 class VitaCard extends StatelessWidget {
   const VitaCard({
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(16),
     this.margin = const EdgeInsets.only(bottom: 12),
-    this.radius = VitaRadius.md,
-    this.shadow = VitaShadow.card,
+    this.radius = 0,
+    this.shadow = const [],
   });
 
   final Widget child;
@@ -80,7 +80,8 @@ class VitaCard extends StatelessWidget {
   }
 }
 
-/// Modern tab header: large title, optional subtitle and trailing actions.
+/// Compact, centered top-level header. Subtitles are intentionally omitted so
+/// the hierarchy matches the rest of the app's navigation bars.
 class VitaTabHeader extends StatelessWidget {
   const VitaTabHeader({
     super.key,
@@ -95,33 +96,35 @@ class VitaTabHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 12, 8),
-      child: Row(
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        color: context.vita.pageBg,
+        border:
+            Border(bottom: BorderSide(color: context.vita.divider, width: 0.5)),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: context.vita.pageTitle),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle!,
-                    style: TextStyle(fontSize: 13, color: context.vita.subText),
-                  ),
-                ],
-              ],
-            ),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                color: context.vita.text),
           ),
-          if (actions != null) actions!,
+          if (actions != null)
+            Positioned(
+                right: 8, top: 0, bottom: 0, child: Center(child: actions!)),
         ],
       ),
     );
   }
 }
 
-/// Horizontal pill chips for picking a companion (replaces dropdowns).
+/// Compact segmented selector for picking a companion.
 class VitaCompanionChips extends StatelessWidget {
   const VitaCompanionChips({
     super.key,
@@ -137,10 +140,10 @@ class VitaCompanionChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 48,
+      height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         itemCount: companions.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
@@ -153,22 +156,13 @@ class VitaCompanionChips extends StatelessWidget {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               curve: Curves.easeOut,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               decoration: BoxDecoration(
                 color: selected ? context.vita.green : context.vita.surface,
-                borderRadius: BorderRadius.circular(VitaRadius.pill),
+                borderRadius: BorderRadius.circular(4),
                 border: Border.all(
                   color: selected ? context.vita.green : context.vita.divider,
                 ),
-                boxShadow: selected
-                    ? const [
-                        BoxShadow(
-                          color: Color(0x2207C160),
-                          blurRadius: 10,
-                          offset: Offset(0, 3),
-                        ),
-                      ]
-                    : const [],
               ),
               child: Text(
                 name,
@@ -250,7 +244,7 @@ class _VitaSkeletonState extends State<VitaSkeleton>
   }
 }
 
-/// Card-shaped skeleton row matching the modern list cards.
+/// Loading row matching the flat conversation list.
 class VitaSkeletonCard extends StatelessWidget {
   const VitaSkeletonCard({super.key, this.withAvatar = true});
 
@@ -259,12 +253,12 @@ class VitaSkeletonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: context.vita.surface,
-        borderRadius: BorderRadius.circular(VitaRadius.md),
-        boxShadow: VitaShadow.card,
+        border:
+            Border(bottom: BorderSide(color: context.vita.divider, width: 0.5)),
       ),
       child: Row(
         children: [
@@ -312,18 +306,10 @@ class VitaEmpty extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                color: context.vita.green.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: 44,
-                color: context.vita.green.withValues(alpha: 0.55),
-              ),
+            Icon(
+              icon,
+              size: 56,
+              color: context.vita.hint,
             ),
             const SizedBox(height: 18),
             Text(
@@ -384,19 +370,19 @@ class VitaListTile extends StatelessWidget {
       color: context.vita.surface,
       child: InkWell(
         onTap: onTap,
-        borderRadius: borderRadius ?? BorderRadius.circular(VitaRadius.md),
+        borderRadius: borderRadius ?? BorderRadius.zero,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
           child: Row(
             children: [
               Container(
-                width: 34,
-                height: 34,
+                width: 30,
+                height: 30,
                 decoration: BoxDecoration(
                   color: accent.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(4),
                 ),
-                child: Icon(icon, color: accent, size: 19),
+                child: Icon(icon, color: accent, size: 18),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -449,7 +435,7 @@ class VitaDateChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
             color: context.vita.surface,
-            borderRadius: BorderRadius.circular(VitaRadius.pill),
+            borderRadius: BorderRadius.circular(4),
             border: Border.all(color: context.vita.divider),
           ),
           child: Text(label, style: context.vita.caption),

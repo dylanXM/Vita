@@ -27,7 +27,9 @@ class LifeController extends GetxController {
       final data = await ApiClient.instance.get('/v1/companions');
       if (data is List) {
         companions.assignAll(
-          data.whereType<Map<String, dynamic>>().map((e) => Map<String, dynamic>.from(e)),
+          data
+              .whereType<Map<String, dynamic>>()
+              .map((e) => Map<String, dynamic>.from(e)),
         );
       }
       if (companions.isNotEmpty && selectedId.value == null) {
@@ -45,10 +47,13 @@ class LifeController extends GetxController {
     if (id == null) return;
     loading.value = true;
     try {
-      final data = await ApiClient.instance.get('/v1/companions/$id/life/today');
+      final data =
+          await ApiClient.instance.get('/v1/companions/$id/life/today');
       if (data is List) {
         events.assignAll(
-          data.whereType<Map<String, dynamic>>().map((e) => Map<String, dynamic>.from(e)),
+          data
+              .whereType<Map<String, dynamic>>()
+              .map((e) => Map<String, dynamic>.from(e)),
         );
       }
     } catch (_) {
@@ -117,7 +122,7 @@ class LifePage extends StatelessWidget {
       );
     }
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 90),
+      padding: const EdgeInsets.fromLTRB(16, 8, 0, 90),
       itemCount: ctrl.events.length,
       itemBuilder: (context, i) {
         final e = ctrl.events[i];
@@ -125,7 +130,9 @@ class LifePage extends StatelessWidget {
         final desc = e['description'] as String? ?? '';
         final loc = e['location'] as String? ?? '';
         final rawTime = e['start_time'] as String?;
-        final when = rawTime != null ? formatClock(DateTime.tryParse(rawTime) ?? DateTime.now()) : '';
+        final when = rawTime != null
+            ? formatClock(DateTime.tryParse(rawTime) ?? DateTime.now())
+            : '';
         return IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -134,54 +141,66 @@ class LifePage extends StatelessWidget {
                 width: 48,
                 child: Column(
                   children: [
-                    Text(when, textAlign: TextAlign.right, style: TextStyle(fontSize: 11.5, color: context.vita.subText)),
+                    Text(when,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                            fontSize: 11.5, color: context.vita.subText)),
                     const SizedBox(height: 6),
                     Container(
                       width: 10,
                       height: 10,
-                      decoration: BoxDecoration(color: context.vita.green, shape: BoxShape.circle),
+                      decoration: BoxDecoration(
+                          color: context.vita.green, shape: BoxShape.circle),
                     ),
                     if (i != ctrl.events.length - 1)
-                      Expanded(child: Container(width: 2, margin: const EdgeInsets.only(top: 4), color: context.vita.divider)),
+                      Expanded(
+                          child: Container(
+                              width: 2,
+                              margin: const EdgeInsets.only(top: 4),
+                              color: context.vita.divider)),
                   ],
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: VitaCard(
-                  margin: const EdgeInsets.only(bottom: 14),
-                  padding: const EdgeInsets.all(14),
+                  margin: EdgeInsets.only(
+                      bottom: i == ctrl.events.length - 1 ? 0 : 1),
+                  padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: context.vita.text)),
+                      Text(title,
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: context.vita.text)),
                       if (desc.isNotEmpty) ...[
                         const SizedBox(height: 5),
-                        Text(desc, style: TextStyle(fontSize: 13, color: context.vita.subText, height: 1.5)),
+                        Text(desc,
+                            style: TextStyle(
+                                fontSize: 13,
+                                color: context.vita.subText,
+                                height: 1.5)),
                       ],
                       if (loc.isNotEmpty) ...[
                         const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: context.vita.pageBg,
-                            borderRadius: BorderRadius.circular(VitaRadius.pill),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.place_outlined, size: 13, color: context.vita.subText),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  loc,
-                                  style: TextStyle(fontSize: 12, color: context.vita.subText),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.place_outlined,
+                                size: 13, color: context.vita.subText),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                loc,
+                                style: TextStyle(
+                                    fontSize: 12, color: context.vita.subText),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ],
                     ],

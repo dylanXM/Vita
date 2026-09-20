@@ -8,7 +8,7 @@ import '../billing/billing_controller.dart';
 import 'chat_list_controller.dart';
 import 'chat_page.dart';
 
-/// Chat tab — the conversation list as modern cards.
+/// Chat tab — a continuous conversation list with familiar message-app rhythm.
 class ChatListPage extends StatelessWidget {
   const ChatListPage({super.key});
 
@@ -25,30 +25,21 @@ class ChatListPage extends StatelessWidget {
             VitaTabHeader(
               title: 'Vita',
               subtitle: 'chat.subtitle'.tr,
-              actions: Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: context.vita.green.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  onPressed: () {
-                    if (!BillingController.to.isSubscribed) {
-                      Get.snackbar('subscription.required.title'.tr,
-                          'subscription.required.create'.tr);
-                      Get.toNamed('/subscription');
-                      return;
-                    }
-                    Get.to(
-                      () => const CompanionCreatePage(),
-                      transition: Transition.cupertino,
-                      duration: const Duration(milliseconds: 300),
-                    );
-                  },
-                  icon: Icon(Icons.person_add_alt_1,
-                      color: context.vita.green, size: 21),
-                ),
+              actions: IconButton(
+                onPressed: () {
+                  if (!BillingController.to.isSubscribed) {
+                    Get.snackbar('subscription.required.title'.tr,
+                        'subscription.required.create'.tr);
+                    Get.toNamed('/subscription');
+                    return;
+                  }
+                  Get.to(
+                    () => const CompanionCreatePage(),
+                    transition: Transition.cupertino,
+                    duration: const Duration(milliseconds: 300),
+                  );
+                },
+                icon: Icon(Icons.add, color: context.vita.text, size: 26),
               ),
             ),
             Expanded(child: Obx(() => _buildBody(ctrl))),
@@ -76,7 +67,11 @@ class ChatListPage extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(0, 4, 0, 90),
       itemCount: ctrl.companions.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (context, _) => Divider(
+        height: 0.5,
+        indent: 82,
+        color: context.vita.divider,
+      ),
       itemBuilder: (context, i) {
         final c = ctrl.companions[i];
         final id = c['id'] as String? ?? '';
@@ -94,13 +89,8 @@ class ChatListPage extends StatelessWidget {
             duration: const Duration(milliseconds: 300),
           ),
           child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: context.vita.surface,
-              borderRadius: BorderRadius.circular(VitaRadius.md),
-              boxShadow: VitaShadow.card,
-            ),
+            color: context.vita.surface,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
                 VitaAvatar(

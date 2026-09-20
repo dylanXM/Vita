@@ -129,13 +129,13 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(4),
             borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(4),
             borderSide: BorderSide.none),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(4),
           borderSide: BorderSide(color: context.vita.green, width: 1.5),
         ),
       ),
@@ -292,7 +292,7 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
                                   width: 92,
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius: BorderRadius.circular(4),
                                     border: Border.all(
                                         color: selected
                                             ? context.vita.green

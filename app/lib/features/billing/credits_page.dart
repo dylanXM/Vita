@@ -24,34 +24,42 @@ class CreditsPage extends StatelessWidget {
   Widget _buildBody(BuildContext context, BillingController ctrl) {
     final packs = _creditPacks(ctrl);
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
       children: [
         // Balance card.
         Container(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           decoration: BoxDecoration(
-            gradient: context.vita.brandGradient,
-            borderRadius: BorderRadius.circular(VitaRadius.lg),
-            boxShadow: [BoxShadow(color: context.vita.green.withValues(alpha: 0.25), blurRadius: 20, offset: const Offset(0, 8))],
+            color: context.vita.surface,
           ),
           child: Column(
             children: [
-              const Text('Your balance', style: TextStyle(fontSize: 13, color: Colors.white, height: 1.3)),
+              Text('Your balance',
+                  style: TextStyle(
+                      fontSize: 13, color: context.vita.subText, height: 1.3)),
               const SizedBox(height: 4),
               Obx(
                 () => Text(
                   '${ctrl.balance.value}',
-                  style: const TextStyle(fontSize: 44, fontWeight: FontWeight.w800, color: Colors.white, height: 1.15),
+                  style: TextStyle(
+                      fontSize: 40,
+                      fontWeight: FontWeight.w700,
+                      color: context.vita.text,
+                      height: 1.15),
                 ),
               ),
-              const Text('credits', style: TextStyle(fontSize: 13, color: Colors.white, height: 1.3)),
+              Text('credits',
+                  style: TextStyle(
+                      fontSize: 13, color: context.vita.subText, height: 1.3)),
             ],
           ),
         ),
         const SizedBox(height: 24),
 
         // Credit packs.
-        Text('Buy more', style: context.vita.sectionTitle),
+        Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text('Buy more', style: context.vita.sectionTitle)),
         const SizedBox(height: 12),
         if (packs.isEmpty)
           const _PacksHint()
@@ -60,12 +68,15 @@ class CreditsPage extends StatelessWidget {
         const SizedBox(height: 24),
 
         // History.
-        Text('History', style: context.vita.sectionTitle),
+        Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text('History', style: context.vita.sectionTitle)),
         const SizedBox(height: 12),
         if (ctrl.transactions.isEmpty)
           Padding(
-            padding: EdgeInsets.symmetric(vertical: 20),
-            child: Text('No transactions yet', style: TextStyle(fontSize: 13, color: context.vita.subText)),
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            child: Text('No transactions yet',
+                style: TextStyle(fontSize: 13, color: context.vita.subText)),
           )
         else
           VitaCard(
@@ -74,7 +85,8 @@ class CreditsPage extends StatelessWidget {
               children: [
                 for (var i = 0; i < ctrl.transactions.length; i++) ...[
                   _TxRow(tx: ctrl.transactions[i]),
-                  if (i != ctrl.transactions.length - 1) const Divider(height: 0.5),
+                  if (i != ctrl.transactions.length - 1)
+                    const Divider(height: 0.5),
                 ],
               ],
             ),
@@ -126,7 +138,10 @@ class _PackCard extends StatelessWidget {
               children: [
                 Text(
                   store.title.isNotEmpty ? store.title : package.identifier,
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: context.vita.text),
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: context.vita.text),
                 ),
                 if (store.description.isNotEmpty)
                   Text(
@@ -144,14 +159,18 @@ class _PackCard extends StatelessWidget {
             child: Opacity(
               opacity: ctrl.busy.value ? 0.5 : 1,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                 decoration: BoxDecoration(
                   color: context.vita.green,
-                  borderRadius: BorderRadius.circular(VitaRadius.pill),
+                  borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   price,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white),
                 ),
               ),
             ),
@@ -171,13 +190,13 @@ class _PacksHint extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: context.vita.surface,
-        borderRadius: BorderRadius.circular(VitaRadius.md),
-        boxShadow: VitaShadow.card,
+        borderRadius: BorderRadius.zero,
       ),
       child: Text(
         'Create consumable products named credits_500 / credits_1000 / credits_5000 in '
         'RevenueCat and they will appear here automatically.',
-        style: TextStyle(fontSize: 12, color: context.vita.subText, height: 1.5),
+        style:
+            TextStyle(fontSize: 12, color: context.vita.subText, height: 1.5),
       ),
     );
   }

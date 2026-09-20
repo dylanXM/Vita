@@ -46,18 +46,19 @@ class _SplashPageState extends State<SplashPage> {
               width: 96,
               height: 96,
               decoration: BoxDecoration(
-                gradient: context.vita.brandGradient,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(color: Color(0x3307C160), blurRadius: 28, offset: Offset(0, 10)),
-                ],
+                color: context.vita.green,
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(Icons.favorite, color: Colors.white, size: 46),
             ),
             SizedBox(height: 20),
             Text(
               'Vita',
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: context.vita.text, letterSpacing: 0.5),
+              style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: context.vita.text,
+                  letterSpacing: 0.5),
             ),
             SizedBox(height: 6),
             Text(

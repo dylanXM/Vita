@@ -59,19 +59,17 @@ class _LoginPageState extends State<LoginPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 16),
-              // Brand mark — gradient circle instead of a logo asset.
+              // A quiet brand mark keeps the authentication screen familiar.
               Center(
                 child: Container(
                   width: 88,
                   height: 88,
                   decoration: BoxDecoration(
-                    gradient: context.vita.brandGradient,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(color: Color(0x3307C160), blurRadius: 24, offset: Offset(0, 8)),
-                    ],
+                    color: context.vita.green,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.favorite, color: Colors.white, size: 42),
+                  child:
+                      const Icon(Icons.favorite, color: Colors.white, size: 42),
                 ),
               ),
               const SizedBox(height: 20),
@@ -109,23 +107,29 @@ class _LoginPageState extends State<LoginPage> {
                   hintText: 'Password',
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
                       color: context.vita.subText,
                       size: 20,
                     ),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                   ),
                 ),
               ),
               const SizedBox(height: 28),
               Obx(
                 () => ElevatedButton(
-                  onPressed: (AuthController.to.loading.value || !_canSubmit) ? null : _login,
+                  onPressed: (AuthController.to.loading.value || !_canSubmit)
+                      ? null
+                      : _login,
                   child: AuthController.to.loading.value
                       ? const SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
                       : const Text('Login'),
                 ),
@@ -136,7 +140,10 @@ class _LoginPageState extends State<LoginPage> {
                   const Expanded(child: Divider()),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text('or', style: TextStyle(color: context.vita.subText.withValues(alpha: 0.8), fontSize: 13)),
+                    child: Text('or',
+                        style: TextStyle(
+                            color: context.vita.subText.withValues(alpha: 0.8),
+                            fontSize: 13)),
                   ),
                   const Expanded(child: Divider()),
                 ],
@@ -144,13 +151,15 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 24),
               OutlinedButton.icon(
                 onPressed: _googleLogin,
-                icon: Icon(Icons.g_mobiledata, color: context.vita.text, size: 26),
+                icon: Icon(Icons.g_mobiledata,
+                    color: context.vita.text, size: 26),
                 label: const Text('Continue with Google'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: context.vita.text,
                   side: BorderSide(color: context.vita.divider),
                   minimumSize: const Size.fromHeight(50),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(VitaRadius.pill)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4)),
                 ),
               ),
               const SizedBox(height: 24),
@@ -159,13 +168,17 @@ class _LoginPageState extends State<LoginPage> {
                 children: [
                   Text(
                     'No account yet? ',
-                    style: TextStyle(fontSize: 13.5, color: context.vita.subText),
+                    style:
+                        TextStyle(fontSize: 13.5, color: context.vita.subText),
                   ),
                   TextButton(
                     onPressed: () => Get.toNamed('/register'),
                     child: Text(
                       'Register',
-                      style: TextStyle(color: context.vita.green, fontSize: 13.5, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                          color: context.vita.green,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],

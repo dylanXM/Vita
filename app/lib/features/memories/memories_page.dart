@@ -26,7 +26,9 @@ class MemoriesController extends GetxController {
       final data = await ApiClient.instance.get('/v1/companions');
       if (data is List) {
         companions.assignAll(
-          data.whereType<Map<String, dynamic>>().map((e) => Map<String, dynamic>.from(e)),
+          data
+              .whereType<Map<String, dynamic>>()
+              .map((e) => Map<String, dynamic>.from(e)),
         );
       }
       if (companions.isNotEmpty && selectedId.value == null) {
@@ -48,7 +50,9 @@ class MemoriesController extends GetxController {
       final list = data is Map ? data['memories'] : data;
       if (list is List) {
         memories.assignAll(
-          list.whereType<Map<String, dynamic>>().map((e) => Map<String, dynamic>.from(e)),
+          list
+              .whereType<Map<String, dynamic>>()
+              .map((e) => Map<String, dynamic>.from(e)),
         );
       }
     } catch (_) {
@@ -117,9 +121,10 @@ class MemoriesPage extends StatelessWidget {
       );
     }
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 90),
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 90),
       itemCount: ctrl.memories.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      separatorBuilder: (context, _) =>
+          Divider(height: 0.5, indent: 60, color: context.vita.divider),
       itemBuilder: (context, i) {
         final m = ctrl.memories[i];
         final content = m['content'] as String? ?? '';
@@ -127,11 +132,7 @@ class MemoriesPage extends StatelessWidget {
         final when = m['event_time'] as String?;
         return Container(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: context.vita.surface,
-            borderRadius: BorderRadius.circular(VitaRadius.md),
-            boxShadow: VitaShadow.card,
-          ),
+          decoration: BoxDecoration(color: context.vita.surface),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -149,13 +150,22 @@ class MemoriesPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(content, style: TextStyle(fontSize: 15, color: context.vita.text, height: 1.45)),
+                    Text(content,
+                        style: TextStyle(
+                            fontSize: 15,
+                            color: context.vita.text,
+                            height: 1.45)),
                     const SizedBox(height: 6),
                     Text(
-                      [type, when != null ? formatDate(DateTime.tryParse(when) ?? DateTime.now()) : null]
-                          .where((e) => e != null && e.isNotEmpty)
-                          .join(' · '),
-                      style: TextStyle(fontSize: 12, color: context.vita.subText),
+                      [
+                        type,
+                        when != null
+                            ? formatDate(
+                                DateTime.tryParse(when) ?? DateTime.now())
+                            : null
+                      ].where((e) => e != null && e.isNotEmpty).join(' · '),
+                      style:
+                          TextStyle(fontSize: 12, color: context.vita.subText),
                     ),
                   ],
                 ),

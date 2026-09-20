@@ -55,6 +55,7 @@ class VitaTranslations extends Translations {
       // Common.
       'common.signout': 'Sign out',
       'common.cancel': 'Cancel',
+      'common.send': 'Send',
       'signout.title': 'Sign out?',
       'signout.message': 'Your companion will be waiting when you come back.',
       // Settings.
@@ -152,6 +153,7 @@ class VitaTranslations extends Translations {
       'me.version': 'Vita v1.0.0',
       'common.signout': '退出登录',
       'common.cancel': '取消',
+      'common.send': '发送',
       'signout.title': '退出登录？',
       'signout.message': '你的伙伴会在这里等你回来。',
       'settings.title': '设置',

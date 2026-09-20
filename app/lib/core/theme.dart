@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 /// Vita design system — a WeChat-inspired modern visual language with
 /// light and dark palettes.
 ///
-/// White (or near-black) surfaces on a soft canvas, the brand green accent,
-/// card shadows, pill actions and generous spacing. Every page resolves its
+/// White (or near-black) grouped surfaces on a soft canvas, the brand green
+/// accent, hairline separators and compact spacing. Every page resolves its
 /// colors through `context.vita`, which returns the [VitaThemeData] matching
 /// the current theme brightness — so light/dark/system modes and live system
 /// brightness changes re-render the whole app automatically.
@@ -249,9 +249,10 @@ class VitaTheme {
     );
     return base.copyWith(
       appBarTheme: AppBarTheme(
-        backgroundColor: t.surface,
+        backgroundColor: t.pageBg,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        shape: Border(bottom: BorderSide(color: t.divider, width: 0.5)),
         centerTitle: true,
         foregroundColor: t.text,
         titleTextStyle: TextStyle(
@@ -267,7 +268,7 @@ class VitaTheme {
           disabledBackgroundColor: t.green.withValues(alpha: 0.4),
           minimumSize: const Size.fromHeight(50),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(VitaRadius.pill)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
@@ -276,7 +277,7 @@ class VitaTheme {
           foregroundColor: t.text,
           side: BorderSide(color: t.divider),
           minimumSize: const Size.fromHeight(50),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(VitaRadius.pill)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
           textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
         ),
       ),
@@ -289,25 +290,26 @@ class VitaTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: t.surface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(VitaRadius.md),
+          borderRadius: BorderRadius.circular(4),
           borderSide: BorderSide(color: t.divider),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(VitaRadius.md),
+          borderRadius: BorderRadius.circular(4),
           borderSide: BorderSide(color: t.divider),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(VitaRadius.md),
+          borderRadius: BorderRadius.circular(4),
           borderSide: BorderSide(color: t.green, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(VitaRadius.md),
+          borderRadius: BorderRadius.circular(4),
           borderSide: BorderSide(color: t.red),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(VitaRadius.md),
+          borderRadius: BorderRadius.circular(4),
           borderSide: BorderSide(color: t.red, width: 1.5),
         ),
         hintStyle: TextStyle(color: t.hint, fontSize: 15),
@@ -316,7 +318,7 @@ class VitaTheme {
         backgroundColor: t.pageBg,
         selectedColor: t.greenTint,
         checkmarkColor: t.green,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
         side: BorderSide(color: t.divider),
         labelStyle: TextStyle(fontSize: 14, color: t.text),
       ),
@@ -329,16 +331,19 @@ class VitaTheme {
         behavior: SnackBarBehavior.floating,
         backgroundColor: Color(0xFF3B3B3B),
         contentTextStyle: TextStyle(color: Colors.white, fontSize: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(4))),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: t.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        titleTextStyle: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: t.text),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        titleTextStyle:
+            TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: t.text),
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: t.surface,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       ),
     );
   }

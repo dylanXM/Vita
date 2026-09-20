@@ -24,16 +24,16 @@ class SubscriptionPage extends StatelessWidget {
 
   Widget _buildBody(BuildContext context, BillingController ctrl) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
       children: [
         // Active subscription banner.
         if (ctrl.isSubscribed)
           Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               color: context.vita.greenTint,
-              borderRadius: BorderRadius.circular(VitaRadius.md),
+              borderRadius: BorderRadius.zero,
             ),
             child: Row(
               children: [
@@ -42,21 +42,34 @@ class SubscriptionPage extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Your plan is active',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: context.vita.text),
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: context.vita.text),
                   ),
                 ),
               ],
             ),
           ),
         if (!ctrl.isSubscribed) ...[
-          Text(
-            'More life, more memories, more of her.',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: context.vita.text),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              'More life, more memories, more of her.',
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: context.vita.text),
+            ),
           ),
           const SizedBox(height: 6),
-          Text(
-            'Subscription includes monthly credits for premium images, voice and more.',
-            style: TextStyle(fontSize: 13, color: context.vita.subText, height: 1.5),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              'Subscription includes monthly credits for premium images, voice and more.',
+              style: TextStyle(
+                  fontSize: 13, color: context.vita.subText, height: 1.5),
+            ),
           ),
         ],
         const SizedBox(height: 20),
@@ -81,7 +94,8 @@ class SubscriptionPage extends StatelessWidget {
           child: TextButton.icon(
             onPressed: ctrl.busy.value ? null : ctrl.restorePurchases,
             icon: const Icon(Icons.settings_backup_restore, size: 18),
-            label: const Text('Restore purchases', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+            label: const Text('Restore purchases',
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
           ),
         ),
         const SizedBox(height: 16),
@@ -90,7 +104,8 @@ class SubscriptionPage extends StatelessWidget {
           'managed there. Credits included with a subscription are granted each '
           'billing period.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11.5, color: context.vita.subText, height: 1.5),
+          style: TextStyle(
+              fontSize: 11.5, color: context.vita.subText, height: 1.5),
         ),
       ],
     );
@@ -112,24 +127,33 @@ class SubscriptionPage extends StatelessWidget {
               Container(
                 width: 36,
                 height: 4,
-                decoration: BoxDecoration(color: const Color(0xFFDDDDDD), borderRadius: BorderRadius.circular(2)),
+                decoration: BoxDecoration(
+                    color: const Color(0xFFDDDDDD),
+                    borderRadius: BorderRadius.circular(2)),
               ),
               const SizedBox(height: 20),
-              Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: context.vita.text)),
+              Text(title,
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: context.vita.text)),
               const SizedBox(height: 8),
               Text(
                 store.description,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: context.vita.subText, height: 1.5),
+                style: TextStyle(
+                    fontSize: 13, color: context.vita.subText, height: 1.5),
               ),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: ctrl.busy.value ? null : () {
-                    Get.back();
-                    ctrl.purchasePackage(package);
-                  },
+                  onPressed: ctrl.busy.value
+                      ? null
+                      : () {
+                          Get.back();
+                          ctrl.purchasePackage(package);
+                        },
                   child: Text(
                     store.priceString.isEmpty
                         ? 'Subscribe'
@@ -169,9 +193,10 @@ class _PlanCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: context.vita.surface,
-          borderRadius: BorderRadius.circular(VitaRadius.lg),
-          border: Border.all(color: isPremium ? context.vita.green : context.vita.divider, width: isPremium ? 1.5 : 1),
-          boxShadow: VitaShadow.card,
+          borderRadius: BorderRadius.zero,
+          border: Border.all(
+              color: isPremium ? context.vita.green : context.vita.divider,
+              width: isPremium ? 1.5 : 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,18 +204,26 @@ class _PlanCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: context.vita.text)),
+                  child: Text(title,
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: context.vita.text)),
                 ),
                 if (isPremium)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: context.vita.greenTint,
-                      borderRadius: BorderRadius.circular(VitaRadius.pill),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       'Recommended',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: context.vita.green),
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: context.vita.green),
                     ),
                   ),
               ],
@@ -200,22 +233,31 @@ class _PlanCard extends StatelessWidget {
               store.description,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12.5, color: context.vita.subText, height: 1.5),
+              style: TextStyle(
+                  fontSize: 12.5, color: context.vita.subText, height: 1.5),
             ),
             const SizedBox(height: 14),
             Row(
               children: [
                 Text(
                   store.priceString.isEmpty ? '—' : store.priceString,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: context.vita.text),
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: context.vita.text),
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   decoration: BoxDecoration(
-                    color: isPremium ? context.vita.green : context.vita.surface,
-                    borderRadius: BorderRadius.circular(VitaRadius.pill),
-                    border: isPremium ? null : Border.fromBorderSide(BorderSide(color: context.vita.green)),
+                    color:
+                        isPremium ? context.vita.green : context.vita.surface,
+                    borderRadius: BorderRadius.circular(4),
+                    border: isPremium
+                        ? null
+                        : Border.fromBorderSide(
+                            BorderSide(color: context.vita.green)),
                   ),
                   child: Text(
                     'Subscribe',
@@ -244,13 +286,16 @@ class _NotConfiguredCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: context.vita.surface,
-        borderRadius: BorderRadius.circular(VitaRadius.md),
-        boxShadow: VitaShadow.card,
+        borderRadius: BorderRadius.zero,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('RevenueCat not configured', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: context.vita.text)),
+          Text('RevenueCat not configured',
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: context.vita.text)),
           SizedBox(height: 4),
           Text(
             'Build with --dart-define=VITA_REVENUECAT_KEY=... to enable in-app purchases.',
@@ -271,8 +316,7 @@ class _NoOfferingsCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: context.vita.surface,
-        borderRadius: BorderRadius.circular(VitaRadius.md),
-        boxShadow: VitaShadow.card,
+        borderRadius: BorderRadius.zero,
       ),
       child: Text(
         'No products configured in RevenueCat yet (api key: ${revenueCatApiKey.isEmpty ? 'empty' : 'set'}).',

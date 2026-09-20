@@ -306,18 +306,10 @@ class _ChatPageState extends State<ChatPage> {
                     color: isUser
                         ? context.vita.bubbleGreen
                         : context.vita.surface,
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(14),
-                      topRight: const Radius.circular(14),
-                      bottomLeft: Radius.circular(isUser ? 14 : 4),
-                      bottomRight: Radius.circular(isUser ? 4 : 14),
-                    ),
-                    boxShadow: const [
-                      BoxShadow(
-                          color: Color(0x08000000),
-                          blurRadius: 6,
-                          offset: Offset(0, 1))
-                    ],
+                    borderRadius: BorderRadius.circular(4),
+                    border: isUser
+                        ? null
+                        : Border.all(color: context.vita.divider, width: 0.5),
                   ),
                   child: Text(
                     content,
@@ -341,7 +333,11 @@ class _ChatPageState extends State<ChatPage> {
 
   Widget _buildInputBar({required bool locked}) {
     return Container(
-      color: context.vita.surface,
+      decoration: BoxDecoration(
+        color: context.vita.pageBg,
+        border:
+            Border(top: BorderSide(color: context.vita.divider, width: 0.5)),
+      ),
       padding: EdgeInsets.fromLTRB(
           12, 8, 12, 8 + MediaQuery.of(context).padding.bottom),
       child: Row(
@@ -360,31 +356,31 @@ class _ChatPageState extends State<ChatPage> {
                 hintText: locked ? 'chat.cannotSend'.tr : 'Message',
                 hintStyle: TextStyle(color: context.vita.hint, fontSize: 15),
                 filled: true,
-                fillColor: context.vita.pageBg,
+                fillColor: context.vita.surface,
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
+                    borderRadius: BorderRadius.circular(4),
                     borderSide: BorderSide.none),
                 enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
+                    borderRadius: BorderRadius.circular(4),
                     borderSide: BorderSide.none),
                 focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
+                    borderRadius: BorderRadius.circular(4),
                     borderSide: BorderSide.none),
               ),
             ),
           ),
           const SizedBox(width: 10),
-          GestureDetector(
-            onTap: locked ? () => Get.toNamed('/subscription') : _send,
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                  color: context.vita.green, shape: BoxShape.circle),
-              child:
-                  const Icon(Icons.arrow_upward, color: Colors.white, size: 20),
+          SizedBox(
+            height: 40,
+            child: ElevatedButton(
+              onPressed: locked ? () => Get.toNamed('/subscription') : _send,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(64, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+              ),
+              child: Text('common.send'.tr),
             ),
           ),
         ],

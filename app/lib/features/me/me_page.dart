@@ -59,24 +59,17 @@ class MePage extends StatelessWidget {
           () => ListView(
             padding: const EdgeInsets.only(bottom: 90),
             children: [
-              // Gradient profile header.
+              const VitaTabHeader(title: 'Vita'),
+              // Account summary follows the same tap-target and surface rhythm
+              // as the grouped menu rows below.
               Container(
-                padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
-                decoration: BoxDecoration(gradient: vita.brandGradient),
+                color: vita.surface,
+                padding: const EdgeInsets.fromLTRB(20, 24, 16, 24),
                 child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.25),
-                        shape: BoxShape.circle,
-                      ),
-                      child: VitaAvatar(
-                        name: auth.email,
-                        radius: 30,
-                        background: Colors.white,
-                        textColor: vita.green,
-                      ),
+                    VitaAvatar(
+                      name: auth.email,
+                      radius: 31,
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -87,31 +80,18 @@ class MePage extends StatelessWidget {
                             auth.email.isEmpty ? 'me.account'.tr : auth.email,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                              color: vita.text,
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.22),
-                              borderRadius: BorderRadius.circular(
-                                VitaRadius.pill,
-                              ),
-                            ),
-                            child: Text(
-                              plan,
-                              style: const TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
+                          Text(
+                            plan,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: vita.subText,
                             ),
                           ),
                         ],
@@ -120,7 +100,7 @@ class MePage extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
 
               // Subscription group.
               VitaCard(
