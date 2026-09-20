@@ -18,12 +18,16 @@ class SettingsPage extends StatelessWidget {
       backgroundColor: vita.pageBg,
       appBar: AppBar(title: Text('settings.title'.tr)),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        padding: const EdgeInsets.only(top: 8, bottom: 24),
         children: [
-          Text('settings.general'.tr, style: vita.sectionTitle),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text('settings.general'.tr, style: vita.sectionTitle),
+          ),
           const SizedBox(height: 12),
           // General group: language + theme.
           VitaCard(
+            radius: 0,
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Column(
               children: [
@@ -32,6 +36,7 @@ class SettingsPage extends StatelessWidget {
                     icon: Icons.language,
                     title: 'lang.title'.tr,
                     subtitle: _langLabel(context, settings.locale.value),
+                    borderRadius: BorderRadius.zero,
                     onTap: () => Get.to(
                       () => const LanguagePage(),
                       transition: Transition.cupertino,
@@ -45,6 +50,7 @@ class SettingsPage extends StatelessWidget {
                     icon: Icons.dark_mode_outlined,
                     title: 'theme.title'.tr,
                     subtitle: _themeLabel(context, settings.themeMode.value),
+                    borderRadius: BorderRadius.zero,
                     onTap: () => Get.to(
                       () => const ThemePage(),
                       transition: Transition.cupertino,
@@ -56,15 +62,20 @@ class SettingsPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Text('settings.account'.tr, style: vita.sectionTitle),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text('settings.account'.tr, style: vita.sectionTitle),
+          ),
           const SizedBox(height: 12),
           // Account group: sign out.
           VitaCard(
+            radius: 0,
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: VitaListTile(
               icon: Icons.logout,
               title: 'common.signout'.tr,
               iconColor: vita.red,
+              borderRadius: BorderRadius.zero,
               onTap: () => _confirmSignOut(context),
             ),
           ),
@@ -94,7 +105,10 @@ class SettingsPage extends StatelessWidget {
               Container(
                 width: 36,
                 height: 4,
-                decoration: BoxDecoration(color: const Color(0xFFDDDDDD), borderRadius: BorderRadius.circular(2)),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDDDDDD),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
               const SizedBox(height: 20),
               Container(
@@ -109,7 +123,11 @@ class SettingsPage extends StatelessWidget {
               const SizedBox(height: 14),
               Text(
                 'signout.title'.tr,
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: vita.text),
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  color: vita.text,
+                ),
               ),
               const SizedBox(height: 6),
               Text(
@@ -132,7 +150,10 @@ class SettingsPage extends StatelessWidget {
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () => Get.back(),
-                child: Text('common.cancel'.tr, style: TextStyle(color: vita.subText)),
+                child: Text(
+                  'common.cancel'.tr,
+                  style: TextStyle(color: vita.subText),
+                ),
               ),
             ],
           ),
@@ -174,9 +195,10 @@ class _OptionListPage extends StatelessWidget {
       backgroundColor: vita.pageBg,
       appBar: AppBar(title: Text(title.tr)),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        padding: const EdgeInsets.only(top: 8, bottom: 24),
         children: [
           VitaCard(
+            radius: 0,
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Column(
               children: [
@@ -194,7 +216,11 @@ class _OptionListPage extends StatelessWidget {
 }
 
 class _Option {
-  const _Option({required this.labelKey, required this.selected, required this.onTap});
+  const _Option({
+    required this.labelKey,
+    required this.selected,
+    required this.onTap,
+  });
 
   final String labelKey;
   final bool selected;
@@ -218,7 +244,11 @@ class _OptionRow extends StatelessWidget {
             Expanded(
               child: Text(
                 option.labelKey.tr,
-                style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w500, color: vita.text),
+                style: TextStyle(
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w500,
+                  color: vita.text,
+                ),
               ),
             ),
             if (option.selected)

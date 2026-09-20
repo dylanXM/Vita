@@ -59,18 +59,31 @@ class MePage extends StatelessWidget {
                             auth.email.isEmpty ? 'me.account'.tr : auth.email,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.22),
-                              borderRadius: BorderRadius.circular(VitaRadius.pill),
+                              borderRadius: BorderRadius.circular(
+                                VitaRadius.pill,
+                              ),
                             ),
                             child: Text(
                               plan,
-                              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.white),
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ],
@@ -83,6 +96,7 @@ class MePage extends StatelessWidget {
 
               // Subscription group.
               VitaCard(
+                radius: 0,
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Column(
                   children: [
@@ -90,8 +104,13 @@ class MePage extends StatelessWidget {
                       icon: Icons.workspace_premium_outlined,
                       title: 'me.plus.title'.tr,
                       subtitle: billing.isSubscribed
-                          ? 'me.plus.active'.trParams({'ent': billing.entitlements.join(', ').toUpperCase()})
+                          ? 'me.plus.active'.trParams({
+                              'ent': billing.entitlements
+                                  .join(', ')
+                                  .toUpperCase(),
+                            })
                           : 'me.plus.unlock'.tr,
+                      borderRadius: BorderRadius.zero,
                       onTap: () => Get.to(
                         () => const SubscriptionPage(),
                         transition: Transition.cupertino,
@@ -102,7 +121,10 @@ class MePage extends StatelessWidget {
                     VitaListTile(
                       icon: Icons.toll_outlined,
                       title: 'me.credits'.tr,
-                      subtitle: 'me.credits.available'.trParams({'n': '${billing.balance.value}'}),
+                      subtitle: 'me.credits.available'.trParams({
+                        'n': '${billing.balance.value}',
+                      }),
+                      borderRadius: BorderRadius.zero,
                       onTap: () => Get.to(
                         () => const CreditsPage(),
                         transition: Transition.cupertino,
@@ -115,10 +137,12 @@ class MePage extends StatelessWidget {
 
               // Settings.
               VitaCard(
+                radius: 0,
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: VitaListTile(
                   icon: Icons.settings_outlined,
                   title: 'me.settings'.tr,
+                  borderRadius: BorderRadius.zero,
                   onTap: () => Get.to(
                     () => const SettingsPage(),
                     transition: Transition.cupertino,

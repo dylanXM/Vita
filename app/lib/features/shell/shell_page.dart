@@ -48,7 +48,11 @@ class ShellPage extends StatelessWidget {
 
 /// Tab definition: localized label key + outline/filled icon pair.
 class _NavItem {
-  const _NavItem({required this.labelKey, required this.icon, required this.activeIcon});
+  const _NavItem({
+    required this.labelKey,
+    required this.icon,
+    required this.activeIcon,
+  });
 
   final String labelKey;
   final IconData icon;
@@ -56,10 +60,26 @@ class _NavItem {
 }
 
 const List<_NavItem> _kTabs = [
-  _NavItem(labelKey: 'tab.chat', icon: Icons.chat_bubble_outline, activeIcon: Icons.chat_bubble),
-  _NavItem(labelKey: 'tab.life', icon: Icons.photo_library_outlined, activeIcon: Icons.photo_library),
-  _NavItem(labelKey: 'tab.memories', icon: Icons.star_border, activeIcon: Icons.star),
-  _NavItem(labelKey: 'tab.me', icon: Icons.person_outline, activeIcon: Icons.person),
+  _NavItem(
+    labelKey: 'tab.chat',
+    icon: Icons.chat_bubble_outline,
+    activeIcon: Icons.chat_bubble,
+  ),
+  _NavItem(
+    labelKey: 'tab.life',
+    icon: Icons.photo_library_outlined,
+    activeIcon: Icons.photo_library,
+  ),
+  _NavItem(
+    labelKey: 'tab.memories',
+    icon: Icons.star_border,
+    activeIcon: Icons.star,
+  ),
+  _NavItem(
+    labelKey: 'tab.me',
+    icon: Icons.person_outline,
+    activeIcon: Icons.person,
+  ),
 ];
 
 /// iOS 27 bottom navigation — a floating Liquid Glass capsule.
@@ -86,105 +106,137 @@ class VitaTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vita = context.vita;
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(_sidePadding, _topGap, _sidePadding, 0),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final slot = (constraints.maxWidth - 2 * _glassInset) / _kTabs.length;
-            final dark = vita.brightness == Brightness.dark;
-            return Container(
-              decoration: BoxDecoration(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(100),
-                boxShadow: [
-                  BoxShadow(
-                    color: vita.glassShadow,
-                    blurRadius: dark ? 24 : 18,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
+    final dark = vita.brightness == Brightness.dark;
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: vita.glass.withValues(alpha: dark ? 0.28 : 0.38),
+            border: Border(
+              top: BorderSide(
+                color: vita.glassRing.withValues(alpha: 0.45),
+                width: 0.5,
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(100),
-                child: BackdropFilter(
-                  // Liquid Glass: strong diffusion of whatever scrolls behind.
-                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                  child: Stack(
-                    children: [
-                      // Glass fill + edge ring.
-                      Positioned.fill(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: vita.glass,
-                            borderRadius: BorderRadius.circular(100),
-                            border: Border.all(color: vita.glassRing, width: 0.5),
-                          ),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                _sidePadding,
+                _topGap,
+                _sidePadding,
+                0,
+              ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final slot =
+                      (constraints.maxWidth - 2 * _glassInset) / _kTabs.length;
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(100),
+                      boxShadow: [
+                        BoxShadow(
+                          color: vita.glassShadow,
+                          blurRadius: dark ? 24 : 18,
+                          offset: const Offset(0, 6),
                         ),
-                      ),
-                      // Specular highlight along the top rim.
-                      Positioned(
-                        top: 0.5,
-                        left: 18,
-                        right: 18,
-                        height: 1,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.transparent,
-                                Colors.white.withValues(alpha: dark ? 0.28 : 0.55),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Tab row (glass oversize of 4pt per side).
-                      Padding(
-                        padding: const EdgeInsets.all(_glassInset),
-                        child: SizedBox(
-                          height: _controlHeight,
-                          child: Stack(
-                            children: [
-                              // Selection pill — morphs between tabs.
-                              AnimatedPositioned(
-                                duration: const Duration(milliseconds: 450),
-                                curve: const Cubic(0.34, 1.56, 0.64, 1.0),
-                                top: (_controlHeight - _pillHeight) / 2,
-                                left: slot * (index + 0.5) - _pillWidth / 2,
-                                width: _pillWidth,
-                                height: _pillHeight,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: vita.selectionPill,
-                                    borderRadius: BorderRadius.circular(100),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(100),
+                      child: BackdropFilter(
+                        // Liquid Glass: strong diffusion of whatever scrolls behind.
+                        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                        child: Stack(
+                          children: [
+                            // Glass fill + edge ring.
+                            Positioned.fill(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: vita.glass,
+                                  borderRadius: BorderRadius.circular(100),
+                                  border: Border.all(
+                                    color: vita.glassRing,
+                                    width: 0.5,
                                   ),
                                 ),
                               ),
-                              Row(
-                                children: [
-                                  for (var i = 0; i < _kTabs.length; i++)
-                                    Expanded(
-                                      child: _TabButton(
-                                        item: _kTabs[i],
-                                        selected: i == index,
-                                        onTap: () => onTap(i),
+                            ),
+                            // Specular highlight along the top rim.
+                            Positioned(
+                              top: 0.5,
+                              left: 18,
+                              right: 18,
+                              height: 1,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.transparent,
+                                      Colors.white.withValues(
+                                        alpha: dark ? 0.28 : 0.55,
+                                      ),
+                                      Colors.transparent,
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Tab row (glass oversize of 4pt per side).
+                            Padding(
+                              padding: const EdgeInsets.all(_glassInset),
+                              child: SizedBox(
+                                height: _controlHeight,
+                                child: Stack(
+                                  children: [
+                                    // Selection pill — morphs between tabs.
+                                    AnimatedPositioned(
+                                      duration: const Duration(
+                                        milliseconds: 450,
+                                      ),
+                                      curve: const Cubic(0.34, 1.56, 0.64, 1.0),
+                                      top: (_controlHeight - _pillHeight) / 2,
+                                      left:
+                                          slot * (index + 0.5) - _pillWidth / 2,
+                                      width: _pillWidth,
+                                      height: _pillHeight,
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          color: vita.selectionPill,
+                                          borderRadius: BorderRadius.circular(
+                                            100,
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                ],
+                                    Row(
+                                      children: [
+                                        for (var i = 0; i < _kTabs.length; i++)
+                                          Expanded(
+                                            child: _TabButton(
+                                              item: _kTabs[i],
+                                              selected: i == index,
+                                              onTap: () => onTap(i),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               ),
-            );
-          },
+            ),
+          ),
         ),
       ),
     );
@@ -192,7 +244,11 @@ class VitaTabBar extends StatelessWidget {
 }
 
 class _TabButton extends StatefulWidget {
-  const _TabButton({required this.item, required this.selected, required this.onTap});
+  const _TabButton({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
 
   final _NavItem item;
   final bool selected;

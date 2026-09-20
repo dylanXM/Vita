@@ -71,7 +71,12 @@ class VitaCard extends StatelessWidget {
 
 /// Modern tab header: large title, optional subtitle and trailing actions.
 class VitaTabHeader extends StatelessWidget {
-  const VitaTabHeader({super.key, required this.title, this.subtitle, this.actions});
+  const VitaTabHeader({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.actions,
+  });
 
   final String title;
   final String? subtitle;
@@ -90,7 +95,10 @@ class VitaTabHeader extends StatelessWidget {
                 Text(title, style: context.vita.pageTitle),
                 if (subtitle != null) ...[
                   const SizedBox(height: 3),
-                  Text(subtitle!, style: TextStyle(fontSize: 13, color: context.vita.subText)),
+                  Text(
+                    subtitle!,
+                    style: TextStyle(fontSize: 13, color: context.vita.subText),
+                  ),
                 ],
               ],
             ),
@@ -138,9 +146,17 @@ class VitaCompanionChips extends StatelessWidget {
               decoration: BoxDecoration(
                 color: selected ? context.vita.green : context.vita.surface,
                 borderRadius: BorderRadius.circular(VitaRadius.pill),
-                border: Border.all(color: selected ? context.vita.green : context.vita.divider),
+                border: Border.all(
+                  color: selected ? context.vita.green : context.vita.divider,
+                ),
                 boxShadow: selected
-                    ? const [BoxShadow(color: Color(0x2207C160), blurRadius: 10, offset: Offset(0, 3))]
+                    ? const [
+                        BoxShadow(
+                          color: Color(0x2207C160),
+                          blurRadius: 10,
+                          offset: Offset(0, 3),
+                        ),
+                      ]
                     : const [],
               ),
               child: Text(
@@ -163,7 +179,12 @@ class VitaCompanionChips extends StatelessWidget {
 
 /// Shimmer placeholder for loading states.
 class VitaSkeleton extends StatefulWidget {
-  const VitaSkeleton({super.key, this.width, this.height = 14, this.radius = 7});
+  const VitaSkeleton({
+    super.key,
+    this.width,
+    this.height = 14,
+    this.radius = 7,
+  });
 
   final double? width;
   final double height;
@@ -173,7 +194,8 @@ class VitaSkeleton extends StatefulWidget {
   State<VitaSkeleton> createState() => _VitaSkeletonState();
 }
 
-class _VitaSkeletonState extends State<VitaSkeleton> with SingleTickerProviderStateMixin {
+class _VitaSkeletonState extends State<VitaSkeleton>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1400),
@@ -199,8 +221,16 @@ class _VitaSkeletonState extends State<VitaSkeleton> with SingleTickerProviderSt
             gradient: LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              stops: [t - 0.3, t, t + 0.3].map((s) => s.clamp(0.0, 1.0)).toList(),
-              colors: [context.vita.shimmerA, context.vita.shimmerB, context.vita.shimmerA],
+              stops: [
+                t - 0.3,
+                t,
+                t + 0.3,
+              ].map((s) => s.clamp(0.0, 1.0)).toList(),
+              colors: [
+                context.vita.shimmerA,
+                context.vita.shimmerB,
+                context.vita.shimmerA,
+              ],
             ),
           ),
         );
@@ -252,7 +282,12 @@ class VitaSkeletonCard extends StatelessWidget {
 }
 
 class VitaEmpty extends StatelessWidget {
-  const VitaEmpty({super.key, required this.icon, required this.title, this.subtitle});
+  const VitaEmpty({
+    super.key,
+    required this.icon,
+    required this.title,
+    this.subtitle,
+  });
 
   final IconData icon;
   final String title;
@@ -273,10 +308,21 @@ class VitaEmpty extends StatelessWidget {
                 color: context.vita.green.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 44, color: context.vita.green.withValues(alpha: 0.55)),
+              child: Icon(
+                icon,
+                size: 44,
+                color: context.vita.green.withValues(alpha: 0.55),
+              ),
             ),
             const SizedBox(height: 18),
-            Text(title, style: TextStyle(color: context.vita.text, fontSize: 16, fontWeight: FontWeight.w600)),
+            Text(
+              title,
+              style: TextStyle(
+                color: context.vita.text,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             if (subtitle != null) ...[
               const SizedBox(height: 6),
               Padding(
@@ -284,7 +330,11 @@ class VitaEmpty extends StatelessWidget {
                 child: Text(
                   subtitle!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: context.vita.subText, fontSize: 13, height: 1.5),
+                  style: TextStyle(
+                    color: context.vita.subText,
+                    fontSize: 13,
+                    height: 1.5,
+                  ),
                 ),
               ),
             ],
@@ -305,6 +355,7 @@ class VitaListTile extends StatelessWidget {
     this.onTap,
     this.trailing,
     this.iconColor,
+    this.borderRadius,
   });
 
   final IconData icon;
@@ -312,6 +363,7 @@ class VitaListTile extends StatelessWidget {
   final String? subtitle;
   final Widget? trailing;
   final Color? iconColor;
+  final BorderRadiusGeometry? borderRadius;
   final VoidCallback? onTap;
 
   @override
@@ -321,7 +373,7 @@ class VitaListTile extends StatelessWidget {
       color: context.vita.surface,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(VitaRadius.md),
+        borderRadius: borderRadius ?? BorderRadius.circular(VitaRadius.md),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
           child: Row(
@@ -340,18 +392,28 @@ class VitaListTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w500, color: context.vita.text)),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w500,
+                        color: context.vita.text,
+                      ),
+                    ),
                     if (subtitle != null) ...[
                       const SizedBox(height: 1),
-                      Text(subtitle!, style: TextStyle(fontSize: 12.5, color: context.vita.subText)),
+                      Text(
+                        subtitle!,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: context.vita.subText,
+                        ),
+                      ),
                     ],
                   ],
                 ),
               ),
-              if (trailing != null) ...[
-                const SizedBox(width: 8),
-                trailing!,
-              ],
+              if (trailing != null) ...[const SizedBox(width: 8), trailing!],
               Icon(Icons.chevron_right, size: 20, color: context.vita.chevron),
             ],
           ),
@@ -395,7 +457,20 @@ String formatClock(DateTime t) {
 
 /// Formats a timestamp as a short date (Sep 19).
 String formatDate(DateTime t) {
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
   return '${months[t.month - 1]} ${t.day}';
 }
 
@@ -411,4 +486,5 @@ String formatDateSeparator(DateTime t) {
 }
 
 /// True when both timestamps fall on the same calendar day.
-bool isSameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+bool isSameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;

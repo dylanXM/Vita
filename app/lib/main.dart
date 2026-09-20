@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
 
 import 'core/bootstrap.dart';
@@ -54,6 +55,7 @@ class _VitaAppState extends State<VitaApp> {
       locale: Get.locale,
       fallbackLocale: const Locale('en'),
       supportedLocales: VitaSettingsController.supportedLocales,
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       translations: VitaTranslations(),
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
@@ -61,12 +63,36 @@ class _VitaAppState extends State<VitaApp> {
       transitionDuration: const Duration(milliseconds: 280),
       getPages: [
         GetPage(name: '/', page: () => const SplashPage()),
-        GetPage(name: '/login', page: () => const LoginPage(), transition: Transition.cupertino),
-        GetPage(name: '/register', page: () => const RegisterPage(), transition: Transition.cupertino),
-        GetPage(name: '/shell', page: () => const ShellPage(), transition: Transition.fadeIn),
-        GetPage(name: '/companion/create', page: () => const CompanionCreatePage(), transition: Transition.cupertino),
-        GetPage(name: '/subscription', page: () => const SubscriptionPage(), transition: Transition.cupertino),
-        GetPage(name: '/credits', page: () => const CreditsPage(), transition: Transition.cupertino),
+        GetPage(
+          name: '/login',
+          page: () => const LoginPage(),
+          transition: Transition.cupertino,
+        ),
+        GetPage(
+          name: '/register',
+          page: () => const RegisterPage(),
+          transition: Transition.cupertino,
+        ),
+        GetPage(
+          name: '/shell',
+          page: () => const ShellPage(),
+          transition: Transition.fadeIn,
+        ),
+        GetPage(
+          name: '/companion/create',
+          page: () => const CompanionCreatePage(),
+          transition: Transition.cupertino,
+        ),
+        GetPage(
+          name: '/subscription',
+          page: () => const SubscriptionPage(),
+          transition: Transition.cupertino,
+        ),
+        GetPage(
+          name: '/credits',
+          page: () => const CreditsPage(),
+          transition: Transition.cupertino,
+        ),
       ],
     );
   }
