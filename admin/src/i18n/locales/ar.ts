@@ -129,6 +129,7 @@ const ar = {
     conversations: "المحادثات",
     messages: "الرسائل",
     memories: "الذكريات",
+    grantCoins: "منح العملات", coinAmount: "عدد العملات", grantNote: "ملاحظة", confirmGrant: "تأكيد المنح", grantSubscription: "منح اشتراك", subscriptionPlan: "خطة الاشتراك", selectPlan: "اختر خطة", subscriptionEndsAt: "تاريخ الانتهاء", coins: "عملات", grantOperations: "سجل المنح", noGrantOperations: "لا توجد عمليات منح.", operationType: "العملية", grantDetails: "التفاصيل", operator: "المنفذ", operationTime: "وقت العملية", grantFailed: "فشل المنح", grantCoinsSuccess: "تم منح {{coins}} عملة", grantSubscriptionSuccess: "تم منح {{plan}} و{{coins}} عملة",
   },
 
   agent: {

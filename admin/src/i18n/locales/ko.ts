@@ -129,6 +129,7 @@ const ko = {
     conversations: "대화",
     messages: "메시지",
     memories: "메모리",
+    grantCoins: "코인 지급", coinAmount: "코인 수량", grantNote: "메모", confirmGrant: "지급 확인", grantSubscription: "구독 지급", subscriptionPlan: "구독 플랜", selectPlan: "플랜 선택", subscriptionEndsAt: "종료 일시", coins: "코인", grantOperations: "지급 작업 기록", noGrantOperations: "지급 기록이 없습니다.", operationType: "작업", grantDetails: "내용", operator: "작업자", operationTime: "작업 시간", grantFailed: "지급 실패", grantCoinsSuccess: "{{coins}} 코인을 지급했습니다", grantSubscriptionSuccess: "{{plan}} 및 {{coins}} 코인을 지급했습니다",
   },
 
   agent: {

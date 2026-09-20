@@ -8,6 +8,8 @@ import type {
   AdminUserInput,
   AdminUserList,
   AdminUserListParams,
+  AdminGrantOperation,
+  AdminGrantResult,
   HealthResponse,
   Profile,
   AgentConfig,
@@ -51,6 +53,12 @@ export const usersApi = {
   remove: (id: string) => http.del<{ message: string }>(`/admin/users/${id}`),
   ban: (id: string) => http.post<AdminUser>(`/admin/users/${id}/ban`),
   unban: (id: string) => http.post<AdminUser>(`/admin/users/${id}/unban`),
+  grantOperations: (id: string, signal?: AbortSignal) =>
+    http.get<BillingList<AdminGrantOperation>>(`/admin/users/${id}/grant-operations`, { signal }),
+  grantCoins: (id: string, body: { coins: number; note: string }) =>
+    http.post<AdminGrantResult>(`/admin/users/${id}/grant-coins`, body),
+  grantSubscription: (id: string, body: { plan_id: string; ends_at: string; note: string }) =>
+    http.post<AdminGrantResult>(`/admin/users/${id}/grant-subscription`, body),
 };
 
 /** Deployment environment of the API instance (admin-only). */

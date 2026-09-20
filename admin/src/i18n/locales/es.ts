@@ -129,6 +129,7 @@ const es = {
     conversations: "Conversaciones",
     messages: "Mensajes",
     memories: "Recuerdos",
+    grantCoins: "Conceder monedas", coinAmount: "Cantidad", grantNote: "Nota", confirmGrant: "Confirmar", grantSubscription: "Conceder suscripción", subscriptionPlan: "Plan", selectPlan: "Seleccionar plan", subscriptionEndsAt: "Fecha de fin", coins: "monedas", grantOperations: "Historial de concesiones", noGrantOperations: "No hay concesiones.", operationType: "Operación", grantDetails: "Detalles", operator: "Operador", operationTime: "Fecha de operación", grantFailed: "Error al conceder", grantCoinsSuccess: "Se concedieron {{coins}} monedas", grantSubscriptionSuccess: "Se concedieron {{plan}} y {{coins}} monedas",
   },
 
   agent: {

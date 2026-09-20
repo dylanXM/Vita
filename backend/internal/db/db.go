@@ -180,6 +180,25 @@ func migrate(db *sql.DB) error {
 			UNIQUE(provider, transaction_id)
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_billing_purchases_scope ON billing_purchases(environment, platform, purchased_at DESC)`,
+		`CREATE TABLE IF NOT EXISTS admin_grant_operations (
+			id TEXT PRIMARY KEY,
+			operator_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+			operator_email TEXT NOT NULL,
+			target_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			target_email TEXT NOT NULL,
+			operation_type TEXT NOT NULL CHECK (operation_type IN ('coins', 'subscription')),
+			coins INTEGER NOT NULL DEFAULT 0,
+			plan_id TEXT REFERENCES subscription_plans(id) ON DELETE SET NULL,
+			plan_name TEXT NOT NULL DEFAULT '',
+			subscription_id TEXT REFERENCES subscriptions(id) ON DELETE SET NULL,
+			expires_at TIMESTAMP,
+			note TEXT NOT NULL DEFAULT '',
+			platform TEXT NOT NULL DEFAULT 'system',
+			environment TEXT NOT NULL CHECK (environment IN ('dev', 'beta', 'prod')),
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_admin_grant_operations_target ON admin_grant_operations(target_user_id, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_admin_grant_operations_operator ON admin_grant_operations(operator_user_id, created_at DESC)`,
 		`CREATE TABLE IF NOT EXISTS companions (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL REFERENCES users(id),

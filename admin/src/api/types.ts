@@ -158,6 +158,33 @@ export interface BillingPagedList<T> extends BillingList<T> {
   total_pages: number;
 }
 
+export interface AdminGrantOperation {
+  id: string;
+  operator_user_id: string | null;
+  operator_email: string;
+  target_user_id: string;
+  target_email: string;
+  operation_type: "coins" | "subscription";
+  coins: number;
+  plan_id: string | null;
+  plan_name: string;
+  subscription_id: string | null;
+  expires_at: string | null;
+  note: string;
+  platform: BillingPlatform | "system";
+  environment: Environment;
+  created_at: string;
+}
+
+export interface AdminGrantResult {
+  id: string;
+  coins: number;
+  balance: number;
+  subscription_id?: string;
+  plan_name?: string;
+  expires_at?: string;
+}
+
 export type AIProviderKind = "openai" | "anthropic";
 
 export interface AIProvider {

@@ -186,6 +186,9 @@ func main() {
 				users.DELETE("/:id", handler.AdminDeleteUser)
 				users.POST("/:id/ban", func(c *gin.Context) { handler.AdminSetBanned(c, true) })
 				users.POST("/:id/unban", func(c *gin.Context) { handler.AdminSetBanned(c, false) })
+				users.GET("/:id/grant-operations", handler.AdminListGrantOperations)
+				users.POST("/:id/grant-coins", handler.AdminGrantCoins)
+				users.POST("/:id/grant-subscription", handler.AdminGrantSubscription)
 			}
 
 			agentAdmin := admin.Group("/agent")

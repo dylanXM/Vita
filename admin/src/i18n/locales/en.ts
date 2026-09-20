@@ -132,6 +132,12 @@ const en = {
     conversations: "Conversations",
     messages: "Messages",
     memories: "Memories",
+    grantCoins: "Grant coins", coinAmount: "Coin amount", grantNote: "Note", confirmGrant: "Confirm grant",
+    grantSubscription: "Grant subscription", subscriptionPlan: "Subscription plan", selectPlan: "Select a plan",
+    subscriptionEndsAt: "End date", coins: "coins", grantOperations: "Grant operations",
+    noGrantOperations: "No grant operations yet.", operationType: "Operation", grantDetails: "Details",
+    operator: "Operator", operationTime: "Operation time", grantFailed: "Grant failed",
+    grantCoinsSuccess: "Granted {{coins}} coins", grantSubscriptionSuccess: "Granted {{plan}} and {{coins}} coins",
   },
 
   agent: {

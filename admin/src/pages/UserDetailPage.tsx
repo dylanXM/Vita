@@ -6,6 +6,8 @@ import {
   ArrowLeft,
   Ban,
   Brain,
+  Coins,
+  CreditCard,
   Heart,
   MessagesSquare,
   MessageSquare,
@@ -18,7 +20,9 @@ import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,9 +34,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/sonner";
-import { usersApi } from "@/api/admin";
+import { subscriptionPlansApi, usersApi } from "@/api/admin";
 import { errorMessage } from "@/api/client";
-import type { AdminUser } from "@/api/types";
+import type { AdminGrantOperation, AdminUser, AdminUserDetail } from "@/api/types";
 import { formatDate } from "@/lib/format";
 import { EnvBadge, RoleBadge, StatusBadge, UserFormDialog } from "./UsersPage";
 
@@ -224,6 +228,8 @@ export function UserDetailPage() {
         </div>
       </div>
 
+      <UserGrants user={u} />
+
       <UserFormDialog
         open={editOpen}
         onOpenChange={setEditOpen}
@@ -271,4 +277,93 @@ export function UserDetailPage() {
       </AlertDialog>
     </div>
   );
+}
+
+function defaultGrantEnd(): string {
+  const date = new Date();
+  date.setMonth(date.getMonth() + 1);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function UserGrants({ user }: { user: AdminUserDetail }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [coins, setCoins] = useState(100);
+  const [coinNote, setCoinNote] = useState("");
+  const [planID, setPlanID] = useState("");
+  const [endsAt, setEndsAt] = useState(defaultGrantEnd);
+  const [subscriptionNote, setSubscriptionNote] = useState("");
+
+  const plans = useQuery({
+    queryKey: ["subscription-plans", user.environment, "grant"],
+    queryFn: ({ signal }) => subscriptionPlansApi.list({ environment: user.environment }, signal),
+  });
+  const operations = useQuery({
+    queryKey: ["admin-grant-operations", user.id],
+    queryFn: ({ signal }) => usersApi.grantOperations(user.id, signal),
+  });
+  const refreshOperations = () => {
+    void queryClient.invalidateQueries({ queryKey: ["admin-grant-operations", user.id] });
+    void queryClient.invalidateQueries({ queryKey: ["credit-ledger"] });
+  };
+  const grantCoins = useMutation({
+    mutationFn: () => usersApi.grantCoins(user.id, { coins, note: coinNote.trim() }),
+    onSuccess: (result) => {
+      toast.success(t("users.grantCoinsSuccess", { coins: result.coins }));
+      setCoinNote("");
+      refreshOperations();
+    },
+    onError: (err) => toast.error(errorMessage(err, t("users.grantFailed"))),
+  });
+  const grantSubscription = useMutation({
+    mutationFn: () => usersApi.grantSubscription(user.id, {
+      plan_id: planID,
+      ends_at: new Date(endsAt).toISOString(),
+      note: subscriptionNote.trim(),
+    }),
+    onSuccess: (result) => {
+      toast.success(t("users.grantSubscriptionSuccess", { plan: result.plan_name, coins: result.coins }));
+      setSubscriptionNote("");
+      refreshOperations();
+    },
+    onError: (err) => toast.error(errorMessage(err, t("users.grantFailed"))),
+  });
+  const enabledPlans = (plans.data?.items ?? []).filter((plan) => plan.enabled);
+  const minimumEnd = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Coins />{t("users.grantCoins")}</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <label className="space-y-2 text-sm"><span>{t("users.coinAmount")}</span><Input type="number" min={1} max={10_000_000} value={coins} onChange={(event) => setCoins(Number(event.target.value))} /></label>
+            <label className="space-y-2 text-sm"><span>{t("users.grantNote")}</span><Input maxLength={500} value={coinNote} onChange={(event) => setCoinNote(event.target.value)} /></label>
+            <Button disabled={coins < 1 || grantCoins.isPending} onClick={() => grantCoins.mutate()}><Coins />{t("users.confirmGrant")}</Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><CreditCard />{t("users.grantSubscription")}</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <label className="space-y-2 text-sm"><span>{t("users.subscriptionPlan")}</span><select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={planID} onChange={(event) => setPlanID(event.target.value)}><option value="">{t("users.selectPlan")}</option>{enabledPlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} · {plan.platform} · {plan.coins.toLocaleString()} {t("users.coins")}</option>)}</select></label>
+            <label className="space-y-2 text-sm"><span>{t("users.subscriptionEndsAt")}</span><Input type="datetime-local" min={minimumEnd} value={endsAt} onChange={(event) => setEndsAt(event.target.value)} /></label>
+            <label className="space-y-2 text-sm"><span>{t("users.grantNote")}</span><Input maxLength={500} value={subscriptionNote} onChange={(event) => setSubscriptionNote(event.target.value)} /></label>
+            <Button disabled={!planID || !endsAt || grantSubscription.isPending} onClick={() => grantSubscription.mutate()}><CreditCard />{t("users.confirmGrant")}</Button>
+          </CardContent>
+        </Card>
+      </div>
+      <Card>
+        <CardHeader><CardTitle>{t("users.grantOperations")}</CardTitle></CardHeader>
+        <CardContent>
+          {operations.isLoading ? <Skeleton className="h-28 w-full" /> : operations.data?.items.length ? <GrantOperationsTable rows={operations.data.items} /> : <p className="text-sm text-muted-foreground">{t("users.noGrantOperations")}</p>}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function GrantOperationsTable({ rows }: { rows: AdminGrantOperation[] }) {
+  const { t } = useTranslation();
+  return <Table><TableHeader><TableRow><TableHead>{t("users.operationType")}</TableHead><TableHead>{t("users.grantDetails")}</TableHead><TableHead>{t("users.subscriptionEndsAt")}</TableHead><TableHead>{t("users.operator")}</TableHead><TableHead>{t("users.grantNote")}</TableHead><TableHead>{t("users.operationTime")}</TableHead></TableRow></TableHeader><TableBody>{rows.map((row) => <TableRow key={row.id}><TableCell>{t(row.operation_type === "coins" ? "users.grantCoins" : "users.grantSubscription")}</TableCell><TableCell>{row.operation_type === "subscription" ? `${row.plan_name} · ${row.platform} · ${row.coins.toLocaleString()} ${t("users.coins")}` : `${row.coins.toLocaleString()} ${t("users.coins")}`}</TableCell><TableCell>{formatDate(row.expires_at)}</TableCell><TableCell>{row.operator_email}</TableCell><TableCell className="max-w-64 truncate" title={row.note}>{row.note || "—"}</TableCell><TableCell>{formatDate(row.created_at)}</TableCell></TableRow>)}</TableBody></Table>;
 }

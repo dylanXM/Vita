@@ -132,6 +132,12 @@ const zhHans = {
     conversations: "会话",
     messages: "消息",
     memories: "记忆",
+    grantCoins: "赠送金币", coinAmount: "金币数量", grantNote: "操作备注", confirmGrant: "确认赠予",
+    grantSubscription: "赠予订阅计划", subscriptionPlan: "订阅计划", selectPlan: "请选择订阅计划",
+    subscriptionEndsAt: "订阅结束时间", coins: "金币", grantOperations: "赠予操作记录",
+    noGrantOperations: "暂无赠予操作记录。", operationType: "操作类型", grantDetails: "赠予内容",
+    operator: "操作人", operationTime: "操作时间", grantFailed: "赠予失败",
+    grantCoinsSuccess: "已赠送 {{coins}} 金币", grantSubscriptionSuccess: "已赠予 {{plan}}，并发放 {{coins}} 金币",
   },
 
   agent: {

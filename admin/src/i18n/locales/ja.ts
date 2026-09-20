@@ -129,6 +129,7 @@ const ja = {
     conversations: "会話",
     messages: "メッセージ",
     memories: "メモリー",
+    grantCoins: "コイン付与", coinAmount: "コイン数", grantNote: "メモ", confirmGrant: "付与する", grantSubscription: "サブスクリプション付与", subscriptionPlan: "プラン", selectPlan: "プランを選択", subscriptionEndsAt: "終了日時", coins: "コイン", grantOperations: "付与履歴", noGrantOperations: "付与履歴はありません。", operationType: "操作", grantDetails: "内容", operator: "操作者", operationTime: "操作日時", grantFailed: "付与に失敗しました", grantCoinsSuccess: "{{coins}} コインを付与しました", grantSubscriptionSuccess: "{{plan}} と {{coins}} コインを付与しました",
   },
 
   agent: {

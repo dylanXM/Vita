@@ -129,6 +129,7 @@ const zhHant = {
     conversations: "對話",
     messages: "訊息",
     memories: "記憶",
+    grantCoins: "贈送金幣", coinAmount: "金幣數量", grantNote: "操作備註", confirmGrant: "確認贈予", grantSubscription: "贈予訂閱方案", subscriptionPlan: "訂閱方案", selectPlan: "選擇訂閱方案", subscriptionEndsAt: "訂閱結束時間", coins: "金幣", grantOperations: "贈予操作記錄", noGrantOperations: "暫無贈予操作記錄。", operationType: "操作類型", grantDetails: "贈予內容", operator: "操作人", operationTime: "操作時間", grantFailed: "贈予失敗", grantCoinsSuccess: "已贈送 {{coins}} 金幣", grantSubscriptionSuccess: "已贈予 {{plan}} 並發放 {{coins}} 金幣",
   },
 
   agent: {

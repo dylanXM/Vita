@@ -129,6 +129,7 @@ const pt = {
     conversations: "Conversas",
     messages: "Mensagens",
     memories: "Memórias",
+    grantCoins: "Conceder moedas", coinAmount: "Quantidade", grantNote: "Nota", confirmGrant: "Confirmar", grantSubscription: "Conceder assinatura", subscriptionPlan: "Plano", selectPlan: "Selecionar plano", subscriptionEndsAt: "Data final", coins: "moedas", grantOperations: "Histórico de concessões", noGrantOperations: "Nenhuma concessão.", operationType: "Operação", grantDetails: "Detalhes", operator: "Operador", operationTime: "Data da operação", grantFailed: "Falha na concessão", grantCoinsSuccess: "{{coins}} moedas concedidas", grantSubscriptionSuccess: "{{plan}} e {{coins}} moedas concedidos",
   },
 
   agent: {
