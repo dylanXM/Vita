@@ -56,7 +56,7 @@ class ExplorePage extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 90),
           children: [
-            VitaTabHeader(title: 'explore.title'.tr),
+            VitaTabHeader(title: 'explore.title'.tr, showDivider: false),
             const SizedBox(height: 10),
             VitaCard(
               radius: 0,

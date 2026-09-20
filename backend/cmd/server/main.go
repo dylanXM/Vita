@@ -122,7 +122,7 @@ func main() {
 
 	engine := gin.Default()
 	engine.Use(middleware.RequestID())
-	engine.Use(middleware.CORS(cfg.AllowedOrigins))
+	engine.Use(middleware.CORS(cfg.AllowedOrigins, cfg.Env == config.EnvDev))
 	engine.Use(middleware.AuthMiddleware(tokenManager, redisClient))
 
 	api := engine.Group("/v1")

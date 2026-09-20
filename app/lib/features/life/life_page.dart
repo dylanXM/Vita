@@ -84,6 +84,7 @@ class LifePage extends StatelessWidget {
             VitaTabHeader(
               title: 'life.title'.tr,
               subtitle: 'life.subtitle'.tr,
+              showDivider: false,
             ),
             Obx(() {
               if (ctrl.companions.isEmpty) return const SizedBox.shrink();

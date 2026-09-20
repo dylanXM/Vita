@@ -3,6 +3,7 @@ package middleware
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -20,7 +21,12 @@ func RequestID() gin.HandlerFunc {
 	}
 }
 
-func CORS(allowedOrigins []string) gin.HandlerFunc {
+// CORS builds a CORS middleware. Origins in allowedOrigins are always trusted.
+// When allowLocalhost is true (dev mode), any http://localhost or
+// http://127.0.0.1 origin on any port is also trusted, so Vite/webpack dev
+// servers on ephemeral ports work without hardcoding them. Production must
+// keep allowLocalhost=false and rely on an explicit allowlist.
+func CORS(allowedOrigins []string, allowLocalhost bool) gin.HandlerFunc {
 	allowed := make(map[string]struct{}, len(allowedOrigins))
 	for _, origin := range allowedOrigins {
 		if origin = strings.TrimSpace(origin); origin != "" {
@@ -30,7 +36,7 @@ func CORS(allowedOrigins []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
 		if origin != "" {
-			if _, ok := allowed[origin]; !ok {
+			if _, ok := allowed[origin]; !ok && !(allowLocalhost && isLocalhostOrigin(origin)) {
 				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "origin is not allowed"})
 				return
 			}
@@ -45,6 +51,17 @@ func CORS(allowedOrigins []string) gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+// isLocalhostOrigin reports whether origin is an http://localhost or
+// http://127.0.0.1 URL on any port. It is only consulted in dev mode.
+func isLocalhostOrigin(origin string) bool {
+	u, err := url.Parse(origin)
+	if err != nil || u.Scheme != "http" || u.Host == "" {
+		return false
+	}
+	host := u.Hostname()
+	return host == "localhost" || host == "127.0.0.1"
 }
 
 func AuthMiddleware(tokens *vitaauth.TokenManager, redisClient *redis.Client) gin.HandlerFunc {
