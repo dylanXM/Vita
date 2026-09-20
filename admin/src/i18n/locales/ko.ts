@@ -20,7 +20,7 @@ const ko = {
     dashboard: "대시보드",
     management: "관리",
     users: "사용자",
-    agent: "AI 컴패니언",
+    agent: "AI 컴패니언", invitationSettings: "초대 코드 설정",
     billing: "결제 관리", subscriptionPlans: "구독 플랜", coinPacks: "코인 팩", billingActivity: "구매 및 원장",
   },
 
@@ -132,6 +132,7 @@ const ko = {
     grantCoins: "코인 지급", coinAmount: "코인 수량", grantNote: "메모", confirmGrant: "지급 확인", grantSubscription: "구독 지급", subscriptionPlan: "구독 플랜", selectPlan: "플랜 선택", subscriptionEndsAt: "종료 일시", coins: "코인", grantOperations: "지급 작업 기록", noGrantOperations: "지급 기록이 없습니다.", operationType: "작업", grantDetails: "내용", operator: "작업자", operationTime: "작업 시간", grantFailed: "지급 실패", grantCoinsSuccess: "{{coins}} 코인을 지급했습니다", grantSubscriptionSuccess: "{{plan}} 및 {{coins}} 코인을 지급했습니다",
   },
 
+  invitation: { title: "초대 코드 설정", desc: "유료 구독 및 코인 구매의 추천 보상을 설정합니다.", invitedUsers: "초대 사용자", rewardedCoins: "누적 보상 코인", rate: "보상 비율", rateDesc: "초대 사용자의 유료 코인 증가분에 적용됩니다. 관리자 지급은 제외됩니다.", percent: "보상 비율(%)", example: "1,000코인 구매 시 초대자는 {{coins}}코인을 받습니다.", save: "저장", saved: "초대 설정을 저장했습니다" },
   agent: {
     title: "AI 컴패니언 에이전트", desc: "모델 공급자, 에이전트 라우팅, 생활 생성과 캐릭터를 설정합니다.",
     providers: "공급자", providersDesc: "OpenAI 호환 및 Anthropic. API 키는 쓰기 전용으로 암호화됩니다.", providerName: "이름", providerType: "유형", baseUrl: "기본 URL", apiKey: "API 키", keepSecret: "비워 두면 기존 키 유지", defaultEndpoint: "기본 엔드포인트", keyConfigured: "키 설정됨", keyMissing: "키 없음", noProviders: "설정된 공급자가 없습니다.", provider: "공급자",

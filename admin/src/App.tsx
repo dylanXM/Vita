@@ -10,6 +10,7 @@ import { NotFoundPage } from "@/pages/NotFoundPage";
 import { AgentPage } from "@/pages/AgentPage";
 import { CoinPacksPage, SubscriptionPlansPage } from "@/pages/BillingProductsPage";
 import { BillingActivityPage } from "@/pages/BillingActivityPage";
+import { InvitationSettingsPage } from "@/pages/InvitationSettingsPage";
 import { Button } from "@/components/ui/button";
 
 function RouteError() {
@@ -52,6 +53,7 @@ const router = createBrowserRouter([
       { path: "subscription-plans", element: <SubscriptionPlansPage /> },
       { path: "coin-packs", element: <CoinPacksPage /> },
       { path: "billing-activity", element: <BillingActivityPage /> },
+      { path: "invitation-settings", element: <InvitationSettingsPage /> },
     ],
   },
   { path: "*", element: <NotFoundPage /> },

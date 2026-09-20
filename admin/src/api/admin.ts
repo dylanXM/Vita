@@ -10,6 +10,7 @@ import type {
   AdminUserListParams,
   AdminGrantOperation,
   AdminGrantResult,
+  InvitationSettings,
   HealthResponse,
   Profile,
   AgentConfig,
@@ -104,6 +105,13 @@ export const purchasesApi = {
 export const creditLedgerApi = {
   list: (params: BillingFilters, signal?: AbortSignal) =>
     http.get<BillingPagedList<CreditLedgerEntry>>("/admin/credit-ledger", { params, signal }),
+};
+
+export const invitationApi = {
+  settings: (signal?: AbortSignal) =>
+    http.get<InvitationSettings>("/admin/invitation-settings", { signal }),
+  saveSettings: (rewardPercent: number) =>
+    http.put<InvitationSettings>("/admin/invitation-settings", { reward_percent: rewardPercent }),
 };
 
 export const agentApi = {

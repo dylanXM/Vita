@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -391,11 +392,12 @@ func AdminEnvironment(c *gin.Context) {
 // --- Current Account ---
 
 type ProfileResponse struct {
-	UserID    string    `json:"user_id"`
-	Email     string    `json:"email"`
-	Role      string    `json:"role"`
-	Timezone  string    `json:"timezone"`
-	CreatedAt time.Time `json:"created_at"`
+	UserID     string    `json:"user_id"`
+	Email      string    `json:"email"`
+	Role       string    `json:"role"`
+	Timezone   string    `json:"timezone"`
+	InviteCode string    `json:"invite_code"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // Me returns the account behind the bearer token. The dashboard uses it both to
@@ -409,8 +411,8 @@ func Me(c *gin.Context) {
 
 	var p ProfileResponse
 	err := db.Get().QueryRow(
-		`SELECT id, email, COALESCE(role_id, 'user'), COALESCE(timezone, 'UTC'), created_at FROM users WHERE id = $1`,
-		userID).Scan(&p.UserID, &p.Email, &p.Role, &p.Timezone, &p.CreatedAt)
+		`SELECT id, email, COALESCE(role_id, 'user'), COALESCE(timezone, 'UTC'), invite_code, created_at FROM users WHERE id = $1`,
+		userID).Scan(&p.UserID, &p.Email, &p.Role, &p.Timezone, &p.InviteCode, &p.CreatedAt)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "account not found"})
 		return
@@ -523,8 +525,9 @@ const registerCooldown = 60 * time.Second
 const pendingRegPrefix = "vita:reg:"
 
 type AppRegisterRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
+	Email      string `json:"email" binding:"required,email"`
+	Password   string `json:"password" binding:"required,min=6"`
+	InviteCode string `json:"invite_code"`
 }
 
 type AppRegisterVerifyRequest struct {
@@ -559,6 +562,19 @@ func AppRegister(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "email already registered"})
 		return
 	}
+	req.InviteCode = strings.ToUpper(strings.TrimSpace(req.InviteCode))
+	inviterID := ""
+	if req.InviteCode != "" {
+		err = db.Get().QueryRow(`SELECT id FROM users WHERE invite_code=$1 AND environment=$2`, req.InviteCode, currentEnvironment()).Scan(&inviterID)
+		if errors.Is(err, sql.ErrNoRows) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid invitation code"})
+			return
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to validate invitation code"})
+			return
+		}
+	}
 
 	hash, err := auth.HashPassword(req.Password)
 	if err != nil {
@@ -575,8 +591,9 @@ func AppRegister(c *gin.Context) {
 
 	code := generateCode()
 	codeJSON, _ := json.Marshal(map[string]string{
-		"email":   req.Email,
-		"purpose": "register",
+		"email":      req.Email,
+		"purpose":    "register",
+		"inviter_id": inviterID,
 	})
 	if err := rdb.Set(ctx, "vcode:"+code, string(codeJSON), codeTTL).Err(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send verification code"})
@@ -635,9 +652,18 @@ func AppRegisterVerify(c *gin.Context) {
 	}
 
 	userID := uuid.New().String()
+	var inviterID any
+	if codeData["inviter_id"] != "" {
+		var valid bool
+		if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE id=$1 AND environment=$2)`, codeData["inviter_id"], currentEnvironment()).Scan(&valid); err != nil || !valid {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invitation code is no longer valid"})
+			return
+		}
+		inviterID = codeData["inviter_id"]
+	}
 	if _, err := db.Get().Exec(
-		`INSERT INTO users (id, email, role_id, password_hash, environment) VALUES ($1, $2, 'user', $3, $4)`,
-		userID, req.Email, hash, currentEnvironment()); err != nil {
+		`INSERT INTO users (id, email, role_id, password_hash, environment,invited_by_user_id) VALUES ($1, $2, 'user', $3, $4,$5)`,
+		userID, req.Email, hash, currentEnvironment(), inviterID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 		return
 	}

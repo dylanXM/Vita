@@ -20,7 +20,7 @@ const zhHant = {
     dashboard: "儀表板",
     management: "管理",
     users: "使用者",
-    agent: "AI 伴侶",
+    agent: "AI 伴侶", invitationSettings: "邀請碼設定",
     billing: "計費管理", subscriptionPlans: "訂閱方案", coinPacks: "金幣包", billingActivity: "購買與流水",
   },
 
@@ -132,6 +132,7 @@ const zhHant = {
     grantCoins: "贈送金幣", coinAmount: "金幣數量", grantNote: "操作備註", confirmGrant: "確認贈予", grantSubscription: "贈予訂閱方案", subscriptionPlan: "訂閱方案", selectPlan: "選擇訂閱方案", subscriptionEndsAt: "訂閱結束時間", coins: "金幣", grantOperations: "贈予操作記錄", noGrantOperations: "暫無贈予操作記錄。", operationType: "操作類型", grantDetails: "贈予內容", operator: "操作人", operationTime: "操作時間", grantFailed: "贈予失敗", grantCoinsSuccess: "已贈送 {{coins}} 金幣", grantSubscriptionSuccess: "已贈予 {{plan}} 並發放 {{coins}} 金幣",
   },
 
+  invitation: { title: "邀請碼設定", desc: "設定付費訂閱與金幣儲值的邀請獎勵。", invitedUsers: "受邀使用者", rewardedCoins: "累計獎勵金幣", rate: "獎勵比例", rateDesc: "受邀使用者付費增加金幣時，邀請人按此比例獲得金幣；管理員贈予不計入。", percent: "獎勵比例（%）", example: "購買 1,000 金幣時，邀請人獲得 {{coins}} 金幣。", save: "儲存設定", saved: "邀請碼設定已儲存" },
   agent: {
     title: "AI 伴侶 Agent", desc: "設定模型服務、Agent 路由、生活事件生成和具體人物。",
     providers: "模型服務", providersDesc: "支援 OpenAI-compatible 與 Anthropic；金鑰只寫並加密儲存。", providerName: "名稱", providerType: "類型", baseUrl: "服務位址", apiKey: "API 金鑰", keepSecret: "留空則保留目前金鑰", defaultEndpoint: "預設服務位址", keyConfigured: "已設定金鑰", keyMissing: "未設定金鑰", noProviders: "尚未設定模型服務。", provider: "模型服務",

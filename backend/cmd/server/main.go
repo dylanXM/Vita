@@ -176,6 +176,8 @@ func main() {
 			admin.DELETE("/coin-packs/:id", handler.AdminDeleteCoinPack)
 			admin.GET("/purchases", handler.AdminListPurchases)
 			admin.GET("/credit-ledger", handler.AdminListCreditLedger)
+			admin.GET("/invitation-settings", handler.AdminGetInvitationSettings)
+			admin.PUT("/invitation-settings", handler.AdminUpdateInvitationSettings)
 
 			users := admin.Group("/users")
 			{

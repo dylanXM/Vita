@@ -20,7 +20,7 @@ const ja = {
     dashboard: "ダッシュボード",
     management: "管理",
     users: "ユーザー",
-    agent: "AIコンパニオン",
+    agent: "AIコンパニオン", invitationSettings: "招待コード設定",
     billing: "課金管理", subscriptionPlans: "サブスクリプションプラン", coinPacks: "コインパック", billingActivity: "購入と台帳",
   },
 
@@ -132,6 +132,7 @@ const ja = {
     grantCoins: "コイン付与", coinAmount: "コイン数", grantNote: "メモ", confirmGrant: "付与する", grantSubscription: "サブスクリプション付与", subscriptionPlan: "プラン", selectPlan: "プランを選択", subscriptionEndsAt: "終了日時", coins: "コイン", grantOperations: "付与履歴", noGrantOperations: "付与履歴はありません。", operationType: "操作", grantDetails: "内容", operator: "操作者", operationTime: "操作日時", grantFailed: "付与に失敗しました", grantCoinsSuccess: "{{coins}} コインを付与しました", grantSubscriptionSuccess: "{{plan}} と {{coins}} コインを付与しました",
   },
 
+  invitation: { title: "招待コード設定", desc: "有料サブスクリプションとコイン購入の紹介報酬を設定します。", invitedUsers: "招待ユーザー", rewardedCoins: "報酬コイン合計", rate: "報酬率", rateDesc: "招待されたユーザーの有料コイン増加に対する割合です。管理者付与は対象外です。", percent: "報酬率（%）", example: "1,000コイン購入時、招待者は{{coins}}コインを受け取ります。", save: "保存", saved: "招待設定を保存しました" },
   agent: {
     title: "AIコンパニオンエージェント", desc: "モデル、エージェントルーティング、生活生成、人物を設定します。",
     providers: "プロバイダー", providersDesc: "OpenAI互換とAnthropic。APIキーは書き込み専用で暗号化されます。", providerName: "名前", providerType: "種類", baseUrl: "ベースURL", apiKey: "APIキー", keepSecret: "空欄で現在のキーを保持", defaultEndpoint: "既定エンドポイント", keyConfigured: "キー設定済み", keyMissing: "キー未設定", noProviders: "プロバイダーがありません。", provider: "プロバイダー",

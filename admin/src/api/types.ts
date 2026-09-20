@@ -185,6 +185,13 @@ export interface AdminGrantResult {
   expires_at?: string;
 }
 
+export interface InvitationSettings {
+  reward_basis_points: number;
+  reward_percent: number;
+  invited_users: number;
+  rewarded_coins: number;
+}
+
 export type AIProviderKind = "openai" | "anthropic";
 
 export interface AIProvider {

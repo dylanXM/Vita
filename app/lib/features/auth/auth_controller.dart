@@ -17,12 +17,17 @@ class AuthController extends GetxController {
 
   /// Starts registration: the backend checks the email, stores the password
   /// and emails a 6-digit code (60s resend cooldown).
-  Future<void> register(String email, String password) async {
+  Future<void> register(
+      String email, String password, String inviteCode) async {
     loading.value = true;
     try {
       await ApiClient.instance.post(
         '/v1/auth/app/register',
-        data: {'email': email, 'password': password},
+        data: {
+          'email': email,
+          'password': password,
+          'invite_code': inviteCode.trim().toUpperCase(),
+        },
       );
     } finally {
       loading.value = false;

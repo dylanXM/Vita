@@ -20,7 +20,7 @@ const es = {
     dashboard: "Panel",
     management: "Gestión",
     users: "Usuarios",
-    agent: "Compañero IA",
+    agent: "Compañero IA", invitationSettings: "Configuración de invitaciones",
     billing: "Facturación", subscriptionPlans: "Planes de suscripción", coinPacks: "Paquetes de monedas", billingActivity: "Compras y movimientos",
   },
 
@@ -132,6 +132,7 @@ const es = {
     grantCoins: "Conceder monedas", coinAmount: "Cantidad", grantNote: "Nota", confirmGrant: "Confirmar", grantSubscription: "Conceder suscripción", subscriptionPlan: "Plan", selectPlan: "Seleccionar plan", subscriptionEndsAt: "Fecha de fin", coins: "monedas", grantOperations: "Historial de concesiones", noGrantOperations: "No hay concesiones.", operationType: "Operación", grantDetails: "Detalles", operator: "Operador", operationTime: "Fecha de operación", grantFailed: "Error al conceder", grantCoinsSuccess: "Se concedieron {{coins}} monedas", grantSubscriptionSuccess: "Se concedieron {{plan}} y {{coins}} monedas",
   },
 
+  invitation: { title: "Configuración de invitaciones", desc: "Configura recompensas por suscripciones y compras de monedas.", invitedUsers: "Usuarios invitados", rewardedCoins: "Monedas recompensadas", rate: "Proporción de recompensa", rateDesc: "Se aplica a aumentos de monedas pagados; se excluyen concesiones administrativas.", percent: "Porcentaje (%)", example: "Al comprar 1.000 monedas, el invitador recibe {{coins}}.", save: "Guardar", saved: "Configuración guardada" },
   agent: {
     title: "Agente de compañero IA", desc: "Configura proveedores, enrutamiento, generación de vida y personajes.",
     providers: "Proveedores", providersDesc: "OpenAI compatible y Anthropic. Las claves son de solo escritura y cifradas.", providerName: "Nombre", providerType: "Tipo", baseUrl: "URL base", apiKey: "Clave API", keepSecret: "Deja vacío para conservar la clave", defaultEndpoint: "Endpoint predeterminado", keyConfigured: "Clave configurada", keyMissing: "Falta la clave", noProviders: "No hay proveedores.", provider: "Proveedor",

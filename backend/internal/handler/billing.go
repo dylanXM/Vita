@@ -152,10 +152,10 @@ func ConsumeCredits(c *gin.Context) {
 // non-empty, an identical grant is skipped (webhook retry safety). Returns the
 // resulting balance.
 func grantCredits(userID string, amount int, kind, dedupeKey string) (int, error) {
-	return grantCreditsForPlatform(userID, amount, kind, dedupeKey, "system")
+	return grantCreditsForPlatform(userID, amount, kind, dedupeKey, "system", false)
 }
 
-func grantCreditsForPlatform(userID string, amount int, kind, dedupeKey, platform string) (int, error) {
+func grantCreditsForPlatform(userID string, amount int, kind, dedupeKey, platform string, rewardInviter bool) (int, error) {
 	if amount == 0 {
 		var bal int
 		err := db.Get().QueryRow(
@@ -185,9 +185,12 @@ func grantCreditsForPlatform(userID string, amount int, kind, dedupeKey, platfor
 	defer tx.Rollback()
 
 	var bal int
+	var environment string
+	var inviterID sql.NullString
 	if err := tx.QueryRow(
-		`UPDATE users SET credits_balance = credits_balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING credits_balance`,
-		amount, userID).Scan(&bal); err != nil {
+		`UPDATE users SET credits_balance = credits_balance + $1, updated_at = CURRENT_TIMESTAMP
+		 WHERE id = $2 RETURNING credits_balance,environment,invited_by_user_id`,
+		amount, userID).Scan(&bal, &environment, &inviterID); err != nil {
 		return 0, err
 	}
 
@@ -195,11 +198,43 @@ func grantCreditsForPlatform(userID string, amount int, kind, dedupeKey, platfor
 	if desc == "" {
 		desc = "credits granted"
 	}
+	sourceTransactionID := uuid.New().String()
 	if _, err := tx.Exec(
 		`INSERT INTO credit_transactions (id, user_id, amount, balance_after, kind, description, platform, environment)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		uuid.New().String(), userID, amount, bal, kind, desc, platform, currentEnvironment()); err != nil {
+		sourceTransactionID, userID, amount, bal, kind, desc, platform, environment); err != nil {
 		return 0, err
+	}
+	if rewardInviter && inviterID.Valid {
+		var basisPoints int
+		if err := tx.QueryRow(`SELECT reward_basis_points FROM invitation_settings WHERE environment=$1`, environment).Scan(&basisPoints); err != nil {
+			return 0, err
+		}
+		rewardCoins := amount * basisPoints / 10000
+		if rewardCoins > 0 {
+			var inviterBalance int
+			err := tx.QueryRow(`UPDATE users SET credits_balance=credits_balance+$1,updated_at=CURRENT_TIMESTAMP
+				WHERE id=$2 AND environment=$3 RETURNING credits_balance`, rewardCoins, inviterID.String, environment).Scan(&inviterBalance)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return 0, err
+			}
+			if err == nil {
+				rewardTransactionID := uuid.New().String()
+				if _, err := tx.Exec(`INSERT INTO credit_transactions
+					(id,user_id,amount,balance_after,kind,description,platform,environment)
+					VALUES($1,$2,$3,$4,'invitation_reward',$5,$6,$7)`, rewardTransactionID,
+					inviterID.String, rewardCoins, inviterBalance, "invitation reward:"+sourceTransactionID, platform, environment); err != nil {
+					return 0, err
+				}
+				if _, err := tx.Exec(`INSERT INTO invitation_rewards
+					(id,inviter_user_id,invited_user_id,source_transaction_id,reward_transaction_id,
+					 source_coins,reward_coins,reward_basis_points)
+					VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, uuid.New().String(), inviterID.String, userID,
+					sourceTransactionID, rewardTransactionID, amount, rewardCoins, basisPoints); err != nil {
+					return 0, err
+				}
+			}
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return 0, err
@@ -399,7 +434,7 @@ func processRevenueCatEvent(ev *revenueCatEvent) {
 		}
 		if amount > 0 {
 			dedupe := fmt.Sprintf("rc-purchase:%s:%d", ev.OriginalTransactionID, ev.PurchasedAtMS)
-			if _, err := grantCreditsForPlatform(userID, amount, "purchase", dedupe, platform); err != nil {
+			if _, err := grantCreditsForPlatform(userID, amount, "purchase", dedupe, platform, true); err != nil {
 				fmt.Printf("revenuecat: failed to grant credits for %s: %v\n", userID, err)
 			}
 			recordPurchase(userID, purchaseRef, "coin_pack", "revenuecat", platform, ev.ProductID, nil, "", amount, "paid", purchasedAt)
@@ -428,7 +463,7 @@ func processRevenueCatEvent(ev *revenueCatEvent) {
 		}
 		if credits > 0 && ev.PeriodType != "TRIAL" {
 			dedupe := fmt.Sprintf("rc-subscription:%s:%d", ref, ev.PurchasedAtMS)
-			if _, err := grantCreditsForPlatform(userID, credits, "grant", dedupe, platform); err != nil {
+			if _, err := grantCreditsForPlatform(userID, credits, "grant", dedupe, platform, true); err != nil {
 				fmt.Printf("revenuecat: failed to grant monthly credits for %s: %v\n", userID, err)
 			}
 		}
@@ -725,7 +760,7 @@ func processStripeSessionCompleted(obj json.RawMessage) {
 		credits = billingCfg.SubscriptionCreditsMonthly
 	}
 	dedupe := "stripe-subscription:" + stripeSub.ID + ":initial"
-	if _, err := grantCreditsForPlatform(userID, credits, "grant", dedupe, "web"); err != nil {
+	if _, err := grantCreditsForPlatform(userID, credits, "grant", dedupe, "web", true); err != nil {
 		fmt.Printf("stripe: failed to grant credits: %v\n", err)
 	}
 	recordPurchase(userID, session.ID, "subscription", "stripe", "web", productID,
@@ -818,7 +853,7 @@ func processStripeInvoicePaid(obj json.RawMessage) {
 	if !configured {
 		credits = billingCfg.SubscriptionCreditsMonthly
 	}
-	if _, err := grantCreditsForPlatform(userIDResolved, credits, "grant", dedupe, "web"); err != nil {
+	if _, err := grantCreditsForPlatform(userIDResolved, credits, "grant", dedupe, "web", true); err != nil {
 		fmt.Printf("stripe: failed to grant renewal credits: %v\n", err)
 	}
 	recordPurchase(userIDResolved, inv.ID, "subscription", "stripe", "web", productID,

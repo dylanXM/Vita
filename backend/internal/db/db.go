@@ -77,6 +77,13 @@ func migrate(db *sql.DB) error {
 		// prod share one database, so the flag lives on the row, not per-server.
 		// Existing rows predate the flag — they are live production accounts.
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS environment TEXT NOT NULL DEFAULT 'prod'`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_code TEXT`,
+		`UPDATE users SET invite_code=UPPER(SUBSTRING(MD5(id || email) FROM 1 FOR 10)) WHERE invite_code IS NULL OR invite_code=''`,
+		`ALTER TABLE users ALTER COLUMN invite_code SET DEFAULT UPPER(SUBSTRING(MD5(RANDOM()::TEXT || CLOCK_TIMESTAMP()::TEXT) FROM 1 FOR 10))`,
+		`ALTER TABLE users ALTER COLUMN invite_code SET NOT NULL`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_invite_code ON users(invite_code)`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS invited_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_users_invited_by ON users(invited_by_user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_environment ON users(environment)`,
 		`CREATE INDEX IF NOT EXISTS idx_verification_codes_expires ON verification_codes(expires_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
@@ -100,6 +107,25 @@ func migrate(db *sql.DB) error {
 		`ALTER TABLE credit_transactions ALTER COLUMN environment SET DEFAULT 'prod'`,
 		`ALTER TABLE credit_transactions ALTER COLUMN environment SET NOT NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_credit_transactions_scope ON credit_transactions(environment, platform, created_at DESC)`,
+		`CREATE TABLE IF NOT EXISTS invitation_settings (
+			environment TEXT PRIMARY KEY CHECK (environment IN ('dev', 'beta', 'prod')),
+			reward_basis_points INTEGER NOT NULL DEFAULT 1000 CHECK (reward_basis_points >= 0 AND reward_basis_points <= 10000),
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`INSERT INTO invitation_settings(environment) VALUES('dev'),('beta'),('prod') ON CONFLICT(environment) DO NOTHING`,
+		`CREATE TABLE IF NOT EXISTS invitation_rewards (
+			id TEXT PRIMARY KEY,
+			inviter_user_id TEXT NOT NULL REFERENCES users(id),
+			invited_user_id TEXT NOT NULL REFERENCES users(id),
+			source_transaction_id TEXT NOT NULL REFERENCES credit_transactions(id),
+			reward_transaction_id TEXT NOT NULL REFERENCES credit_transactions(id),
+			source_coins INTEGER NOT NULL,
+			reward_coins INTEGER NOT NULL,
+			reward_basis_points INTEGER NOT NULL,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(source_transaction_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_invitation_rewards_inviter ON invitation_rewards(inviter_user_id,created_at DESC)`,
 		`CREATE TABLE IF NOT EXISTS subscriptions (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL REFERENCES users(id),

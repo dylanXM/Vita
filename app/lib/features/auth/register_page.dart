@@ -20,6 +20,7 @@ class RegisterPage extends StatefulWidget {
 class _RegisterPageState extends State<RegisterPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _inviteCode = TextEditingController();
   final _code = TextEditingController();
   Timer? _timer;
   int _countdown = 0;
@@ -31,6 +32,7 @@ class _RegisterPageState extends State<RegisterPage> {
     _timer?.cancel();
     _email.dispose();
     _password.dispose();
+    _inviteCode.dispose();
     _code.dispose();
     super.dispose();
   }
@@ -56,10 +58,15 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> _sendCode() async {
     if (!_emailValid || !_passwordValid) return;
     try {
-      await AuthController.to.register(_email.text.trim(), _password.text);
+      await AuthController.to.register(
+        _email.text.trim(),
+        _password.text,
+        _inviteCode.text,
+      );
       setState(() => _step = 2);
       _startCountdown();
-      Get.snackbar('Check your inbox', 'We sent a verification code to ${_email.text.trim()}');
+      Get.snackbar('Check your inbox',
+          'We sent a verification code to ${_email.text.trim()}');
     } catch (e) {
       Get.snackbar('Failed to send code', '$e');
     }
@@ -68,9 +75,14 @@ class _RegisterPageState extends State<RegisterPage> {
   /// Step 2: resend (re-issues the code, 60s server cooldown).
   Future<void> _resendCode() async {
     try {
-      await AuthController.to.register(_email.text.trim(), _password.text);
+      await AuthController.to.register(
+        _email.text.trim(),
+        _password.text,
+        _inviteCode.text,
+      );
       _startCountdown();
-      Get.snackbar('Check your inbox', 'We sent a verification code to ${_email.text.trim()}');
+      Get.snackbar('Check your inbox',
+          'We sent a verification code to ${_email.text.trim()}');
     } catch (e) {
       Get.snackbar('Failed to send code', '$e');
     }
@@ -80,7 +92,8 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> _verify() async {
     if (_code.text.length != 6) return;
     try {
-      await AuthController.to.verifyRegistration(_email.text.trim(), _code.text.trim());
+      await AuthController.to
+          .verifyRegistration(_email.text.trim(), _code.text.trim());
       Get.offAllNamed('/shell');
     } catch (e) {
       Get.snackbar('Verification failed', '$e');
@@ -109,7 +122,8 @@ class _RegisterPageState extends State<RegisterPage> {
               Row(
                 children: [
                   IconButton(
-                    icon: Icon(Icons.arrow_back_ios_new, size: 20, color: context.vita.text),
+                    icon: Icon(Icons.arrow_back_ios_new,
+                        size: 20, color: context.vita.text),
                     onPressed: _back,
                   ),
                 ],
@@ -119,7 +133,10 @@ class _RegisterPageState extends State<RegisterPage> {
                 Text(
                   'Create account',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: context.vita.text),
+                  style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      color: context.vita.text),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -145,25 +162,42 @@ class _RegisterPageState extends State<RegisterPage> {
                     hintText: 'Password (at least 6 characters)',
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        _obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
                         color: context.vita.subText,
                         size: 20,
                       ),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _inviteCode,
+                  autocorrect: false,
+                  textCapitalization: TextCapitalization.characters,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _sendCode(),
+                  decoration: InputDecoration(
+                    hintText: 'auth.inviteCodeOptional'.tr,
                   ),
                 ),
                 const SizedBox(height: 28),
                 Obx(
                   () => ElevatedButton(
-                    onPressed: (AuthController.to.loading.value || !_emailValid || !_passwordValid)
+                    onPressed: (AuthController.to.loading.value ||
+                            !_emailValid ||
+                            !_passwordValid)
                         ? null
                         : _sendCode,
                     child: AuthController.to.loading.value
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
                           )
                         : const Text('Get verification code'),
                   ),
@@ -174,13 +208,17 @@ class _RegisterPageState extends State<RegisterPage> {
                   children: [
                     Text(
                       'Already have an account? ',
-                      style: TextStyle(fontSize: 13.5, color: context.vita.subText),
+                      style: TextStyle(
+                          fontSize: 13.5, color: context.vita.subText),
                     ),
                     TextButton(
                       onPressed: () => Get.back(),
                       child: Text(
                         'Login',
-                        style: TextStyle(color: context.vita.green, fontSize: 13.5, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                            color: context.vita.green,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600),
                       ),
                     ),
                   ],
@@ -190,7 +228,10 @@ class _RegisterPageState extends State<RegisterPage> {
                 Text(
                   'Verify your email',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: context.vita.text),
+                  style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      color: context.vita.text),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -231,13 +272,20 @@ class _RegisterPageState extends State<RegisterPage> {
                 const SizedBox(height: 16),
                 Center(
                   child: TextButton(
-                    onPressed: (_countdown > 0 || AuthController.to.loading.value) ? null : _resendCode,
+                    onPressed:
+                        (_countdown > 0 || AuthController.to.loading.value)
+                            ? null
+                            : _resendCode,
                     child: Text(
-                      _countdown > 0 ? 'Resend in $_countdown s' : 'Resend code',
+                      _countdown > 0
+                          ? 'Resend in $_countdown s'
+                          : 'Resend code',
                       style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w600,
-                        color: _countdown > 0 ? context.vita.hint : context.vita.green,
+                        color: _countdown > 0
+                            ? context.vita.hint
+                            : context.vita.green,
                       ),
                     ),
                   ),
@@ -245,12 +293,16 @@ class _RegisterPageState extends State<RegisterPage> {
                 const SizedBox(height: 28),
                 Obx(
                   () => ElevatedButton(
-                    onPressed: (AuthController.to.loading.value || _code.text.length != 6) ? null : _verify,
+                    onPressed: (AuthController.to.loading.value ||
+                            _code.text.length != 6)
+                        ? null
+                        : _verify,
                     child: AuthController.to.loading.value
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
                           )
                         : const Text('Verify and sign in'),
                   ),

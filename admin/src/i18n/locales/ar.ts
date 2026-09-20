@@ -20,7 +20,7 @@ const ar = {
     dashboard: "لوحة التحكم",
     management: "الإدارة",
     users: "المستخدمون",
-    agent: "رفيق الذكاء الاصطناعي",
+    agent: "رفيق الذكاء الاصطناعي", invitationSettings: "إعدادات رمز الدعوة",
     billing: "إدارة الفوترة", subscriptionPlans: "خطط الاشتراك", coinPacks: "حزم العملات", billingActivity: "المشتريات والسجل",
   },
 
@@ -132,6 +132,7 @@ const ar = {
     grantCoins: "منح العملات", coinAmount: "عدد العملات", grantNote: "ملاحظة", confirmGrant: "تأكيد المنح", grantSubscription: "منح اشتراك", subscriptionPlan: "خطة الاشتراك", selectPlan: "اختر خطة", subscriptionEndsAt: "تاريخ الانتهاء", coins: "عملات", grantOperations: "سجل المنح", noGrantOperations: "لا توجد عمليات منح.", operationType: "العملية", grantDetails: "التفاصيل", operator: "المنفذ", operationTime: "وقت العملية", grantFailed: "فشل المنح", grantCoinsSuccess: "تم منح {{coins}} عملة", grantSubscriptionSuccess: "تم منح {{plan}} و{{coins}} عملة",
   },
 
+  invitation: { title: "إعدادات رمز الدعوة", desc: "إعداد مكافآت الاشتراكات وشراء العملات المدفوعة.", invitedUsers: "المستخدمون المدعوون", rewardedCoins: "عملات المكافآت", rate: "نسبة المكافأة", rateDesc: "تطبق على زيادات العملات المدفوعة وتستثني منح المشرف.", percent: "النسبة (%)", example: "عند شراء 1,000 عملة يحصل الداعي على {{coins}}.", save: "حفظ", saved: "تم حفظ الإعدادات" },
   agent: {
     title: "وكيل رفيق الذكاء الاصطناعي", desc: "إعداد مزودي النماذج والتوجيه وتوليد الحياة والشخصيات.",
     providers: "المزودون", providersDesc: "يدعم OpenAI المتوافق وAnthropic. المفاتيح للكتابة فقط ومشفرة.", providerName: "الاسم", providerType: "النوع", baseUrl: "الرابط الأساسي", apiKey: "مفتاح API", keepSecret: "اتركه فارغاً للاحتفاظ بالمفتاح الحالي", defaultEndpoint: "النقطة الافتراضية", keyConfigured: "المفتاح مضبوط", keyMissing: "المفتاح مفقود", noProviders: "لا يوجد مزودون.", provider: "المزود",

@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/constants.dart';
 import '../auth/auth_controller.dart';
 import '../billing/billing_controller.dart';
 import '../billing/credits_page.dart';
@@ -13,6 +17,29 @@ import '../../shared/widgets.dart';
 class MePage extends StatelessWidget {
   const MePage({super.key});
 
+  Future<void> _rateApp() async {
+    final url = defaultTargetPlatform == TargetPlatform.iOS
+        ? appStoreUrl
+        : playStoreUrl;
+    if (url.isEmpty ||
+        !await launchUrl(Uri.parse(url),
+            mode: LaunchMode.externalApplication)) {
+      Get.snackbar('me.rate'.tr, 'me.storeUnavailable'.tr);
+    }
+  }
+
+  Future<void> _contactUs() async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: supportEmail,
+      queryParameters: {'subject': 'Vita App Support'},
+    );
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      Get.snackbar('me.contact'.tr,
+          'me.emailUnavailable'.trParams({'email': supportEmail}));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = AuthController.to;
@@ -21,6 +48,7 @@ class MePage extends StatelessWidget {
     final plan = billing.isSubscribed
         ? 'Vita ${billing.entitlements.join(' + ').toUpperCase()}'
         : 'me.free'.tr;
+    final inviteCode = auth.profile.value?['invite_code'] as String? ?? '';
 
     return Scaffold(
       backgroundColor: vita.pageBg,
@@ -105,9 +133,8 @@ class MePage extends StatelessWidget {
                       title: 'me.plus.title'.tr,
                       subtitle: billing.isSubscribed
                           ? 'me.plus.active'.trParams({
-                              'ent': billing.entitlements
-                                  .join(', ')
-                                  .toUpperCase(),
+                              'ent':
+                                  billing.entitlements.join(', ').toUpperCase(),
                             })
                           : 'me.plus.unlock'.tr,
                       borderRadius: BorderRadius.zero,
@@ -139,15 +166,49 @@ class MePage extends StatelessWidget {
               VitaCard(
                 radius: 0,
                 padding: const EdgeInsets.symmetric(vertical: 4),
-                child: VitaListTile(
-                  icon: Icons.settings_outlined,
-                  title: 'me.settings'.tr,
-                  borderRadius: BorderRadius.zero,
-                  onTap: () => Get.to(
-                    () => const SettingsPage(),
-                    transition: Transition.cupertino,
-                    duration: const Duration(milliseconds: 300),
-                  ),
+                child: Column(
+                  children: [
+                    VitaListTile(
+                      icon: Icons.card_giftcard_outlined,
+                      title: 'me.inviteCode'.tr,
+                      subtitle: inviteCode.isEmpty ? '—' : inviteCode,
+                      borderRadius: BorderRadius.zero,
+                      onTap: inviteCode.isEmpty
+                          ? null
+                          : () async {
+                              await Clipboard.setData(
+                                  ClipboardData(text: inviteCode));
+                              Get.snackbar(
+                                  'me.inviteCode'.tr, 'me.inviteCopied'.tr);
+                            },
+                    ),
+                    const Divider(indent: 52, height: 0.5),
+                    VitaListTile(
+                      icon: Icons.star_outline,
+                      title: 'me.rate'.tr,
+                      borderRadius: BorderRadius.zero,
+                      onTap: _rateApp,
+                    ),
+                    const Divider(indent: 52, height: 0.5),
+                    VitaListTile(
+                      icon: Icons.mail_outline,
+                      title: 'me.contact'.tr,
+                      subtitle: supportEmail,
+                      borderRadius: BorderRadius.zero,
+                      onTap: _contactUs,
+                    ),
+                    const Divider(indent: 52, height: 0.5),
+                    VitaListTile(
+                      icon: Icons.settings_outlined,
+                      title: 'me.settings'.tr,
+                      borderRadius: BorderRadius.zero,
+                      onTap: () => Get.to(
+                        () => const SettingsPage(),
+                        transition: Transition.cupertino,
+                        duration: const Duration(milliseconds: 300),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 

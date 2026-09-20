@@ -21,6 +21,7 @@ const zhHans = {
     management: "管理",
     users: "用户",
     agent: "AI 伴侣",
+    invitationSettings: "邀请码配置",
     billing: "计费管理",
     subscriptionPlans: "订阅计划",
     coinPacks: "金币包",
@@ -139,6 +140,8 @@ const zhHans = {
     operator: "操作人", operationTime: "操作时间", grantFailed: "赠予失败",
     grantCoinsSuccess: "已赠送 {{coins}} 金币", grantSubscriptionSuccess: "已赠予 {{plan}}，并发放 {{coins}} 金币",
   },
+
+  invitation: { title: "邀请码配置", desc: "配置付费订阅和金币充值产生的邀请人奖励。", invitedUsers: "受邀用户数", rewardedCoins: "累计奖励金币", rate: "奖励比例", rateDesc: "受邀用户每次通过订阅或充值增加金币时，邀请人按此比例获得金币；管理员赠予不参与奖励。", percent: "奖励比例（%）", example: "受邀用户购买 1,000 金币时，邀请人获得 {{coins}} 金币。", save: "保存配置", saved: "邀请码配置已保存" },
 
   agent: {
     title: "AI 伴侣 Agent",

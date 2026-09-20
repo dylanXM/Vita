@@ -20,7 +20,7 @@ const pt = {
     dashboard: "Painel",
     management: "Gerenciamento",
     users: "Usuários",
-    agent: "Companheiro IA",
+    agent: "Companheiro IA", invitationSettings: "Configuração de convites",
     billing: "Faturação", subscriptionPlans: "Planos de assinatura", coinPacks: "Pacotes de moedas", billingActivity: "Compras e extrato",
   },
 
@@ -132,6 +132,7 @@ const pt = {
     grantCoins: "Conceder moedas", coinAmount: "Quantidade", grantNote: "Nota", confirmGrant: "Confirmar", grantSubscription: "Conceder assinatura", subscriptionPlan: "Plano", selectPlan: "Selecionar plano", subscriptionEndsAt: "Data final", coins: "moedas", grantOperations: "Histórico de concessões", noGrantOperations: "Nenhuma concessão.", operationType: "Operação", grantDetails: "Detalhes", operator: "Operador", operationTime: "Data da operação", grantFailed: "Falha na concessão", grantCoinsSuccess: "{{coins}} moedas concedidas", grantSubscriptionSuccess: "{{plan}} e {{coins}} moedas concedidos",
   },
 
+  invitation: { title: "Configuração de convites", desc: "Configure recompensas por assinaturas e compras de moedas.", invitedUsers: "Usuários convidados", rewardedCoins: "Moedas recompensadas", rate: "Proporção da recompensa", rateDesc: "Aplica-se aos aumentos pagos de moedas; concessões administrativas são excluídas.", percent: "Percentual (%)", example: "Em 1.000 moedas compradas, o convidador recebe {{coins}}.", save: "Salvar", saved: "Configuração salva" },
   agent: {
     title: "Agente de companheiro IA", desc: "Configure provedores, roteamento, geração de vida e personagens.",
     providers: "Provedores", providersDesc: "OpenAI compatível e Anthropic. As chaves são somente gravação e criptografadas.", providerName: "Nome", providerType: "Tipo", baseUrl: "URL base", apiKey: "Chave de API", keepSecret: "Deixe vazio para manter a chave atual", defaultEndpoint: "Endpoint padrão", keyConfigured: "Chave configurada", keyMissing: "Chave ausente", noProviders: "Nenhum provedor configurado.", provider: "Provedor",

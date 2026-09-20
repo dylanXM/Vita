@@ -21,6 +21,7 @@ const en = {
     management: "Management",
     users: "Users",
     agent: "AI companion",
+    invitationSettings: "Invitation settings",
     billing: "Billing",
     subscriptionPlans: "Subscription plans",
     coinPacks: "Coin packs",
@@ -139,6 +140,8 @@ const en = {
     operator: "Operator", operationTime: "Operation time", grantFailed: "Grant failed",
     grantCoinsSuccess: "Granted {{coins}} coins", grantSubscriptionSuccess: "Granted {{plan}} and {{coins}} coins",
   },
+
+  invitation: { title: "Invitation settings", desc: "Configure inviter rewards for paid subscription and coin purchases.", invitedUsers: "Invited users", rewardedCoins: "Rewarded coins", rate: "Reward ratio", rateDesc: "The inviter receives this percentage of every paid coin increase. Admin grants are excluded.", percent: "Reward percentage (%)", example: "For 1,000 purchased coins, the inviter receives {{coins}} coins.", save: "Save settings", saved: "Invitation settings saved" },
 
   agent: {
     title: "AI companion agent",
