@@ -558,13 +558,19 @@ func recordPurchase(userID, transactionID, kind, provider, platform, productID s
 	}
 }
 
-// creditsFromProductID maps product ids such as "credits_500" / "coins_1000" to
+// creditsFromProductID maps product ids such as "credits_500", "coins_1000" or
+// the Vita store catalog form "vita.coins.1200" to
 // their credit amount. Returns 0 when the product is not a credit pack.
 func creditsFromProductID(productID string) int {
 	if productID == "" {
 		return 0
 	}
 	lower := strings.ToLower(productID)
+	if strings.HasPrefix(lower, "vita.coins.") {
+		if n, err := strconv.Atoi(strings.TrimPrefix(lower, "vita.coins.")); err == nil && n > 0 {
+			return n
+		}
+	}
 	for _, prefix := range []string{"credits_", "coins_"} {
 		if strings.HasPrefix(lower, prefix) {
 			if n, err := strconv.Atoi(strings.TrimPrefix(lower, prefix)); err == nil && n > 0 {

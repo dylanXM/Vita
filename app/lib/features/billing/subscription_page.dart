@@ -5,6 +5,7 @@ import 'package:purchases_flutter/purchases_flutter.dart';
 import '../../core/constants.dart';
 import '../../core/theme.dart';
 import 'billing_controller.dart';
+import 'billing_products.dart';
 
 /// Subscription page — Plus / Premium plan cards (RevenueCat) plus a restore
 /// path. Value is expressed in product terms, not tokens (per the monetisation
@@ -23,6 +24,11 @@ class SubscriptionPage extends StatelessWidget {
   }
 
   Widget _buildBody(BuildContext context, BillingController ctrl) {
+    final plans = ctrl.offerings.value?.current?.availablePackages
+            .where((package) => isSubscriptionProduct(
+                package.identifier, package.storeProduct.identifier))
+            .toList() ??
+        const <Package>[];
     return ListView(
       padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
       children: [
@@ -77,11 +83,10 @@ class SubscriptionPage extends StatelessWidget {
         // Plans from RevenueCat.
         if (!ctrl.rcReady.value)
           const _NotConfiguredCard()
-        else if (ctrl.offerings.value == null ||
-            (ctrl.offerings.value!.current?.availablePackages.isEmpty ?? true))
+        else if (plans.isEmpty)
           const _NoOfferingsCard()
         else
-          ...ctrl.offerings.value!.current!.availablePackages.map(
+          ...plans.map(
             (p) => _PlanCard(
               package: p,
               onSubscribe: () => ctrl.purchasePackage(p),
@@ -183,7 +188,8 @@ class _PlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = package.storeProduct;
-    final isPremium = package.identifier.toLowerCase().contains('premium');
+    final isPremium =
+        isPremiumProduct(package.identifier, package.storeProduct.identifier);
     final title = store.title.isNotEmpty ? store.title : package.identifier;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,

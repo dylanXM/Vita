@@ -5,6 +5,7 @@ import 'package:purchases_flutter/purchases_flutter.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import 'billing_controller.dart';
+import 'billing_products.dart';
 
 /// Credits page — gradient balance card, credit packs and the transaction
 /// history synced from the server via the RevenueCat webhook.
@@ -97,8 +98,8 @@ class CreditsPage extends StatelessWidget {
     );
   }
 
-  /// Credit packs are RevenueCat packages whose identifier starts with
-  /// credits_ / coins_ (they map to the server-side grant on purchase).
+  /// Credit packs accept both the Vita store product IDs and legacy
+  /// RevenueCat package identifiers.
   List<Package> _creditPacks(BillingController ctrl) {
     final o = ctrl.offerings.value;
     if (o == null) return const [];
@@ -106,8 +107,7 @@ class CreditsPage extends StatelessWidget {
     void collect(Offering? offering) {
       if (offering == null) return;
       for (final p in offering.availablePackages) {
-        final id = p.identifier.toLowerCase();
-        if (id.startsWith('credits_') || id.startsWith('coins_')) {
+        if (isCoinProduct(p.identifier, p.storeProduct.identifier)) {
           packs.add(p);
         }
       }

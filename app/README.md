@@ -36,9 +36,14 @@ Platform setup for Google sign-in:
 ## Subscriptions & credits (RevenueCat)
 
 1. Create the products in RevenueCat / App Store Connect / Play Console:
-   - Subscriptions with entitlements `plus` and `premium`.
-   - Consumables named `credits_500`, `credits_1000`, `credits_5000`, ... The
-     backend maps `credits_<N>` / `coins_<N>` to a credit grant.
+   - `vita.plus.monthly` — US$9.99/month, entitlement `plus`.
+   - `vita.plus.yearly` — US$79.99/year, entitlement `plus`.
+   - `vita.premium.monthly` — US$19.99/month, entitlement `premium`.
+   - `vita.premium.yearly` — US$159.99/year, entitlement `premium`.
+   - Consumables `vita.coins.100` (US$1.99), `vita.coins.500` (US$7.99), and
+     `vita.coins.1200` (US$14.99).
+   Use the same product IDs for the iOS and Android RevenueCat products. Store
+   prices remain authoritative and may be localized by Apple or Google.
 2. Point the RevenueCat webhook at `POST {API}/v1/webhooks/revenuecat` with the
    shared secret in the `Authorization: Bearer ...` header
    (`VITA_REVENUECAT_WEBHOOK_SECRET` on the backend).

@@ -33,3 +33,18 @@ func TestPlatformFromRevenueCatStore(t *testing.T) {
 		}
 	}
 }
+
+func TestCreditsFromProductIDSupportsVitaCatalog(t *testing.T) {
+	tests := map[string]int{
+		"vita.coins.100":    100,
+		"vita.coins.500":    500,
+		"vita.coins.1200":   1200,
+		"coins_500":         500,
+		"vita.plus.monthly": 0,
+	}
+	for productID, want := range tests {
+		if got := creditsFromProductID(productID); got != want {
+			t.Errorf("creditsFromProductID(%q) = %d; want %d", productID, got, want)
+		}
+	}
+}
