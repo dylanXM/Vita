@@ -64,7 +64,7 @@ class MePage extends StatelessWidget {
           () => ListView(
             padding: const EdgeInsets.only(bottom: 90),
             children: [
-              const VitaTabHeader(title: 'Vita'),
+              const VitaTabHeader(title: 'Vita', showDivider: false),
               // Account summary follows the same tap-target and surface rhythm
               // as the grouped menu rows below.
               Container(

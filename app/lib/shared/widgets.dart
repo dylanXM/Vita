@@ -89,11 +89,16 @@ class VitaTabHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.actions,
+    this.showDivider = true,
   });
 
   final String title;
   final String? subtitle;
   final Widget? actions;
+
+  /// Hairline under the header. The four root tab pages turn it off so the
+  /// title reads as part of the content; pushed pages keep it as a nav bar rule.
+  final bool showDivider;
 
   @override
   Widget build(BuildContext context) {
@@ -106,8 +111,10 @@ class VitaTabHeader extends StatelessWidget {
       height: 52,
       decoration: BoxDecoration(
         color: context.vita.pageBg,
-        border:
-            Border(bottom: BorderSide(color: context.vita.divider, width: 0.5)),
+        border: showDivider
+            ? Border(
+                bottom: BorderSide(color: context.vita.divider, width: 0.5))
+            : null,
       ),
       child: Stack(
         alignment: Alignment.center,

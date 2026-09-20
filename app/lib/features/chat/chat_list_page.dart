@@ -26,6 +26,7 @@ class ChatListPage extends StatelessWidget {
             VitaTabHeader(
               title: 'Vita',
               subtitle: 'chat.subtitle'.tr,
+              showDivider: false,
               actions: IconButton(
                 onPressed: () {
                   if (!BillingController.to.isSubscribed) {
