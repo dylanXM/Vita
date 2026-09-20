@@ -98,6 +98,11 @@ class VitaTabHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      // Full width is required: inside a Column's loose constraints the
+      // Container/Stack would shrink to the title's width, which would make
+      // the trailing `Positioned(right: 8)` action hug the centered title
+      // instead of the screen's right edge.
+      width: double.infinity,
       height: 52,
       decoration: BoxDecoration(
         color: context.vita.pageBg,

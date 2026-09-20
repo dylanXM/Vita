@@ -11,7 +11,6 @@ import '../memories/memories_page.dart';
 class ExploreController extends GetxController {
   static ExploreController get to => Get.find();
 
-  final section = 0.obs;
   final loading = false.obs;
   final posts = <Map<String, dynamic>>[].obs;
 
@@ -39,27 +38,66 @@ class ExploreController extends GetxController {
       loading.value = false;
     }
   }
+}
 
-  void selectSection(int value) {
-    if (section.value == value) {
-      if (value == 0) loadPosts();
-      return;
-    }
-    section.value = value;
-    AnalyticsService.to.track(
-      value == 0 ? 'explore_moments_viewed' : 'memory_list_viewed',
-      category: 'life',
+/// Explore tab — a grouped menu (same pattern as the Me page): each tile
+/// pushes a full second page instead of switching content in place.
+class ExplorePage extends StatelessWidget {
+  const ExplorePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final vita = context.vita;
+    return Scaffold(
+      backgroundColor: vita.pageBg,
+      // Bottom is open so the list scrolls behind the floating glass tab bar.
+      body: SafeArea(
+        bottom: false,
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 90),
+          children: [
+            VitaTabHeader(title: 'explore.title'.tr),
+            const SizedBox(height: 10),
+            VitaCard(
+              radius: 0,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Column(
+                children: [
+                  VitaListTile(
+                    icon: Icons.dynamic_feed_outlined,
+                    title: 'explore.moments'.tr,
+                    borderRadius: BorderRadius.zero,
+                    onTap: () => Get.to(
+                      () => const MomentsPage(),
+                      transition: Transition.cupertino,
+                      duration: const Duration(milliseconds: 300),
+                    ),
+                  ),
+                  const Divider(indent: 52, height: 0.5),
+                  VitaListTile(
+                    icon: Icons.auto_stories_outlined,
+                    title: 'explore.memories'.tr,
+                    borderRadius: BorderRadius.zero,
+                    onTap: () => Get.to(
+                      () => const MemoriesPage(),
+                      transition: Transition.cupertino,
+                      duration: const Duration(milliseconds: 300),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
-    if (value == 0) {
-      loadPosts();
-    } else if (MemoriesController.to.companions.isEmpty) {
-      MemoriesController.to.loadCompanions();
-    }
   }
 }
 
-class ExplorePage extends StatelessWidget {
-  const ExplorePage({super.key});
+/// Moments second page — companions' public posts, pushed from the Explore
+/// menu.
+class MomentsPage extends StatelessWidget {
+  const MomentsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -70,93 +108,8 @@ class ExplorePage extends StatelessWidget {
         bottom: false,
         child: Column(
           children: [
-            VitaTabHeader(title: 'explore.title'.tr),
-            Obx(
-              () => _ExploreSections(
-                selected: controller.section.value,
-                onChanged: controller.selectSection,
-              ),
-            ),
-            Expanded(
-              child: Obx(
-                () => controller.section.value == 0
-                    ? _MomentsFeed(controller: controller)
-                    : const MemoriesPage(embedded: true),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ExploreSections extends StatelessWidget {
-  const _ExploreSections({required this.selected, required this.onChanged});
-
-  final int selected;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 45,
-      color: context.vita.surface,
-      child: Row(
-        children: [
-          _SectionButton(
-            label: 'explore.moments'.tr,
-            selected: selected == 0,
-            onTap: () => onChanged(0),
-          ),
-          _SectionButton(
-            label: 'explore.memories'.tr,
-            selected: selected == 1,
-            onTap: () => onChanged(1),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionButton extends StatelessWidget {
-  const _SectionButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Expanded(
-              child: Center(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: selected ? context.vita.text : context.vita.subText,
-                    fontSize: 14,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                  ),
-                ),
-              ),
-            ),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: selected ? 24 : 0,
-              height: 2,
-              color: context.vita.green,
-            ),
+            VitaTabHeader(title: 'explore.moments'.tr),
+            Expanded(child: _MomentsFeed(controller: controller)),
           ],
         ),
       ),

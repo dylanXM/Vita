@@ -119,14 +119,6 @@ class SettingsPage extends StatelessWidget {
                   borderRadius: BorderRadius.zero,
                   onTap: () => _confirmSignOut(context),
                 ),
-                const Divider(indent: 52, height: 0.5),
-                VitaListTile(
-                  icon: Icons.person_remove_outlined,
-                  title: 'settings.deleteAccount'.tr,
-                  iconColor: vita.red,
-                  borderRadius: BorderRadius.zero,
-                  onTap: () => _confirmDeleteAccount(context),
-                ),
               ],
             ),
           ),
@@ -146,54 +138,6 @@ class SettingsPage extends StatelessWidget {
       () => LegalDocumentPage(type: type),
       transition: Transition.cupertino,
       duration: const Duration(milliseconds: 300),
-    );
-  }
-
-  void _confirmDeleteAccount(BuildContext context) {
-    final vita = context.vita;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: vita.surface,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('deleteAccount.title'.tr,
-                  style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                      color: vita.text)),
-              const SizedBox(height: 8),
-              Text('deleteAccount.message'.tr,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: vita.subText)),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: vita.red),
-                  onPressed: () async {
-                    Navigator.of(ctx).pop();
-                    try {
-                      await AuthController.to.deleteAccount();
-                    } catch (_) {
-                      Get.snackbar('Vita', 'deleteAccount.failed'.tr);
-                    }
-                  },
-                  child: Text('deleteAccount.confirm'.tr),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text('common.cancel'.tr,
-                    style: TextStyle(color: vita.subText)),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 

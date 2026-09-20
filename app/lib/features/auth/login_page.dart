@@ -19,7 +19,24 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    // TextEditingController changes do not rebuild this widget on their own,
+    // so without these listeners the button's enabled state (computed from
+    // _canSubmit at build time) would only refresh on unrelated rebuilds such
+    // as the password-visibility toggle.
+    _email.addListener(_onFieldChanged);
+    _password.addListener(_onFieldChanged);
+  }
+
+  void _onFieldChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    _email.removeListener(_onFieldChanged);
+    _password.removeListener(_onFieldChanged);
     _email.dispose();
     _password.dispose();
     super.dispose();

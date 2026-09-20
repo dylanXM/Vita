@@ -81,36 +81,13 @@ class MemoriesController extends GetxController {
 }
 
 class MemoriesPage extends StatelessWidget {
-  const MemoriesPage({super.key, this.embedded = false});
-
-  final bool embedded;
+  const MemoriesPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     final ctrl = MemoriesController.to;
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Obx(() {
-          if (ctrl.companions.isEmpty) return const SizedBox.shrink();
-          return VitaCompanionChips(
-            companions: ctrl.companions,
-            selectedId: ctrl.selectedId.value,
-            onChanged: (v) {
-              ctrl.selectedId.value = v;
-              ctrl.loadMemories();
-            },
-          );
-        }),
-        Expanded(child: Obx(() => _buildBody(ctrl))),
-      ],
-    );
-    if (embedded) {
-      return ColoredBox(color: context.vita.pageBg, child: content);
-    }
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      // Bottom is open so the grid scrolls behind the glass tab bar.
       body: SafeArea(
         bottom: false,
         child: Column(children: [
@@ -118,7 +95,25 @@ class MemoriesPage extends StatelessWidget {
             title: 'memories.title'.tr,
             subtitle: 'memories.subtitle'.tr,
           ),
-          Expanded(child: content),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Obx(() {
+                  if (ctrl.companions.isEmpty) return const SizedBox.shrink();
+                  return VitaCompanionChips(
+                    companions: ctrl.companions,
+                    selectedId: ctrl.selectedId.value,
+                    onChanged: (v) {
+                      ctrl.selectedId.value = v;
+                      ctrl.loadMemories();
+                    },
+                  );
+                }),
+                Expanded(child: Obx(() => _buildBody(ctrl))),
+              ],
+            ),
+          ),
         ]),
       ),
     );
