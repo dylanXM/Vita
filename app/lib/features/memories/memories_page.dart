@@ -63,6 +63,21 @@ class MemoriesController extends GetxController {
       loading.value = false;
     }
   }
+
+  Future<void> updateMemory(String id, String content) async {
+    final companionId = selectedId.value;
+    if (companionId == null) return;
+    await ApiClient.instance.put('/v1/companions/$companionId/memories/$id',
+        data: {'content': content});
+    await loadMemories();
+  }
+
+  Future<void> deleteMemory(String id) async {
+    final companionId = selectedId.value;
+    if (companionId == null) return;
+    await ApiClient.instance.delete('/v1/companions/$companionId/memories/$id');
+    memories.removeWhere((item) => item['id'] == id);
+  }
 }
 
 class MemoriesPage extends StatelessWidget {
@@ -181,10 +196,70 @@ class MemoriesPage extends StatelessWidget {
                   ],
                 ),
               ),
+              PopupMenuButton<String>(
+                onSelected: (action) {
+                  if (action == 'edit') {
+                    _editMemory(context, ctrl, m);
+                  } else if (action == 'delete') {
+                    _deleteMemory(context, ctrl, m);
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(value: 'edit', child: Text('memories.edit'.tr)),
+                  PopupMenuItem(
+                      value: 'delete', child: Text('memories.delete'.tr)),
+                ],
+              ),
             ],
           ),
         );
       },
     );
+  }
+
+  Future<void> _editMemory(BuildContext context, MemoriesController ctrl,
+      Map<String, dynamic> memory) async {
+    final input =
+        TextEditingController(text: memory['content'] as String? ?? '');
+    final value = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('memories.edit'.tr),
+        content: TextField(
+            controller: input, minLines: 2, maxLines: 5, maxLength: 500),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text('common.cancel'.tr)),
+          FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, input.text.trim()),
+              child: Text('common.save'.tr)),
+        ],
+      ),
+    );
+    input.dispose();
+    if (value != null && value.isNotEmpty) {
+      await ctrl.updateMemory(memory['id'] as String, value);
+    }
+  }
+
+  Future<void> _deleteMemory(BuildContext context, MemoriesController ctrl,
+      Map<String, dynamic> memory) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('memories.delete'.tr),
+        content: Text('memories.deleteConfirm'.tr),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text('common.cancel'.tr)),
+          FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text('memories.delete'.tr)),
+        ],
+      ),
+    );
+    if (confirmed == true) await ctrl.deleteMemory(memory['id'] as String);
   }
 }

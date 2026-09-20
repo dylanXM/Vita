@@ -3,6 +3,7 @@ package agent
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseLifePlanFromFence(t *testing.T) {
@@ -128,6 +129,39 @@ func TestEmojiMessagePolicyKeepsEmojiNatural(t *testing.T) {
 		if !strings.Contains(emojiMessagePolicy, expected) {
 			t.Fatalf("emoji policy missing %q", expected)
 		}
+	}
+}
+
+func TestReplyDelayForBusyEventIsShortAndBounded(t *testing.T) {
+	now := time.Date(2026, 9, 20, 10, 0, 0, 0, time.UTC)
+	if got := replyDelayForEvent("commute", now.Add(time.Hour), now); got != 2*time.Minute {
+		t.Fatalf("commute delay = %s", got)
+	}
+	if got := replyDelayForEvent("work", now.Add(time.Hour), now); got != 5*time.Minute {
+		t.Fatalf("work delay = %s", got)
+	}
+	if got := replyDelayForEvent("work", now.Add(10*time.Second), now); got != 15*time.Second {
+		t.Fatalf("minimum delay = %s", got)
+	}
+}
+
+func TestInferFollowUpAtUsesUserLocalEvening(t *testing.T) {
+	location := time.FixedZone("UTC+8", 8*60*60)
+	now := time.Date(2026, 9, 20, 11, 30, 0, 0, location)
+	tomorrow := inferFollowUpAt("我明天有面试", now)
+	if tomorrow.Day() != 21 || tomorrow.Hour() != 18 || tomorrow.Location() != location {
+		t.Fatalf("tomorrow follow-up = %v", tomorrow)
+	}
+	nextWeek := inferFollowUpAt("next week I have an exam", now)
+	if nextWeek.Day() != 27 || nextWeek.Hour() != 18 {
+		t.Fatalf("next-week follow-up = %v", nextWeek)
+	}
+}
+
+func TestStringSliceFiltersEmptyMedia(t *testing.T) {
+	got := stringSlice([]any{"https://example.com/a.jpg", " ", 3})
+	if len(got) != 1 || got[0] != "https://example.com/a.jpg" {
+		t.Fatalf("media = %#v", got)
 	}
 }
 

@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:get/get.dart';
+import 'package:get/get.dart' hide FormData, MultipartFile;
 
 import 'constants.dart';
 import 'supported_locales.dart';
@@ -70,6 +70,22 @@ class ApiClient {
     try {
       final r = await dio.post(path, data: data);
       return r.data;
+    } on DioException catch (e) {
+      throw _exception(e);
+    }
+  }
+
+  Future<dynamic> upload(String path, String filePath,
+      {required String kind}) async {
+    try {
+      final form = FormData.fromMap({
+        'kind': kind,
+        'file': await MultipartFile.fromFile(filePath,
+            contentType: kind == 'audio' ? DioMediaType('audio', 'mp4') : null),
+      });
+      final response = await dio.post(path,
+          data: form, options: Options(contentType: 'multipart/form-data'));
+      return response.data;
     } on DioException catch (e) {
       throw _exception(e);
     }

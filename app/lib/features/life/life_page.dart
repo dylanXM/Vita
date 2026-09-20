@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import 'dart:convert';
+
 import '../../core/api_client.dart';
 import '../../core/analytics_service.dart';
 import '../../core/theme.dart';
@@ -136,6 +138,10 @@ class LifePage extends StatelessWidget {
             ? Map<String, dynamic>.from(e['payload'] as Map)
             : const <String, dynamic>{};
         final relatedName = payload['related_companion_name'] as String? ?? '';
+        final media = (payload['media_urls'] as List? ?? const [])
+            .whereType<String>()
+            .where((url) => url.isNotEmpty)
+            .toList();
         final rawTime = e['start_time'] as String?;
         final when = rawTime != null
             ? formatClock(DateTime.tryParse(rawTime) ?? DateTime.now())
@@ -190,6 +196,10 @@ class LifePage extends StatelessWidget {
                                 color: context.vita.subText,
                                 height: 1.5)),
                       ],
+                      if (media.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _LifePhoto(url: media.first),
+                      ],
                       if (loc.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Row(
@@ -238,6 +248,36 @@ class LifePage extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _LifePhoto extends StatelessWidget {
+  const _LifePhoto({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    ImageProvider provider;
+    if (url.startsWith('data:image/') && url.contains(',')) {
+      provider = MemoryImage(base64Decode(url.substring(url.indexOf(',') + 1)));
+    } else {
+      provider = NetworkImage(url);
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: AspectRatio(
+        aspectRatio: 4 / 3,
+        child: Image(
+          image: provider,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => ColoredBox(
+            color: context.vita.pageBg,
+            child: Icon(Icons.broken_image_outlined, color: context.vita.hint),
+          ),
+        ),
+      ),
     );
   }
 }

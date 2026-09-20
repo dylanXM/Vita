@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -982,8 +983,9 @@ func DeleteCompanion(c *gin.Context) {
 }
 
 type SendMessageRequest struct {
-	Content     string `json:"content" binding:"required"`
+	Content     string `json:"content"`
 	MessageType string `json:"message_type"`
+	MediaID     string `json:"media_id"`
 }
 
 type SendMessageResponse struct {
@@ -1008,8 +1010,16 @@ func SendMessage(c *gin.Context) {
 	if req.MessageType == "" {
 		req.MessageType = "text"
 	}
-	if req.MessageType != "text" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "this version supports text messages only"})
+	if req.MessageType != "text" && req.MessageType != "voice" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported message type"})
+		return
+	}
+	if req.MessageType == "text" && strings.TrimSpace(req.Content) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "message content is required"})
+		return
+	}
+	if req.MessageType == "voice" && strings.TrimSpace(req.MediaID) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "voice media is required"})
 		return
 	}
 	var companionID string
@@ -1044,13 +1054,27 @@ func SendMessage(c *gin.Context) {
 	createdAt := time.Now().UTC()
 	appLocale := language.Normalize(c.GetHeader("Accept-Language"))
 	_, _ = db.Get().Exec(`UPDATE users SET preferred_locale=$1,updated_at=CURRENT_TIMESTAMP WHERE id=$2`, appLocale, userID)
-	query := `INSERT INTO messages (id,conversation_id,sender_type,message_type,content,payload,source,delivery_status,created_at) VALUES ($1,$2,'user',$3,$4,'{}'::jsonb,'user','delivered',$5)`
-	_, err := db.Get().Exec(query, msgID, conversationID, req.MessageType, req.Content, createdAt)
+	mediaURL := ""
+	if req.MessageType == "voice" {
+		if companionAgent == nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "agent service is unavailable"})
+			return
+		}
+		transcript, transcriptErr := companionAgent.TranscribeMedia(c.Request.Context(), strings.TrimSpace(req.MediaID), userID, companionID)
+		if transcriptErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "voice message could not be transcribed"})
+			return
+		}
+		req.Content = transcript
+		mediaURL = "/v1/media/" + strings.TrimSpace(req.MediaID)
+	}
+	query := `INSERT INTO messages (id,conversation_id,sender_type,message_type,content,media_url,payload,source,delivery_status,created_at) VALUES ($1,$2,'user',$3,$4,NULLIF($5,''),'{}'::jsonb,'user','delivered',$6)`
+	_, err := db.Get().Exec(query, msgID, conversationID, req.MessageType, req.Content, mediaURL, createdAt)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send message"})
 		return
 	}
-	userMessage := &agent.SavedMessage{ID: msgID, ConversationID: conversationID, SenderType: "user", MessageType: req.MessageType, Content: req.Content, Payload: map[string]any{}, Source: "user", DeliveryStatus: "delivered", CreatedAt: createdAt}
+	userMessage := &agent.SavedMessage{ID: msgID, ConversationID: conversationID, SenderType: "user", MessageType: req.MessageType, Content: req.Content, MediaURL: mediaURL, Payload: map[string]any{}, Source: "user", DeliveryStatus: "delivered", CreatedAt: createdAt}
 	response := SendMessageResponse{ID: msgID, Content: req.Content, Sender: "user", Created: createdAt, UserMessage: userMessage}
 	if companionAgent == nil {
 		response.AgentError = "agent service is unavailable"
@@ -1159,7 +1183,13 @@ func GetOrCreateConversation(c *gin.Context) {
 		`SELECT id FROM conversations WHERE user_id = $1 AND companion_id = $2 LIMIT 1`,
 		userID, req.CompanionID).Scan(&conversationID)
 	if err == nil {
-		c.JSON(http.StatusOK, gin.H{"conversation_id": conversationID, "can_send": canSend, "access_code": accessCode})
+		response := gin.H{"conversation_id": conversationID, "can_send": canSend, "access_code": accessCode}
+		if companionAgent != nil {
+			if status, statusErr := companionAgent.CurrentStatus(c.Request.Context(), req.CompanionID, userID); statusErr == nil {
+				response["companion_status"] = status
+			}
+		}
+		c.JSON(http.StatusOK, response)
 		return
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
@@ -1174,7 +1204,13 @@ func GetOrCreateConversation(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create conversation"})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"conversation_id": conversationID, "can_send": canSend, "access_code": accessCode})
+	response := gin.H{"conversation_id": conversationID, "can_send": canSend, "access_code": accessCode}
+	if companionAgent != nil {
+		if status, statusErr := companionAgent.CurrentStatus(c.Request.Context(), req.CompanionID, userID); statusErr == nil {
+			response["companion_status"] = status
+		}
+	}
+	c.JSON(http.StatusCreated, response)
 }
 
 func GetTodayLife(c *gin.Context) {
@@ -1272,6 +1308,49 @@ func GetMemories(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"memories": memories})
 }
 
+func UpdateMemory(c *gin.Context) {
+	var input struct {
+		Content string `json:"content" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	input.Content = strings.TrimSpace(input.Content)
+	if input.Content == "" || len([]rune(input.Content)) > 500 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "memory content must contain 1 to 500 characters"})
+		return
+	}
+	metadata, _ := json.Marshal(map[string]any{"source": "user_correction", "confirmed": true})
+	result, err := db.Get().Exec(`UPDATE memories m SET content=$1,metadata=$2
+		FROM companions c WHERE m.id=$3 AND m.companion_id=$4 AND c.id=m.companion_id AND c.user_id=$5`,
+		input.Content, metadata, c.Param("memory_id"), c.Param("id"), c.GetString("user_id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update memory"})
+		return
+	}
+	if count, _ := result.RowsAffected(); count == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "memory not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"id": c.Param("memory_id"), "content": input.Content})
+}
+
+func DeleteMemory(c *gin.Context) {
+	result, err := db.Get().Exec(`DELETE FROM memories m USING companions c
+		WHERE m.id=$1 AND m.companion_id=$2 AND c.id=m.companion_id AND c.user_id=$3`,
+		c.Param("memory_id"), c.Param("id"), c.GetString("user_id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete memory"})
+		return
+	}
+	if count, _ := result.RowsAffected(); count == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "memory not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "memory deleted"})
+}
+
 // GetExplorePosts returns posts from the user's own companions and characters
 // they have met. The query intentionally exposes character-facing fields only;
 // no owner identity, chat content or private memory crosses user boundaries.
@@ -1339,7 +1418,48 @@ func GetExplorePosts(c *gin.Context) {
 }
 
 func UploadMedia(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"url": "https://storage.example.com/uploaded"})
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "media file is required"})
+		return
+	}
+	defer file.Close()
+	kind := strings.ToLower(strings.TrimSpace(c.PostForm("kind")))
+	if kind != "audio" && kind != "image" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "media kind must be audio or image"})
+		return
+	}
+	const maxUpload = 10 << 20
+	data, err := io.ReadAll(io.LimitReader(file, maxUpload+1))
+	if err != nil || len(data) == 0 || len(data) > maxUpload {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "media must contain 1 byte to 10 MB"})
+		return
+	}
+	mimeType := header.Header.Get("Content-Type")
+	if mimeType == "" {
+		mimeType = http.DetectContentType(data)
+	}
+	if (kind == "audio" && !strings.HasPrefix(mimeType, "audio/")) || (kind == "image" && !strings.HasPrefix(mimeType, "image/")) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "media content type does not match kind"})
+		return
+	}
+	id := uuid.New().String()
+	if _, err := db.Get().Exec(`INSERT INTO media_assets(id,user_id,kind,mime_type,data,size_bytes) VALUES($1,$2,$3,$4,$5,$6)`, id, c.GetString("user_id"), kind, mimeType, data, len(data)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store media"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"id": id, "url": "/v1/media/" + id, "mime_type": mimeType, "size_bytes": len(data)})
+}
+
+func GetMedia(c *gin.Context) {
+	var mimeType string
+	var data []byte
+	if err := db.Get().QueryRow(`SELECT mime_type,data FROM media_assets WHERE id=$1`, c.Param("id")).Scan(&mimeType, &data); err != nil {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	c.Header("Cache-Control", "private, max-age=86400")
+	c.Data(http.StatusOK, mimeType, data)
 }
 
 func GenerateMedia(c *gin.Context) {

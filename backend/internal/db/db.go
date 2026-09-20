@@ -267,6 +267,10 @@ func migrate(db *sql.DB) error {
 			metadata TEXT,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
+		`ALTER TABLE memories ADD COLUMN IF NOT EXISTS follow_up_at TIMESTAMP`,
+		`ALTER TABLE memories ADD COLUMN IF NOT EXISTS follow_up_claimed_at TIMESTAMP`,
+		`ALTER TABLE memories ADD COLUMN IF NOT EXISTS followed_up_at TIMESTAMP`,
+		`CREATE INDEX IF NOT EXISTS idx_memories_follow_up ON memories(follow_up_at) WHERE followed_up_at IS NULL`,
 		`CREATE TABLE IF NOT EXISTS life_events (
 			id TEXT PRIMARY KEY,
 			companion_id TEXT NOT NULL REFERENCES companions(id),
@@ -335,6 +339,10 @@ func migrate(db *sql.DB) error {
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`ALTER TABLE agent_settings ADD COLUMN IF NOT EXISTS free_default_chat_hours INTEGER NOT NULL DEFAULT 24`,
+		`ALTER TABLE agent_settings ADD COLUMN IF NOT EXISTS image_model_id TEXT REFERENCES ai_models(id) ON DELETE SET NULL`,
+		`ALTER TABLE agent_settings ADD COLUMN IF NOT EXISTS daily_life_photo_limit INTEGER NOT NULL DEFAULT 2`,
+		`ALTER TABLE agent_settings ADD COLUMN IF NOT EXISTS transcription_model_id TEXT REFERENCES ai_models(id) ON DELETE SET NULL`,
+		`ALTER TABLE agent_settings ADD COLUMN IF NOT EXISTS speech_model_id TEXT REFERENCES ai_models(id) ON DELETE SET NULL`,
 		`INSERT INTO agent_settings (id) VALUES ('default') ON CONFLICT (id) DO NOTHING`,
 		`CREATE TABLE IF NOT EXISTS companion_portraits (
 			id TEXT PRIMARY KEY,
@@ -495,6 +503,29 @@ func migrate(db *sql.DB) error {
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_outbox_message_channel ON notification_outbox(message_id, channel)`,
+		`CREATE TABLE IF NOT EXISTS pending_agent_replies (
+			conversation_id TEXT PRIMARY KEY REFERENCES conversations(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			companion_id TEXT NOT NULL REFERENCES companions(id) ON DELETE CASCADE,
+			trigger_message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+			scheduled_at TIMESTAMP NOT NULL,
+			status TEXT NOT NULL DEFAULT 'pending',
+			attempts INTEGER NOT NULL DEFAULT 0,
+			last_error TEXT NOT NULL DEFAULT '',
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_pending_agent_replies_due ON pending_agent_replies(status,scheduled_at)`,
+		`CREATE TABLE IF NOT EXISTS media_assets (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			kind TEXT NOT NULL CHECK(kind IN ('image','audio')),
+			mime_type TEXT NOT NULL,
+			data BYTEA NOT NULL,
+			size_bytes INTEGER NOT NULL,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_media_assets_user ON media_assets(user_id,created_at DESC)`,
 		`CREATE TABLE IF NOT EXISTS onboarding_configs (
 			environment TEXT NOT NULL CHECK (environment IN ('dev', 'beta', 'prod')),
 			platform TEXT NOT NULL CHECK (platform IN ('ios', 'android')),

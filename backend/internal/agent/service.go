@@ -45,6 +45,13 @@ type SavedMessage struct {
 	CreatedAt      time.Time      `json:"created_at"`
 }
 
+type CompanionStatus struct {
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	Busy        bool       `json:"busy"`
+	AvailableAt *time.Time `json:"available_at,omitempty"`
+}
+
 type companionContext struct {
 	ID                string
 	Name              string
@@ -62,6 +69,8 @@ type companionContext struct {
 	LifeGoal          string
 	Backstory         string
 	Enthusiasm        int
+	VoiceEnabled      bool
+	VoiceConfig       string
 }
 
 type lifePlanEvent struct {
@@ -93,13 +102,17 @@ type socialPlanEvent struct {
 }
 
 type lifeSettings struct {
-	LifeModelID         sql.NullString
-	ProactiveModelID    sql.NullString
-	DailyEventMin       int
-	DailyEventMax       int
-	DailyProactiveLimit int
-	QuietStart          int
-	QuietEnd            int
+	LifeModelID          sql.NullString
+	ProactiveModelID     sql.NullString
+	ImageModelID         sql.NullString
+	TranscriptionModelID sql.NullString
+	SpeechModelID        sql.NullString
+	DailyEventMin        int
+	DailyEventMax        int
+	DailyProactiveLimit  int
+	DailyLifePhotoLimit  int
+	QuietStart           int
+	QuietEnd             int
 }
 
 func NewService(db *sql.DB, secret string, mock bool, push *FCMClient) (*Service, error) {
@@ -130,11 +143,20 @@ func (s *Service) Run(ctx context.Context, interval time.Duration) {
 }
 
 func (s *Service) runTick(ctx context.Context) {
+	if err := s.DispatchDueReplies(ctx); err != nil {
+		log.Printf("agent delayed replies: %v", err)
+	}
+	if err := s.DispatchMemoryFollowups(ctx); err != nil {
+		log.Printf("agent memory follow-ups: %v", err)
+	}
 	if err := s.EnsureDailyPlans(ctx); err != nil {
 		log.Printf("agent life planning: %v", err)
 	}
 	if err := s.EnsureCompanionSocialWorld(ctx); err != nil {
 		log.Printf("agent social world: %v", err)
+	}
+	if err := s.GenerateDueLifePhotos(ctx); err != nil {
+		log.Printf("agent life photos: %v", err)
 	}
 	if err := s.PublishDueMoments(ctx); err != nil {
 		log.Printf("agent moment publishing: %v", err)
@@ -147,11 +169,104 @@ func (s *Service) runTick(ctx context.Context) {
 	}
 }
 
+// GenerateDueLifePhotos creates scene images only for real, already-due life
+// events. The image is attached to its source event so Life, Moments and chat
+// all retain the same provenance instead of showing unrelated AI pictures.
+func (s *Service) GenerateDueLifePhotos(ctx context.Context) error {
+	settings, err := s.loadLifeSettings(ctx)
+	if err != nil || s.mock || !settings.ImageModelID.Valid || settings.DailyLifePhotoLimit <= 0 {
+		return err
+	}
+	model, err := s.loadModel(ctx, settings.ImageModelID.String)
+	if err != nil {
+		return err
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT e.id,e.companion_id,c.name,COALESCE(c.appearance,''),COALESCE(c.city,''),
+		       COALESCE(e.title,''),COALESCE(e.description,''),COALESCE(e.location,''),COALESCE(e.emotion,''),
+		       e.payload::text
+		FROM life_events e JOIN companions c ON c.id=e.companion_id
+		WHERE e.status='active' AND e.start_time<=CURRENT_TIMESTAMP
+		  AND (e.importance>=60 OR COALESCE((e.payload->>'moment_candidate')::boolean,false)=true)
+		  AND jsonb_array_length(COALESCE(e.payload->'media_urls','[]'::jsonb))=0
+		  AND c.active=true AND c.life_enabled=true
+		  AND (SELECT COUNT(*) FROM life_events same_day
+		       WHERE same_day.companion_id=e.companion_id AND same_day.local_date=e.local_date
+		         AND jsonb_array_length(COALESCE(same_day.payload->'media_urls','[]'::jsonb))>0) < $1
+		ORDER BY e.start_time LIMIT 20`, settings.DailyLifePhotoLimit)
+	if err != nil {
+		return err
+	}
+	type candidate struct {
+		id, companionID, name, appearance, city, title, description, location, emotion, payload string
+	}
+	var candidates []candidate
+	for rows.Next() {
+		var item candidate
+		if err := rows.Scan(&item.id, &item.companionID, &item.name, &item.appearance, &item.city, &item.title, &item.description, &item.location, &item.emotion, &item.payload); err != nil {
+			rows.Close()
+			return err
+		}
+		candidates = append(candidates, item)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, item := range candidates {
+		var photoCount int
+		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM life_events WHERE companion_id=$1 AND local_date=(SELECT local_date FROM life_events WHERE id=$2) AND jsonb_array_length(COALESCE(payload->'media_urls','[]'::jsonb))>0`, item.companionID, item.id).Scan(&photoCount); err != nil {
+			return err
+		}
+		if photoCount >= settings.DailyLifePhotoLimit {
+			continue
+		}
+		prompt := fmt.Sprintf("A candid, realistic everyday photo from %s's life in %s. Event: %s — %s. Location: %s. Mood: %s. Appearance continuity: %s. Natural phone-camera composition, ordinary lived-in details, no text, no watermark, no collage.", item.name, item.city, item.title, item.description, item.location, item.emotion, item.appearance)
+		imageURL, imageErr := s.client.GenerateImage(ctx, model, GenerateImageRequest{Prompt: prompt, Size: "1024x1024"})
+		if imageErr != nil {
+			s.recordRun(ctx, item.companionID, "life_photo", model.ID, "failed", imageErr.Error())
+			continue
+		}
+		payload := map[string]any{}
+		_ = json.Unmarshal([]byte(item.payload), &payload)
+		payload["media_urls"] = []string{imageURL}
+		payload["photo_source"] = "life_event"
+		payload["image_model_id"] = model.ID
+		encoded, _ := json.Marshal(payload)
+		result, updateErr := s.db.ExecContext(ctx, `UPDATE life_events SET payload=$2 WHERE id=$1 AND jsonb_array_length(COALESCE(payload->'media_urls','[]'::jsonb))=0`, item.id, encoded)
+		if updateErr != nil {
+			return updateErr
+		}
+		if changed, _ := result.RowsAffected(); changed > 0 {
+			s.recordRun(ctx, item.companionID, "life_photo", model.ID, "succeeded", "")
+		}
+	}
+	return nil
+}
+
 func (s *Service) Reply(ctx context.Context, conversationID, userID string) (*SavedMessage, error) {
 	profile, err := s.loadCompanionForConversation(ctx, conversationID, userID)
 	if err != nil {
 		return nil, err
 	}
+	status, err := s.CurrentStatus(ctx, profile.ID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if status.Busy && status.AvailableAt != nil {
+		var triggerMessageID string
+		if err := s.db.QueryRowContext(ctx, `SELECT id FROM messages WHERE conversation_id=$1 AND sender_type='user' ORDER BY created_at DESC LIMIT 1`, conversationID).Scan(&triggerMessageID); err != nil {
+			return nil, err
+		}
+		_, err := s.db.ExecContext(ctx, `INSERT INTO pending_agent_replies(conversation_id,user_id,companion_id,trigger_message_id,scheduled_at)
+			VALUES($1,$2,$3,$4,$5) ON CONFLICT(conversation_id) DO UPDATE SET trigger_message_id=EXCLUDED.trigger_message_id,
+			scheduled_at=EXCLUDED.scheduled_at,status='pending',last_error='',updated_at=CURRENT_TIMESTAMP`,
+			conversationID, userID, profile.ID, triggerMessageID, *status.AvailableAt)
+		return nil, err
+	}
+	return s.replyNow(ctx, conversationID, userID, profile)
+}
+
+func (s *Service) replyNow(ctx context.Context, conversationID, userID string, profile companionContext) (*SavedMessage, error) {
 	recent, err := s.loadRecentMessages(ctx, conversationID, 24)
 	if err != nil {
 		return nil, err
@@ -181,10 +296,238 @@ func (s *Service) Reply(ctx context.Context, conversationID, userID string) (*Sa
 	if err != nil {
 		return nil, err
 	}
+	if profile.VoiceEnabled {
+		if audioModel, modelErr := s.loadRoutedModel(ctx, profile.ID, "speech"); modelErr == nil {
+			voice := "alloy"
+			voiceConfig := map[string]any{}
+			_ = json.Unmarshal([]byte(profile.VoiceConfig), &voiceConfig)
+			if configured, ok := voiceConfig["voice"].(string); ok && strings.TrimSpace(configured) != "" {
+				voice = strings.TrimSpace(configured)
+			}
+			if audio, mimeType, speechErr := s.client.GenerateSpeech(ctx, audioModel, text, voice); speechErr == nil {
+				mediaID := uuid.New().String()
+				if _, storeErr := s.db.ExecContext(ctx, `INSERT INTO media_assets(id,user_id,kind,mime_type,data,size_bytes) VALUES($1,$2,'audio',$3,$4,$5)`, mediaID, userID, mimeType, audio, len(audio)); storeErr == nil {
+					reply.MessageType = "voice"
+					reply.MediaURL = "/v1/media/" + mediaID
+					_, _ = s.db.ExecContext(ctx, `UPDATE messages SET message_type='voice',media_url=$2 WHERE id=$1`, reply.ID, reply.MediaURL)
+				}
+			}
+		}
+	}
 	if len(recent) > 0 {
-		s.updateRelationshipAndMemory(ctx, profile.ID, recent[len(recent)-1].Content)
+		s.updateRelationshipAndMemory(ctx, profile.ID, userID, recent[len(recent)-1].Content)
 	}
 	return reply, nil
+}
+
+func (s *Service) TranscribeMedia(ctx context.Context, mediaID, userID, companionID string) (string, error) {
+	model, err := s.loadRoutedModel(ctx, companionID, "transcription")
+	if err != nil {
+		return "", err
+	}
+	var mimeType string
+	var data []byte
+	if err := s.db.QueryRowContext(ctx, `SELECT mime_type,data FROM media_assets WHERE id=$1 AND user_id=$2 AND kind='audio'`, mediaID, userID).Scan(&mimeType, &data); err != nil {
+		return "", fmt.Errorf("audio media not found")
+	}
+	filename := "voice.m4a"
+	if strings.Contains(mimeType, "webm") {
+		filename = "voice.webm"
+	} else if strings.Contains(mimeType, "mpeg") {
+		filename = "voice.mp3"
+	}
+	return s.client.TranscribeAudio(ctx, model, filename, mimeType, data)
+}
+
+func (s *Service) CurrentStatus(ctx context.Context, companionID, userID string) (CompanionStatus, error) {
+	var status CompanionStatus
+	var eventType string
+	var end time.Time
+	err := s.db.QueryRowContext(ctx, `SELECT COALESCE(e.title,''),COALESCE(e.description,''),COALESCE(e.event_type,''),e.end_time
+		FROM life_events e JOIN companions c ON c.id=e.companion_id
+		WHERE e.companion_id=$1 AND c.user_id=$2 AND e.status='active'
+		  AND e.start_time<=CURRENT_TIMESTAMP AND e.end_time>CURRENT_TIMESTAMP
+		ORDER BY e.start_time DESC LIMIT 1`, companionID, userID).Scan(&status.Title, &status.Description, &eventType, &end)
+	if errors.Is(err, sql.ErrNoRows) {
+		return CompanionStatus{Title: "available"}, nil
+	}
+	if err != nil {
+		return status, err
+	}
+	status.Busy = eventType == "work" || eventType == "study" || eventType == "commute"
+	if status.Busy {
+		available := time.Now().UTC().Add(replyDelayForEvent(eventType, end, time.Now().UTC()))
+		status.AvailableAt = &available
+	}
+	return status, nil
+}
+
+func replyDelayForEvent(eventType string, eventEnd, now time.Time) time.Duration {
+	delay := 2 * time.Minute
+	if eventType == "work" || eventType == "study" {
+		delay = 5 * time.Minute
+	}
+	remaining := eventEnd.Sub(now)
+	if remaining > 0 && remaining < delay {
+		delay = remaining
+	}
+	if delay < 15*time.Second {
+		delay = 15 * time.Second
+	}
+	if delay > 10*time.Minute {
+		delay = 10 * time.Minute
+	}
+	return delay
+}
+
+func (s *Service) DispatchDueReplies(ctx context.Context) error {
+	rows, err := s.db.QueryContext(ctx, `SELECT conversation_id,user_id,companion_id,attempts FROM pending_agent_replies
+		WHERE status='pending' AND scheduled_at<=CURRENT_TIMESTAMP ORDER BY scheduled_at LIMIT 20`)
+	if err != nil {
+		return err
+	}
+	type pending struct {
+		conversationID, userID, companionID string
+		attempts                            int
+	}
+	var items []pending
+	for rows.Next() {
+		var item pending
+		if err := rows.Scan(&item.conversationID, &item.userID, &item.companionID, &item.attempts); err != nil {
+			rows.Close()
+			return err
+		}
+		items = append(items, item)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, item := range items {
+		claimed, err := s.db.ExecContext(ctx, `UPDATE pending_agent_replies SET status='processing',updated_at=CURRENT_TIMESTAMP WHERE conversation_id=$1 AND status='pending' AND scheduled_at<=CURRENT_TIMESTAMP`, item.conversationID)
+		if err != nil {
+			return err
+		}
+		if count, _ := claimed.RowsAffected(); count == 0 {
+			continue
+		}
+		profile, err := s.loadCompanionForConversation(ctx, item.conversationID, item.userID)
+		if err == nil {
+			_, err = s.replyNow(ctx, item.conversationID, item.userID, profile)
+		}
+		if err == nil {
+			_, err = s.db.ExecContext(ctx, `DELETE FROM pending_agent_replies WHERE conversation_id=$1 AND status='processing'`, item.conversationID)
+		} else {
+			retry := time.Now().UTC().Add(time.Duration(1<<min(item.attempts, 5)) * time.Minute)
+			_, _ = s.db.ExecContext(ctx, `UPDATE pending_agent_replies SET status='pending',attempts=attempts+1,scheduled_at=$2,last_error=$3,updated_at=CURRENT_TIMESTAMP WHERE conversation_id=$1`, item.conversationID, retry, truncate(err.Error(), 1000))
+		}
+	}
+	return nil
+}
+
+func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
+	settings, err := s.loadLifeSettings(ctx)
+	if err != nil {
+		return err
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT m.id,m.companion_id,c.user_id,cv.id,COALESCE(m.content,''),c.name,COALESCE(u.timezone,'UTC')
+		FROM memories m JOIN companions c ON c.id=m.companion_id JOIN users u ON u.id=c.user_id
+		JOIN conversations cv ON cv.companion_id=c.id AND cv.user_id=c.user_id
+		WHERE m.type IN ('user_plan','shared_commitment') AND m.follow_up_at<=CURRENT_TIMESTAMP AND m.followed_up_at IS NULL
+		  AND (m.follow_up_claimed_at IS NULL OR m.follow_up_claimed_at<CURRENT_TIMESTAMP-INTERVAL '10 minutes')
+		  AND c.active=true AND c.proactive_enabled=true AND c.friendship_active=true
+		  AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active'
+		    AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP))
+		ORDER BY m.follow_up_at LIMIT 20`)
+	if err != nil {
+		return err
+	}
+	type followup struct{ id, companionID, userID, conversationID, content, name, timezone string }
+	var items []followup
+	for rows.Next() {
+		var item followup
+		if err := rows.Scan(&item.id, &item.companionID, &item.userID, &item.conversationID, &item.content, &item.name, &item.timezone); err != nil {
+			rows.Close()
+			return err
+		}
+		items = append(items, item)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, item := range items {
+		location, _ := time.LoadLocation(item.timezone)
+		if location == nil {
+			location = time.UTC
+		}
+		if inQuietHours(time.Now().In(location).Hour(), settings.QuietStart, settings.QuietEnd) {
+			continue
+		}
+		localNow := time.Now().In(location)
+		dayStart := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 0, 0, 0, 0, location).UTC()
+		dayEnd := time.Date(localNow.Year(), localNow.Month(), localNow.Day()+1, 0, 0, 0, 0, location).UTC()
+		var autonomousToday int
+		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM messages WHERE conversation_id=$1 AND source IN ('proactive','memory_followup') AND created_at>=$2 AND created_at<$3`, item.conversationID, dayStart, dayEnd).Scan(&autonomousToday); err != nil {
+			return err
+		}
+		if autonomousToday >= settings.DailyProactiveLimit {
+			continue
+		}
+		claimed, err := s.db.ExecContext(ctx, `UPDATE memories SET follow_up_claimed_at=CURRENT_TIMESTAMP WHERE id=$1 AND followed_up_at IS NULL AND (follow_up_claimed_at IS NULL OR follow_up_claimed_at<CURRENT_TIMESTAMP-INTERVAL '10 minutes')`, item.id)
+		if err != nil {
+			return err
+		}
+		if count, _ := claimed.RowsAffected(); count == 0 {
+			continue
+		}
+		preferredLocale := s.preferredLocale(ctx, item.userID)
+		text := localizedMock(map[string]string{
+			"zh-Hans": "你之前提到的事情，后来还顺利吗？",
+			"zh-Hant": "你之前提到的事情，後來還順利嗎？",
+			"ja":      "前に話していたこと、その後うまくいった？",
+			"ko":      "전에 말했던 일은 그 후 잘됐어?",
+			"es":      "¿Cómo salió eso que me contaste?",
+			"pt":      "Como correu aquilo que você me contou?",
+			"ar":      "كيف سار الأمر الذي أخبرتني عنه؟",
+		}, preferredLocale, "How did the thing you told me about go?")
+		modelID := ""
+		if !s.mock && settings.ProactiveModelID.Valid {
+			model, modelErr := s.loadModel(ctx, settings.ProactiveModelID.String)
+			if modelErr == nil {
+				modelID = model.ID
+				text, modelErr = s.client.GenerateText(ctx, model, GenerateRequest{
+					System:      companionSystemBoundary + "\n\n" + responseLanguagePolicy("", preferredLocale) + "\n\n" + emojiMessagePolicy,
+					Messages:    []ChatMessage{{Role: "user", Content: fmt.Sprintf("The user previously said: %q. Follow up naturally now without assuming or inventing the outcome. Ask one concise, specific question.", item.content)}},
+					Temperature: 0.8, MaxTokens: 120,
+				})
+			}
+			if modelErr != nil {
+				_, _ = s.db.ExecContext(ctx, `UPDATE memories SET follow_up_claimed_at=NULL WHERE id=$1`, item.id)
+				continue
+			}
+		}
+		tx, err := s.db.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		messageID := uuid.New().String()
+		payload, _ := json.Marshal(map[string]any{"memory_id": item.id, "model_id": modelID})
+		if _, err = tx.ExecContext(ctx, `INSERT INTO messages(id,conversation_id,sender_type,message_type,content,payload,source,delivery_status) VALUES($1,$2,'assistant','text',$3,$4,'memory_followup','delivered')`, messageID, item.conversationID, text, payload); err == nil {
+			_, err = tx.ExecContext(ctx, `UPDATE memories SET followed_up_at=CURRENT_TIMESTAMP,follow_up_claimed_at=NULL WHERE id=$1`, item.id)
+		}
+		if err == nil {
+			outbox, _ := json.Marshal(map[string]any{"title": item.name, "body": text, "message_id": messageID, "type": "text"})
+			_, err = tx.ExecContext(ctx, `INSERT INTO notification_outbox(id,user_id,companion_id,message_id,channel,payload,status) VALUES($1,$2,$3,$4,'push',$5,'ready') ON CONFLICT DO NOTHING`, uuid.New().String(), item.userID, item.companionID, messageID, outbox)
+		}
+		if err != nil {
+			tx.Rollback()
+			_, _ = s.db.ExecContext(ctx, `UPDATE memories SET follow_up_claimed_at=NULL WHERE id=$1`, item.id)
+			continue
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Service) EnsureDailyPlans(ctx context.Context) error {
@@ -699,7 +1042,7 @@ func (s *Service) DispatchDueProactive(ctx context.Context) error {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT e.id, e.companion_id, c.user_id, c.name, COALESCE(c.city, ''),
 		       COALESCE(e.title, ''), COALESCE(e.description, ''), COALESCE(e.location, ''),
-		       COALESCE(u.timezone, 'UTC'), COALESCE(r.enthusiasm,0)
+		       COALESCE(u.timezone, 'UTC'), COALESCE(r.enthusiasm,0),e.payload::text
 		FROM life_events e
 		JOIN companions c ON c.id = e.companion_id
 		JOIN users u ON u.id = c.user_id
@@ -716,13 +1059,13 @@ func (s *Service) DispatchDueProactive(ctx context.Context) error {
 	}
 	defer rows.Close()
 	type dueEvent struct {
-		id, companionID, userID, name, city, title, description, location, timezone string
-		enthusiasm                                                                  int
+		id, companionID, userID, name, city, title, description, location, timezone, payload string
+		enthusiasm                                                                           int
 	}
 	var due []dueEvent
 	for rows.Next() {
 		var event dueEvent
-		if err := rows.Scan(&event.id, &event.companionID, &event.userID, &event.name, &event.city, &event.title, &event.description, &event.location, &event.timezone, &event.enthusiasm); err != nil {
+		if err := rows.Scan(&event.id, &event.companionID, &event.userID, &event.name, &event.city, &event.title, &event.description, &event.location, &event.timezone, &event.enthusiasm, &event.payload); err != nil {
 			return err
 		}
 		due = append(due, event)
@@ -736,8 +1079,8 @@ func (s *Service) DispatchDueProactive(ctx context.Context) error {
 }
 
 func (s *Service) dispatchEvent(ctx context.Context, event struct {
-	id, companionID, userID, name, city, title, description, location, timezone string
-	enthusiasm                                                                  int
+	id, companionID, userID, name, city, title, description, location, timezone, payload string
+	enthusiasm                                                                           int
 }, settings lifeSettings) error {
 	location, err := time.LoadLocation(event.timezone)
 	if err != nil {
@@ -752,7 +1095,7 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 	var sentToday int
 	if err := s.db.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM messages m JOIN conversations c ON c.id = m.conversation_id
-		WHERE c.companion_id = $1 AND m.source = 'proactive' AND m.created_at >= $2 AND m.created_at < $3`, event.companionID, dayStart, dayEnd).Scan(&sentToday); err != nil {
+		WHERE c.companion_id = $1 AND m.source IN ('proactive','memory_followup') AND m.created_at >= $2 AND m.created_at < $3`, event.companionID, dayStart, dayEnd).Scan(&sentToday); err != nil {
 		return err
 	}
 	effectiveLimit := min(8, settings.DailyProactiveLimit+event.enthusiasm/25)
@@ -805,7 +1148,19 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 	}
 	defer tx.Rollback()
 	messageID := uuid.New().String()
-	payload, _ := json.Marshal(map[string]any{"event_title": event.title, "model_id": modelID})
+	eventPayload := map[string]any{}
+	_ = json.Unmarshal([]byte(event.payload), &eventPayload)
+	mediaURLs := stringSlice(eventPayload["media_urls"])
+	messageType := "life_card"
+	mediaURL := ""
+	if len(mediaURLs) > 0 {
+		messageType = "image_text"
+		mediaURL = mediaURLs[0]
+	}
+	payload, _ := json.Marshal(map[string]any{
+		"event_title": event.title, "event_description": event.description, "event_location": event.location,
+		"media_urls": mediaURLs, "model_id": modelID,
+	})
 	result, err := tx.ExecContext(ctx, `UPDATE life_events SET shared_at = CURRENT_TIMESTAMP WHERE id = $1 AND shared_at IS NULL`, event.id)
 	if err != nil {
 		return err
@@ -814,11 +1169,11 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 		return nil
 	}
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO messages (id, conversation_id, sender_type, message_type, content, payload, source, life_event_id, delivery_status, created_at)
-		VALUES ($1,$2,'assistant','text',$3,$4,'proactive',$5,'delivered',CURRENT_TIMESTAMP)`, messageID, conversationID, text, payload, event.id); err != nil {
+		INSERT INTO messages (id, conversation_id, sender_type, message_type, content, media_url, payload, source, life_event_id, delivery_status, created_at)
+		VALUES ($1,$2,'assistant',$3,$4,NULLIF($5,''),$6,'proactive',$7,'delivered',CURRENT_TIMESTAMP)`, messageID, conversationID, messageType, text, mediaURL, payload, event.id); err != nil {
 		return err
 	}
-	outboxPayload, _ := json.Marshal(map[string]any{"title": event.name, "body": text, "message_id": messageID, "type": "text"})
+	outboxPayload, _ := json.Marshal(map[string]any{"title": event.name, "body": text, "message_id": messageID, "type": messageType})
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO notification_outbox (id, user_id, companion_id, message_id, channel, payload, status)
 		VALUES ($1,$2,$3,$4,'push',$5,'ready') ON CONFLICT (message_id, channel) DO NOTHING`,
@@ -830,6 +1185,25 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 	}
 	s.recordRun(ctx, event.companionID, "proactive", modelID, "succeeded", "")
 	return nil
+}
+
+func stringSlice(value any) []string {
+	items := make([]string, 0)
+	switch values := value.(type) {
+	case []any:
+		for _, item := range values {
+			if text, ok := item.(string); ok && strings.TrimSpace(text) != "" {
+				items = append(items, text)
+			}
+		}
+	case []string:
+		for _, text := range values {
+			if strings.TrimSpace(text) != "" {
+				items = append(items, text)
+			}
+		}
+	}
+	return items
 }
 
 // DispatchPushOutbox delivers proactive messages through FCM even when the
@@ -967,12 +1341,14 @@ func (s *Service) loadCompanionForConversation(ctx context.Context, conversation
 	err := s.db.QueryRowContext(ctx, `
 		SELECT c.id, c.name, COALESCE(c.gender, ''), COALESCE(c.persona, ''), COALESCE(c.city, ''),
 		       COALESCE(c.occupation, ''), COALESCE(c.interests, ''), COALESCE(c.relationship_stage, 'stranger'),
-		       c.personality_tags::text, c.speaking_style, c.likes, c.dislikes, c.life_habits, c.life_goal, c.backstory
+		       c.personality_tags::text, c.speaking_style, c.likes, c.dislikes, c.life_habits, c.life_goal, c.backstory,
+		       c.voice_enabled,c.voice_config::text
 		FROM conversations v JOIN companions c ON c.id = v.companion_id
 		WHERE v.id = $1 AND v.user_id = $2 AND c.active = true`, conversationID, userID).Scan(
 		&profile.ID, &profile.Name, &profile.Gender, &profile.Persona, &profile.City, &profile.Occupation,
 		&profile.Interests, &profile.RelationshipStage, &profile.PersonalityTags, &profile.SpeakingStyle,
 		&profile.Likes, &profile.Dislikes, &profile.LifeHabits, &profile.LifeGoal, &profile.Backstory,
+		&profile.VoiceEnabled, &profile.VoiceConfig,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return profile, fmt.Errorf("conversation not found")
@@ -1051,6 +1427,10 @@ func (s *Service) loadRoutedModel(ctx context.Context, companionID, route string
 		column = "life_model_id"
 	} else if route == "proactive" {
 		column = "proactive_model_id"
+	} else if route == "transcription" {
+		column = "transcription_model_id"
+	} else if route == "speech" {
+		column = "speech_model_id"
 	}
 	var modelID sql.NullString
 	query := fmt.Sprintf(`SELECT COALESCE(c.model_id, s.%s) FROM companions c CROSS JOIN agent_settings s WHERE c.id = $1 AND s.id = 'default'`, column)
@@ -1090,11 +1470,11 @@ func (s *Service) loadModel(ctx context.Context, id string) (Model, error) {
 func (s *Service) loadLifeSettings(ctx context.Context) (lifeSettings, error) {
 	var settings lifeSettings
 	err := s.db.QueryRowContext(ctx, `
-		SELECT life_model_id, proactive_model_id, daily_event_min, daily_event_max,
-		       daily_proactive_limit, quiet_hours_start, quiet_hours_end
+		SELECT life_model_id, proactive_model_id, image_model_id, transcription_model_id,speech_model_id,daily_event_min, daily_event_max,
+		       daily_proactive_limit, daily_life_photo_limit, quiet_hours_start, quiet_hours_end
 		FROM agent_settings WHERE id = 'default'`).Scan(
-		&settings.LifeModelID, &settings.ProactiveModelID, &settings.DailyEventMin,
-		&settings.DailyEventMax, &settings.DailyProactiveLimit, &settings.QuietStart, &settings.QuietEnd)
+		&settings.LifeModelID, &settings.ProactiveModelID, &settings.ImageModelID, &settings.TranscriptionModelID, &settings.SpeechModelID, &settings.DailyEventMin,
+		&settings.DailyEventMax, &settings.DailyProactiveLimit, &settings.DailyLifePhotoLimit, &settings.QuietStart, &settings.QuietEnd)
 	return settings, err
 }
 
@@ -1136,7 +1516,7 @@ func (s *Service) recordRun(ctx context.Context, companionID, kind, modelID, sta
 		uuid.New().String(), companionID, kind, modelID, status, truncate(runError, 2000))
 }
 
-func (s *Service) updateRelationshipAndMemory(ctx context.Context, companionID, userText string) {
+func (s *Service) updateRelationshipAndMemory(ctx context.Context, companionID, userID, userText string) {
 	intimacyDelta := 0
 	if len([]rune(strings.TrimSpace(userText))) >= 20 {
 		intimacyDelta = 1
@@ -1159,11 +1539,33 @@ func (s *Service) updateRelationshipAndMemory(ctx context.Context, companionID, 
 		return
 	}
 	metadata, _ := json.Marshal(map[string]any{"source": "conversation", "captured_by": "rule_v1"})
+	var followUpAt any
+	if kind == "user_plan" || kind == "shared_commitment" {
+		var timezone string
+		_ = s.db.QueryRowContext(ctx, `SELECT COALESCE(timezone,'UTC') FROM users WHERE id=$1`, userID).Scan(&timezone)
+		location, _ := time.LoadLocation(timezone)
+		if location == nil {
+			location = time.UTC
+		}
+		followUpAt = inferFollowUpAt(userText, time.Now().In(location)).UTC()
+	}
 	_, _ = s.db.ExecContext(ctx, `
-		INSERT INTO memories (id,companion_id,type,content,importance,event_time,metadata)
-		SELECT $1,$2,$3,$4,$5,CURRENT_TIMESTAMP,$6
+		INSERT INTO memories (id,companion_id,type,content,importance,event_time,metadata,follow_up_at)
+		SELECT $1,$2,$3,$4,$5,CURRENT_TIMESTAMP,$6,$7
 		WHERE NOT EXISTS (SELECT 1 FROM memories WHERE companion_id=$2 AND content=$4)`,
-		uuid.New().String(), companionID, kind, strings.TrimSpace(userText), importance, string(metadata))
+		uuid.New().String(), companionID, kind, strings.TrimSpace(userText), importance, string(metadata), followUpAt)
+}
+
+func inferFollowUpAt(text string, now time.Time) time.Time {
+	normalized := strings.ToLower(text)
+	days := 1
+	if strings.Contains(normalized, "下周") || strings.Contains(normalized, "next week") {
+		days = 7
+	} else if strings.Contains(normalized, "下个月") || strings.Contains(normalized, "next month") {
+		days = 30
+	}
+	target := now.AddDate(0, 0, days)
+	return time.Date(target.Year(), target.Month(), target.Day(), 18, 0, 0, 0, target.Location())
 }
 
 func classifyMemory(text string) (string, int, bool) {

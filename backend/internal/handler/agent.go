@@ -49,9 +49,13 @@ type agentSettingsResponse struct {
 	ChatModelID          *string `json:"chat_model_id"`
 	LifeModelID          *string `json:"life_model_id"`
 	ProactiveModelID     *string `json:"proactive_model_id"`
+	ImageModelID         *string `json:"image_model_id"`
+	TranscriptionModelID *string `json:"transcription_model_id"`
+	SpeechModelID        *string `json:"speech_model_id"`
 	DailyEventMin        int     `json:"daily_event_min"`
 	DailyEventMax        int     `json:"daily_event_max"`
 	DailyProactiveLimit  int     `json:"daily_proactive_limit"`
+	DailyLifePhotoLimit  int     `json:"daily_life_photo_limit"`
 	QuietHoursStart      int     `json:"quiet_hours_start"`
 	QuietHoursEnd        int     `json:"quiet_hours_end"`
 	FreeDefaultChatHours int     `json:"free_default_chat_hours"`
@@ -252,16 +256,17 @@ func AdminUpdateAgentSettings(c *gin.Context) {
 	}
 	if input.DailyEventMin < 8 || input.DailyEventMax < input.DailyEventMin || input.DailyEventMax > 15 ||
 		input.DailyProactiveLimit < 0 || input.DailyProactiveLimit > 8 ||
+		input.DailyLifePhotoLimit < 0 || input.DailyLifePhotoLimit > 4 ||
 		input.QuietHoursStart < 0 || input.QuietHoursStart > 23 || input.QuietHoursEnd < 0 || input.QuietHoursEnd > 23 ||
 		input.FreeDefaultChatHours < 1 || input.FreeDefaultChatHours > 720 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid agent limits"})
 		return
 	}
 	_, err := db.Get().Exec(`
-		UPDATE agent_settings SET chat_model_id=$1,life_model_id=$2,proactive_model_id=$3,
-		daily_event_min=$4,daily_event_max=$5,daily_proactive_limit=$6,quiet_hours_start=$7,quiet_hours_end=$8,
-		free_default_chat_hours=$9,updated_at=CURRENT_TIMESTAMP WHERE id='default'`, input.ChatModelID, input.LifeModelID, input.ProactiveModelID,
-		input.DailyEventMin, input.DailyEventMax, input.DailyProactiveLimit, input.QuietHoursStart, input.QuietHoursEnd, input.FreeDefaultChatHours)
+		UPDATE agent_settings SET chat_model_id=$1,life_model_id=$2,proactive_model_id=$3,image_model_id=$4,transcription_model_id=$5,speech_model_id=$6,
+		daily_event_min=$7,daily_event_max=$8,daily_proactive_limit=$9,daily_life_photo_limit=$10,quiet_hours_start=$11,quiet_hours_end=$12,
+		free_default_chat_hours=$13,updated_at=CURRENT_TIMESTAMP WHERE id='default'`, input.ChatModelID, input.LifeModelID, input.ProactiveModelID, input.ImageModelID, input.TranscriptionModelID, input.SpeechModelID,
+		input.DailyEventMin, input.DailyEventMax, input.DailyProactiveLimit, input.DailyLifePhotoLimit, input.QuietHoursStart, input.QuietHoursEnd, input.FreeDefaultChatHours)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save agent settings"})
 		return
@@ -571,11 +576,14 @@ func loadAdminModels() ([]adminModel, error) {
 
 func loadAgentSettings() (agentSettingsResponse, error) {
 	var output agentSettingsResponse
-	var chat, life, proactive sql.NullString
-	err := db.Get().QueryRow(`SELECT chat_model_id,life_model_id,proactive_model_id,daily_event_min,daily_event_max,daily_proactive_limit,quiet_hours_start,quiet_hours_end,free_default_chat_hours FROM agent_settings WHERE id='default'`).Scan(&chat, &life, &proactive, &output.DailyEventMin, &output.DailyEventMax, &output.DailyProactiveLimit, &output.QuietHoursStart, &output.QuietHoursEnd, &output.FreeDefaultChatHours)
+	var chat, life, proactive, image, transcription, speech sql.NullString
+	err := db.Get().QueryRow(`SELECT chat_model_id,life_model_id,proactive_model_id,image_model_id,transcription_model_id,speech_model_id,daily_event_min,daily_event_max,daily_proactive_limit,daily_life_photo_limit,quiet_hours_start,quiet_hours_end,free_default_chat_hours FROM agent_settings WHERE id='default'`).Scan(&chat, &life, &proactive, &image, &transcription, &speech, &output.DailyEventMin, &output.DailyEventMax, &output.DailyProactiveLimit, &output.DailyLifePhotoLimit, &output.QuietHoursStart, &output.QuietHoursEnd, &output.FreeDefaultChatHours)
 	output.ChatModelID = nullString(chat)
 	output.LifeModelID = nullString(life)
 	output.ProactiveModelID = nullString(proactive)
+	output.ImageModelID = nullString(image)
+	output.TranscriptionModelID = nullString(transcription)
+	output.SpeechModelID = nullString(speech)
 	return output, err
 }
 

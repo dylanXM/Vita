@@ -311,9 +311,13 @@ export interface AgentSettings {
   chat_model_id: string | null;
   life_model_id: string | null;
   proactive_model_id: string | null;
+	image_model_id: string | null;
+	transcription_model_id: string | null;
+	speech_model_id: string | null;
   daily_event_min: number;
   daily_event_max: number;
   daily_proactive_limit: number;
+	daily_life_photo_limit: number;
   quiet_hours_start: number;
   quiet_hours_end: number;
   free_default_chat_hours: number;

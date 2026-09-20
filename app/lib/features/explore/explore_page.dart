@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -312,8 +314,8 @@ class _MomentMedia extends StatelessWidget {
         ),
         itemCount: visible.length,
         itemBuilder: (context, index) => ClipRect(
-          child: Image.network(
-            visible[index],
+          child: Image(
+            image: _momentImage(visible[index]),
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Container(
               color: context.vita.pageBg,
@@ -327,4 +329,11 @@ class _MomentMedia extends StatelessWidget {
       ),
     );
   }
+}
+
+ImageProvider _momentImage(String url) {
+  if (url.startsWith('data:image/') && url.contains(',')) {
+    return MemoryImage(base64Decode(url.substring(url.indexOf(',') + 1)));
+  }
+  return NetworkImage(url);
 }

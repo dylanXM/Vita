@@ -148,13 +148,16 @@ func main() {
 		{
 			memories.Use(middleware.RequireAuth())
 			memories.GET("/", handler.GetMemories)
+			memories.PUT("/:memory_id", handler.UpdateMemory)
+			memories.DELETE("/:memory_id", handler.DeleteMemory)
 		}
 		api.GET("/explore/posts", middleware.RequireAuth(), handler.GetExplorePosts)
 
 		media := api.Group("/media")
 		{
-			media.POST("/upload", handler.UploadMedia)
-			media.POST("/generate", handler.GenerateMedia)
+			media.POST("/upload", middleware.RequireAuth(), handler.UploadMedia)
+			media.POST("/generate", middleware.RequireAuth(), handler.GenerateMedia)
+			media.GET("/:id", handler.GetMedia)
 		}
 
 		api.GET("/health", handler.Health)

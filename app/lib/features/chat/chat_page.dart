@@ -1,11 +1,20 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 
+import '../../core/constants.dart';
 import '../../core/theme.dart';
 import '../../core/analytics_service.dart';
 import '../../shared/widgets.dart';
 import '../../core/api_client.dart';
 import '../billing/billing_controller.dart';
+import '../life/life_page.dart';
+import '../shell/shell_page.dart';
 import 'chat_controller.dart';
 
 /// Chat detail page — message bubbles (user right / companion left),
@@ -69,6 +78,10 @@ class _ChatPageState extends State<ChatPage> {
   );
   final _input = TextEditingController();
   final _scroll = ScrollController();
+  final _recorder = AudioRecorder();
+  final _player = AudioPlayer();
+  Timer? _recordingTimer;
+  bool _recording = false;
 
   @override
   void initState() {
@@ -80,10 +93,41 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   void dispose() {
+    _recorder.dispose();
+    _player.dispose();
+    _recordingTimer?.cancel();
     _input.dispose();
     _scroll.dispose();
     Get.delete<ChatController>(tag: widget.companionId);
     super.dispose();
+  }
+
+  Future<void> _toggleRecording() async {
+    if (_recording) {
+      _recordingTimer?.cancel();
+      final path = await _recorder.stop();
+      if (mounted) setState(() => _recording = false);
+      if (path != null) await ctrl.sendVoice(path);
+      return;
+    }
+    if (!await _recorder.hasPermission()) return;
+    final directory = await getTemporaryDirectory();
+    final path =
+        '${directory.path}/vita_voice_${DateTime.now().microsecondsSinceEpoch}.m4a';
+    await _recorder.start(
+        const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 64000),
+        path: path);
+    if (mounted) setState(() => _recording = true);
+    _recordingTimer = Timer(const Duration(seconds: 60), () {
+      if (_recording && mounted) _toggleRecording();
+    });
+  }
+
+  Future<void> _playVoice(String url) async {
+    final resolved = url.startsWith('http')
+        ? url
+        : '${vitaApiBaseUrl.replaceFirst(RegExp(r'/+$'), '')}${url.startsWith('/') ? url : '/$url'}';
+    await _player.play(UrlSource(resolved));
   }
 
   void _send() {
@@ -285,11 +329,26 @@ class _ChatPageState extends State<ChatPage> {
                 radius: 17,
                 imageUrl: widget.companion?['portrait_url'] as String?),
             const SizedBox(width: 9),
-            Text(widget.name,
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: context.vita.text)),
+            Obx(() => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(widget.name,
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: context.vita.text)),
+                    if (ctrl.companionStatus.value.isNotEmpty)
+                      Text(
+                          ctrl.companionBusy.value
+                              ? ctrl.companionStatus.value
+                              : 'chat.available'.tr,
+                          style: TextStyle(
+                              fontSize: 11, color: context.vita.subText),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                  ],
+                )),
           ],
         ),
         actions: [
@@ -402,10 +461,11 @@ class _ChatPageState extends State<ChatPage> {
                         ? null
                         : Border.all(color: context.vita.divider, width: 0.5),
                   ),
-                  child: Text(
-                    content,
-                    style: TextStyle(
-                        fontSize: 16, color: context.vita.text, height: 1.4),
+                  child: _ChatMessageBody(
+                    message: m,
+                    content: content,
+                    companionId: widget.companionId,
+                    onPlayVoice: _playVoice,
                   ),
                 ),
               ),
@@ -433,6 +493,12 @@ class _ChatPageState extends State<ChatPage> {
           12, 8, 12, 8 + MediaQuery.of(context).padding.bottom),
       child: Row(
         children: [
+          IconButton(
+            onPressed: locked || ctrl.sending.value ? null : _toggleRecording,
+            tooltip: _recording ? 'chat.voiceStop'.tr : 'chat.voice'.tr,
+            icon: Icon(_recording ? Icons.stop_circle_outlined : Icons.mic_none,
+                color: _recording ? Colors.red : context.vita.subText),
+          ),
           IconButton(
             onPressed: locked ? null : _showEmojiPicker,
             tooltip: 'chat.emoji'.tr,
@@ -485,6 +551,108 @@ class _ChatPageState extends State<ChatPage> {
       ),
     );
   }
+}
+
+class _ChatMessageBody extends StatelessWidget {
+  const _ChatMessageBody({
+    required this.message,
+    required this.content,
+    required this.companionId,
+    required this.onPlayVoice,
+  });
+
+  final Map<String, dynamic> message;
+  final String content;
+  final String companionId;
+  final ValueChanged<String> onPlayVoice;
+
+  @override
+  Widget build(BuildContext context) {
+    final type = message['message_type'] as String? ?? 'text';
+    final payload = message['payload'] is Map
+        ? Map<String, dynamic>.from(message['payload'] as Map)
+        : const <String, dynamic>{};
+    final mediaURL = message['media_url'] as String? ?? '';
+    final children = <Widget>[];
+    if (type == 'voice' && mediaURL.isNotEmpty) {
+      children.add(InkWell(
+        onTap: () => onPlayVoice(mediaURL),
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.play_circle_fill, color: context.vita.green, size: 28),
+            const SizedBox(width: 7),
+            Text('chat.voiceMessage'.tr,
+                style: TextStyle(color: context.vita.text)),
+          ]),
+        ),
+      ));
+    } else if (mediaURL.isNotEmpty) {
+      children.add(ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: AspectRatio(
+          aspectRatio: 4 / 3,
+          child: Image(image: _messageImage(mediaURL), fit: BoxFit.cover),
+        ),
+      ));
+    }
+    if (content.isNotEmpty) {
+      if (children.isNotEmpty) children.add(const SizedBox(height: 7));
+      children.add(Text(content,
+          style: TextStyle(
+              fontSize: type == 'voice' ? 13 : 16,
+              color: type == 'voice' ? context.vita.subText : context.vita.text,
+              height: 1.4)));
+    }
+    if (type == 'life_card') {
+      if (children.isNotEmpty) children.add(const SizedBox(height: 8));
+      children.add(InkWell(
+        onTap: () {
+          Get.back();
+          LifeController.to.selectedId.value = companionId;
+          LifeController.to.loadEvents();
+          ShellController.to.switchTo(1);
+        },
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+              color: context.vita.pageBg,
+              borderRadius: BorderRadius.circular(6)),
+          child: Row(children: [
+            Icon(Icons.access_time, size: 18, color: context.vita.green),
+            const SizedBox(width: 8),
+            Expanded(
+                child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(payload['event_title'] as String? ?? '',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: context.vita.text)),
+                if ((payload['event_location'] as String? ?? '').isNotEmpty)
+                  Text(payload['event_location'] as String,
+                      style:
+                          TextStyle(fontSize: 11, color: context.vita.subText)),
+              ],
+            )),
+            Icon(Icons.chevron_right, size: 18, color: context.vita.hint),
+          ]),
+        ),
+      ));
+    }
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.start, children: children);
+  }
+}
+
+ImageProvider _messageImage(String url) {
+  if (url.startsWith('data:image/') && url.contains(',')) {
+    return MemoryImage(base64Decode(url.substring(url.indexOf(',') + 1)));
+  }
+  return NetworkImage(url);
 }
 
 class _SheetInfoRow extends StatelessWidget {

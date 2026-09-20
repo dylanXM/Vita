@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
 )
 
 const maxProviderResponseBytes = 4 << 20
+const maxImageProviderResponseBytes = 16 << 20
 
 type ChatMessage struct {
 	Role    string `json:"role"`
@@ -33,6 +35,93 @@ type GenerateRequest struct {
 	MaxTokens   int
 }
 
+type GenerateImageRequest struct {
+	Prompt string
+	Size   string
+}
+
+func (c *Client) TranscribeAudio(ctx context.Context, model Model, filename, mimeType string, audio []byte) (string, error) {
+	if model.Kind != "openai" {
+		return "", fmt.Errorf("audio transcription is unsupported for provider kind %q", model.Kind)
+	}
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	_ = writer.WriteField("model", model.ModelName)
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return "", err
+	}
+	if _, err := part.Write(audio); err != nil {
+		return "", err
+	}
+	if err := writer.Close(); err != nil {
+		return "", err
+	}
+	endpoint := strings.TrimRight(defaultBaseURL(model.Kind, model.BaseURL), "/") + "/v1/audio/transcriptions"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, &body)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+model.APIKey)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("provider request: %w", err)
+	}
+	defer resp.Body.Close()
+	reader := io.LimitReader(resp.Body, maxProviderResponseBytes)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		raw, _ := io.ReadAll(reader)
+		return "", fmt.Errorf("provider returned %s: %s", resp.Status, strings.TrimSpace(string(raw)))
+	}
+	var output struct {
+		Text string `json:"text"`
+	}
+	if err := json.NewDecoder(reader).Decode(&output); err != nil {
+		return "", fmt.Errorf("decode transcription response: %w", err)
+	}
+	if strings.TrimSpace(output.Text) == "" {
+		return "", fmt.Errorf("provider returned an empty transcription")
+	}
+	return strings.TrimSpace(output.Text), nil
+}
+
+func (c *Client) GenerateSpeech(ctx context.Context, model Model, text, voice string) ([]byte, string, error) {
+	if model.Kind != "openai" {
+		return nil, "", fmt.Errorf("speech generation is unsupported for provider kind %q", model.Kind)
+	}
+	if strings.TrimSpace(voice) == "" {
+		voice = "alloy"
+	}
+	body, _ := json.Marshal(map[string]any{"model": model.ModelName, "voice": voice, "input": text, "response_format": "mp3"})
+	endpoint := strings.TrimRight(defaultBaseURL(model.Kind, model.BaseURL), "/") + "/v1/audio/speech"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+model.APIKey)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("provider request: %w", err)
+	}
+	defer resp.Body.Close()
+	reader := io.LimitReader(resp.Body, 10<<20)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		raw, _ := io.ReadAll(reader)
+		return nil, "", fmt.Errorf("provider returned %s: %s", resp.Status, strings.TrimSpace(string(raw)))
+	}
+	audio, err := io.ReadAll(reader)
+	if err != nil || len(audio) == 0 {
+		return nil, "", fmt.Errorf("provider returned empty speech audio")
+	}
+	mimeType := resp.Header.Get("Content-Type")
+	if mimeType == "" {
+		mimeType = "audio/mpeg"
+	}
+	return audio, mimeType, nil
+}
+
 type Client struct {
 	httpClient *http.Client
 }
@@ -50,6 +139,37 @@ func (c *Client) GenerateText(ctx context.Context, model Model, input GenerateRe
 	default:
 		return "", fmt.Errorf("unsupported provider kind %q", model.Kind)
 	}
+}
+
+func (c *Client) GenerateImage(ctx context.Context, model Model, input GenerateImageRequest) (string, error) {
+	if model.Kind != "openai" {
+		return "", fmt.Errorf("image generation is unsupported for provider kind %q", model.Kind)
+	}
+	size := strings.TrimSpace(input.Size)
+	if size == "" {
+		size = "1024x1024"
+	}
+	body := map[string]any{"model": model.ModelName, "prompt": input.Prompt, "size": size, "n": 1}
+	var response struct {
+		Data []struct {
+			URL     string `json:"url"`
+			B64JSON string `json:"b64_json"`
+		} `json:"data"`
+	}
+	endpoint := strings.TrimRight(defaultBaseURL(model.Kind, model.BaseURL), "/") + "/v1/images/generations"
+	if err := c.doJSONWithLimit(ctx, endpoint, model.APIKey, "", body, &response, maxImageProviderResponseBytes); err != nil {
+		return "", err
+	}
+	if len(response.Data) == 0 {
+		return "", fmt.Errorf("openai-compatible provider returned no image")
+	}
+	if imageURL := strings.TrimSpace(response.Data[0].URL); imageURL != "" {
+		return imageURL, nil
+	}
+	if encoded := strings.TrimSpace(response.Data[0].B64JSON); encoded != "" {
+		return "data:image/png;base64," + encoded, nil
+	}
+	return "", fmt.Errorf("openai-compatible provider returned an empty image")
 }
 
 func (c *Client) openAI(ctx context.Context, model Model, input GenerateRequest) (string, error) {
@@ -106,6 +226,10 @@ func (c *Client) anthropic(ctx context.Context, model Model, input GenerateReque
 }
 
 func (c *Client) doJSON(ctx context.Context, endpoint, apiKey, anthropicVersion string, body any, output any) error {
+	return c.doJSONWithLimit(ctx, endpoint, apiKey, anthropicVersion, body, output, maxProviderResponseBytes)
+}
+
+func (c *Client) doJSONWithLimit(ctx context.Context, endpoint, apiKey, anthropicVersion string, body any, output any, responseLimit int64) error {
 	encoded, err := json.Marshal(body)
 	if err != nil {
 		return fmt.Errorf("encode provider request: %w", err)
@@ -126,7 +250,7 @@ func (c *Client) doJSON(ctx context.Context, endpoint, apiKey, anthropicVersion 
 		return fmt.Errorf("provider request: %w", err)
 	}
 	defer resp.Body.Close()
-	reader := io.LimitReader(resp.Body, maxProviderResponseBytes)
+	reader := io.LimitReader(resp.Body, responseLimit)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		raw, _ := io.ReadAll(reader)
 		return fmt.Errorf("provider returned %s: %s", resp.Status, strings.TrimSpace(string(raw)))

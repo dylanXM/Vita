@@ -17,6 +17,8 @@ class ChatController extends GetxController {
   final sending = false.obs;
   final messages = <Map<String, dynamic>>[].obs;
   final accessError = RxnString();
+  final companionStatus = ''.obs;
+  final companionBusy = false.obs;
   String? _conversationId;
   Timer? _pollTimer;
   bool _polling = false;
@@ -44,6 +46,11 @@ class ChatController extends GetxController {
         data: {'companion_id': companionId},
       );
       _conversationId = conv['conversation_id'] as String?;
+      final status = conv['companion_status'];
+      if (status is Map) {
+        companionStatus.value = status['title'] as String? ?? '';
+        companionBusy.value = status['busy'] == true;
+      }
       if (conv['can_send'] == false) {
         accessError.value =
             conv['access_code'] as String? ?? 'subscription_required';
@@ -133,6 +140,38 @@ class ChatController extends GetxController {
         'companion_id': companionId,
         'reason': e.code ?? e.message,
       });
+      if (e.action == 'open_subscription') {
+        accessError.value = e.code ?? 'subscription_required';
+      } else {
+        rethrow;
+      }
+    } finally {
+      sending.value = false;
+    }
+  }
+
+  Future<void> sendVoice(String filePath) async {
+    if (_conversationId == null || sending.value) return;
+    sending.value = true;
+    try {
+      final uploaded = await ApiClient.instance
+          .upload('/v1/media/upload', filePath, kind: 'audio');
+      if (uploaded is! Map || uploaded['id'] is! String) return;
+      final data = await ApiClient.instance.post(
+        '/v1/conversations/$_conversationId/messages',
+        data: {'message_type': 'voice', 'media_id': uploaded['id']},
+      );
+      if (data is Map) {
+        final userMessage = data['user_message'];
+        final companionMessage = data['companion_message'];
+        if (userMessage is Map) {
+          _addIfNew(Map<String, dynamic>.from(userMessage));
+        }
+        if (companionMessage is Map) {
+          _addIfNew(Map<String, dynamic>.from(companionMessage));
+        }
+      }
+    } on ApiException catch (e) {
       if (e.action == 'open_subscription') {
         accessError.value = e.code ?? 'subscription_required';
       } else {
