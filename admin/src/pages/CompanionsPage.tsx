@@ -54,10 +54,19 @@ export function CompanionsPage() {
         title={t("companions.title")}
         description={t("companions.desc")}
         actions={
-          <Button variant="outline" size="sm" onClick={() => void list.refetch()} disabled={list.isFetching}>
-            <RefreshCw className={list.isFetching ? "animate-spin" : undefined} />
-            {t("common.refresh")}
-          </Button>
+          <>
+            <Button variant="outline" size="sm" onClick={() => void list.refetch()} disabled={list.isFetching}>
+              <RefreshCw className={list.isFetching ? "animate-spin" : undefined} />
+              {t("common.refresh")}
+            </Button>
+            <Select value={environment || "all"} onValueChange={(value) => setEnvironment(value === "all" ? "" : value)}>
+              <SelectTrigger className="lg:w-40"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("users.allEnvironments")}</SelectItem>
+                {ENVIRONMENTS.map((env) => <SelectItem key={env} value={env}>{t(`users.env${env[0].toUpperCase()}${env.slice(1)}`)}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </>
         }
       />
       <Card>
@@ -73,13 +82,6 @@ export function CompanionsPage() {
                 <SelectItem value="all">{t("companions.allStatus")}</SelectItem>
                 <SelectItem value="active">{t("companions.active")}</SelectItem>
                 <SelectItem value="inactive">{t("companions.inactive")}</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={environment || "all"} onValueChange={(value) => setEnvironment(value === "all" ? "" : value)}>
-              <SelectTrigger className="lg:w-40"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("users.allEnvironments")}</SelectItem>
-                {ENVIRONMENTS.map((env) => <SelectItem key={env} value={env}>{t(`users.env${env[0].toUpperCase()}${env.slice(1)}`)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

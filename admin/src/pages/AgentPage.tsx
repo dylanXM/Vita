@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bot, ImagePlus, Pencil, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { agentApi } from "@/api/admin";
+import { agentApi, envApi } from "@/api/admin";
+import { ENVIRONMENTS, type Environment } from "@/api/types";
 import type {
   AgentSettings,
   AIModel,
@@ -21,6 +22,7 @@ import { errorMessage } from "@/api/client";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -71,13 +73,23 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export function AgentPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const serverEnv = useQuery({ queryKey: ["admin-environment"], queryFn: ({ signal }) => envApi.get(signal) });
+  const [environment, setEnvironment] = useState<Environment | null>(null);
+  const activeEnv = environment ?? serverEnv.data?.environment;
+
+  useEffect(() => {
+    if (!environment && serverEnv.data?.environment) setEnvironment(serverEnv.data.environment);
+  }, [environment, serverEnv.data]);
+
   const configQuery = useQuery({
-    queryKey: ["agent-config"],
-    queryFn: ({ signal }) => agentApi.config(signal),
+    queryKey: ["agent-config", activeEnv],
+    queryFn: ({ signal }) => agentApi.config(activeEnv ?? undefined, signal),
+    enabled: Boolean(activeEnv),
   });
   const companionsQuery = useQuery({
-    queryKey: ["agent-companions"],
-    queryFn: ({ signal }) => agentApi.companions(signal),
+    queryKey: ["agent-companions", activeEnv],
+    queryFn: ({ signal }) => agentApi.companions(activeEnv ?? undefined, signal),
+    enabled: Boolean(activeEnv),
   });
 
   const refresh = () => {
@@ -91,9 +103,17 @@ export function AgentPage() {
         title={t("agent.title")}
         description={t("agent.desc")}
         actions={
-          <Button variant="outline" onClick={refresh}>
-            <RefreshCw /> {t("common.refresh")}
-          </Button>
+          <>
+            <Button variant="outline" onClick={refresh}>
+              <RefreshCw /> {t("common.refresh")}
+            </Button>
+            <Select value={activeEnv ?? ""} onValueChange={(v) => setEnvironment(v as Environment)}>
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {ENVIRONMENTS.map((env) => <SelectItem key={env} value={env}>{t(`billing.env.${env}`)}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </>
         }
       />
       {configQuery.isLoading ? (
@@ -106,7 +126,12 @@ export function AgentPage() {
       ) : (
         <>
           <ProviderSection providers={configQuery.data.providers} onSaved={refresh} />
-          <ModelSection providers={configQuery.data.providers} models={configQuery.data.models} subscriptionPlans={configQuery.data.subscription_plans} onSaved={refresh} />
+          <ModelSection
+            providers={configQuery.data.providers}
+            models={configQuery.data.models}
+            subscriptionPlans={(configQuery.data.subscription_plans ?? []).filter((plan) => !activeEnv || plan.environment === activeEnv)}
+            onSaved={refresh}
+          />
           <SettingsSection initial={configQuery.data.settings} onSaved={refresh} />
           <PortraitSection portraits={configQuery.data.portraits} onSaved={refresh} />
         </>

@@ -40,7 +40,9 @@ export function BillingActivityPage() {
   const result = tab === "purchases" ? purchases : ledger;
 
   return <div className="space-y-6">
-    <PageHeader title={t("billing.activityTitle")} description={t("billing.activityDesc")} />
+    <PageHeader title={t("billing.activityTitle")} description={t("billing.activityDesc")} actions={
+      <Select value={activeEnv ?? ""} onValueChange={(v) => setEnvironment(v as Environment)}><SelectTrigger className="w-44"><SelectValue placeholder={t("billing.environment")} /></SelectTrigger><SelectContent>{ENVIRONMENTS.map((env) => <SelectItem key={env} value={env}>{t(`billing.env.${env}`)}</SelectItem>)}</SelectContent></Select>
+    } />
     <Card><CardContent className="space-y-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-2">
@@ -48,7 +50,6 @@ export function BillingActivityPage() {
           <Button size="sm" variant={tab === "ledger" ? "default" : "outline"} onClick={() => setTab("ledger")}>{t("billing.ledger")}</Button>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Select value={activeEnv ?? ""} onValueChange={(v) => setEnvironment(v as Environment)}><SelectTrigger className="w-44"><SelectValue placeholder={t("billing.environment")} /></SelectTrigger><SelectContent>{ENVIRONMENTS.map((env) => <SelectItem key={env} value={env}>{t(`billing.env.${env}`)}</SelectItem>)}</SelectContent></Select>
           <Select value={platform} onValueChange={(v) => setPlatform(v as ActivityPlatform)}><SelectTrigger className="w-44"><SelectValue /></SelectTrigger><SelectContent>
             <SelectItem value="all">{t("billing.allPlatforms")}</SelectItem>
             {(["ios","android","web","system"] as const).map((value) => <SelectItem key={value} value={value}>{t(`billing.platform.${value}`)}</SelectItem>)}

@@ -183,7 +183,8 @@ export const legalDocumentsApi = {
 };
 
 export const agentApi = {
-  config: (signal?: AbortSignal) => http.get<AgentConfig>("/admin/agent/config", { signal }),
+  config: (env?: string, signal?: AbortSignal) =>
+    http.get<AgentConfig>("/admin/agent/config", { signal, params: env ? { environment: env } : undefined }),
   saveSettings: (body: AgentSettings) => http.put<AgentSettings>("/admin/agent/settings", body),
   createProvider: (body: AIProviderInput) => http.post<AIProvider>("/admin/agent/providers", body),
   updateProvider: (id: string, body: AIProviderInput) =>
@@ -209,8 +210,8 @@ export const agentApi = {
     http.post<CompanionPortrait>("/admin/agent/portraits", body),
   updatePortrait: (id: string, body: Omit<CompanionPortrait, "id">) =>
     http.put<CompanionPortrait>(`/admin/agent/portraits/${id}`, body),
-  companions: (signal?: AbortSignal) =>
-    http.get<{ items: AdminCompanion[] }>("/admin/agent/companions", { signal }),
+  companions: (env?: string, signal?: AbortSignal) =>
+    http.get<{ items: AdminCompanion[] }>("/admin/agent/companions", { signal, params: env ? { environment: env } : undefined }),
   createCompanion: (body: AdminCompanionInput) =>
     http.post<{ id: string }>("/admin/agent/companions", body),
   updateCompanion: (id: string, body: AdminCompanionInput) =>

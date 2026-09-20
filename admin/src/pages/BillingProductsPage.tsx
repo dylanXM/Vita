@@ -70,16 +70,18 @@ function BillingProductsPage({ plan }: { plan: boolean }) {
   return (
     <div className="space-y-6">
       <PageHeader title={t(titleKey)} description={t(descKey)} actions={
-        <Button size="sm" disabled={!activeEnv} onClick={() => { setEditing(null); setDialogOpen(true); }}>
-          <Plus />{t(plan ? "billing.addPlan" : "billing.addPack")}
-        </Button>
-      } />
-      <Card><CardContent className="space-y-4 p-4">
-        <div className="flex flex-wrap gap-3">
+        <>
           <Select value={activeEnv ?? ""} onValueChange={(v) => setEnvironment(v as Environment)}>
             <SelectTrigger className="w-44"><SelectValue placeholder={t("billing.environment")} /></SelectTrigger>
             <SelectContent>{ENVIRONMENTS.map((env) => <SelectItem key={env} value={env}>{t(`billing.env.${env}`)}</SelectItem>)}</SelectContent>
           </Select>
+          <Button size="sm" disabled={!activeEnv} onClick={() => { setEditing(null); setDialogOpen(true); }}>
+            <Plus />{t(plan ? "billing.addPlan" : "billing.addPack")}
+          </Button>
+        </>
+      } />
+      <Card><CardContent className="space-y-4 p-4">
+        <div className="flex flex-wrap gap-3">
           <Select value={platform} onValueChange={(v) => setPlatform(v as BillingPlatform | "all")}>
             <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
             <SelectContent>

@@ -398,6 +398,19 @@ export function UsersPage() {
               <RefreshCw className={list.isFetching ? "animate-spin" : undefined} />
               {t("common.refresh")}
             </Button>
+            <Select value={env === "" ? "all" : env} onValueChange={(v) => setEnv(v === "all" ? "" : v)}>
+              <SelectTrigger className="sm:w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("users.allEnvironments")}</SelectItem>
+                {ENVIRONMENTS.map((e) => (
+                  <SelectItem key={e} value={e}>
+                    {t(`users.env${e[0].toUpperCase()}${e.slice(1)}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button size="sm" onClick={() => { setDialogUser(null); setDialogOpen(true); }}>
               <Plus />
               {t("users.createUser")}
@@ -444,19 +457,6 @@ export function UsersPage() {
                   <SelectItem value="all">{t("users.allStatus")}</SelectItem>
                   <SelectItem value="active">{t("users.statusActive")}</SelectItem>
                   <SelectItem value="banned">{t("users.statusBanned")}</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={env === "" ? "all" : env} onValueChange={(v) => setEnv(v === "all" ? "" : v)}>
-                <SelectTrigger className="sm:w-36">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("users.allEnvironments")}</SelectItem>
-                  {ENVIRONMENTS.map((e) => (
-                    <SelectItem key={e} value={e}>
-                      {t(`users.env${e[0].toUpperCase()}${e.slice(1)}`)}
-                    </SelectItem>
-                  ))}
                 </SelectContent>
               </Select>
             </div>

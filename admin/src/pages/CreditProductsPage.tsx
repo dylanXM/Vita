@@ -34,17 +34,18 @@ export function CreditProductsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("creditProducts.title")} description={t("creditProducts.description")} />
-      <div className="w-44">
-        <Select value={environment} onValueChange={(value) => setEnvironment(value as Environment)}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="dev">Dev</SelectItem>
-            <SelectItem value="beta">Beta</SelectItem>
-            <SelectItem value="prod">Prod</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <PageHeader title={t("creditProducts.title")} description={t("creditProducts.description")} actions={
+        <div className="w-44">
+          <Select value={environment} onValueChange={(value) => setEnvironment(value as Environment)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="dev">Dev</SelectItem>
+              <SelectItem value="beta">Beta</SelectItem>
+              <SelectItem value="prod">Prod</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      } />
       <div className="overflow-hidden rounded-lg border bg-card">
         <Table>
           <TableHeader><TableRow>
