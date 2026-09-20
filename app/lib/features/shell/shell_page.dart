@@ -10,11 +10,11 @@ import '../../core/theme.dart';
 import '../chat/chat_list_page.dart';
 import '../life/life_page.dart';
 import '../me/me_page.dart';
-import '../memories/memories_page.dart';
+import '../explore/explore_page.dart';
 import '../whats_new/whats_new_sheet.dart';
 
 /// Main shell — iOS 27 style: content scrolls edge to edge behind a
-/// floating Liquid Glass tab capsule (Chat | Life | Memories | Me).
+/// floating Liquid Glass tab capsule (Chat | Life | Explore | Me).
 class ShellController extends GetxController {
   static ShellController get to => Get.find();
 
@@ -22,11 +22,16 @@ class ShellController extends GetxController {
 
   void switchTo(int i) {
     if (i == index.value) return;
-    const tabs = ['chat', 'life', 'memories', 'me'];
+    const tabs = ['chat', 'life', 'explore', 'me'];
     AnalyticsService.to.track('tab_selected',
         category: 'navigation',
         properties: {'from': tabs[index.value], 'to': tabs[i]});
     index.value = i;
+    if (i == 1) {
+      LifeController.to.loadCompanions();
+    } else if (i == 2) {
+      ExploreController.to.loadPosts();
+    }
   }
 }
 
@@ -61,7 +66,7 @@ class _ShellPageState extends State<ShellPage> {
           children: const [
             ChatListPage(),
             LifePage(),
-            MemoriesPage(),
+            ExplorePage(),
             MePage(),
           ],
         ),
@@ -94,13 +99,13 @@ const List<_NavItem> _kTabs = [
   ),
   _NavItem(
     labelKey: 'tab.life',
-    icon: Icons.explore_outlined,
-    activeIcon: Icons.explore,
+    icon: Icons.access_time_outlined,
+    activeIcon: Icons.access_time_filled,
   ),
   _NavItem(
-    labelKey: 'tab.memories',
-    icon: Icons.bookmark_border_rounded,
-    activeIcon: Icons.bookmark_rounded,
+    labelKey: 'tab.explore',
+    icon: Icons.explore_outlined,
+    activeIcon: Icons.explore,
   ),
   _NavItem(
     labelKey: 'tab.me',

@@ -1272,6 +1272,72 @@ func GetMemories(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"memories": memories})
 }
 
+// GetExplorePosts returns posts from the user's own companions and characters
+// they have met. The query intentionally exposes character-facing fields only;
+// no owner identity, chat content or private memory crosses user boundaries.
+func GetExplorePosts(c *gin.Context) {
+	rows, err := db.Get().Query(`
+		WITH owned AS (
+			SELECT c.id FROM companions c WHERE c.user_id=$1 AND c.active=true AND c.life_enabled=true
+			  AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active'
+			    AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP))
+		), visible AS (
+			SELECT id FROM owned
+			UNION
+			SELECT CASE WHEN r.companion_a_id=o.id THEN r.companion_b_id ELSE r.companion_a_id END
+			FROM companion_relationships r JOIN owned o ON o.id IN (r.companion_a_id,r.companion_b_id)
+			WHERE r.status='active'
+		)
+		SELECT p.id,p.post_type,p.content,p.media_urls::text,p.payload::text,p.published_at,
+		       author.id,author.name,COALESCE(ap.image_url,''),
+		       related.id,related.name,COALESCE(rp.image_url,''),
+		       (author.user_id=$1)
+		FROM moment_posts p
+		JOIN visible v ON v.id=p.author_companion_id
+		JOIN companions author ON author.id=p.author_companion_id AND author.active=true
+		LEFT JOIN companion_portraits ap ON ap.id=author.portrait_id
+		LEFT JOIN life_events le ON le.id=p.life_event_id
+		LEFT JOIN companions related ON related.id=le.related_companion_id
+		LEFT JOIN companion_portraits rp ON rp.id=related.portrait_id
+		ORDER BY p.published_at DESC LIMIT 100`, c.GetString("user_id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load explore posts"})
+		return
+	}
+	defer rows.Close()
+	posts := make([]gin.H, 0)
+	for rows.Next() {
+		var id, postType, content, mediaRaw, payloadRaw string
+		var published time.Time
+		var authorID, authorName, authorPortrait string
+		var relatedID, relatedName, relatedPortrait sql.NullString
+		var own bool
+		if err := rows.Scan(&id, &postType, &content, &mediaRaw, &payloadRaw, &published, &authorID, &authorName, &authorPortrait, &relatedID, &relatedName, &relatedPortrait, &own); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read explore posts"})
+			return
+		}
+		media := make([]string, 0)
+		payload := map[string]any{}
+		_ = json.Unmarshal([]byte(mediaRaw), &media)
+		_ = json.Unmarshal([]byte(payloadRaw), &payload)
+		var related any
+		if relatedID.Valid {
+			related = gin.H{"id": relatedID.String, "name": relatedName.String, "portrait_url": relatedPortrait.String}
+		}
+		posts = append(posts, gin.H{
+			"id": id, "post_type": postType, "content": content, "media_urls": media,
+			"payload": payload, "published_at": published, "is_own_companion": own,
+			"author":            gin.H{"id": authorID, "name": authorName, "portrait_url": authorPortrait},
+			"related_companion": related,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load explore posts"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"posts": posts})
+}
+
 func UploadMedia(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"url": "https://storage.example.com/uploaded"})
 }

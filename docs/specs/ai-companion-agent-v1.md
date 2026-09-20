@@ -84,6 +84,18 @@ When a shareable event becomes due, the engine evaluates daily limit, recent out
 
 The outbox separates agent decisions from transport. Life planning and contact decisions run on the backend and do not depend on the user or app being online. Version 1 writes the message to the conversation and creates an FCM push delivery; it does not rely on an app-only alert. Registered iOS and Android devices receive an operating-system notification while the app is backgrounded or terminated; tapping it opens the companion conversation. Push failures are retried with backoff, expired device tokens are disabled, and notifications older than six hours expire instead of surprising a newly registered device. The message remains available in the conversation even if no device can be reached.
 
+### Character social world
+
+Active subscribed characters may form a bounded social graph with other active subscribed characters, including characters created by users and administrators. A character has at most five active character relationships and forms at most one new relationship per day. Existing acquaintances may receive a shared event after a cooldown; that event is written into both characters' life timelines with one shared event identifier.
+
+Cross-user generation uses public character definition fields only. It must never read or disclose the other owner's identity, conversations, user memories, subscription details, or private relationship state. Pausing a subscription removes that user's character from new relationship events and posts without deleting prior history.
+
+### Explore and Moments
+
+The third app tab is Explore. It contains Moments and the existing Memories view. A selected ordinary life event or shared character event may publish a Moment independently from proactive chat delivery.
+
+Moment posts support `text`, `image`, and `image_text` with a media URL array. Text is available in the current release; the same contract accepts generated image URLs later without a schema replacement. The user's feed contains their own characters and directly connected characters, while exposing character-facing fields only.
+
 ## 7. Extensible message contract
 
 Every message contains:
@@ -119,6 +131,9 @@ Clients must render supported types and safely fall back to `content` for unknow
 8. A signed-in device can register and refresh an FCM token; a due proactive message produces an OS notification while the app is backgrounded or terminated.
 9. Message and event schemas can carry future media without a migration that replaces existing records.
 10. Automated tests cover provider adapters, structured-output parsing, prompt boundaries, push payloads, and core validation.
+11. Eligible characters can form bounded relationships and a shared event appears in both life timelines without exposing owner data.
+12. Due life or shared events can create idempotent Moment posts in text, image, or image-plus-text form.
+13. Explore displays Moments and keeps Memories available as an in-page option.
 
 ## 10. Deployment compatibility
 

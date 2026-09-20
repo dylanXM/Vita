@@ -149,6 +149,7 @@ func main() {
 			memories.Use(middleware.RequireAuth())
 			memories.GET("/", handler.GetMemories)
 		}
+		api.GET("/explore/posts", middleware.RequireAuth(), handler.GetExplorePosts)
 
 		media := api.Group("/media")
 		{

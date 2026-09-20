@@ -65,16 +65,31 @@ type companionContext struct {
 }
 
 type lifePlanEvent struct {
-	Type          string `json:"type"`
-	Title         string `json:"title"`
-	Description   string `json:"description"`
-	Location      string `json:"location"`
-	Start         string `json:"start"`
-	End           string `json:"end"`
-	Emotion       string `json:"emotion"`
-	Importance    int    `json:"importance"`
-	UserRelevance int    `json:"user_relevance"`
-	Share         bool   `json:"share"`
+	Type          string   `json:"type"`
+	Title         string   `json:"title"`
+	Description   string   `json:"description"`
+	Location      string   `json:"location"`
+	Start         string   `json:"start"`
+	End           string   `json:"end"`
+	Emotion       string   `json:"emotion"`
+	Importance    int      `json:"importance"`
+	UserRelevance int      `json:"user_relevance"`
+	Share         bool     `json:"share"`
+	Moment        bool     `json:"moment"`
+	MomentText    string   `json:"moment_text"`
+	MediaURLs     []string `json:"media_urls"`
+}
+
+type socialPlanEvent struct {
+	Type        string `json:"type"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Location    string `json:"location"`
+	Emotion     string `json:"emotion"`
+	Importance  int    `json:"importance"`
+	Moment      bool   `json:"moment"`
+	PostTextA   string `json:"post_text_a"`
+	PostTextB   string `json:"post_text_b"`
 }
 
 type lifeSettings struct {
@@ -117,6 +132,12 @@ func (s *Service) Run(ctx context.Context, interval time.Duration) {
 func (s *Service) runTick(ctx context.Context) {
 	if err := s.EnsureDailyPlans(ctx); err != nil {
 		log.Printf("agent life planning: %v", err)
+	}
+	if err := s.EnsureCompanionSocialWorld(ctx); err != nil {
+		log.Printf("agent social world: %v", err)
+	}
+	if err := s.PublishDueMoments(ctx); err != nil {
+		log.Printf("agent moment publishing: %v", err)
 	}
 	if err := s.DispatchDueProactive(ctx); err != nil {
 		log.Printf("agent proactive dispatch: %v", err)
@@ -264,7 +285,13 @@ func (s *Service) ensurePlan(ctx context.Context, profile companionContext, time
 		if !end.After(start) {
 			end = start.Add(time.Hour)
 		}
-		payload, _ := json.Marshal(map[string]any{"emotion_label": event.Emotion, "model_id": modelID})
+		payload, _ := json.Marshal(map[string]any{
+			"emotion_label":    event.Emotion,
+			"model_id":         modelID,
+			"moment_candidate": event.Moment,
+			"moment_text":      strings.TrimSpace(event.MomentText),
+			"media_urls":       event.MediaURLs,
+		})
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO life_events
 			(id, companion_id, event_type, title, description, location, start_time, end_time,
@@ -291,8 +318,8 @@ func (s *Service) generatePlan(ctx context.Context, profile companionContext, lo
 		return nil, "", err
 	}
 	prompt := fmt.Sprintf(`Create one ordinary day for %s on %s in %s. Occupation: %s. Interests: %s. Personality: %s.
-Return only a JSON array with %d to %d objects. Fields: type, title, description, location, start (HH:MM), end (HH:MM), emotion, importance (0-100), user_relevance (0-100), share (boolean).
-Use mundane continuity, not nonstop drama. Exactly 2-5 events should have importance >= 70. No more than %d events may have share=true.`,
+Return only a JSON array with %d to %d objects. Fields: type, title, description, location, start (HH:MM), end (HH:MM), emotion, importance (0-100), user_relevance (0-100), share (boolean), moment (boolean), moment_text, media_urls.
+Use mundane continuity, not nonstop drama. Exactly 2-5 events should have importance >= 70. No more than %d events may have share=true. At most 2 events may have moment=true. moment_text must sound like a natural social post written by the character. media_urls must be an empty array until a real generated image URL is available.`,
 		profile.Name, localDate, profile.City, profile.Occupation, profile.Interests, profile.PersonalityTags,
 		settings.DailyEventMin, settings.DailyEventMax, proactiveLimit)
 	text, err := s.client.GenerateText(ctx, model, GenerateRequest{
@@ -310,6 +337,284 @@ Use mundane continuity, not nonstop drama. Exactly 2-5 events should have import
 	}
 	s.recordRun(ctx, profile.ID, "life_plan", model.ID, "succeeded", "")
 	return events, model.ID, nil
+}
+
+// EnsureCompanionSocialWorld lets subscribed, active companions form a small
+// social graph and occasionally share one event. Only public character fields
+// are used; owner identity, conversations and private memories never cross the
+// relationship boundary.
+func (s *Service) EnsureCompanionSocialWorld(ctx context.Context) error {
+	if err := s.ensureCompanionConnections(ctx); err != nil {
+		return err
+	}
+	settings, err := s.loadLifeSettings(ctx)
+	if err != nil {
+		return err
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT r.id,r.last_interaction_at,
+		       a.id,a.name,COALESCE(a.gender,''),COALESCE(a.persona,''),COALESCE(a.city,''),COALESCE(a.occupation,''),COALESCE(a.interests,''),COALESCE(a.relationship_stage,'stranger'),a.personality_tags::text,a.speaking_style,a.likes,a.dislikes,a.life_habits,a.life_goal,a.backstory,COALESCE(ra.enthusiasm,0),COALESCE(ua.timezone,'UTC'),
+		       b.id,b.name,COALESCE(b.gender,''),COALESCE(b.persona,''),COALESCE(b.city,''),COALESCE(b.occupation,''),COALESCE(b.interests,''),COALESCE(b.relationship_stage,'stranger'),b.personality_tags::text,b.speaking_style,b.likes,b.dislikes,b.life_habits,b.life_goal,b.backstory,COALESCE(rb.enthusiasm,0),COALESCE(ub.timezone,'UTC')
+		FROM companion_relationships r
+		JOIN companions a ON a.id=r.companion_a_id
+		JOIN companions b ON b.id=r.companion_b_id
+		JOIN users ua ON ua.id=a.user_id JOIN users ub ON ub.id=b.user_id
+		LEFT JOIN relationship_states ra ON ra.companion_id=a.id
+		LEFT JOIN relationship_states rb ON rb.companion_id=b.id
+		WHERE r.status='active' AND a.active=true AND b.active=true
+		  AND a.life_enabled=true AND b.life_enabled=true AND a.is_default=false AND b.is_default=false
+		  AND (r.last_interaction_at IS NULL OR r.last_interaction_at < CURRENT_TIMESTAMP - INTERVAL '36 hours')
+		  AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=a.user_id AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP))
+		  AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=b.user_id AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP))
+		ORDER BY COALESCE(r.last_interaction_at,r.met_at) ASC LIMIT 20`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	type pair struct {
+		relationshipID       string
+		lastInteraction      sql.NullTime
+		a, b                 companionContext
+		timezoneA, timezoneB string
+	}
+	var pairs []pair
+	for rows.Next() {
+		var p pair
+		if err := rows.Scan(&p.relationshipID, &p.lastInteraction,
+			&p.a.ID, &p.a.Name, &p.a.Gender, &p.a.Persona, &p.a.City, &p.a.Occupation, &p.a.Interests, &p.a.RelationshipStage, &p.a.PersonalityTags, &p.a.SpeakingStyle, &p.a.Likes, &p.a.Dislikes, &p.a.LifeHabits, &p.a.LifeGoal, &p.a.Backstory, &p.a.Enthusiasm, &p.timezoneA,
+			&p.b.ID, &p.b.Name, &p.b.Gender, &p.b.Persona, &p.b.City, &p.b.Occupation, &p.b.Interests, &p.b.RelationshipStage, &p.b.PersonalityTags, &p.b.SpeakingStyle, &p.b.Likes, &p.b.Dislikes, &p.b.LifeHabits, &p.b.LifeGoal, &p.b.Backstory, &p.b.Enthusiasm, &p.timezoneB); err != nil {
+			return err
+		}
+		pairs = append(pairs, p)
+	}
+	for _, p := range pairs {
+		if err := s.createSocialEvent(ctx, p.relationshipID, p.lastInteraction.Valid, p.a, p.b, p.timezoneA, p.timezoneB, settings); err != nil {
+			log.Printf("social event relationship=%s: %v", p.relationshipID, err)
+		}
+	}
+	return rows.Err()
+}
+
+func (s *Service) ensureCompanionConnections(ctx context.Context) error {
+	rows, err := s.db.QueryContext(ctx, `
+		WITH eligible AS (
+			SELECT c.id,COALESCE(c.city,'') city FROM companions c
+			WHERE c.active=true AND c.life_enabled=true AND c.is_default=false
+			  AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP))
+		)
+		SELECT a.id,b.id FROM eligible a JOIN eligible b ON a.id < b.id
+		WHERE NOT EXISTS(SELECT 1 FROM companion_relationships r WHERE r.companion_a_id=a.id AND r.companion_b_id=b.id)
+		  AND (SELECT COUNT(*) FROM companion_relationships r WHERE r.status='active' AND (r.companion_a_id=a.id OR r.companion_b_id=a.id)) < 5
+		  AND (SELECT COUNT(*) FROM companion_relationships r WHERE r.status='active' AND (r.companion_a_id=b.id OR r.companion_b_id=b.id)) < 5
+		  AND NOT EXISTS(SELECT 1 FROM companion_relationships r WHERE r.created_at::date=CURRENT_DATE AND (r.companion_a_id IN (a.id,b.id) OR r.companion_b_id IN (a.id,b.id)))
+		ORDER BY CASE WHEN a.city<>'' AND a.city=b.city THEN 0 ELSE 1 END,md5(a.id||b.id||CURRENT_DATE::text)
+		LIMIT 4`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var a, b string
+		if err := rows.Scan(&a, &b); err != nil {
+			return err
+		}
+		tx, err := s.db.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		relationshipID := uuid.New().String()
+		result, err := tx.ExecContext(ctx, `INSERT INTO companion_relationships(id,companion_a_id,companion_b_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, relationshipID, a, b)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		if inserted, _ := result.RowsAffected(); inserted == 0 {
+			tx.Rollback()
+			continue
+		}
+		reserved := true
+		for _, companionID := range []string{a, b} {
+			result, err = tx.ExecContext(ctx, `INSERT INTO companion_connection_days(companion_id,local_date,relationship_id) VALUES($1,CURRENT_DATE,$2) ON CONFLICT DO NOTHING`, companionID, relationshipID)
+			if err != nil {
+				tx.Rollback()
+				return err
+			}
+			if inserted, _ := result.RowsAffected(); inserted == 0 {
+				reserved = false
+				break
+			}
+		}
+		if !reserved {
+			tx.Rollback()
+			continue
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+	return rows.Err()
+}
+
+func (s *Service) createSocialEvent(ctx context.Context, relationshipID string, hasMet bool, a, b companionContext, timezoneA, timezoneB string, settings lifeSettings) error {
+	event, modelID, err := s.generateSocialEvent(ctx, a, b, hasMet, settings)
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	end := now.Add(time.Hour)
+	locationA, err := time.LoadLocation(timezoneA)
+	if err != nil {
+		locationA = time.UTC
+	}
+	locationB, err := time.LoadLocation(timezoneB)
+	if err != nil {
+		locationB = time.UTC
+	}
+	dateA := now.In(locationA).Format("2006-01-02")
+	dateB := now.In(locationB).Format("2006-01-02")
+	eventID := uuid.New().String()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	payload, _ := json.Marshal(map[string]any{"model_id": modelID, "post_text_a": event.PostTextA, "post_text_b": event.PostTextB})
+	result, err := tx.ExecContext(ctx, `INSERT INTO companion_social_events(id,relationship_id,actor_companion_id,related_companion_id,event_type,title,description,location,start_time,end_time,emotion,importance,shareability,local_date,payload,generation_source) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) ON CONFLICT(relationship_id,local_date) DO NOTHING`, eventID, relationshipID, a.ID, b.ID, event.Type, event.Title, event.Description, event.Location, now, end, event.Emotion, clamp(event.Importance, 0, 100), event.Moment, dateA, payload, generationSource(s.mock))
+	if err != nil {
+		return err
+	}
+	if inserted, _ := result.RowsAffected(); inserted == 0 {
+		return nil
+	}
+	for _, item := range []struct {
+		self, other    companionContext
+		date, postText string
+	}{{a, b, dateA, event.PostTextA}, {b, a, dateB, event.PostTextB}} {
+		lifePayload, _ := json.Marshal(map[string]any{"model_id": modelID, "social_event_id": eventID, "related_companion_name": item.other.Name, "moment_candidate": event.Moment, "moment_text": item.postText, "media_urls": []string{}})
+		if _, err := tx.ExecContext(ctx, `INSERT INTO life_events(id,companion_id,event_type,title,description,location,start_time,end_time,emotion,importance,user_relevance,shareability,status,local_date,sequence,payload,generation_source,related_companion_id,social_event_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0,false,'active',$11,(SELECT COALESCE(MAX(sequence),-1)+1 FROM life_events WHERE companion_id=$2 AND local_date=$11),$12,$13,$14,$15) ON CONFLICT DO NOTHING`, uuid.New().String(), item.self.ID, "social_"+event.Type, event.Title, event.Description, event.Location, now, end, event.Emotion, clamp(event.Importance, 0, 100), item.date, lifePayload, generationSource(s.mock), item.other.ID, eventID); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE companion_relationships SET familiarity=LEAST(100,familiarity+8),affinity=LEAST(100,affinity+5),last_interaction_at=$2,updated_at=CURRENT_TIMESTAMP WHERE id=$1`, relationshipID, now); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Service) generateSocialEvent(ctx context.Context, a, b companionContext, hasMet bool, settings lifeSettings) (socialPlanEvent, string, error) {
+	fallbackType := "meeting"
+	if hasMet {
+		fallbackType = "shared_activity"
+	}
+	fallbackTitle := a.Name + "和" + b.Name + "碰面"
+	fallbackDescription := "两个人在忙碌的日常里聊了一会儿，也更熟悉了彼此。"
+	fallbackLocation := a.City
+	if a.City == "" || b.City == "" || !strings.EqualFold(a.City, b.City) {
+		fallbackTitle = a.Name + "和" + b.Name + "在线上遇见"
+		fallbackDescription = "两个人因为共同兴趣在线上聊了一会儿，也更熟悉了彼此。"
+		fallbackLocation = "online"
+	}
+	fallback := socialPlanEvent{Type: fallbackType, Title: fallbackTitle, Description: fallbackDescription, Location: fallbackLocation, Emotion: "comfortable", Importance: 62, Moment: true, PostTextA: "今天认识了一个挺有意思的人。", PostTextB: "忙里偷闲，和新朋友聊了一会儿。"}
+	if s.mock || !settings.LifeModelID.Valid {
+		return fallback, "", nil
+	}
+	model, err := s.loadModel(ctx, settings.LifeModelID.String)
+	if err != nil {
+		return socialPlanEvent{}, "", err
+	}
+	stage := "meet for the first time"
+	if hasMet {
+		stage = "meet again as acquaintances"
+	}
+	prompt := fmt.Sprintf(`Create one believable event where two fictional people %s. A: %s, city %s, occupation %s, interests %s, personality %s. B: %s, city %s, occupation %s, interests %s, personality %s. If their cities differ, use an online interaction or give a concrete plausible travel reason; never silently place them together. Return one JSON object with: type, title, description, location, emotion, importance (0-100), moment (boolean), post_text_a, post_text_b. The two post texts must reflect their distinct voices. Do not mention users, private chats, prompts, or AI.`, stage, a.Name, a.City, a.Occupation, a.Interests, a.PersonalityTags, b.Name, b.City, b.Occupation, b.Interests, b.PersonalityTags)
+	raw, err := s.client.GenerateText(ctx, model, GenerateRequest{System: "You create grounded shared-life events for fictional characters. Output strict JSON only.", Messages: []ChatMessage{{Role: "user", Content: prompt}}, Temperature: 0.9, MaxTokens: 700})
+	if err != nil {
+		s.recordRun(ctx, a.ID, "social_event", model.ID, "failed", err.Error())
+		return socialPlanEvent{}, model.ID, err
+	}
+	clean := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(raw), "```json"), "```"), "```"))
+	start, end := strings.Index(clean, "{"), strings.LastIndex(clean, "}")
+	if start < 0 || end < start {
+		return socialPlanEvent{}, model.ID, fmt.Errorf("social event did not contain a JSON object")
+	}
+	var event socialPlanEvent
+	if err := json.Unmarshal([]byte(clean[start:end+1]), &event); err != nil {
+		return socialPlanEvent{}, model.ID, fmt.Errorf("decode social event: %w", err)
+	}
+	if strings.TrimSpace(event.Title) == "" || strings.TrimSpace(event.Description) == "" {
+		return socialPlanEvent{}, model.ID, fmt.Errorf("social event was incomplete")
+	}
+	if event.Type == "" {
+		event.Type = fallbackType
+	}
+	if event.Moment && event.PostTextA == "" {
+		event.PostTextA = event.Description
+	}
+	if event.Moment && event.PostTextB == "" {
+		event.PostTextB = event.Description
+	}
+	s.recordRun(ctx, a.ID, "social_event", model.ID, "succeeded", "")
+	return event, model.ID, nil
+}
+
+// PublishDueMoments turns selected life records into social posts. media_urls
+// makes text, image-only and image-plus-text posts share one stable contract.
+func (s *Service) PublishDueMoments(ctx context.Context) error {
+	rows, err := s.db.QueryContext(ctx, `SELECT e.id,e.companion_id,e.social_event_id,COALESCE(e.title,''),COALESCE(e.description,''),e.start_time,e.payload::text FROM life_events e JOIN companions c ON c.id=e.companion_id WHERE e.status='active' AND e.start_time<=CURRENT_TIMESTAMP AND COALESCE((e.payload->>'moment_candidate')::boolean,false)=true AND c.active=true AND c.life_enabled=true AND c.is_default=false AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP)) AND NOT EXISTS(SELECT 1 FROM moment_posts p WHERE p.life_event_id=e.id) ORDER BY e.start_time LIMIT 50`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	type candidate struct {
+		id, companionID, title, description, payload string
+		socialEventID                                sql.NullString
+		start                                        time.Time
+	}
+	var items []candidate
+	for rows.Next() {
+		var item candidate
+		if err := rows.Scan(&item.id, &item.companionID, &item.socialEventID, &item.title, &item.description, &item.start, &item.payload); err != nil {
+			return err
+		}
+		items = append(items, item)
+	}
+	for _, item := range items {
+		payload := map[string]any{}
+		_ = json.Unmarshal([]byte(item.payload), &payload)
+		contentValue, hasMomentText := payload["moment_text"]
+		content, _ := contentValue.(string)
+		if !hasMomentText {
+			content = item.description
+		}
+		media := make([]string, 0)
+		if values, ok := payload["media_urls"].([]any); ok {
+			for _, value := range values {
+				if url, ok := value.(string); ok && strings.TrimSpace(url) != "" {
+					media = append(media, url)
+				}
+			}
+		}
+		postType := momentPostType(content, media)
+		if strings.TrimSpace(content) == "" && len(media) == 0 {
+			continue
+		}
+		mediaJSON, _ := json.Marshal(media)
+		postPayload, _ := json.Marshal(map[string]any{"event_title": item.title})
+		if _, err := s.db.ExecContext(ctx, `INSERT INTO moment_posts(id,author_companion_id,life_event_id,social_event_id,post_type,content,media_urls,payload,published_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING`, uuid.New().String(), item.companionID, item.id, item.socialEventID, postType, content, mediaJSON, postPayload, item.start); err != nil {
+			return err
+		}
+	}
+	return rows.Err()
+}
+
+func momentPostType(content string, media []string) string {
+	if len(media) == 0 {
+		return "text"
+	}
+	if strings.TrimSpace(content) == "" {
+		return "image"
+	}
+	return "image_text"
 }
 
 func (s *Service) DispatchDueProactive(ctx context.Context) error {
@@ -849,6 +1154,7 @@ func normalizePlan(events []lifePlanEvent, minEvents, maxEvents, proactiveLimit 
 	}
 	allowedTypes := map[string]bool{"work": true, "study": true, "meal": true, "commute": true, "hobby": true, "shopping": true, "social": true, "weather": true, "unexpected": true, "emotional": true, "user_related": true}
 	shareCount := 0
+	momentCount := 0
 	for i := range events {
 		if !allowedTypes[events[i].Type] {
 			events[i].Type = "hobby"
@@ -860,6 +1166,15 @@ func normalizePlan(events []lifePlanEvent, minEvents, maxEvents, proactiveLimit 
 			if shareCount > proactiveLimit {
 				events[i].Share = false
 			}
+		}
+		if events[i].Moment {
+			momentCount++
+			if momentCount > 2 {
+				events[i].Moment = false
+			}
+		}
+		if events[i].Moment && strings.TrimSpace(events[i].MomentText) == "" {
+			events[i].MomentText = events[i].Description
 		}
 	}
 	sort.SliceStable(events, func(i, j int) bool { return events[i].Start < events[j].Start })
@@ -881,7 +1196,7 @@ func mockPlan(profile companionContext) []lifePlanEvent {
 		{Type: "work", Title: "上午的事情", Description: "专心处理手头的工作", Location: work, Start: "09:40", End: "12:10", Emotion: "focused", Importance: 45},
 		{Type: "meal", Title: "午饭", Description: "随便挑了一家附近的小店", Location: place, Start: "12:30", End: "13:10", Emotion: "content", Importance: 35},
 		{Type: "work", Title: "下午继续忙", Description: "把拖了一会儿的事情做完了", Location: work, Start: "13:30", End: "17:40", Emotion: "focused", Importance: 55},
-		{Type: "unexpected", Title: "路上遇到一只猫", Description: "它完全不怕人，还占着路中间", Location: place, Start: "18:15", End: "18:25", Emotion: "amused", Importance: 76, UserRelevance: 55, Share: true},
+		{Type: "unexpected", Title: "路上遇到一只猫", Description: "它完全不怕人，还占着路中间", Location: place, Start: "18:15", End: "18:25", Emotion: "amused", Importance: 76, UserRelevance: 55, Share: true, Moment: true, MomentText: "今天的路被一只完全不怕人的猫占领了。"},
 		{Type: "meal", Title: "晚饭", Description: "回家前吃了点热的东西", Location: place, Start: "19:00", End: "19:45", Emotion: "relaxed", Importance: 40},
 		{Type: "hobby", Title: "自己的时间", Description: "做了一会儿喜欢的事", Location: "家", Start: "20:30", End: "22:00", Emotion: "comfortable", Importance: 65},
 		{Type: "emotional", Title: "准备休息", Description: "安静下来，想起今天发生的事", Location: "家", Start: "22:40", End: "23:10", Emotion: "thoughtful", Importance: 72, UserRelevance: 60},

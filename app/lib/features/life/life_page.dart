@@ -132,6 +132,10 @@ class LifePage extends StatelessWidget {
         final title = e['title'] as String? ?? '';
         final desc = e['description'] as String? ?? '';
         final loc = e['location'] as String? ?? '';
+        final payload = e['payload'] is Map
+            ? Map<String, dynamic>.from(e['payload'] as Map)
+            : const <String, dynamic>{};
+        final relatedName = payload['related_companion_name'] as String? ?? '';
         final rawTime = e['start_time'] as String?;
         final when = rawTime != null
             ? formatClock(DateTime.tryParse(rawTime) ?? DateTime.now())
@@ -199,6 +203,26 @@ class LifePage extends StatelessWidget {
                                 loc,
                                 style: TextStyle(
                                     fontSize: 12, color: context.vita.subText),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (relatedName.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.people_outline,
+                                size: 13, color: context.vita.green),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                'explore.with'.trParams({'name': relatedName}),
+                                style: TextStyle(
+                                    fontSize: 12, color: context.vita.green),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),

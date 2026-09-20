@@ -17,24 +17,44 @@ func TestParseLifePlanFromFence(t *testing.T) {
 
 func TestNormalizePlanCapsSharesAndCount(t *testing.T) {
 	events := []lifePlanEvent{
-		{Type: "meal", Start: "09:00", Share: true},
-		{Type: "unknown", Start: "08:00", Share: true},
+		{Type: "meal", Start: "09:00", Share: true, Moment: true},
+		{Type: "unknown", Start: "08:00", Share: true, Moment: true},
+		{Type: "hobby", Start: "10:00", Moment: true},
 	}
 	got := normalizePlan(events, 8, 10, 1, companionContext{Name: "Mia"})
 	if len(got) != 8 {
 		t.Fatalf("len = %d", len(got))
 	}
 	shares := 0
+	moments := 0
 	for _, event := range got {
 		if event.Share {
 			shares++
+		}
+		if event.Moment {
+			moments++
 		}
 	}
 	if shares > 1 {
 		t.Fatalf("shares = %d", shares)
 	}
+	if moments > 2 {
+		t.Fatalf("moments = %d", moments)
+	}
 	if got[0].Type != "hobby" {
 		t.Fatalf("unknown type was not normalized: %#v", got[0])
+	}
+}
+
+func TestMomentPostType(t *testing.T) {
+	if got := momentPostType("hello", nil); got != "text" {
+		t.Fatalf("text post type = %q", got)
+	}
+	if got := momentPostType("", []string{"https://example.com/a.jpg"}); got != "image" {
+		t.Fatalf("image post type = %q", got)
+	}
+	if got := momentPostType("hello", []string{"https://example.com/a.jpg"}); got != "image_text" {
+		t.Fatalf("image text post type = %q", got)
 	}
 }
 
