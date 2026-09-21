@@ -398,7 +398,8 @@ class _ChatPageState extends State<ChatPage> {
                 VitaAvatar(
                     name: widget.name,
                     radius: 22,
-                    imageUrl: widget.companion?['portrait_url'] as String?),
+                    imageUrl: widget.companion?['portrait_url'] as String?,
+                    borderRadius: BorderRadius.circular(10)),
                 const SizedBox(width: 8),
               ],
               Flexible(
@@ -457,7 +458,8 @@ class _ChatPageState extends State<ChatPage> {
               ],
               if (isUser) ...[
                 const SizedBox(width: 8),
-                VitaAvatar(name: '1', radius: 22),
+                VitaAvatar(name: '1', radius: 22,
+                    borderRadius: BorderRadius.circular(10)),
               ],
             ],
           ),
