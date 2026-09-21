@@ -76,7 +76,7 @@ class ChatListPage extends StatelessWidget {
       );
     }
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(0, 4, 0, 90),
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 90),
       itemCount: list.length,
       separatorBuilder: (context, _) => Divider(
         height: 0.5,
@@ -116,15 +116,16 @@ class ChatListPage extends StatelessWidget {
           },
           child: Container(
             color: context.vita.surface,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            height: 72,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
                 VitaAvatar(
                     name: name,
-                    radius: 26,
+                    radius: 22,
                     imageUrl: c['portrait_url'] as String?,
-                    borderRadius: BorderRadius.circular(12)),
-                const SizedBox(width: 14),
+                    borderRadius: BorderRadius.circular(8)),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -132,13 +133,13 @@ class ChatListPage extends StatelessWidget {
                       Text(name,
                           style: TextStyle(
                               fontSize: 16,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w500,
                               color: context.vita.text)),
                       const SizedBox(height: 3),
                       Text(
                         subtitle,
                         style: TextStyle(
-                            fontSize: 13, color: context.vita.subText),
+                            fontSize: 12.5, color: context.vita.subText),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -198,11 +199,19 @@ class _ChatSearchBox extends StatelessWidget {
         decoration: InputDecoration(
           hintText: 'contacts.search'.tr,
           hintStyle: TextStyle(color: context.vita.hint, fontSize: 14),
-          prefixIcon: Icon(Icons.search, size: 18, color: context.vita.hint),
+          prefixIcon: const SizedBox(
+            height: 40,
+            width: 38,
+            child: Center(
+              child: Icon(Icons.search, size: 18, color: Color(0xFFBBBBBB)),
+            ),
+          ),
           filled: true,
           fillColor: context.vita.surface,
-          contentPadding: const EdgeInsets.symmetric(vertical: 0),
+          contentPadding: const EdgeInsets.symmetric(vertical: 8),
           isDense: true,
+          prefixIconConstraints:
+              const BoxConstraints(minWidth: 38, minHeight: 40),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.zero,
             borderSide: BorderSide.none,

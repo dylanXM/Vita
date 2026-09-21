@@ -205,6 +205,8 @@ func validateStoryBackgroundInput(input storyBackgroundInput) error {
 }
 
 type startStoryInput struct {
+	// CompanionID is optional. When empty, the story runs with the signed-in
+	// user as the protagonist (no AI companion alongside).
 	CompanionID    string `json:"companion_id"`
 	BackgroundID   string `json:"background_id"`
 	IdempotencyKey string `json:"idempotency_key"`
@@ -216,13 +218,21 @@ func StartStory(c *gin.Context) {
 		return
 	}
 	var input startStoryInput
-	if err := c.ShouldBindJSON(&input); err != nil || strings.TrimSpace(input.CompanionID) == "" || strings.TrimSpace(input.BackgroundID) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "companion, background, and idempotency key are required"})
+	if err := c.ShouldBindJSON(&input); err != nil || strings.TrimSpace(input.BackgroundID) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "background and idempotency key are required"})
 		return
 	}
 	userID := c.GetString("user_id")
 	var environment, companionName string
-	if err := db.Get().QueryRow(`SELECT u.environment,c.name FROM companions c JOIN users u ON u.id=c.user_id WHERE c.id=$1 AND c.user_id=$2 AND c.deleted_at IS NULL AND c.active=true`, input.CompanionID, userID).Scan(&environment, &companionName); err != nil {
+	selfMode := strings.TrimSpace(input.CompanionID) == ""
+	if selfMode {
+		// User-as-protagonist: pull environment and display name straight from
+		// the users row instead of joining a companion.
+		if err := db.Get().QueryRow(`SELECT u.environment, COALESCE(NULLIF(u.nickname, ''), split_part(u.email, '@', 1)) FROM users u WHERE u.id=$1`, userID).Scan(&environment, &companionName); err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "account not found"})
+			return
+		}
+	} else if err := db.Get().QueryRow(`SELECT u.environment,c.name FROM companions c JOIN users u ON u.id=c.user_id WHERE c.id=$1 AND c.user_id=$2 AND c.deleted_at IS NULL AND c.active=true`, input.CompanionID, userID).Scan(&environment, &companionName); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "companion not found"})
 		return
 	}
@@ -253,7 +263,17 @@ func StartStory(c *gin.Context) {
 	choices, _ := json.Marshal(chapter.Choices)
 	tx, err := db.Get().BeginTx(c.Request.Context(), nil)
 	if err == nil {
-		_, err = tx.Exec(`INSERT INTO stories(id,user_id,companion_id,background_id,title,background_snapshot,current_chapter_no) VALUES($1,$2,$3,$4,$5,$6,1)`, storyID, userID, input.CompanionID, input.BackgroundID, background.Title+" · "+companionName, snapshot)
+				var companionArg any
+		if selfMode {
+			companionArg = nil
+		} else {
+			companionArg = input.CompanionID
+		}
+		storyTitle := background.Title
+		if !selfMode {
+			storyTitle = background.Title + " · " + companionName
+		}
+		_, err = tx.Exec(`INSERT INTO stories(id,user_id,companion_id,background_id,title,background_snapshot,current_chapter_no) VALUES($1,$2,$3,$4,$5,$6,1)`, storyID, userID, companionArg, input.BackgroundID, storyTitle, snapshot)
 	}
 	if err == nil {
 		_, err = tx.Exec(`INSERT INTO story_chapters(id,story_id,chapter_no,title,content,choices) VALUES($1,$2,1,$3,$4,$5)`, chapterID, storyID, chapter.Title, chapter.Content, choices)
@@ -277,7 +297,7 @@ func loadAccessibleBackground(id, userID, environment string) (storyBackground, 
 }
 
 func ListStories(c *gin.Context) {
-	rows, err := db.Get().Query(`SELECT s.id,s.title,s.current_chapter_no,s.status,s.created_at,s.updated_at,c.id,c.name,COALESCE(NULLIF(c.avatar_url,''),p.image_url,''),COALESCE(s.background_snapshot->>'cover_url','') FROM stories s JOIN companions c ON c.id=s.companion_id LEFT JOIN companion_portraits p ON p.id=c.portrait_id WHERE s.user_id=$1 ORDER BY s.updated_at DESC`, c.GetString("user_id"))
+	rows, err := db.Get().Query(`SELECT s.id,s.title,s.current_chapter_no,s.status,s.created_at,s.updated_at,COALESCE(c.id,''),COALESCE(c.name,''),COALESCE(NULLIF(c.avatar_url,''),p.image_url,''),COALESCE(s.background_snapshot->>'cover_url','') FROM stories s LEFT JOIN companions c ON c.id=s.companion_id LEFT JOIN companion_portraits p ON p.id=c.portrait_id WHERE s.user_id=$1 ORDER BY s.updated_at DESC`, c.GetString("user_id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load stories"})
 		return
@@ -301,7 +321,7 @@ func writeStoryDetail(c *gin.Context, storyID, userID string) {
 	var id, title, status, companionID, companionName, snapshot string
 	var chapterNo int
 	var created, updated time.Time
-	err := db.Get().QueryRow(`SELECT s.id,s.title,s.status,s.current_chapter_no,s.companion_id,c.name,s.background_snapshot::text,s.created_at,s.updated_at FROM stories s JOIN companions c ON c.id=s.companion_id WHERE s.id=$1 AND s.user_id=$2`, storyID, userID).Scan(&id, &title, &status, &chapterNo, &companionID, &companionName, &snapshot, &created, &updated)
+	err := db.Get().QueryRow(`SELECT s.id,s.title,s.status,s.current_chapter_no,COALESCE(s.companion_id,''),COALESCE(c.name,''),s.background_snapshot::text,s.created_at,s.updated_at FROM stories s LEFT JOIN companions c ON c.id=s.companion_id WHERE s.id=$1 AND s.user_id=$2`, storyID, userID).Scan(&id, &title, &status, &chapterNo, &companionID, &companionName, &snapshot, &created, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "story not found"})
 		return

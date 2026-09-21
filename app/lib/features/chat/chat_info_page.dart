@@ -39,9 +39,12 @@ class ChatInfoPage extends StatelessWidget {
     final vita = context.vita;
     return Scaffold(
       backgroundColor: vita.pageBg,
-      appBar: AppBar(title: Text('chatInfo.title'.tr)),
+      appBar: AppBar(
+        title: Text('chatInfo.title'.tr),
+        shape: const Border(),
+      ),
       body: ListView(
-        padding: const EdgeInsets.only(top: 10, bottom: 28),
+        padding: const EdgeInsets.only(top: 0, bottom: 28),
         children: [
           _group([
             _ProfileRow(

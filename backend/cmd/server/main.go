@@ -237,6 +237,7 @@ func main() {
 		// session and to verify the account has the admin role.
 		api.GET("/me", middleware.RequireAuth(), handler.Me)
 		api.PUT("/me/locale", middleware.RequireAuth(), handler.UpdateMyLocale)
+		api.PUT("/me/profile", middleware.RequireAuth(), handler.UpdateMyProfile)
 		api.DELETE("/me", middleware.RequireAuth(), handler.DeleteMe)
 
 		admin := api.Group("/admin", middleware.RequireAdmin())

@@ -446,6 +446,8 @@ type ProfileResponse struct {
 	Timezone   string    `json:"timezone"`
 	InviteCode string    `json:"invite_code"`
 	Locale     string    `json:"locale"`
+	Nickname   string    `json:"nickname"`
+	AvatarURL  string    `json:"avatar_url"`
 	CreatedAt  time.Time `json:"created_at"`
 }
 
@@ -460,8 +462,8 @@ func Me(c *gin.Context) {
 
 	var p ProfileResponse
 	err := db.Get().QueryRow(
-		`SELECT id, email, COALESCE(role_id, 'user'), COALESCE(timezone, 'UTC'), invite_code, preferred_locale, created_at FROM users WHERE id = $1`,
-		userID).Scan(&p.UserID, &p.Email, &p.Role, &p.Timezone, &p.InviteCode, &p.Locale, &p.CreatedAt)
+		`SELECT id, email, COALESCE(role_id, 'user'), COALESCE(timezone, 'UTC'), invite_code, preferred_locale, COALESCE(nickname, ''), COALESCE(avatar_url, ''), created_at FROM users WHERE id = $1`,
+		userID).Scan(&p.UserID, &p.Email, &p.Role, &p.Timezone, &p.InviteCode, &p.Locale, &p.Nickname, &p.AvatarURL, &p.CreatedAt)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "account not found"})
 		return
@@ -538,6 +540,48 @@ func UpdateMyLocale(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"locale": locale})
+}
+
+// UpdateMyProfile lets the signed-in user edit their display name and avatar.
+// Either field is optional; a null field is left untouched. avatar_url is the
+// media path returned by POST /v1/media/upload (e.g. "/v1/media/<id>").
+func UpdateMyProfile(c *gin.Context) {
+	var input struct {
+		Nickname  *string `json:"nickname"`
+		AvatarURL *string `json:"avatar_url"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
+	if input.Nickname != nil {
+		nick := strings.TrimSpace(*input.Nickname)
+		if len([]rune(nick)) > 30 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "nickname must be at most 30 characters"})
+			return
+		}
+		if _, err := db.Get().Exec(`UPDATE users SET nickname=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2`, nick, userID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update profile"})
+			return
+		}
+	}
+	if input.AvatarURL != nil {
+		avatar := strings.TrimSpace(*input.AvatarURL)
+		if len(avatar) > 512 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "avatar_url is too long"})
+			return
+		}
+		if _, err := db.Get().Exec(`UPDATE users SET avatar_url=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2`, avatar, userID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update profile"})
+			return
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 // --- Admin Stats ---

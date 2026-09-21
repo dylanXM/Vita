@@ -10,6 +10,7 @@ import '../../shared/widgets.dart';
 import '../auth/auth_controller.dart';
 import 'deleted_companions_page.dart';
 import 'legal_document_page.dart';
+import 'profile_edit_page.dart';
 
 /// Settings — language, theme and sign out. Reached from the Me page.
 class SettingsPage extends StatelessWidget {
@@ -142,12 +143,31 @@ class SettingsPage extends StatelessWidget {
             child: Text('settings.account'.tr, style: vita.sectionTitle),
           ),
           const SizedBox(height: 12),
-          // Account group: sign out.
+          // Account group: profile, deleted companions, sign out.
           VitaCard(
             radius: 0,
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Column(
               children: [
+                Obx(() {
+                  final auth = AuthController.to;
+                  final nick = auth.nickname;
+                  return VitaListTile(
+                    customIcon: const VitaMenuIcon(
+                      icon: Icons.person_outline_rounded,
+                      color: Color(0xFF4A90E2),
+                    ),
+                    title: 'settings.profile'.tr,
+                    subtitle: nick.isEmpty ? auth.email : nick,
+                    borderRadius: BorderRadius.zero,
+                    onTap: () => Get.to(
+                      () => const ProfileEditPage(),
+                      transition: Transition.cupertino,
+                      duration: const Duration(milliseconds: 300),
+                    ),
+                  );
+                }),
+                const Divider(indent: 52, height: 0.5),
                 VitaListTile(
                   customIcon: const VitaMenuIcon(
                     icon: Icons.restore_from_trash_outlined,

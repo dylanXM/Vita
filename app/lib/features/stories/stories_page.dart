@@ -12,6 +12,7 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
+import '../auth/auth_controller.dart';
 
 String _requestKey() =>
     '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
@@ -52,14 +53,15 @@ class StoriesController extends GetxController {
   }
 
   Future<void> start(
-      Map<String, dynamic> background, Map<String, dynamic> companion) async {
+      Map<String, dynamic> background, Map<String, dynamic>? companion) async {
     loading.value = true;
     try {
-      final result = await ApiClient.instance.post('/v1/stories/', data: {
+      final data = <String, dynamic>{
         'background_id': background['id'],
-        'companion_id': companion['id'],
-        'idempotency_key': _requestKey()
-      });
+        'idempotency_key': _requestKey(),
+      };
+      if (companion != null) data['companion_id'] = companion['id'];
+      final result = await ApiClient.instance.post('/v1/stories/', data: data);
       await load();
       Get.to(() => StoryDetailPage(initial: _map(result)),
           transition: Transition.cupertino);
@@ -172,6 +174,25 @@ class StoriesPage extends StatelessWidget {
                   child: Text('storyHub.chooseCompanion'.tr,
                       style: const TextStyle(
                           fontSize: 17, fontWeight: FontWeight.w600))),
+              // Self-as-protagonist entry: no AI companion, the user themselves
+              // is the lead character.
+              ListTile(
+                  leading: Obx(() {
+                    final auth = AuthController.to;
+                    final name = auth.nickname.isNotEmpty
+                        ? auth.nickname
+                        : (auth.email.isEmpty ? 'storyHub.self'.tr : auth.email);
+                    return VitaAvatar(
+                        name: name,
+                        imageUrl: auth.avatarUrl,
+                    );
+                  }),
+                  title: Text('storyHub.self'.tr),
+                  onTap: () {
+                    Get.back();
+                    controller.start(background, null);
+                  }),
+              const Divider(height: 0.5, indent: 72),
               ...controller.companions.map((companion) => ListTile(
                   leading: VitaAvatar(
                       name: '${companion['name'] ?? ''}',

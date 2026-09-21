@@ -148,6 +148,11 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		FROM (VALUES ('dev'),('beta'),('prod')) AS environments(environment)
 		ON CONFLICT(environment,document_type,version) DO NOTHING`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_locale TEXT NOT NULL DEFAULT 'en'`,
+		// User-editable profile fields shown on the Me tab and used as the
+		// chat sender identity. Empty nickname/avatar fall back to the email
+		// and the bundled default avatar on the client.
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_code TEXT`,
 		`UPDATE users SET invite_code=UPPER(SUBSTRING(MD5(id || email) FROM 1 FOR 10)) WHERE invite_code IS NULL OR invite_code=''`,
 		`ALTER TABLE users ALTER COLUMN invite_code SET DEFAULT UPPER(SUBSTRING(MD5(RANDOM()::TEXT || CLOCK_TIMESTAMP()::TEXT) FROM 1 FOR 10))`,
@@ -679,7 +684,11 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`ALTER TABLE credit_products DROP CONSTRAINT IF EXISTS credit_products_category_check`,
-		`ALTER TABLE credit_products ADD CONSTRAINT credit_products_category_check CHECK (category IN ('gift','photo','voice','date','keepsake','outfit','call','pet'))`,
+		// The category list must stay a superset of every category inserted
+		// by later migrations (including 'story' added further below), or a
+		// re-run on a database that already has those rows will violate the
+		// constraint when it is re-added here.
+		`ALTER TABLE credit_products ADD CONSTRAINT credit_products_category_check CHECK (category IN ('gift','photo','voice','date','keepsake','outfit','call','pet','story'))`,
 		`INSERT INTO credit_products(environment,product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata)
 		 SELECT env,'ai_pet_feed','pet','credits.product.petFeed.name','credits.product.petFeed.description','🥣',5,true,5,'{"hidden_from_catalog":true}'::jsonb
 		 FROM (VALUES('dev'),('beta'),('prod')) AS environments(env)
@@ -932,6 +941,9 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		`CREATE INDEX IF NOT EXISTS idx_stories_user ON stories(user_id,updated_at DESC)`,
 		`CREATE TABLE IF NOT EXISTS story_chapters (id TEXT PRIMARY KEY,story_id TEXT NOT NULL REFERENCES stories(id) ON DELETE CASCADE,chapter_no INTEGER NOT NULL CHECK (chapter_no>0),title TEXT NOT NULL,content TEXT NOT NULL,choices JSONB NOT NULL DEFAULT '[]'::jsonb,selected_choice_id TEXT NOT NULL DEFAULT '',selected_choice_text TEXT NOT NULL DEFAULT '',created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE(story_id,chapter_no))`,
 		`CREATE TABLE IF NOT EXISTS storyboards (id TEXT PRIMARY KEY,story_id TEXT NOT NULL REFERENCES stories(id) ON DELETE CASCADE,status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','generating','completed','failed')),summary TEXT NOT NULL DEFAULT '',image_url TEXT NOT NULL DEFAULT '',panel_count INTEGER NOT NULL CHECK (panel_count IN (4,6,8,9)),panels JSONB NOT NULL DEFAULT '[]'::jsonb,spend_id TEXT,failure_reason TEXT NOT NULL DEFAULT '',created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+		`ALTER TABLE stories ALTER COLUMN companion_id DROP NOT NULL`,
+		`ALTER TABLE stories DROP CONSTRAINT IF EXISTS stories_companion_id_fkey`,
+		`ALTER TABLE stories ADD CONSTRAINT stories_companion_id_fkey FOREIGN KEY(companion_id) REFERENCES companions(id) ON DELETE SET NULL`,
 		`ALTER TABLE storyboards ADD COLUMN IF NOT EXISTS image_url TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE storyboards ADD COLUMN IF NOT EXISTS panel_count INTEGER NOT NULL DEFAULT 8`,
 		`ALTER TABLE storyboards DROP CONSTRAINT IF EXISTS storyboards_status_check`,
