@@ -225,7 +225,6 @@ type modelCreateInput struct {
 	ModelName           string   `json:"model_name" binding:"required"`
 	DisplayName         string   `json:"display_name" binding:"required"`
 	Scenarios           []string `json:"scenarios"`
-	Capabilities        []string `json:"capabilities"`
 	SubscriptionPlanIDs []string `json:"subscription_plan_ids"`
 	Enabled             *bool    `json:"enabled"`
 }
@@ -270,14 +269,6 @@ func AdminCreateModel(c *gin.Context) {
 	if input.ProviderID == "" || input.ModelName == "" || input.DisplayName == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "provider, model ID, and display name are required"})
 		return
-	}
-	if len(input.Scenarios) == 0 {
-		legacyScenarios, legacyErr := scenariosForCapabilities(input.Capabilities)
-		if legacyErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": legacyErr.Error()})
-			return
-		}
-		input.Scenarios = legacyScenarios
 	}
 	scenarios, capabilities, err := normalizeModelScenarios(input.Scenarios)
 	if err != nil {
@@ -329,27 +320,6 @@ func AdminCreateModel(c *gin.Context) {
 		return
 	}
 	respondWithAdminModel(c, id)
-}
-
-func scenariosForCapabilities(capabilities []string) ([]string, error) {
-	if len(capabilities) == 0 {
-		return nil, errors.New("select at least one model scenario")
-	}
-	wanted := make(map[string]bool, len(capabilities))
-	for _, raw := range capabilities {
-		capability := strings.TrimSpace(raw)
-		if capability != "text" && capability != "image" && capability != "audio" && capability != "video" {
-			return nil, fmt.Errorf("unsupported model capability %q", capability)
-		}
-		wanted[capability] = true
-	}
-	scenarios := make([]string, 0)
-	for _, scenario := range orderedModelScenarios {
-		if wanted[modelScenarioCapabilities[scenario]] {
-			scenarios = append(scenarios, scenario)
-		}
-	}
-	return scenarios, nil
 }
 
 func AdminTestModel(c *gin.Context) {
@@ -686,17 +656,6 @@ func AdminUpdateMediaModelRoutes(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save model routes"})
 			return
 		}
-	}
-	if _, err := tx.ExecContext(c.Request.Context(), `UPDATE agent_settings SET
-		chat_model_id=(SELECT CASE WHEN enabled THEN primary_model_id END FROM agent_media_routes WHERE route_key='text_chat'),
-		life_model_id=(SELECT CASE WHEN enabled THEN primary_model_id END FROM agent_media_routes WHERE route_key='text_life_plan'),
-		proactive_model_id=(SELECT CASE WHEN enabled THEN primary_model_id END FROM agent_media_routes WHERE route_key='text_proactive'),
-		image_model_id=(SELECT CASE WHEN enabled THEN primary_model_id END FROM agent_media_routes WHERE route_key='image_life_photo'),
-		transcription_model_id=(SELECT CASE WHEN enabled THEN primary_model_id END FROM agent_media_routes WHERE route_key='audio_transcription'),
-		speech_model_id=(SELECT CASE WHEN enabled THEN primary_model_id END FROM agent_media_routes WHERE route_key='audio_speech'),updated_at=CURRENT_TIMESTAMP
-		WHERE id='default'`); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to sync legacy media settings"})
-		return
 	}
 	if err := tx.Commit(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save model routes"})

@@ -24,10 +24,7 @@ bool isPremiumProduct(String packageIdentifier, String productIdentifier) {
       productIdentifier.toLowerCase().startsWith('vita.premium.');
 }
 
-bool isCoinProduct(String packageIdentifier, String productIdentifier) {
-  final packageId = packageIdentifier.toLowerCase();
+bool isCoinProduct(String _, String productIdentifier) {
   final productId = productIdentifier.toLowerCase();
-  return vitaCoinProductIds.containsKey(productId) ||
-      packageId.startsWith('credits_') ||
-      packageId.startsWith('coins_');
+  return vitaCoinProductIds.containsKey(productId);
 }

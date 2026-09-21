@@ -69,8 +69,6 @@ type Config struct {
 	SMTPFromName string
 
 	// AgentConfigKey encrypts provider API keys stored through the admin UI.
-	// Production should set a dedicated high-entropy value. Falling back to the
-	// JWT secret keeps local development compatible with existing environments.
 	AgentConfigKey               string
 	AgentEnabled                 bool
 	AgentTick                    time.Duration
@@ -85,8 +83,6 @@ type Config struct {
 	// dependency); WebhookSecret verifies Stripe webhook signatures.
 	StripeSecretKey     string
 	StripeWebhookSecret string
-	StripePricePlus     string
-	StripePricePremium  string
 
 	// SubscriptionCreditsMonthly is granted on each subscription purchase /
 	// renewal (credits model, see the monetisation plan).
@@ -127,21 +123,16 @@ func Load() *Config {
 		SMTPFrom:     getEnv("VITA_SMTP_FROM", ""),
 		SMTPFromName: getEnv("VITA_SMTP_FROM_NAME", "Vita"),
 
-		AgentConfigKey:    getEnv("VITA_AGENT_CONFIG_KEY", getEnv("VITA_JWT_SECRET", "dev-secret-change-me-32-characters-min")),
-		AgentEnabled:      getEnv("VITA_AGENT_ENABLED", "true") == "true",
-		AgentTick:         durationEnv(getEnv("VITA_AGENT_TICK", "1m"), time.Minute),
-		FirebaseProjectID: getEnv("VITA_FIREBASE_PROJECT_ID", ""),
-		FirebaseServiceAccountBase64: getEnv(
-			"VITA_FIREBASE_SERVICE_ACCOUNT_BASE64",
-			getEnv("VITA_FCM_CREDENTIALS_JSON", ""),
-		),
+		AgentConfigKey:               getEnv("VITA_AGENT_CONFIG_KEY", "dev-agent-config-key-32-characters-min"),
+		AgentEnabled:                 getEnv("VITA_AGENT_ENABLED", "true") == "true",
+		AgentTick:                    durationEnv(getEnv("VITA_AGENT_TICK", "1m"), time.Minute),
+		FirebaseProjectID:            getEnv("VITA_FIREBASE_PROJECT_ID", ""),
+		FirebaseServiceAccountBase64: getEnv("VITA_FIREBASE_SERVICE_ACCOUNT_BASE64", ""),
 
 		RevenueCatWebhookSecret: getEnv("VITA_REVENUECAT_WEBHOOK_SECRET", ""),
 
 		StripeSecretKey:     getEnv("VITA_STRIPE_SECRET_KEY", ""),
 		StripeWebhookSecret: getEnv("VITA_STRIPE_WEBHOOK_SECRET", ""),
-		StripePricePlus:     getEnv("VITA_STRIPE_PRICE_PLUS", ""),
-		StripePricePremium:  getEnv("VITA_STRIPE_PRICE_PREMIUM", ""),
 
 		SubscriptionCreditsMonthly: atoiEnv(getEnv("VITA_SUBSCRIPTION_CREDITS_MONTHLY", "500"), 500),
 	}

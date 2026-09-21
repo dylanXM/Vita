@@ -99,8 +99,6 @@ base64 < firebase-service-account.json | tr -d '\n'
 - [ ] 制定服务账号私钥轮换流程；轮换时先更新环境变量，再废弃旧私钥。
 - [ ] 后端日志不得输出 Service Account JSON、私钥、OAuth Token 或设备 Token。
 
-兼容环境变量 `VITA_FCM_CREDENTIALS_JSON` 仍可读取原始 JSON，但正式环境统一使用 Base64 变量。
-
 ## 6. 数据库迁移
 
 本次依赖以下新增或扩展结构：
@@ -335,8 +333,6 @@ VITA_REVENUECAT_WEBHOOK_SECRET=<RevenueCat Webhook Authorization secret>
 # Stripe；启用 Web 订阅时全部必填
 VITA_STRIPE_SECRET_KEY=<Stripe restricted/secret key>
 VITA_STRIPE_WEBHOOK_SECRET=<Stripe endpoint signing secret>
-VITA_STRIPE_PRICE_PLUS=<Plus recurring Price ID>
-VITA_STRIPE_PRICE_PREMIUM=<Premium recurring Price ID>
 
 # 系统推送
 VITA_FIREBASE_PROJECT_ID=<Firebase Project ID>

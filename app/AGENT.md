@@ -28,10 +28,9 @@ For every other surface:
 - Touch targets must remain at least 44 logical pixels and layouts must support
   system text scaling, safe areas, light mode and dark mode.
 
-## Compatibility and validation
+## Validation
 
-- The App may be released after Backend/Admin/Webapp. Treat newly added API
-  fields as optional and keep safe fallbacks for older Backend responses.
+- Backend/Admin/Webapp/App use the current API contract in this pre-release project.
 - Update all eight App locales together: Arabic, English, Spanish, Japanese,
   Korean, Portuguese, Simplified Chinese and Traditional Chinese.
 - Run `flutter test` and `flutter analyze` after changes. Add focused unit or

@@ -41,5 +41,5 @@ class ChatMessageContent {
 
   bool get contentIsTranslationKey => source.startsWith('paid_');
 
-  bool get isGift => type == 'gift' || source == 'paid_gift';
+  bool get isGift => type == 'gift';
 }

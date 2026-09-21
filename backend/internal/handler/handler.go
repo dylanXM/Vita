@@ -791,9 +791,8 @@ func AppRegisterVerify(c *gin.Context) {
 	}
 	var pending pendingRegistration
 	if err := json.Unmarshal([]byte(pendingRaw), &pending); err != nil {
-		// Finish a verification already issued by an older Backend during a
-		// rolling deployment; new registration requests are strictly gated above.
-		pending.PasswordHash = pendingRaw
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "registration expired, please request a new code"})
+		return
 	}
 	if pending.PasswordHash == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "registration expired, please request a new code"})

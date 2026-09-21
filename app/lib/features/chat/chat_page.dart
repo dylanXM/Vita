@@ -628,10 +628,10 @@ class _AnimatedGiftCardState extends State<_AnimatedGiftCard>
     final configured = widget.content.payload['name_key'];
     if (configured is String && configured.isNotEmpty) return configured;
     return switch (widget.content.payload['product_key']) {
-      'gift_coffee' || 'legacy_gift_10' => 'experience.gift.coffee',
+      'gift_coffee' => 'experience.gift.coffee',
       'gift_flowers' => 'experience.gift.flowers',
-      'gift_cake' || 'legacy_gift_50' => 'experience.gift.cake',
-      'gift_keepsake' || 'legacy_gift_100' => 'experience.gift.keepsake',
+      'gift_cake' => 'experience.gift.cake',
+      'gift_keepsake' => 'experience.gift.keepsake',
       _ => 'gift.sent.title',
     };
   }

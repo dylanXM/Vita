@@ -138,14 +138,3 @@ func TestNormalizeModelScenariosAllowsVideoWithoutRequiringATestAdapter(t *testi
 		t.Fatalf("capabilities = %#v", capabilities)
 	}
 }
-
-func TestScenariosForCapabilitiesKeepsLegacyCreateRequestsCompatible(t *testing.T) {
-	scenarios, err := scenariosForCapabilities([]string{"text", "audio"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := "text_chat,text_life_plan,text_proactive,text_character_profile,text_story_chapter,text_storyboard,audio_transcription,audio_speech"
-	if strings.Join(scenarios, ",") != want {
-		t.Fatalf("scenarios = %#v", scenarios)
-	}
-}

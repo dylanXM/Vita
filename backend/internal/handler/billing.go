@@ -33,8 +33,6 @@ type BillingConfig struct {
 	RevenueCatWebhookSecret    string
 	StripeSecretKey            string
 	StripeWebhookSecret        string
-	StripePricePlus            string
-	StripePricePremium         string
 	SubscriptionCreditsMonthly int
 }
 
@@ -702,21 +700,13 @@ func CreateStripeCheckout(c *gin.Context) {
 	err := db.Get().QueryRow(`SELECT product_id FROM subscription_plans
 		WHERE environment=$1 AND platform='web' AND key=$2 AND enabled=true LIMIT 1`,
 		currentEnvironment(), req.Plan).Scan(&priceID)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		// Keep legacy Stripe checkout working during an additive deployment
-		// before the product-catalog migration has reached the shared database.
-		fmt.Printf("billing: subscription plan lookup unavailable: %v\n", err)
+	if errors.Is(err, sql.ErrNoRows) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unknown subscription plan"})
+		return
 	}
-	if priceID == "" {
-		switch req.Plan {
-		case "plus":
-			priceID = billingCfg.StripePricePlus
-		case "premium":
-			priceID = billingCfg.StripePricePremium
-		default:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "unknown subscription plan"})
-			return
-		}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load subscription plan"})
+		return
 	}
 	if priceID == "" {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "stripe price not configured"})

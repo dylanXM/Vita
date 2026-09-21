@@ -100,8 +100,6 @@ func main() {
 		RevenueCatWebhookSecret:    cfg.RevenueCatWebhookSecret,
 		StripeSecretKey:            cfg.StripeSecretKey,
 		StripeWebhookSecret:        cfg.StripeWebhookSecret,
-		StripePricePlus:            cfg.StripePricePlus,
-		StripePricePremium:         cfg.StripePricePremium,
 		SubscriptionCreditsMonthly: cfg.SubscriptionCreditsMonthly,
 	})
 	go func() {
@@ -164,7 +162,6 @@ func main() {
 			companions.PUT("/:id", handler.UpdateCompanion)
 			companions.DELETE("/:id", handler.DeleteCompanion)
 			companions.POST("/:id/restore", handler.RestoreCompanion)
-			companions.POST("/:id/gifts", handler.TransferCoinsToCompanion)
 			companions.GET("/:id/experiences", handler.ListCompanionExperiences)
 			companions.POST("/:id/experiences/:product_key", handler.PurchaseCompanionExperience)
 		}

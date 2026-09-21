@@ -15,9 +15,8 @@ directory.
 
 ## Repository-wide rules
 
-- Keep Backend, Admin and Webapp deployable together. Database and API changes
-  must be additive and compatible with the currently released App, because the
-  App is released later through mobile stores.
+- Keep Backend, Admin, Webapp and App aligned to the current pre-release API
+  contract.
 - Do not duplicate shared business rules across clients; enforce authoritative
   rules in Backend and let clients present the returned state.
 - Changes to user-visible text must update every locale supported by that

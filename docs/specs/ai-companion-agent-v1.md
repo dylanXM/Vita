@@ -145,9 +145,9 @@ Clients must render supported types and safely fall back to `content` for unknow
 12. Due life or shared events can create idempotent Moment posts in text, image, or image-plus-text form.
 13. Explore displays Moments and keeps Memories available as an in-page option.
 
-## 10. Deployment compatibility
+## 10. Deployment notes
 
-Database changes are additive. Backend and admin can deploy together before the app update: legacy app creation payloads remain valid, legacy message readers continue to receive the original fields, and new response fields are additive. The later app release enables personality/portrait selection, device-token registration, notification permission, and push deep links.
+Backend, admin, webapp, and app use the same current API contract for personality/portrait selection, device-token registration, notification permission, and push deep links.
 
 ### Device-push prerequisites
 

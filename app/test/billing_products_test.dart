@@ -13,9 +13,9 @@ void main() {
     expect(isPremiumProduct(r'$rc_monthly', 'vita.plus.monthly'), isFalse);
   });
 
-  test('recognizes Vita and legacy coin package identifiers', () {
+  test('recognizes configured coin product IDs', () {
     expect(isCoinProduct('coin_pack', 'vita.coins.1200'), isTrue);
-    expect(isCoinProduct('coins_500', 'legacy.product'), isTrue);
+    expect(isCoinProduct('coins_500', 'vita.unknown'), isFalse);
     expect(isCoinProduct(r'$rc_monthly', 'vita.plus.monthly'), isFalse);
   });
 }

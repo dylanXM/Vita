@@ -35,7 +35,7 @@ export function CompanionDetailPage() {
   const config = useQuery({
     queryKey: ["agent-config"],
     queryFn: async ({ signal }) => {
-      const value = await agentApi.config(signal);
+      const value = await agentApi.config(undefined, signal);
       return { ...value, models: value.models.filter((model) => model.enabled && model.capabilities.includes("text")) };
     },
   });

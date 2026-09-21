@@ -1,84 +1,17 @@
 package handler
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"vita/internal/credits"
 	"vita/internal/db"
 )
-
-type companionGiftRequest struct {
-	Coins int `json:"coins" binding:"required,min=1,max=100000"`
-}
-
-func TransferCoinsToCompanion(c *gin.Context) {
-	userID := c.GetString("user_id")
-	companionID := c.Param("id")
-	var input companionGiftRequest
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	active, err := userHasActiveSubscription(userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check subscription"})
-		return
-	}
-	if !active {
-		subscriptionRequired(c, "gift_requires_subscription", "Subscribe to reconnect before sending a gift")
-		return
-	}
-	var exists bool
-	if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM companions WHERE id=$1 AND user_id=$2 AND active=true AND is_default=false)`, companionID, userID).Scan(&exists); err != nil || !exists {
-		c.JSON(http.StatusNotFound, gin.H{"error": "companion not found"})
-		return
-	}
-	legacyProductKey := map[int]string{10: "legacy_gift_10", 50: "legacy_gift_50", 100: "legacy_gift_100"}[input.Coins]
-	if legacyProductKey == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "this legacy gift amount is no longer available", "code": "product_unavailable"})
-		return
-	}
-	idempotencyKey := strings.TrimSpace(c.GetHeader("X-Idempotency-Key"))
-	if idempotencyKey == "" {
-		idempotencyKey = "legacy-gift-" + uuid.New().String()
-	}
-	reservation, err := credits.Reserve(c.Request.Context(), db.Get(), credits.ReserveParams{
-		UserID: userID, CompanionID: companionID, Environment: currentEnvironment(), Platform: requestPlatform(c),
-		ProductKey: legacyProductKey, IdempotencyKey: idempotencyKey, ReferenceType: "legacy_gift",
-	})
-	if err != nil {
-		writeSpendError(c, err)
-		return
-	}
-	if reservation.Idempotent {
-		c.JSON(http.StatusOK, gin.H{"balance": reservation.Balance, "coins": reservation.Product.Coins, "result": reservation.Result, "idempotent": true})
-		return
-	}
-	result, referenceID, err := fulfillCatalogGift(c.Request.Context(), userID, companionID, reservation.Product)
-	if err != nil {
-		settlementCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = credits.Refund(settlementCtx, db.Get(), reservation.ID, err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send gift", "refunded": true})
-		return
-	}
-	settlementCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := credits.Complete(settlementCtx, db.Get(), reservation.ID, referenceID, result); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "gift completed but settlement could not be recorded"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"balance": reservation.Balance, "coins": reservation.Product.Coins, "result": result})
-}
 
 func userHasActiveSubscription(userID string) (bool, error) {
 	var active bool

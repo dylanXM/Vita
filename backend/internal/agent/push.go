@@ -60,9 +60,7 @@ func (e *FCMError) Error() string {
 	return fmt.Sprintf("fcm returned status %d: %s", e.StatusCode, e.Body)
 }
 
-// NewFCMClient returns nil when push is intentionally not configured. The
-// preferred input is base64-encoded service-account JSON; raw JSON remains
-// accepted for compatibility with the project's earlier environment name.
+// NewFCMClient returns nil when push is intentionally not configured.
 func NewFCMClient(projectID, serviceAccountBase64 string) (*FCMClient, error) {
 	projectID = strings.TrimSpace(projectID)
 	serviceAccountBase64 = strings.TrimSpace(serviceAccountBase64)
@@ -72,13 +70,9 @@ func NewFCMClient(projectID, serviceAccountBase64 string) (*FCMClient, error) {
 	if serviceAccountBase64 == "" {
 		return nil, errors.New("VITA_FIREBASE_SERVICE_ACCOUNT_BASE64 is required when Firebase push is enabled")
 	}
-	raw := []byte(serviceAccountBase64)
-	if !strings.HasPrefix(serviceAccountBase64, "{") {
-		decoded, err := base64.StdEncoding.DecodeString(serviceAccountBase64)
-		if err != nil {
-			return nil, fmt.Errorf("decode Firebase service account: %w", err)
-		}
-		raw = decoded
+	raw, err := base64.StdEncoding.DecodeString(serviceAccountBase64)
+	if err != nil {
+		return nil, fmt.Errorf("decode Firebase service account: %w", err)
 	}
 	var account firebaseServiceAccount
 	if err := json.Unmarshal(raw, &account); err != nil {

@@ -440,10 +440,6 @@ func AdminUpdateCreditProduct(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "environment is required"})
 		return
 	}
-	if strings.HasPrefix(c.Param("product_key"), "legacy_gift_") {
-		c.JSON(http.StatusConflict, gin.H{"error": "legacy gift products are fixed for old app compatibility"})
-		return
-	}
 	var input struct {
 		Coins     int  `json:"coins" binding:"required,min=1,max=100000"`
 		Enabled   bool `json:"enabled"`
