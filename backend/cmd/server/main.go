@@ -20,6 +20,7 @@ import (
 	"vita/internal/handler"
 	"vita/internal/mail"
 	"vita/internal/middleware"
+	"vita/internal/storage"
 )
 
 func main() {
@@ -44,6 +45,11 @@ func main() {
 		log.Fatalf("failed to connect database: %v", err)
 	}
 	defer dbClient.Close()
+	mediaStorage, err := storage.NewService(dbClient, cfg.Env, cfg.AgentConfigKey)
+	if err != nil {
+		log.Fatalf("failed to initialize media storage: %v", err)
+	}
+	handler.InitMediaStorage(mediaStorage)
 
 	pushClient, err := agent.NewFCMClient(cfg.FirebaseProjectID, cfg.FirebaseServiceAccountBase64)
 	if err != nil {
@@ -53,6 +59,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to initialize companion agent: %v", err)
 	}
+	agentService.SetMediaStorage(mediaStorage)
 	handler.InitAgent(agentService)
 	agentCtx, stopAgent := context.WithCancel(context.Background())
 	defer stopAgent()
@@ -69,6 +76,9 @@ func main() {
 				}
 				if err := handler.PurgeExpiredCompanions(agentCtx); err != nil {
 					log.Printf("expired companion cleanup: %v", err)
+				}
+				if err := mediaStorage.ProcessDeletionQueue(agentCtx, 50); err != nil {
+					log.Printf("media object cleanup: %v", err)
 				}
 			}
 		}
@@ -236,6 +246,9 @@ func main() {
 		{
 			admin.GET("/stats", handler.AdminStats)
 			admin.GET("/environment", handler.AdminEnvironment)
+			admin.GET("/storage-config", handler.AdminGetStorageConfig)
+			admin.PUT("/storage-config", handler.AdminUpdateStorageConfig)
+			admin.POST("/storage-config/test", handler.AdminTestStorageConfig)
 			admin.GET("/subscription-plans", handler.AdminListSubscriptionPlans)
 			admin.POST("/subscription-plans", handler.AdminCreateSubscriptionPlan)
 			admin.PUT("/subscription-plans/:id", handler.AdminUpdateSubscriptionPlan)

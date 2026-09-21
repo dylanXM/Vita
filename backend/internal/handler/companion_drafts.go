@@ -16,8 +16,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/ledongthuc/pdf"
-
-	"vita/internal/db"
 )
 
 const (
@@ -110,7 +108,11 @@ func GenerateCompanionDraft(c *gin.Context) {
 		return
 	}
 	mediaID := uuid.New().String()
-	if _, err := db.Get().ExecContext(c.Request.Context(), `INSERT INTO media_assets(id,user_id,kind,mime_type,data,size_bytes) VALUES($1,$2,'image',$3,$4,$5)`, mediaID, userID, mimeType, imageData, len(imageData)); err != nil {
+	if mediaStorage == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "media storage is unavailable"})
+		return
+	}
+	if err := mediaStorage.Store(c.Request.Context(), userID, mediaID, "image", mimeType, imageData); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store character image"})
 		return
 	}

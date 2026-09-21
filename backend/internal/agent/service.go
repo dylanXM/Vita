@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 
 	"vita/internal/language"
+	"vita/internal/storage"
 )
 
 const companionSystemBoundary = `You are driving a persistent AI companion who lives in another place.
@@ -29,6 +30,7 @@ type Service struct {
 	client *Client
 	push   *FCMClient
 	mock   bool
+	media  *storage.Service
 }
 
 type SavedMessage struct {
@@ -128,6 +130,8 @@ func NewService(db *sql.DB, secret string, mock bool, push *FCMClient) (*Service
 func (s *Service) EncryptSecret(value string) (string, error) { return s.box.Encrypt(value) }
 
 func (s *Service) DecryptSecret(value string) (string, error) { return s.box.Decrypt(value) }
+
+func (s *Service) SetMediaStorage(media *storage.Service) { s.media = media }
 
 func (s *Service) Run(ctx context.Context, interval time.Duration) {
 	if interval <= 0 {
@@ -312,10 +316,12 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 			}
 			if audio, mimeType, _, speechErr := s.generateSpeechWithFallback(ctx, profile.ID, "reply_speech", audioModels, text, voice); speechErr == nil {
 				mediaID := uuid.New().String()
-				if _, storeErr := s.db.ExecContext(ctx, `INSERT INTO media_assets(id,user_id,kind,mime_type,data,size_bytes) VALUES($1,$2,'audio',$3,$4,$5)`, mediaID, userID, mimeType, audio, len(audio)); storeErr == nil {
-					reply.MessageType = "voice"
-					reply.MediaURL = "/v1/media/" + mediaID
-					_, _ = s.db.ExecContext(ctx, `UPDATE messages SET message_type='voice',media_url=$2 WHERE id=$1`, reply.ID, reply.MediaURL)
+				if s.media != nil {
+					if storeErr := s.media.Store(ctx, userID, mediaID, "audio", mimeType, audio); storeErr == nil {
+						reply.MessageType = "voice"
+						reply.MediaURL = "/v1/media/" + mediaID
+						_, _ = s.db.ExecContext(ctx, `UPDATE messages SET message_type='voice',media_url=$2 WHERE id=$1`, reply.ID, reply.MediaURL)
+					}
 				}
 			}
 		}
@@ -331,9 +337,11 @@ func (s *Service) TranscribeMedia(ctx context.Context, mediaID, userID, companio
 	if err != nil {
 		return "", err
 	}
-	var mimeType string
-	var data []byte
-	if err := s.db.QueryRowContext(ctx, `SELECT mime_type,data FROM media_assets WHERE id=$1 AND user_id=$2 AND kind='audio'`, mediaID, userID).Scan(&mimeType, &data); err != nil {
+	if s.media == nil {
+		return "", fmt.Errorf("media storage is unavailable")
+	}
+	mimeType, data, err := s.media.LoadBytes(ctx, mediaID, userID)
+	if err != nil {
 		return "", fmt.Errorf("audio media not found")
 	}
 	filename := "voice.m4a"
@@ -443,7 +451,10 @@ func (s *Service) SpeakLatestReply(ctx context.Context, userID, companionID stri
 		return nil, err
 	}
 	mediaID := uuid.New().String()
-	if _, err := s.db.ExecContext(ctx, `INSERT INTO media_assets(id,user_id,kind,mime_type,data,size_bytes) VALUES($1,$2,'audio',$3,$4,$5)`, mediaID, userID, mimeType, audio, len(audio)); err != nil {
+	if s.media == nil {
+		return nil, fmt.Errorf("media storage is unavailable")
+	}
+	if err := s.media.Store(ctx, userID, mediaID, "audio", mimeType, audio); err != nil {
 		return nil, err
 	}
 	message.MessageType = "voice"

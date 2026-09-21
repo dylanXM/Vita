@@ -53,6 +53,9 @@ import type {
   StoryConfig,
   StoryBackground,
   StoryBackgroundInput,
+  StorageConfig,
+  StorageConfigInput,
+  StorageProvider,
 } from "./types";
 
 /** Admin sign-in. The API also accepts a 6-digit code for the same accounts. */
@@ -91,6 +94,15 @@ export const usersApi = {
 /** Deployment environment of the API instance (admin-only). */
 export const envApi = {
   get: (signal?: AbortSignal) => http.get<AdminEnvironment>("/admin/environment", { signal }),
+};
+
+export const storageApi = {
+  get: (environment: Environment, signal?: AbortSignal) =>
+    http.get<StorageConfig>("/admin/storage-config", { params: { environment }, signal }),
+  save: (environment: Environment, body: StorageConfigInput) =>
+    http.put<StorageConfig>("/admin/storage-config", body, { params: { environment } }),
+  test: (environment: Environment, provider: Exclude<StorageProvider, "postgres">) =>
+    http.post<{ provider: string; success: boolean }>("/admin/storage-config/test", undefined, { params: { environment, provider } }),
 };
 
 export const healthApi = {

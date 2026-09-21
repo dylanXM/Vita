@@ -24,6 +24,7 @@ import (
 	"vita/internal/db"
 	"vita/internal/language"
 	"vita/internal/mail"
+	"vita/internal/storage"
 )
 
 const codeLength = 6
@@ -1767,6 +1768,10 @@ func GetExplorePosts(c *gin.Context) {
 }
 
 func UploadMedia(c *gin.Context) {
+	if mediaStorage == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "media storage is unavailable"})
+		return
+	}
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "media file is required"})
@@ -1793,22 +1798,30 @@ func UploadMedia(c *gin.Context) {
 		return
 	}
 	id := uuid.New().String()
-	if _, err := db.Get().Exec(`INSERT INTO media_assets(id,user_id,kind,mime_type,data,size_bytes) VALUES($1,$2,$3,$4,$5,$6)`, id, c.GetString("user_id"), kind, mimeType, data, len(data)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store media"})
+	if err := mediaStorage.Store(c.Request.Context(), c.GetString("user_id"), id, kind, mimeType, data); err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to store media"})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"id": id, "url": "/v1/media/" + id, "mime_type": mimeType, "size_bytes": len(data)})
 }
 
 func GetMedia(c *gin.Context) {
-	var mimeType string
-	var data []byte
-	if err := db.Get().QueryRow(`SELECT mime_type,data FROM media_assets WHERE id=$1 AND user_id=$2`, c.Param("id"), c.GetString("user_id")).Scan(&mimeType, &data); err != nil {
+	if mediaStorage == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "media storage is unavailable"})
+		return
+	}
+	media, err := mediaStorage.Open(c.Request.Context(), c.Param("id"), c.GetString("user_id"))
+	if errors.Is(err, storage.ErrNotFound) {
 		c.Status(http.StatusNotFound)
 		return
 	}
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to load media"})
+		return
+	}
+	defer media.Body.Close()
 	c.Header("Cache-Control", "private, max-age=86400")
-	c.Data(http.StatusOK, mimeType, data)
+	c.DataFromReader(http.StatusOK, media.Size, media.MimeType, media.Body, nil)
 }
 
 func GenerateMedia(c *gin.Context) {

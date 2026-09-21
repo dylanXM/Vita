@@ -208,6 +208,7 @@ class ChatController extends GetxController {
           .upload('/v1/media/upload', filePath, kind: 'audio');
       if (uploaded is! Map || uploaded['id'] is! String) return;
       final mediaID = uploaded['id'] as String;
+      final mediaURL = uploaded['url'] as String? ?? '/v1/media/$mediaID';
       optimisticId = 'local-${DateTime.now().microsecondsSinceEpoch}';
       messages.add({
         'id': optimisticId,
@@ -215,7 +216,7 @@ class ChatController extends GetxController {
         'content': '',
         'sender_type': 'user',
         'message_type': 'voice',
-        'media_url': '/v1/media/$mediaID',
+        'media_url': mediaURL,
         'source': 'user',
         'payload': <String, dynamic>{},
         'delivery_status': 'sending',

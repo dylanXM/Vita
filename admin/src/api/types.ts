@@ -49,6 +49,39 @@ export interface AdminEnvironment {
   environment: Environment;
 }
 
+export type StorageProvider = "postgres" | "r2" | "cos";
+
+export interface StorageProviderConfig {
+  enabled: boolean;
+  endpoint: string;
+  bucket: string;
+  region: string;
+  access_key_configured: boolean;
+  secret_key_configured: boolean;
+}
+
+export interface StorageConfig {
+  environment: Environment;
+  active_provider: StorageProvider;
+  r2: StorageProviderConfig;
+  cos: StorageProviderConfig;
+}
+
+export interface StorageProviderInput {
+  enabled: boolean;
+  endpoint: string;
+  bucket: string;
+  region: string;
+  access_key: string;
+  secret_key: string;
+}
+
+export interface StorageConfigInput {
+  active_provider: StorageProvider;
+  r2: StorageProviderInput;
+  cos: StorageProviderInput;
+}
+
 /** A user account as seen by the admin console (`/v1/admin/users`). */
 export interface AdminUser {
   id: string;

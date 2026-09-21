@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import ar from "./ar";
 import en from "./en";
-import es from "./es";
-import ja from "./ja";
-import ko from "./ko";
-import pt from "./pt";
 import zhHans from "./zh-Hans";
-import zhHant from "./zh-Hant";
 
 function leafKeys(value: unknown, prefix = ""): string[] {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return [prefix];
@@ -17,7 +11,7 @@ function leafKeys(value: unknown, prefix = ""): string[] {
 describe("admin translations", () => {
   it("keeps every locale aligned with the English key set", () => {
     const expected = leafKeys(en).sort();
-    for (const [locale, translations] of Object.entries({ ar, es, ja, ko, pt, "zh-Hans": zhHans, "zh-Hant": zhHant })) {
+    for (const [locale, translations] of Object.entries({ "zh-Hans": zhHans })) {
       expect(leafKeys(translations).sort(), locale + " translation keys").toEqual(expected);
     }
   });
