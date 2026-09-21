@@ -392,7 +392,7 @@ class _ChatPageState extends State<ChatPage> {
           child: Row(
             mainAxisAlignment:
                 isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (!isUser) ...[
                 VitaAvatar(
@@ -439,23 +439,25 @@ class _ChatPageState extends State<ChatPage> {
                           ),
                         ),
                       ),
+                    if (isUser && deliveryStatus != 'delivered')
+                      Positioned(
+                        right: -(8 +
+                            (deliveryStatus == 'sending' ? 14.0 : 17.0)),
+                        bottom: 0,
+                        child: deliveryStatus == 'sending'
+                            ? SizedBox.square(
+                                dimension: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.5,
+                                  color: context.vita.subText,
+                                ),
+                              )
+                            : Icon(Icons.error_outline_rounded,
+                                size: 17, color: context.vita.red),
+                      ),
                   ],
                 ),
               ),
-              if (isUser && deliveryStatus != 'delivered') ...[
-                const SizedBox(width: 8),
-                if (deliveryStatus == 'sending')
-                  SizedBox.square(
-                    dimension: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 1.5,
-                      color: context.vita.subText,
-                    ),
-                  )
-                else
-                  Icon(Icons.error_outline_rounded,
-                      size: 17, color: context.vita.red),
-              ],
               if (isUser) ...[
                 const SizedBox(width: 8),
                 VitaAvatar(name: '1', radius: 22,
