@@ -5,7 +5,7 @@ import '../../core/api_client.dart';
 import '../../core/analytics_service.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
-import '../chat/chat_page.dart';
+import 'life_detail_page.dart';
 
 /// Contacts tab — WeChat-style contacts list of all the user's AI companions,
 /// with a rounded search field. Tapping a contact opens the chat thread.
@@ -188,10 +188,10 @@ class _ContactTile extends StatelessWidget {
       color: context.vita.surface,
       child: InkWell(
         onTap: () {
-          AnalyticsService.to.track('contacts_opened',
+          AnalyticsService.to.track('life_detail_opened',
               category: 'navigation', properties: {'companion_id': id});
           Get.to(
-            () => ChatPage(companionId: id, name: name, companion: companion),
+            () => LifeDetailPage(companion: companion),
             transition: Transition.cupertino,
             duration: const Duration(milliseconds: 300),
           );
