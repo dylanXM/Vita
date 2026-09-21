@@ -67,7 +67,7 @@ class ChatController extends GetxController {
   /// level state carried by the response.
   Future<void> _syncConversation() async {
     final conv = await ApiClient.instance.post(
-      '/v1/conversations',
+      '/v1/conversations/',
       data: {'companion_id': companionId},
     );
     final rawId = conv is Map ? conv['conversation_id'] : null;
