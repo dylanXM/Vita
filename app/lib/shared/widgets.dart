@@ -394,6 +394,7 @@ class VitaListTile extends StatelessWidget {
     this.trailing,
     this.iconColor,
     this.borderRadius,
+    this.showChevron = true,
   }) : assert(icon != null || customIcon != null,
             'Either icon or customIcon must be provided');
 
@@ -407,6 +408,7 @@ class VitaListTile extends StatelessWidget {
   final Widget? trailing;
   final Color? iconColor;
   final BorderRadius? borderRadius;
+  final bool showChevron;
   final VoidCallback? onTap;
 
   @override
@@ -459,7 +461,9 @@ class VitaListTile extends StatelessWidget {
                 ),
               ),
               if (trailing != null) ...[const SizedBox(width: 8), trailing!],
-              Icon(Icons.chevron_right, size: 20, color: context.vita.chevron),
+              if (showChevron)
+                Icon(Icons.chevron_right,
+                    size: 20, color: context.vita.chevron),
             ],
           ),
         ),

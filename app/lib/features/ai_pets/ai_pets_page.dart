@@ -13,6 +13,8 @@ import '../chat/chat_page.dart';
 import '../life/life_detail_page.dart';
 import '../life/life_page.dart';
 import '../memories/memories_page.dart';
+import 'ai_pet_avatar.dart';
+import 'ai_pet_desktop_controller.dart';
 
 class AIPetsPage extends StatefulWidget {
   const AIPetsPage({super.key});
@@ -114,6 +116,8 @@ class _AIPetsPageState extends State<AIPetsPage> {
         ChatListController.to.load(),
         LifeController.to.loadCompanions(),
         MemoriesController.to.loadCompanions(),
+        if (Get.isRegistered<AIPetDesktopController>())
+          AIPetDesktopController.to.refreshPet(),
       ]);
       if (mounted && companionId.isNotEmpty) {
         await Get.to(() => AIPetHomePage(
@@ -192,7 +196,7 @@ class _BreedCard extends StatelessWidget {
                 child: SizedBox(
                     width: 76,
                     height: 76,
-                    child: _PetImage(
+                    child: AIPetAvatar(
                         name: '${breed['name'] ?? ''}',
                         imageUrl: '${breed['avatar_url'] ?? ''}'))),
             const SizedBox(width: 14),
@@ -629,7 +633,7 @@ class _AnimatedPetSceneState extends State<_AnimatedPetScene>
                           ? 0.0
                           : _blinkAmount(_blinkController.value);
                   final hasBlinkFrame =
-                      _closedEyeAssetPath(widget.imageUrl) != null;
+                      aiPetClosedEyeAssetPath(widget.imageUrl) != null;
                   var dy = idle * 4;
                   var dx = 0.0;
                   var scale = 1.0;
@@ -680,7 +684,7 @@ class _AnimatedPetSceneState extends State<_AnimatedPetScene>
                           child: SizedBox(
                             width: 245,
                             height: 245,
-                            child: _PetImage(
+                            child: AIPetAvatar(
                               name: widget.name,
                               imageUrl: widget.imageUrl,
                               blinkAmount: blink,
@@ -754,64 +758,6 @@ class _SceneStar extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
       Icon(Icons.star_rounded, size: size, color: const Color(0xFFFFB930));
-}
-
-class _PetImage extends StatelessWidget {
-  const _PetImage({
-    required this.name,
-    required this.imageUrl,
-    this.blinkAmount = 0,
-  });
-  final String name;
-  final String imageUrl;
-  final double blinkAmount;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget fallback() => ColoredBox(
-          color: const Color(0xFFFFE9D7),
-          child: Center(
-              child: Icon(Icons.pets_rounded,
-                  size: 52, color: context.vita.green)),
-        );
-
-    if (imageUrl.startsWith('asset://')) {
-      final assetPath = imageUrl.substring('asset://'.length);
-      final closedEyeAsset = _closedEyeAssetPath(imageUrl);
-      final openEyes = Image.asset(assetPath,
-          fit: BoxFit.contain, errorBuilder: (_, __, ___) => fallback());
-      if (closedEyeAsset == null) return openEyes;
-      return Stack(fit: StackFit.expand, children: [
-        openEyes,
-        Opacity(
-            opacity: blinkAmount.clamp(0.0, 1.0),
-            child: Image.asset(closedEyeAsset, fit: BoxFit.contain)),
-      ]);
-    }
-    if (imageUrl.isNotEmpty) {
-      return Image.network(imageUrl,
-          fit: BoxFit.contain, errorBuilder: (_, __, ___) => fallback());
-    }
-    return fallback();
-  }
-}
-
-String? _closedEyeAssetPath(String imageUrl) {
-  if (!imageUrl.startsWith('asset://assets/ai_pets/') ||
-      imageUrl.endsWith('_blink.png')) {
-    return null;
-  }
-  final assetPath = imageUrl.substring('asset://'.length);
-  const supportedAssets = {
-    'assets/ai_pets/cat_orange.png',
-    'assets/ai_pets/cat_ragdoll.png',
-    'assets/ai_pets/cat_tuxedo.png',
-    'assets/ai_pets/dog_corgi.png',
-    'assets/ai_pets/dog_retriever.png',
-    'assets/ai_pets/dog_shiba.png',
-  };
-  if (!supportedAssets.contains(assetPath)) return null;
-  return assetPath.replaceFirst('.png', '_blink.png');
 }
 
 class _StatusBar extends StatelessWidget {

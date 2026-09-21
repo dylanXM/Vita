@@ -40,7 +40,7 @@ class ChatListPresentation {
     // ordinary text unchanged.
     if (messageType == 'voice') return '[$voiceLabel]';
     if (messageType == 'image' || messageType == 'image_text') {
-      return message.isEmpty ? '[$photoLabel]' : '[$photoLabel] $message.tr';
+      return message.isEmpty ? '[$photoLabel]' : '[$photoLabel] ${message.tr}';
     }
     return message.isEmpty ? fallback : message.tr;
   }

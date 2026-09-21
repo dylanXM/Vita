@@ -18,6 +18,7 @@ class VitaSettingsController extends GetxController {
 
   static const _themeKey = 'vita_theme_mode';
   static const _localeKey = 'vita_locale';
+  static const _petDesktopKey = 'vita_pet_desktop_enabled';
 
   /// Languages the app ships.
   static const List<Locale> supportedLocales = vitaSupportedLocales;
@@ -27,6 +28,9 @@ class VitaSettingsController extends GetxController {
 
   /// null → follow the device language (default).
   final Rxn<Locale> locale = Rxn<Locale>();
+
+  /// Whether the adopted AI pet floats above every app route.
+  final petDesktopEnabled = false.obs;
 
   /// Completes once the persisted preferences have been loaded.
   final Completer<void> ready = Completer<void>();
@@ -52,6 +56,7 @@ class VitaSettingsController extends GetxController {
     if (lang != null) {
       locale.value = vitaLocaleFromTag(lang);
     }
+    petDesktopEnabled.value = prefs.getBool(_petDesktopKey) ?? false;
     // GetX resolves .tr through the static Get.locale, so even in
     // "follow system" mode we pin it to a concrete supported locale.
     Get.locale = effectiveLocale;
@@ -85,6 +90,12 @@ class VitaSettingsController extends GetxController {
     unawaited(syncLocale());
   }
 
+  void setPetDesktopEnabled(bool enabled) {
+    petDesktopEnabled.value = enabled;
+    _persistBool(_petDesktopKey, enabled);
+    _changed();
+  }
+
   Future<void> syncLocale() async {
     try {
       await ApiClient.instance.put('/v1/me/locale', data: {
@@ -103,6 +114,11 @@ class VitaSettingsController extends GetxController {
     } else {
       await prefs.setString(key, value);
     }
+  }
+
+  Future<void> _persistBool(String key, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, value);
   }
 
   void _changed() => onPreferenceChanged?.call();

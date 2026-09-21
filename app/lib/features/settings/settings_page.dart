@@ -70,6 +70,26 @@ class SettingsPage extends StatelessWidget {
                   ),
                 ),
                 const Divider(indent: 52, height: 0.5),
+                Obx(
+                  () => VitaListTile(
+                    customIcon: const VitaMenuIcon(
+                      icon: Icons.pets_outlined,
+                      color: Color(0xFFE88952),
+                    ),
+                    title: 'settings.petDesktop'.tr,
+                    subtitle: 'settings.petDesktop.subtitle'.tr,
+                    borderRadius: BorderRadius.zero,
+                    showChevron: false,
+                    trailing: Switch.adaptive(
+                      value: settings.petDesktopEnabled.value,
+                      onChanged: settings.setPetDesktopEnabled,
+                    ),
+                    onTap: () => settings.setPetDesktopEnabled(
+                      !settings.petDesktopEnabled.value,
+                    ),
+                  ),
+                ),
+                const Divider(indent: 52, height: 0.5),
                 VitaListTile(
                   customIcon: const VitaMenuIcon(
                     icon: Icons.notifications_none_rounded,

@@ -15,6 +15,7 @@ import 'features/onboarding/onboarding_page.dart';
 import 'features/billing/credits_page.dart';
 import 'features/billing/subscription_page.dart';
 import 'features/companion/companion_create_page.dart';
+import 'features/ai_pets/ai_pet_desktop_overlay.dart';
 import 'features/shell/shell_page.dart';
 
 Future<void> main() async {
@@ -62,6 +63,8 @@ class _VitaAppState extends State<VitaApp> {
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       translations: VitaTranslations(),
       debugShowCheckedModeBanner: false,
+      builder: (context, child) =>
+          AIPetDesktopOverlay(child: child ?? const SizedBox.shrink()),
       routingCallback: (routing) {
         final route = routing?.current;
         if (route != null && route.isNotEmpty) {
