@@ -9,6 +9,7 @@ import '../../core/supported_locales.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../auth/auth_controller.dart';
+import 'deleted_companions_page.dart';
 import 'legal_document_page.dart';
 
 /// Settings — language, theme and sign out. Reached from the Me page.
@@ -74,10 +75,10 @@ class SettingsPage extends StatelessWidget {
                 const Divider(indent: 52, height: 0.5),
                 VitaListTile(
                   customIcon: SvgPicture.asset(
-                      'assets/icons/menu_notifications.svg',
-                      width: 18,
-                      height: 18,
-                    ),
+                    'assets/icons/menu_notifications.svg',
+                    width: 18,
+                    height: 18,
+                  ),
                   title: 'settings.notifications'.tr,
                   subtitle: 'settings.notifications.subtitle'.tr,
                   borderRadius: BorderRadius.zero,
@@ -99,10 +100,10 @@ class SettingsPage extends StatelessWidget {
               children: [
                 VitaListTile(
                   customIcon: SvgPicture.asset(
-                      'assets/icons/menu_privacy.svg',
-                      width: 18,
-                      height: 18,
-                    ),
+                    'assets/icons/menu_privacy.svg',
+                    width: 18,
+                    height: 18,
+                  ),
                   title: 'settings.privacy'.tr,
                   borderRadius: BorderRadius.zero,
                   onTap: () => _openLegal(LegalDocumentType.privacy),
@@ -110,10 +111,10 @@ class SettingsPage extends StatelessWidget {
                 const Divider(indent: 52, height: 0.5),
                 VitaListTile(
                   customIcon: SvgPicture.asset(
-                      'assets/icons/menu_terms.svg',
-                      width: 18,
-                      height: 18,
-                    ),
+                    'assets/icons/menu_terms.svg',
+                    width: 18,
+                    height: 18,
+                  ),
                   title: 'settings.terms'.tr,
                   borderRadius: BorderRadius.zero,
                   onTap: () => _openLegal(LegalDocumentType.terms),
@@ -134,11 +135,23 @@ class SettingsPage extends StatelessWidget {
             child: Column(
               children: [
                 VitaListTile(
+                  icon: Icons.restore_from_trash_outlined,
+                  title: 'settings.deletedCompanions'.tr,
+                  subtitle: 'settings.deletedCompanions.subtitle'.tr,
+                  borderRadius: BorderRadius.zero,
+                  onTap: () => Get.to(
+                    () => const DeletedCompanionsPage(),
+                    transition: Transition.cupertino,
+                    duration: const Duration(milliseconds: 300),
+                  ),
+                ),
+                const Divider(indent: 52, height: 0.5),
+                VitaListTile(
                   customIcon: SvgPicture.asset(
-                      'assets/icons/menu_logout.svg',
-                      width: 18,
-                      height: 18,
-                    ),
+                    'assets/icons/menu_logout.svg',
+                    width: 18,
+                    height: 18,
+                  ),
                   title: 'common.signout'.tr,
                   iconColor: vita.red,
                   borderRadius: BorderRadius.zero,

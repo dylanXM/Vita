@@ -603,6 +603,9 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS life_enabled BOOLEAN NOT NULL DEFAULT true`,
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS friendship_active BOOLEAN NOT NULL DEFAULT true`,
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS subscription_paused_at TIMESTAMP`,
+		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP`,
+		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS purge_after TIMESTAMP`,
+		`CREATE INDEX IF NOT EXISTS idx_companions_purge_after ON companions(purge_after) WHERE deleted_at IS NOT NULL`,
 		// Reserved for the upcoming voice-message capability. Keeping the
 		// provider-specific settings in JSON avoids another migration when the
 		// first TTS provider is selected; voice stays off for the text-only app.

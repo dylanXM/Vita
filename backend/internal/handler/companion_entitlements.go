@@ -205,7 +205,7 @@ func syncUserCompanionEntitlement(userID string, active bool) error {
 	if !active {
 		_, err := db.Get().Exec(`UPDATE companions SET life_enabled=false,friendship_active=false,
 			subscription_paused_at=COALESCE(subscription_paused_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP
-			WHERE user_id=$1 AND active=true AND is_default=false`, userID)
+			WHERE user_id=$1 AND is_default=false AND (active=true OR deleted_at IS NOT NULL)`, userID)
 		return err
 	}
 
@@ -271,7 +271,14 @@ func syncUserCompanionEntitlement(userID string, active bool) error {
 		}
 	}
 	_, err = tx.Exec(`UPDATE companions SET life_enabled=true,friendship_active=true,
-		subscription_paused_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE user_id=$1 AND active=true AND is_default=false`, userID)
+		subscription_paused_at=NULL,updated_at=CURRENT_TIMESTAMP
+		WHERE user_id=$1 AND active=true AND is_default=false AND deleted_at IS NULL`, userID)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`UPDATE companions SET life_enabled=true,friendship_active=false,proactive_enabled=false,
+		subscription_paused_at=NULL,updated_at=CURRENT_TIMESTAMP
+		WHERE user_id=$1 AND deleted_at IS NOT NULL AND purge_after>CURRENT_TIMESTAMP AND is_default=false`, userID)
 	if err != nil {
 		return err
 	}

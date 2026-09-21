@@ -10,6 +10,7 @@ import (
 	"io"
 	"math/big"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1195,7 +1196,18 @@ func UpdateCompanion(c *gin.Context) {
 }
 
 func DeleteCompanion(c *gin.Context) {
-	result, err := db.Get().Exec(`UPDATE companions SET active=false,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$2`, c.Param("id"), c.GetString("user_id"))
+	userID := c.GetString("user_id")
+	subscribed, err := userHasActiveSubscription(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check subscription"})
+		return
+	}
+	purgeAfter := time.Now().UTC().Add(companionRecoveryWindow)
+	result, err := db.Get().ExecContext(c.Request.Context(), `UPDATE companions SET
+		active=false,friendship_active=false,life_enabled=$3,
+		deleted_at=CURRENT_TIMESTAMP,purge_after=$4,updated_at=CURRENT_TIMESTAMP
+		WHERE id=$1 AND user_id=$2 AND is_default=false AND deleted_at IS NULL`,
+		c.Param("id"), userID, subscribed, purgeAfter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete companion"})
 		return
@@ -1204,7 +1216,10 @@ func DeleteCompanion(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "companion not found"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "companion deleted"})
+	c.JSON(http.StatusOK, gin.H{
+		"message": "companion deleted", "purge_after": purgeAfter,
+		"life_engine_running": subscribed,
+	})
 }
 
 type SendMessageRequest struct {
@@ -1350,6 +1365,76 @@ func GetMessages(c *gin.Context) {
 	}
 	_, _ = db.Get().Exec(`UPDATE conversations SET last_read_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$2`, conversationID, userID)
 	c.JSON(http.StatusOK, messages)
+}
+
+// GetConversationMedia returns the complete image and voice history for one
+// owned conversation. It is paginated independently from the chat timeline so
+// the App does not need to load every text message to build the media gallery.
+func GetConversationMedia(c *gin.Context) {
+	conversationID := c.Param("id")
+	userID := c.GetString("user_id")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "30"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 30
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	var exists bool
+	if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM conversations WHERE id=$1 AND user_id=$2)`, conversationID, userID).Scan(&exists); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify conversation"})
+		return
+	}
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
+		return
+	}
+	var total int
+	if err := db.Get().QueryRow(`SELECT COUNT(*) FROM messages
+		WHERE conversation_id=$1 AND COALESCE(media_url,'')<>''
+		AND (message_type='voice' OR message_type IN ('image','image_text') OR COALESCE(payload->>'media_kind','')='image')`, conversationID).Scan(&total); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to count conversation media"})
+		return
+	}
+	rows, err := db.Get().Query(`SELECT id,sender_type,message_type,COALESCE(content,''),COALESCE(media_url,''),payload::text,created_at
+		FROM messages WHERE conversation_id=$1 AND COALESCE(media_url,'')<>''
+		AND (message_type='voice' OR message_type IN ('image','image_text') OR COALESCE(payload->>'media_kind','')='image')
+		ORDER BY created_at DESC,id DESC LIMIT $2 OFFSET $3`, conversationID, pageSize, (page-1)*pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get conversation media"})
+		return
+	}
+	defer rows.Close()
+	items := make([]gin.H, 0)
+	for rows.Next() {
+		var id, senderType, messageType, content, mediaURL, payloadRaw string
+		var createdAt time.Time
+		if err := rows.Scan(&id, &senderType, &messageType, &content, &mediaURL, &payloadRaw, &createdAt); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read conversation media"})
+			return
+		}
+		payload := map[string]any{}
+		_ = json.Unmarshal([]byte(payloadRaw), &payload)
+		kind := "image"
+		if messageType == "voice" {
+			kind = "voice"
+		}
+		items = append(items, gin.H{"id": id, "sender_type": senderType, "message_type": messageType,
+			"kind": kind, "content": content, "media_url": mediaURL, "payload": payload, "created_at": createdAt})
+	}
+	if err := rows.Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read conversation media"})
+		return
+	}
+	totalPages := 0
+	if total > 0 {
+		totalPages = (total + pageSize - 1) / pageSize
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "page_size": pageSize, "total_pages": totalPages})
 }
 
 // GetOrCreateConversation returns the conversation between the current user and

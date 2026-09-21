@@ -189,7 +189,9 @@ func (s *Service) GenerateDueLifePhotos(ctx context.Context) error {
 		WHERE e.status='active' AND e.start_time<=CURRENT_TIMESTAMP
 		  AND (e.importance>=60 OR COALESCE((e.payload->>'moment_candidate')::boolean,false)=true)
 		  AND jsonb_array_length(COALESCE(e.payload->'media_urls','[]'::jsonb))=0
-		  AND c.active=true AND c.life_enabled=true
+		  AND (c.active=true OR c.deleted_at IS NOT NULL) AND c.life_enabled=true
+		  AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active'
+		    AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP))
 		  AND (SELECT COUNT(*) FROM life_events same_day
 		       WHERE same_day.companion_id=e.companion_id AND same_day.local_date=e.local_date
 		         AND jsonb_array_length(COALESCE(same_day.payload->'media_urls','[]'::jsonb))>0) < $1
@@ -676,7 +678,7 @@ func (s *Service) EnsureDailyPlans(ctx context.Context) error {
 		       COALESCE(u.timezone, 'UTC')
 		FROM companions c JOIN users u ON u.id = c.user_id
 		LEFT JOIN relationship_states r ON r.companion_id=c.id
-		WHERE c.active = true AND c.life_enabled=true AND c.is_default=false
+		WHERE (c.active = true OR c.deleted_at IS NOT NULL) AND c.life_enabled=true AND c.is_default=false
 		AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active'
 		  AND (s.current_period_end IS NULL OR s.current_period_end > CURRENT_TIMESTAMP))`)
 	if err != nil {
@@ -891,7 +893,8 @@ func (s *Service) EnsureCompanionSocialWorld(ctx context.Context) error {
 		JOIN users ua ON ua.id=a.user_id JOIN users ub ON ub.id=b.user_id
 		LEFT JOIN relationship_states ra ON ra.companion_id=a.id
 		LEFT JOIN relationship_states rb ON rb.companion_id=b.id
-		WHERE r.status='active' AND a.active=true AND b.active=true
+		WHERE r.status='active'
+		  AND (a.active=true OR a.deleted_at IS NOT NULL) AND (b.active=true OR b.deleted_at IS NOT NULL)
 		  AND a.life_enabled=true AND b.life_enabled=true AND a.is_default=false AND b.is_default=false
 		  AND (r.last_interaction_at IS NULL OR r.last_interaction_at < CURRENT_TIMESTAMP - INTERVAL '36 hours')
 		  AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=a.user_id AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP))
@@ -929,7 +932,7 @@ func (s *Service) ensureCompanionConnections(ctx context.Context) error {
 	rows, err := s.db.QueryContext(ctx, `
 		WITH eligible AS (
 			SELECT c.id,COALESCE(c.city,'') city FROM companions c
-			WHERE c.active=true AND c.life_enabled=true AND c.is_default=false
+			WHERE (c.active=true OR c.deleted_at IS NOT NULL) AND c.life_enabled=true AND c.is_default=false
 			  AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP))
 		)
 		SELECT a.id,b.id FROM eligible a JOIN eligible b ON a.id < b.id
@@ -1131,7 +1134,7 @@ func (s *Service) generateSocialEvent(ctx context.Context, a, b companionContext
 // PublishDueMoments turns selected life records into social posts. media_urls
 // makes text, image-only and image-plus-text posts share one stable contract.
 func (s *Service) PublishDueMoments(ctx context.Context) error {
-	rows, err := s.db.QueryContext(ctx, `SELECT e.id,e.companion_id,e.social_event_id,COALESCE(e.title,''),COALESCE(e.description,''),e.start_time,e.payload::text FROM life_events e JOIN companions c ON c.id=e.companion_id WHERE e.status='active' AND e.start_time<=CURRENT_TIMESTAMP AND COALESCE((e.payload->>'moment_candidate')::boolean,false)=true AND c.active=true AND c.life_enabled=true AND c.is_default=false AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP)) AND NOT EXISTS(SELECT 1 FROM moment_posts p WHERE p.life_event_id=e.id) ORDER BY e.start_time LIMIT 50`)
+	rows, err := s.db.QueryContext(ctx, `SELECT e.id,e.companion_id,e.social_event_id,COALESCE(e.title,''),COALESCE(e.description,''),e.start_time,e.payload::text FROM life_events e JOIN companions c ON c.id=e.companion_id WHERE e.status='active' AND e.start_time<=CURRENT_TIMESTAMP AND COALESCE((e.payload->>'moment_candidate')::boolean,false)=true AND (c.active=true OR c.deleted_at IS NOT NULL) AND c.life_enabled=true AND c.is_default=false AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP)) AND NOT EXISTS(SELECT 1 FROM moment_posts p WHERE p.life_event_id=e.id) ORDER BY e.start_time LIMIT 50`)
 	if err != nil {
 		return err
 	}

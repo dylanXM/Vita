@@ -67,6 +67,9 @@ func main() {
 				if err := credits.RefundStale(agentCtx, dbClient, 10*time.Minute); err != nil {
 					log.Printf("credit reservation recovery: %v", err)
 				}
+				if err := handler.PurgeExpiredCompanions(agentCtx); err != nil {
+					log.Printf("expired companion cleanup: %v", err)
+				}
 			}
 		}
 	}()
@@ -150,10 +153,12 @@ func main() {
 			companions.GET("/", handler.ListCompanions)
 			companions.PUT("/:id", handler.UpdateCompanion)
 			companions.DELETE("/:id", handler.DeleteCompanion)
+			companions.POST("/:id/restore", handler.RestoreCompanion)
 			companions.POST("/:id/gifts", handler.TransferCoinsToCompanion)
 			companions.GET("/:id/experiences", handler.ListCompanionExperiences)
 			companions.POST("/:id/experiences/:product_key", handler.PurchaseCompanionExperience)
 		}
+		api.GET("/companions-deleted", middleware.RequireAuth(), handler.ListDeletedCompanions)
 		api.GET("/companion-options", middleware.RequireAuth(), handler.CompanionOptions)
 		api.POST("/me/push-tokens", middleware.RequireAuth(), handler.RegisterPushToken)
 		api.DELETE("/me/push-tokens", middleware.RequireAuth(), handler.UnregisterPushToken)
@@ -164,6 +169,7 @@ func main() {
 			conversations.POST("/", handler.GetOrCreateConversation)
 			conversations.POST("/:id/messages", handler.SendMessage)
 			conversations.GET("/:id/messages", handler.GetMessages)
+			conversations.GET("/:id/media", handler.GetConversationMedia)
 		}
 
 		// Billing — credits, subscriptions and provider webhooks.

@@ -16,8 +16,8 @@ import '../../shared/widgets.dart';
 import '../shell/shell_page.dart';
 import '../auth/auth_controller.dart';
 import 'chat_controller.dart';
+import 'chat_info_page.dart';
 import 'chat_message_content.dart';
-import 'experience_sheet.dart';
 
 /// Chat detail page — message bubbles (user right / companion left),
 /// date separators and a WeChat-style input bar.
@@ -209,100 +209,20 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  void _showExperiences() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: context.vita.surface,
-      showDragHandle: true,
-      builder: (_) => ExperienceSheet(
-        companionId: widget.companionId,
-        onCompleted: ctrl.poll,
-      ),
+  Future<void> _openChatInfo() async {
+    final companion = Map<String, dynamic>.from(
+      widget.companion ??
+          <String, dynamic>{'id': widget.companionId, 'name': widget.name},
     );
-  }
-
-  void _showCompanionSheet() {
-    final c = widget.companion ?? const <String, dynamic>{};
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: context.vita.surface,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                    color: const Color(0xFFDDDDDD),
-                    borderRadius: BorderRadius.circular(2)),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  VitaAvatar(
-                      name: widget.name,
-                      radius: 30,
-                      imageUrl: c['portrait_url'] as String?),
-                  const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(widget.name,
-                          style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                              color: context.vita.text)),
-                      if ((c['city'] as String?)?.isNotEmpty == true)
-                        Text(c['city'] as String,
-                            style: TextStyle(
-                                fontSize: 13, color: context.vita.subText)),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              _SheetInfoRow(
-                  icon: Icons.place_outlined,
-                  label: 'chat.city'.tr,
-                  value: c['city'] as String? ?? ''),
-              const SizedBox(height: 4),
-              _SheetInfoRow(
-                  icon: Icons.work_outline,
-                  label: 'chat.occupation'.tr,
-                  value: c['occupation'] as String? ?? ''),
-              const SizedBox(height: 4),
-              _SheetInfoRow(
-                  icon: Icons.favorite_outline,
-                  label: 'chat.interests'.tr,
-                  value: c['interests'] as String? ?? ''),
-              const SizedBox(height: 4),
-              _SheetInfoRow(
-                  icon: Icons.explore,
-                  label: 'chat.relationship'.tr,
-                  value: (c['relationship_stage'] as String?)?.toUpperCase() ??
-                      ''),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.tonalIcon(
-                  onPressed: () {
-                    Navigator.of(ctx).pop();
-                    _showExperiences();
-                  },
-                  icon: const Icon(Icons.auto_awesome_outlined),
-                  label: Text('experience.title'.tr),
-                ),
-              ),
-            ],
-          ),
-        ),
+    final deleted = await Get.to<bool>(
+      () => ChatInfoPage(
+        companion: companion,
+        onExperienceCompleted: ctrl.poll,
       ),
+      transition: Transition.cupertino,
+      duration: const Duration(milliseconds: 300),
     );
+    if (deleted == true) Get.back(result: true);
   }
 
   @override
@@ -319,7 +239,7 @@ class _ChatPageState extends State<ChatPage> {
         actions: [
           IconButton(
             icon: Icon(Icons.more_horiz, color: context.vita.subText),
-            onPressed: _showCompanionSheet,
+            onPressed: _openChatInfo,
           ),
         ],
       ),
@@ -609,40 +529,5 @@ class _ChatMessageBody extends StatelessWidget {
     }
     return Column(
         crossAxisAlignment: CrossAxisAlignment.start, children: children);
-  }
-}
-
-class _SheetInfoRow extends StatelessWidget {
-  const _SheetInfoRow(
-      {required this.icon, required this.label, required this.value});
-
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: context.vita.subText),
-        const SizedBox(width: 10),
-        SizedBox(
-          width: 84,
-          child: Text(label,
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: context.vita.subText)),
-        ),
-        Expanded(
-          child: Text(
-            value.isEmpty ? '—' : value,
-            style: TextStyle(fontSize: 14, color: context.vita.text),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
   }
 }
