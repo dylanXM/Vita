@@ -55,32 +55,48 @@ class _SplashPageState extends State<SplashPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.vita.surface,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset(
-              'assets/branding/vita_app_icon_1024.png',
-              width: 128,
-              height: 128,
-              fit: BoxFit.contain,
-            ),
-            SizedBox(height: 20),
-            Text(
-              'Vita',
-              style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: context.vita.text,
-                  letterSpacing: 0.5),
-            ),
-            SizedBox(height: 6),
-            Text(
-              'auth.tagline'.tr,
-              style: TextStyle(fontSize: 13, color: context.vita.subText),
-            ),
-          ],
+      backgroundColor: const Color(0xFFF8FBFF),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFEFFBFF),
+              Color(0xFFFBFCFF),
+              Color(0xFFF6F1FF),
+            ],
+            stops: [0, 0.52, 1],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.asset(
+                'assets/branding/vita_app_icon_1024.png',
+                width: 128,
+                height: 128,
+                fit: BoxFit.contain,
+              ),
+              SizedBox(height: 20),
+              Text(
+                'Vita',
+                style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: context.vita.text,
+                    letterSpacing: 0.5),
+              ),
+              SizedBox(height: 6),
+              Text(
+                'auth.tagline'.tr,
+                style: TextStyle(fontSize: 13, color: context.vita.subText),
+              ),
+            ],
+          ),
         ),
       ),
     );
