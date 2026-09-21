@@ -60,14 +60,11 @@ class _SplashPageState extends State<SplashPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                color: context.vita.green,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.favorite, color: Colors.white, size: 46),
+            Image.asset(
+              'assets/branding/vita_app_icon_1024.png',
+              width: 128,
+              height: 128,
+              fit: BoxFit.contain,
             ),
             SizedBox(height: 20),
             Text(
