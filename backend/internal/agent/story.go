@@ -47,7 +47,13 @@ func cleanJSON(raw string) string {
 // returns exactly three irreversible choices for the next chapter.
 func (s *Service) GenerateStoryChapter(ctx context.Context, userID, companionID, background, history, selectedChoice string) (StoryChapter, error) {
 	var companionName, persona, appearance, backstory string
-	if err := s.db.QueryRowContext(ctx, `SELECT name,persona,appearance,backstory FROM companions WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL`, companionID, userID).Scan(&companionName, &persona, &appearance, &backstory); err != nil {
+	if companionID == "" {
+		// Self-as-protagonist: pull the user's display name; there is no AI
+		// companion persona to describe.
+		if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(NULLIF(nickname, ''), split_part(email, '@', 1)) FROM users WHERE id=$1`, userID).Scan(&companionName); err != nil {
+			return StoryChapter{}, err
+		}
+	} else if err := s.db.QueryRowContext(ctx, `SELECT name,persona,appearance,backstory FROM companions WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL`, companionID, userID).Scan(&companionName, &persona, &appearance, &backstory); err != nil {
 		return StoryChapter{}, err
 	}
 	if s.mock {
@@ -59,7 +65,12 @@ func (s *Service) GenerateStoryChapter(ctx context.Context, userID, companionID,
 		return StoryChapter{}, err
 	}
 	system := `你是互动故事编剧。根据故事背景、角色设定、不可回退的历史章节和用户刚刚选择的发展方向，续写一个连贯章节。避免替用户做选择。严格输出 JSON：{"title":"章节标题","content":"800字以内正文","choices":[{"id":"a","text":"选项"},{"id":"b","text":"选项"},{"id":"c","text":"选项"}]}。choices 必须恰好三个，且能产生明显不同但符合设定的发展。`
-	input := fmt.Sprintf("故事背景：%s\n主角：%s\n性格：%s\n外貌：%s\n人物经历：%s\n已发生历史：%s\n本次选择：%s", background, companionName, persona, appearance, backstory, history, selectedChoice)
+	var input string
+	if companionID == "" {
+		input = fmt.Sprintf("故事背景：%s\n主角（就是用户本人）：%s\n请用第二人称'你'来叙述这个故事，主角的性格、外貌、经历未特别设定，由你根据背景合理展开。\n已发生历史：%s\n本次选择：%s", background, companionName, history, selectedChoice)
+	} else {
+		input = fmt.Sprintf("故事背景：%s\n主角：%s\n性格：%s\n外貌：%s\n人物经历：%s\n已发生历史：%s\n本次选择：%s", background, companionName, persona, appearance, backstory, history, selectedChoice)
+	}
 	raw, _, err := s.generateTextWithFallback(ctx, companionID, "story_chapter", models, GenerateRequest{System: system, Messages: []ChatMessage{{Role: "user", Content: input}}, Temperature: .85, MaxTokens: 1400})
 	if err != nil {
 		return StoryChapter{}, err
