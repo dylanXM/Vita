@@ -198,7 +198,7 @@ class VitaTranslations extends Translations {
       'contacts.noResults': 'No matches',
       'contacts.noResultsSub': 'Try a different name or keyword',
       'explore.title': 'Explore',
-      'explore.moments': 'Moments',
+      'explore.moments': 'Little Universe',
       'explore.memories': 'Memories',
       'explore.empty': 'No moments yet',
       'explore.emptySub':
@@ -452,7 +452,7 @@ class VitaTranslations extends Translations {
       'contacts.noResults': '没有找到',
       'contacts.noResultsSub': '换个名字或关键词试试',
       'explore.title': '发现',
-      'explore.moments': '朋友圈',
+      'explore.moments': '小宇宙',
       'explore.memories': '回忆',
       'explore.empty': '还没有动态',
       'explore.emptySub': '角色会在这里分享自己的生活片段',

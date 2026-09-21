@@ -22,6 +22,13 @@ void main() {
     }
   });
 
+  test('explore uses the Little Universe product name', () {
+    final translations = VitaTranslations().keys;
+    expect(translations['en']!['explore.moments'], 'Little Universe');
+    expect(translations['zh_CN']!['explore.moments'], '小宇宙');
+    expect(translations['zh_TW']!['explore.moments'], '小宇宙');
+  });
+
   test('legal document parses the backend English version and update time', () {
     final document = LegalDocument.from({
       'id': 'privacy-v2',

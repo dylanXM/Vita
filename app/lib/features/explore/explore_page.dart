@@ -62,38 +62,37 @@ class ExplorePage extends StatelessWidget {
             VitaCard(
               radius: 0,
               padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Column(
-                children: [
-                  VitaListTile(
-                    customIcon: SvgPicture.asset(
-                      'assets/icons/menu_moments.svg',
-                      width: 18,
-                      height: 18,
-                    ),
-                    title: 'explore.moments'.tr,
-                    borderRadius: BorderRadius.zero,
-                    onTap: () => Get.to(
-                      () => const MomentsPage(),
-                      transition: Transition.cupertino,
-                      duration: const Duration(milliseconds: 300),
-                    ),
-                  ),
-                  const Divider(indent: 52, height: 0.5),
-                  VitaListTile(
-                    customIcon: SvgPicture.asset(
-                      'assets/icons/menu_memories.svg',
-                      width: 18,
-                      height: 18,
-                    ),
-                    title: 'explore.memories'.tr,
-                    borderRadius: BorderRadius.zero,
-                    onTap: () => Get.to(
-                      () => const MemoriesPage(),
-                      transition: Transition.cupertino,
-                      duration: const Duration(milliseconds: 300),
-                    ),
-                  ),
-                ],
+              child: VitaListTile(
+                customIcon: SvgPicture.asset(
+                  'assets/icons/menu_moments.svg',
+                  width: 18,
+                  height: 18,
+                ),
+                title: 'explore.moments'.tr,
+                borderRadius: BorderRadius.zero,
+                onTap: () => Get.to(
+                  () => const MomentsPage(),
+                  transition: Transition.cupertino,
+                  duration: const Duration(milliseconds: 300),
+                ),
+              ),
+            ),
+            VitaCard(
+              radius: 0,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: VitaListTile(
+                customIcon: SvgPicture.asset(
+                  'assets/icons/menu_memories.svg',
+                  width: 18,
+                  height: 18,
+                ),
+                title: 'explore.memories'.tr,
+                borderRadius: BorderRadius.zero,
+                onTap: () => Get.to(
+                  () => const MemoriesPage(),
+                  transition: Transition.cupertino,
+                  duration: const Duration(milliseconds: 300),
+                ),
               ),
             ),
           ],
