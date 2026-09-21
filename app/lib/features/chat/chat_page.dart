@@ -14,10 +14,10 @@ import '../../core/theme.dart';
 import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
 import '../shell/shell_page.dart';
-import '../auth/auth_controller.dart';
 import 'chat_controller.dart';
 import 'chat_info_page.dart';
 import 'chat_message_content.dart';
+import 'experience_sheet.dart';
 
 /// Chat detail page — message bubbles (user right / companion left),
 /// date separators and a WeChat-style input bar.
@@ -381,6 +381,11 @@ class _ChatPageState extends State<ChatPage> {
       final parsed = ChatMessageContent.from(m);
       final isGift = parsed.isGift;
       final deliveryStatus = m['delivery_status'] as String? ?? 'delivered';
+      final bubbleColor = isGift
+          ? Colors.transparent
+          : isUser
+              ? context.vita.bubbleGreen
+              : context.vita.surface;
       items.add(
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
@@ -392,38 +397,52 @@ class _ChatPageState extends State<ChatPage> {
               if (!isUser) ...[
                 VitaAvatar(
                     name: widget.name,
-                    radius: 20,
+                    radius: 22,
                     imageUrl: widget.companion?['portrait_url'] as String?),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
               ],
               Flexible(
-                child: Container(
-                  constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * 0.66,
-                  ),
-                  padding: isGift
-                      ? EdgeInsets.zero
-                      : const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-                  decoration: BoxDecoration(
-                    color: isGift
-                        ? Colors.transparent
-                        : isUser
-                            ? context.vita.bubbleGreen
-                            : context.vita.surface,
-                    borderRadius: BorderRadius.circular(4),
-                    border: isUser || isGift
-                        ? null
-                        : Border.all(color: context.vita.divider, width: 0.5),
-                  ),
-                  child: _ChatMessageBody(
-                    message: m,
-                    companionId: widget.companionId,
-                    onPlayVoice: _playVoice,
-                  ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.66,
+                      ),
+                      padding: isGift
+                          ? EdgeInsets.zero
+                          : const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                      decoration: isGift
+                          ? null
+                          : BoxDecoration(
+                              color: bubbleColor,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                      child: _ChatMessageBody(
+                        message: m,
+                        companionId: widget.companionId,
+                        onPlayVoice: _playVoice,
+                      ),
+                    ),
+                    if (!isGift)
+                      Positioned(
+                        right: isUser ? -6 : null,
+                        left: isUser ? null : -6,
+                        top: 22,
+                        child: CustomPaint(
+                          size: const Size(6, 8),
+                          painter: _BubbleTailPainter(
+                            color: bubbleColor,
+                            pointRight: isUser,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               if (isUser && deliveryStatus != 'delivered') ...[
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 if (deliveryStatus == 'sending')
                   SizedBox.square(
                     dimension: 14,
@@ -437,8 +456,8 @@ class _ChatPageState extends State<ChatPage> {
                       size: 17, color: context.vita.red),
               ],
               if (isUser) ...[
-                const SizedBox(width: 10),
-                VitaAvatar(name: AuthController.to.email, radius: 20),
+                const SizedBox(width: 8),
+                VitaAvatar(name: '1', radius: 22),
               ],
             ],
           ),
@@ -456,71 +475,100 @@ class _ChatPageState extends State<ChatPage> {
   Widget _buildInputBar({required bool locked}) {
     return Container(
       decoration: BoxDecoration(
-        color: context.vita.pageBg,
+        color: context.vita.surface,
         border:
             Border(top: BorderSide(color: context.vita.divider, width: 0.5)),
       ),
       padding: EdgeInsets.fromLTRB(
-          12, 8, 12, 8 + MediaQuery.of(context).padding.bottom),
+          8, 8, 8, 8 + MediaQuery.of(context).padding.bottom),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          IconButton(
-            onPressed: locked || ctrl.sending.value ? null : _toggleRecording,
-            tooltip: _recording ? 'chat.voiceStop'.tr : 'chat.voice'.tr,
-            icon: Icon(_recording ? Icons.stop_circle_outlined : Icons.mic_none,
-                color: _recording ? Colors.red : context.vita.subText),
+          _RoundIconButton(
+            icon: _recording ? Icons.keyboard : Icons.graphic_eq,
+            onTap: locked ? null : _toggleRecording,
+            active: _recording,
           ),
-          IconButton(
-            onPressed: locked ? null : _showEmojiPicker,
-            tooltip: 'chat.emoji'.tr,
-            icon: Icon(Icons.sentiment_satisfied_alt_outlined,
-                color: locked ? context.vita.hint : context.vita.subText),
-          ),
-          const SizedBox(width: 2),
+          const SizedBox(width: 8),
           Expanded(
-            child: TextField(
-              controller: _input,
-              enabled: !locked,
-              minLines: 1,
-              maxLines: 4,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => _send(),
-              style: TextStyle(
-                  fontSize: 16, color: context.vita.text, height: 1.4),
-              decoration: InputDecoration(
-                hintText: locked ? 'chat.cannotSend'.tr : 'chat.message'.tr,
-                hintStyle: TextStyle(color: context.vita.hint, fontSize: 15),
-                filled: true,
-                fillColor: context.vita.surface,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(4),
-                    borderSide: BorderSide.none),
-                enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(4),
-                    borderSide: BorderSide.none),
-                focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(4),
-                    borderSide: BorderSide.none),
+            child: Container(
+              decoration: BoxDecoration(
+                color: context.vita.surface,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(
+                      height: 40,
+                      child: TextField(
+                controller: _input,
+                enabled: !locked,
+                minLines: 1,
+                maxLines: 5,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _send(),
+                style: TextStyle(
+                    fontSize: 16, color: context.vita.text, height: 1.4),
+                decoration: InputDecoration(
+                  hintText: locked ? 'chat.cannotSend'.tr : 'chat.message'.tr,
+                  hintStyle:
+                      TextStyle(color: context.vita.hint, fontSize: 15),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: Color(0xFFDDDDDD))),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: Color(0xFFDDDDDD))),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: context.vita.green, width: 1.5)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(vertical: 6),
+                ),
+              ),
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          SizedBox(
-            height: 40,
-            child: ElevatedButton(
-              // Never disabled: sending may fail, but the user must always be
-              // able to try — the controller resolves the conversation on send.
-              onPressed: locked ? () => Get.toNamed('/subscription') : _send,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(64, 40),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-              ),
-              child: Text('common.send'.tr),
-            ),
+          const SizedBox(width: 8),
+          _RoundIconButton(
+            icon: Icons.sentiment_satisfied_alt_outlined,
+            onTap: locked ? null : _showEmojiPicker,
+          ),
+          const SizedBox(width: 8),
+          _RoundIconButton(
+            icon: Icons.add,
+            onTap: locked ? null : _showMorePanel,
           ),
         ],
+      ),
+    );
+  }
+
+  void _showMorePanel() {
+    FocusScope.of(context).unfocus();
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: context.vita.pageBg,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          child: Row(
+            children: [
+              _MorePanelButton(
+                icon: Icons.swap_horiz_rounded,
+                label: '转账',
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  Get.snackbar('转账', '转账功能即将上线');
+                },
+              ),
+              const SizedBox(width: 20),
+              _MorePanelButton(
+                icon: Icons.card_giftcard_rounded,
+                label: '礼物',
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  showModalBottomSheet<void>(context: context, isScrollControlled: true, backgroundColor: context.vita.surface, showDragHandle: true, builder: (_) => ExperienceSheet(companionId: widget.companionId, onCompleted: ctrl.poll));
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -766,3 +814,120 @@ class _AnimatedGiftCardState extends State<_AnimatedGiftCard>
     );
   }
 }
+
+/// Circular icon button matching the WeChat-style composer.
+class _RoundIconButton extends StatelessWidget {
+  const _RoundIconButton({
+    required this.icon,
+    required this.onTap,
+    this.active = false,
+  });
+
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 38,
+        height: 38,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: active ? context.vita.green : context.vita.surface,
+          border: Border.all(
+            color: active ? context.vita.green : context.vita.divider,
+            width: 1,
+          ),
+        ),
+        child: Icon(
+          icon,
+          size: 22,
+          color: active
+              ? Colors.white
+              : enabled
+                  ? context.vita.text
+                  : context.vita.hint,
+        ),
+      ),
+    );
+  }
+}
+
+/// Grid button inside the "+" more panel (white rounded square + label).
+class _MorePanelButton extends StatelessWidget {
+  const _MorePanelButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: context.vita.surface,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, size: 30, color: context.vita.text),
+          ),
+          const SizedBox(height: 8),
+          Text(label,
+              style: TextStyle(fontSize: 12, color: context.vita.subText)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Clip path that adds a small WeChat-style tail to a chat bubble.
+/// [isUser] = true draws the tail on the right (green bubble); false on the
+/// left (white bubble).
+class _BubbleTailPainter extends CustomPainter {
+  _BubbleTailPainter({required this.color, required this.pointRight});
+
+  final Color color;
+  final bool pointRight;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    final path = Path();
+    if (pointRight) {
+      path
+        ..moveTo(0, 0)
+        ..lineTo(size.width, size.height / 2)
+        ..lineTo(0, size.height)
+        ..close();
+    } else {
+      path
+        ..moveTo(size.width, 0)
+        ..lineTo(0, size.height / 2)
+        ..lineTo(size.width, size.height)
+        ..close();
+    }
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_BubbleTailPainter old) =>
+      old.color != color || old.pointRight != pointRight;
+}
+
+/// Chat avatar: mint-green circle with green initial (WeChat-style).
