@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../core/theme.dart';
+import 'media_image.dart';
 
 /// Small shared widgets used across features.
 
@@ -31,11 +32,22 @@ class VitaAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
     final source = imageUrl?.trim() ?? '';
-    final ImageProvider<Object>? image = source.startsWith('asset://')
-        ? AssetImage(source.substring('asset://'.length))
-        : source.isNotEmpty
-            ? NetworkImage(source)
-            : null;
+    final hasImage = source.isNotEmpty;
+    Widget content() => hasImage
+        ? source.startsWith('asset://')
+            ? Image.asset(source.substring('asset://'.length),
+                fit: BoxFit.cover)
+            : VitaMediaImage(url: source)
+        : Center(
+            child: Text(
+              initial,
+              style: TextStyle(
+                color: textColor ?? context.vita.green,
+                fontSize: radius * 0.9,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          );
     if (borderRadius != null) {
       final size = radius * 2;
       return ClipRRect(
@@ -44,35 +56,17 @@ class VitaAvatar extends StatelessWidget {
           width: size,
           height: size,
           color: background ?? context.vita.green.withValues(alpha: 0.18),
-          child: image != null
-              ? Image(image: image, fit: BoxFit.cover)
-              : Center(
-                  child: Text(
-                    initial,
-                    style: TextStyle(
-                      color: textColor ?? context.vita.green,
-                      fontSize: radius * 0.9,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
+          child: content(),
         ),
       );
     }
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: background ?? context.vita.green.withValues(alpha: 0.18),
-      backgroundImage: image,
-      child: image == null
-          ? Text(
-              initial,
-              style: TextStyle(
-                color: textColor ?? context.vita.green,
-                fontSize: radius * 0.9,
-                fontWeight: FontWeight.w600,
-              ),
-            )
-          : null,
+    return ClipOval(
+      child: Container(
+        width: radius * 2,
+        height: radius * 2,
+        color: background ?? context.vita.green.withValues(alpha: 0.18),
+        child: content(),
+      ),
     );
   }
 }

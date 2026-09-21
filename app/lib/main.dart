@@ -14,7 +14,7 @@ import 'features/auth/splash_page.dart';
 import 'features/onboarding/onboarding_page.dart';
 import 'features/billing/credits_page.dart';
 import 'features/billing/subscription_page.dart';
-import 'features/companion/companion_create_page.dart';
+import 'features/companion/companion_create_method_page.dart';
 import 'features/ai_pets/ai_pet_desktop_overlay.dart';
 import 'features/shell/shell_page.dart';
 
@@ -98,7 +98,7 @@ class _VitaAppState extends State<VitaApp> {
         ),
         GetPage(
           name: '/companion/create',
-          page: () => const CompanionCreatePage(),
+          page: () => const CompanionCreateMethodPage(),
           transition: Transition.cupertino,
         ),
         GetPage(

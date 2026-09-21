@@ -501,7 +501,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_ai_model_subscription_plans_plan ON ai_model_subscription_plans(subscription_plan_id, model_id)`,
 		`UPDATE ai_models SET configured_scenarios =
-			(CASE WHEN capabilities ? 'text' THEN '["text_chat","text_life_plan","text_proactive"]'::jsonb ELSE '[]'::jsonb END) ||
+			(CASE WHEN capabilities ? 'text' THEN '["text_chat","text_life_plan","text_proactive","text_character_profile"]'::jsonb ELSE '[]'::jsonb END) ||
 			(CASE WHEN capabilities ? 'image' THEN '["image_life_photo","image_requested_photo"]'::jsonb ELSE '[]'::jsonb END) ||
 			(CASE WHEN capabilities ? 'audio' THEN '["audio_transcription","audio_speech"]'::jsonb ELSE '[]'::jsonb END) ||
 			(CASE WHEN capabilities ? 'video' THEN '["video_life_clip","video_realtime_avatar"]'::jsonb ELSE '[]'::jsonb END)
@@ -544,11 +544,13 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			END IF;
 		END $$`,
 		`INSERT INTO agent_media_routes(route_key,media_type) VALUES
-			('text_chat','text'),('text_life_plan','text'),('text_proactive','text'),
+			('text_chat','text'),('text_life_plan','text'),('text_proactive','text'),('text_character_profile','text'),
 			('image_life_photo','image'),('image_requested_photo','image'),
 			('audio_transcription','audio'),('audio_speech','audio'),
 			('video_life_clip','video'),('video_realtime_avatar','video')
 		ON CONFLICT(route_key) DO NOTHING`,
+		`UPDATE ai_models SET configured_scenarios=configured_scenarios || '["text_character_profile"]'::jsonb
+		WHERE capabilities ? 'text' AND NOT configured_scenarios ? 'text_character_profile'`,
 		`UPDATE agent_media_routes r SET primary_model_id=s.chat_model_id,enabled=true
 		FROM agent_settings s WHERE s.id='default' AND s.chat_model_id IS NOT NULL
 		AND r.route_key='text_chat' AND r.primary_model_id IS NULL`,

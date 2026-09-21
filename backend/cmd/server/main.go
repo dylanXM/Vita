@@ -160,6 +160,7 @@ func main() {
 		}
 		api.GET("/companions-deleted", middleware.RequireAuth(), handler.ListDeletedCompanions)
 		api.GET("/companion-options", middleware.RequireAuth(), handler.CompanionOptions)
+		api.POST("/companion-drafts", middleware.RequireAuth(), handler.GenerateCompanionDraft)
 		api.POST("/me/push-tokens", middleware.RequireAuth(), handler.RegisterPushToken)
 		api.DELETE("/me/push-tokens", middleware.RequireAuth(), handler.UnregisterPushToken)
 

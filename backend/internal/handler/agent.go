@@ -236,19 +236,20 @@ const (
 )
 
 var modelScenarioCapabilities = map[string]string{
-	"text_chat":             "text",
-	"text_life_plan":        "text",
-	"text_proactive":        "text",
-	"image_life_photo":      "image",
-	"image_requested_photo": "image",
-	"audio_transcription":   "audio",
-	"audio_speech":          "audio",
-	"video_life_clip":       "video",
-	"video_realtime_avatar": "video",
+	"text_chat":              "text",
+	"text_life_plan":         "text",
+	"text_proactive":         "text",
+	"text_character_profile": "text",
+	"image_life_photo":       "image",
+	"image_requested_photo":  "image",
+	"audio_transcription":    "audio",
+	"audio_speech":           "audio",
+	"video_life_clip":        "video",
+	"video_realtime_avatar":  "video",
 }
 
 var orderedModelScenarios = []string{
-	"text_chat", "text_life_plan", "text_proactive",
+	"text_chat", "text_life_plan", "text_proactive", "text_character_profile",
 	"image_life_photo", "image_requested_photo",
 	"audio_transcription", "audio_speech",
 	"video_life_clip", "video_realtime_avatar",
@@ -612,15 +613,16 @@ type mediaModelRoute struct {
 }
 
 var mediaRouteTypes = map[string]string{
-	"text_chat":             "text",
-	"text_life_plan":        "text",
-	"text_proactive":        "text",
-	"image_life_photo":      "image",
-	"image_requested_photo": "image",
-	"audio_transcription":   "audio",
-	"audio_speech":          "audio",
-	"video_life_clip":       "video",
-	"video_realtime_avatar": "video",
+	"text_chat":              "text",
+	"text_life_plan":         "text",
+	"text_proactive":         "text",
+	"text_character_profile": "text",
+	"image_life_photo":       "image",
+	"image_requested_photo":  "image",
+	"audio_transcription":    "audio",
+	"audio_speech":           "audio",
+	"video_life_clip":        "video",
+	"video_realtime_avatar":  "video",
 }
 
 func AdminListMediaModelRoutes(c *gin.Context) {

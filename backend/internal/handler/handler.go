@@ -1043,6 +1043,8 @@ type CreateCompanionRequest struct {
 	LifeGoal          string   `json:"life_goal"`
 	Backstory         string   `json:"backstory"`
 	PortraitID        *string  `json:"portrait_id"`
+	AvatarMediaID     *string  `json:"avatar_media_id"`
+	CreationSource    string   `json:"creation_source"`
 }
 
 func CreateCompanion(c *gin.Context) {
@@ -1069,15 +1071,38 @@ func CreateCompanion(c *gin.Context) {
 	if req.RelationshipStage == "" {
 		req.RelationshipStage = "stranger"
 	}
+	creationSource := strings.TrimSpace(req.CreationSource)
+	if creationSource == "" {
+		creationSource = "tags_portrait"
+	}
+	if creationSource != "tags_portrait" && creationSource != "user_description" && creationSource != "meet_file" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid companion creation source"})
+		return
+	}
+	avatarURL := ""
+	if req.AvatarMediaID != nil && strings.TrimSpace(*req.AvatarMediaID) != "" {
+		mediaID := strings.TrimSpace(*req.AvatarMediaID)
+		var exists bool
+		if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM media_assets WHERE id=$1 AND user_id=$2 AND kind='image')`, mediaID, userID).Scan(&exists); err != nil || !exists {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "character image is unavailable"})
+			return
+		}
+		avatarURL = "/v1/media/" + mediaID
+		req.AvatarMediaID = &mediaID
+	}
+	if creationSource != "tags_portrait" && avatarURL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "AI-created companions require a character image"})
+		return
+	}
 	tags, _ := json.Marshal(req.PersonalityTags)
 	tx, err := db.Get().Begin()
 	if err == nil {
 		_, err = tx.Exec(`INSERT INTO companions
 			(id,user_id,name,gender,persona,appearance,city,occupation,interests,relationship_stage,
-			 personality_tags,speaking_style,likes,dislikes,life_habits,life_goal,backstory,portrait_id,creation_source,proactive_enabled,active)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'tags_portrait',true,true)`,
+			 personality_tags,speaking_style,likes,dislikes,life_habits,life_goal,backstory,portrait_id,avatar_url,creation_source,proactive_enabled,active)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,true,true)`,
 			companionID, userID, req.Name, req.Gender, req.Persona, req.Appearance, req.City, req.Occupation, req.Interests,
-			req.RelationshipStage, tags, req.SpeakingStyle, req.Likes, req.Dislikes, req.LifeHabits, req.LifeGoal, req.Backstory, req.PortraitID)
+			req.RelationshipStage, tags, req.SpeakingStyle, req.Likes, req.Dislikes, req.LifeHabits, req.LifeGoal, req.Backstory, req.PortraitID, avatarURL, creationSource)
 	}
 	if err == nil {
 		_, err = tx.Exec(`INSERT INTO relationship_states (companion_id) VALUES ($1)`, companionID)
@@ -1100,7 +1125,7 @@ func CreateCompanion(c *gin.Context) {
 		RelationshipStage: req.RelationshipStage, PersonalityTags: req.PersonalityTags,
 		SpeakingStyle: req.SpeakingStyle, Likes: req.Likes, Dislikes: req.Dislikes,
 		LifeHabits: req.LifeHabits, LifeGoal: req.LifeGoal, Backstory: req.Backstory,
-		PortraitID: req.PortraitID, CreationSource: "tags_portrait", ProactiveEnabled: true, Active: true,
+		PortraitID: req.PortraitID, PortraitURL: avatarURL, CreationSource: creationSource, ProactiveEnabled: true, Active: true,
 		LifeEnabled: true, FriendshipActive: true, CanChat: true,
 	})
 }

@@ -19,7 +19,7 @@ function model(id: string, enabled: boolean, capabilities: AIModel["capabilities
     model_name: id,
     display_name: id,
     capabilities,
-    configured_scenarios: [...(capabilities.includes("text") ? ["text_chat" as const] : []), ...(capabilities.includes("image") ? ["image_life_photo" as const] : [])],
+    configured_scenarios: [...(capabilities.includes("text") ? ["text_chat" as const, "text_character_profile" as const] : []), ...(capabilities.includes("image") ? ["image_life_photo" as const] : [])],
     subscription_plan_ids: [],
     enabled,
     created_at: "2026-09-20T00:00:00Z",

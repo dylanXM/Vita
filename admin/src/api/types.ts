@@ -358,6 +358,7 @@ export type AIModelScenario =
   | "text_chat"
   | "text_life_plan"
   | "text_proactive"
+  | "text_character_profile"
   | "image_life_photo"
   | "image_requested_photo"
   | "audio_transcription"
@@ -432,7 +433,7 @@ export interface AgentConfig {
 export type MediaModelType = "text" | "image" | "audio" | "video";
 
 export interface MediaModelRoute {
-  route_key: "text_chat" | "text_life_plan" | "text_proactive" | "image_life_photo" | "image_requested_photo" | "audio_transcription" | "audio_speech" | "video_life_clip" | "video_realtime_avatar";
+  route_key: "text_chat" | "text_life_plan" | "text_proactive" | "text_character_profile" | "image_life_photo" | "image_requested_photo" | "audio_transcription" | "audio_speech" | "video_life_clip" | "video_realtime_avatar";
   media_type: MediaModelType;
   enabled: boolean;
   primary_model_id: string | null;

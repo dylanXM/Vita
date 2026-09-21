@@ -155,6 +155,26 @@ class ApiClient {
     }
   }
 
+  Future<dynamic> postMultipart(String path,
+      {required Map<String, String> fields,
+      required Map<String, String> files}) async {
+    try {
+      final values = <String, dynamic>{...fields};
+      for (final entry in files.entries) {
+        values[entry.key] = await MultipartFile.fromFile(
+          entry.value,
+          filename: entry.value.split(RegExp(r'[/\\]')).last,
+        );
+      }
+      final response = await dio.post(path,
+          data: FormData.fromMap(values),
+          options: Options(contentType: 'multipart/form-data'));
+      return response.data;
+    } on DioException catch (e) {
+      throw _exception(e);
+    }
+  }
+
   Future<dynamic> put(String path, {Map<String, dynamic>? data}) async {
     try {
       final r = await dio.put(path, data: data);

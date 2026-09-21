@@ -20,6 +20,17 @@ func TestModelScenario(ctx context.Context, client *Client, model Model, scenari
 			Temperature: 0.2, MaxTokens: 80,
 		})
 		return err
+	case "text_character_profile":
+		output, err := client.GenerateText(ctx, model, GenerateRequest{
+			System:      "You create editable fictional AI character profiles. Output strict JSON only.",
+			Messages:    []ChatMessage{{Role: "user", Content: `Return a JSON object for a fictional character named Mina with all fields: name, gender, persona, appearance, city, occupation, interests, personality_tags, speaking_style, likes, dislikes, life_habits, life_goal, backstory.`}},
+			Temperature: 0.2, MaxTokens: 500,
+		})
+		if err != nil {
+			return err
+		}
+		_, err = parseCharacterProfile(output)
+		return err
 	case "text_life_plan":
 		output, err := client.GenerateText(ctx, model, GenerateRequest{
 			System:      "You plan a believable daily timeline for a fictional AI companion. Output strict JSON only.",

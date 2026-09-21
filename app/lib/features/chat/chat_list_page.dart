@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
-import '../companion/companion_create_page.dart';
+import '../companion/companion_create_method_page.dart';
 import '../billing/billing_controller.dart';
 import 'chat_list_controller.dart';
 import 'chat_list_presentation.dart';
@@ -36,7 +36,7 @@ class ChatListPage extends StatelessWidget {
                     return;
                   }
                   Get.to(
-                    () => const CompanionCreatePage(),
+                    () => const CompanionCreateMethodPage(),
                     transition: Transition.cupertino,
                     duration: const Duration(milliseconds: 300),
                   );

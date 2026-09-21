@@ -53,6 +53,7 @@ const modelScenarios: AIModelScenario[] = [
   "text_chat",
   "text_life_plan",
   "text_proactive",
+  "text_character_profile",
   "image_life_photo",
   "image_requested_photo",
   "audio_transcription",

@@ -13,7 +13,7 @@ Version 1 supports text conversations and text proactive messages. The message c
 ## 2. Non-goals
 
 - No 3D world, virtual room, Live2D, real-time avatar, calls, multi-NPC world, game quests, gacha, or XP UI.
-- No creation from historical chat or user-uploaded reference images in v1.
+- User-uploaded images are used only as character avatars; image-content analysis remains out of scope.
 - No manipulative retention language, guilt, threats, payment pressure, or claims of physical presence.
 - No attempt to deceive users about the product being AI. The character may speak naturally, but system and safety surfaces remain truthful.
 
@@ -35,18 +35,26 @@ Provider secrets are encrypted at rest. API responses expose only `api_key_confi
 
 ## 4. Companion creation v1
 
-The user chooses:
+The user can choose one of three creation paths:
 
-- relationship archetype: girlfriend, boyfriend, friend, or custom;
-- name, city, occupation, and interests;
-- personality tags from a system list;
-- one system portrait.
+1. Template creation: relationship archetype, name, city, occupation,
+   interests, personality tags, and one system portrait.
+2. Description creation: a text description and one user image. The backend
+   generates an editable character profile; the image becomes the avatar.
+3. Meet TA: one PDF, DOCX, or UTF-8 TXT document, the target character name,
+   and one user image. The backend distills only that named character into an
+   editable profile; the image becomes the avatar.
+
+AI-assisted paths return a draft and never create the companion until the user
+reviews and confirms it. Character-profile generation uses the independently
+configured `text_character_profile` model route and ordered fallbacks.
 
 The backend creates relationship and state rows transactionally and marks the companion for Life Engine initialization. Future creation sources are represented by `creation_source`:
 
 - `tags_portrait` (v1);
 - `chat_history` (reserved);
-- `user_images` (reserved);
+- `user_description`;
+- `meet_file`;
 - `admin`.
 
 ## 5. Agent context and reply
@@ -123,7 +131,9 @@ Clients must render supported types and safely fall back to `content` for unknow
 
 1. Admin can create an OpenAI-compatible or Anthropic provider, create models, and select defaults.
 2. Admin can bind a model and persona definition to a companion.
-3. App creation can submit personality tags and a system portrait.
+3. App creation supports template, description plus image, and named-character
+   document distillation plus image; AI-generated fields are editable before
+   confirmation.
 4. Sending a text message stores the user message, invokes the assigned model, stores the companion reply, and returns both.
 5. Life Engine creates one bounded daily plan per companion and does not duplicate it on restart.
 6. Due shareable events become ordinary companion messages, capped per day.
