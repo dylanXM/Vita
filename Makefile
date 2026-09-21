@@ -286,8 +286,8 @@ endif
 # emulator cannot reach the host backend, change APP_API_URL_ANDROID to
 # http://10.0.2.2:8260 (host loopback as seen from the emulator).
 APP_API_URL_IOS     = http://127.0.0.1:8260
-APP_API_URL_ANDROID = http://127.0.0.1:8260
-APP_API_URL         = $(APP_API_URL_IOS)
+APP_API_URL_ANDROID = http://10.0.2.2:8260
+APP_API_URL         = $(APP_API_URL_ANDROID)
 # China mirrors for pub packages and Flutter engine artifacts so that
 # `flutter pub get` / `flutter precache` are reachable from mainland China.
 # Override by exporting PUB_HOSTED_URL / FLUTTER_STORAGE_BASE_URL before make.

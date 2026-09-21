@@ -109,13 +109,13 @@ class _NavItem {
 const List<_NavItem> _kTabs = [
   _NavItem(
     labelKey: 'tab.chat',
-    icon: Icons.textsms_outlined,
-    activeIcon: Icons.textsms_rounded,
+    icon: Icons.chat_bubble_outline_rounded,
+    activeIcon: Icons.chat_bubble_rounded,
   ),
   _NavItem(
     labelKey: 'tab.memories',
-    icon: Icons.menu_book_outlined,
-    activeIcon: Icons.menu_book_rounded,
+    icon: Icons.auto_stories_outlined,
+    activeIcon: Icons.auto_stories_rounded,
   ),
   _NavItem(
     labelKey: 'tab.explore',
@@ -129,10 +129,14 @@ const List<_NavItem> _kTabs = [
   ),
 ];
 
-/// Floating glass bottom dock matching the reference app.
+/// Floating glass bottom dock with a liquid-glass selection pill.
 ///
-/// It is hosted inside [SafeArea] instead of relying on Scaffold defaults, so
-/// the pill always floats above the home indicator/navigation gesture area.
+/// The capsule keeps the reference glass treatment; the active tab gets a
+/// frosted, near-transparent pill behind it while its icon and label turn
+/// brand green.
+///
+/// Hosted inside [SafeArea] rather than Scaffold defaults, so the pill
+/// always floats above the home indicator/navigation gesture area.
 class VitaTabBar extends StatelessWidget {
   const VitaTabBar({super.key, required this.index, required this.onTap});
 
@@ -158,8 +162,8 @@ class VitaTabBar extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: vita.glassShadow,
-                blurRadius: 24,
-                offset: const Offset(0, 8),
+                blurRadius: dark ? 32 : 24,
+                offset: Offset(0, dark ? 12 : 8),
               ),
             ],
           ),
@@ -169,17 +173,25 @@ class VitaTabBar extends StatelessWidget {
               filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: vita.glass.withValues(alpha: dark ? 0.44 : 0.58),
+                  // Dark mode: a light white tint reads as glass, while the
+                  // gray token just smudges the near-black canvas.
+                  color: dark
+                      ? const Color(0x29FFFFFF)
+                      : vita.glass.withValues(alpha: 0.58),
                   borderRadius: BorderRadius.circular(VitaRadius.pill),
                   border: Border.all(
-                    color: vita.glassRing.withValues(alpha: dark ? 0.55 : 0.7),
-                    width: 0.5,
+                    color: dark
+                        ? Colors.white.withValues(alpha: 0.16)
+                        : vita.glassRing.withValues(alpha: 0.7),
+                    width: dark ? 0.75 : 0.5,
                   ),
                 ),
                 child: SizedBox(
                   height: pillHeight,
                   child: Stack(
                     children: [
+                      // Liquid-glass selection pill sliding under the
+                      // active tab.
                       AnimatedAlign(
                         alignment: Alignment(
                           -1 + (index * 2 / (_kTabs.length - 1)),
@@ -191,17 +203,8 @@ class VitaTabBar extends StatelessWidget {
                           widthFactor: 1 / _kTabs.length,
                           heightFactor: 1,
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 2,
-                              vertical: 6,
-                            ),
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: vita.green,
-                                borderRadius:
-                                    BorderRadius.circular(VitaRadius.pill),
-                              ),
-                            ),
+                            padding: const EdgeInsets.all(6),
+                            child: const _LiquidGlassPill(),
                           ),
                         ),
                       ),
@@ -251,7 +254,7 @@ class _TabButtonState extends State<_TabButton> {
   Widget build(BuildContext context) {
     final vita = context.vita;
     final label = widget.item.labelKey.tr;
-    final color = widget.selected ? const Color(0xFF0F0F11) : vita.tabInactive;
+    final color = widget.selected ? vita.green : vita.tabInactive;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => setState(() => _pressed = true),
@@ -281,11 +284,37 @@ class _TabButtonState extends State<_TabButton> {
                 style: TextStyle(
                   fontSize: 10,
                   height: 1.0,
-                  fontWeight: FontWeight.w500,
+                  fontWeight:
+                      widget.selected ? FontWeight.w600 : FontWeight.w500,
                   color: color,
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Frosted liquid-glass selection pill that slides under the active tab.
+class _LiquidGlassPill extends StatelessWidget {
+  const _LiquidGlassPill();
+
+  @override
+  Widget build(BuildContext context) {
+    final vita = context.vita;
+    final dark = vita.brightness == Brightness.dark;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(VitaRadius.pill),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: dark
+                ? const Color(0x3DFFFFFF)
+                : const Color(0x80FFFFFF),
+            borderRadius: BorderRadius.circular(VitaRadius.pill),
           ),
         ),
       ),
