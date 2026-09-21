@@ -8,6 +8,7 @@ import '../../shared/widgets.dart';
 import '../../shared/media_image.dart';
 import '../memories/memories_page.dart';
 import '../ai_pets/ai_pets_page.dart';
+import '../stories/stories_page.dart';
 
 class ExploreController extends GetxController {
   static ExploreController get to => Get.find();
@@ -71,6 +72,23 @@ class ExplorePage extends StatelessWidget {
                 borderRadius: BorderRadius.zero,
                 onTap: () => Get.to(
                   () => const MomentsPage(),
+                  transition: Transition.cupertino,
+                  duration: const Duration(milliseconds: 300),
+                ),
+              ),
+            ),
+            VitaCard(
+              radius: 0,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: VitaListTile(
+                customIcon: const VitaMenuIcon(
+                  icon: Icons.auto_stories_outlined,
+                  color: Color(0xFF576B95),
+                ),
+                title: 'storyHub.title'.tr,
+                borderRadius: BorderRadius.zero,
+                onTap: () => Get.to(
+                  () => const StoriesPage(),
                   transition: Transition.cupertino,
                   duration: const Duration(milliseconds: 300),
                 ),

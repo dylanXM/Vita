@@ -203,6 +203,17 @@ func main() {
 			aiPets.GET("/:id/state", handler.GetAIPetState)
 			aiPets.POST("/:id/feed", handler.FeedAIPet)
 		}
+		stories := api.Group("/stories", middleware.RequireAuth())
+		{
+			stories.GET("/catalog", handler.ListStoryCatalog)
+			stories.GET("/", handler.ListStories)
+			stories.POST("/", handler.StartStory)
+			stories.GET("/:id", handler.GetStory)
+			stories.POST("/:id/choices", handler.AdvanceStory)
+			stories.POST("/:id/storyboards", handler.GenerateStoryBoard)
+		}
+		api.POST("/story-backgrounds", middleware.RequireAuth(), handler.CreateStoryBackground)
+		api.DELETE("/story-backgrounds/:id", middleware.RequireAuth(), handler.DeleteStoryBackground)
 
 		media := api.Group("/media")
 		{
@@ -255,6 +266,12 @@ func main() {
 			admin.GET("/ai-pet-breeds", handler.AdminListAIPetBreeds)
 			admin.POST("/ai-pet-breeds", handler.AdminCreateAIPetBreed)
 			admin.PUT("/ai-pet-breeds/:id", handler.AdminUpdateAIPetBreed)
+			admin.GET("/story-config", handler.AdminGetStoryConfig)
+			admin.PUT("/story-config", handler.AdminUpdateStoryConfig)
+			admin.GET("/story-backgrounds", handler.AdminListStoryBackgrounds)
+			admin.POST("/story-backgrounds", handler.AdminCreateStoryBackground)
+			admin.PUT("/story-backgrounds/:id", handler.AdminUpdateStoryBackground)
+			admin.DELETE("/story-backgrounds/:id", handler.AdminDeleteStoryBackground)
 
 			users := admin.Group("/users")
 			{

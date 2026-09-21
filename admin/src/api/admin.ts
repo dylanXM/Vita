@@ -50,6 +50,9 @@ import type {
   LegalDocumentType,
   AIPetBreed,
   AIPetBreedInput,
+  StoryConfig,
+  StoryBackground,
+  StoryBackgroundInput,
 } from "./types";
 
 /** Admin sign-in. The API also accepts a 6-digit code for the same accounts. */
@@ -175,6 +178,17 @@ export const aiPetBreedsApi = {
   create: (body: AIPetBreedInput) => http.post<AIPetBreed>("/admin/ai-pet-breeds", body),
   update: (id: string, body: AIPetBreedInput) =>
     http.put<AIPetBreed>(`/admin/ai-pet-breeds/${id}`, body),
+};
+
+export const storiesApi = {
+  config: (environment: Environment, signal?: AbortSignal) =>
+    http.get<StoryConfig>("/admin/story-config", { params: { environment }, signal }),
+  saveConfig: (body: StoryConfig) => http.put<StoryConfig>("/admin/story-config", body),
+  backgrounds: (environment: Environment, signal?: AbortSignal) =>
+    http.get<{ items: StoryBackground[] }>("/admin/story-backgrounds", { params: { environment }, signal }),
+  createBackground: (body: StoryBackgroundInput) => http.post<{ id: string }>("/admin/story-backgrounds", body),
+  updateBackground: (id: string, body: StoryBackgroundInput) => http.put<{ id: string }>(`/admin/story-backgrounds/${id}`, body),
+  removeBackground: (id: string) => http.del<{ message: string }>(`/admin/story-backgrounds/${id}`),
 };
 
 export const legalDocumentsApi = {

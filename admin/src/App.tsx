@@ -20,6 +20,7 @@ import { CreditProductsPage } from "@/pages/CreditProductsPage";
 import { MediaModelsPage } from "@/pages/MediaModelsPage";
 import { LegalDocumentsPage } from "@/pages/LegalDocumentsPage";
 import { AIPetsPage } from "@/pages/AIPetsPage";
+import { StoryHubPage } from "@/pages/StoryHubPage";
 import { Button } from "@/components/ui/button";
 
 function RouteError() {
@@ -72,6 +73,7 @@ const router = createBrowserRouter([
       { path: "social-links", element: <SocialLinksPage /> },
       { path: "legal-documents", element: <LegalDocumentsPage /> },
       { path: "ai-pets", element: <AIPetsPage /> },
+      { path: "story-hub", element: <StoryHubPage /> },
     ],
   },
   { path: "*", element: <NotFoundPage /> },

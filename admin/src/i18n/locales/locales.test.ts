@@ -25,8 +25,11 @@ describe("admin translations", () => {
   it("contains labels for every media route", () => {
     for (const key of [
       "route.text_character_profile",
+      "route.text_story_chapter",
+      "route.text_storyboard",
       "route.image_life_photo",
       "route.image_requested_photo",
+      "route.image_storyboard_frame",
       "route.audio_transcription",
       "route.audio_speech",
       "route.video_life_clip",

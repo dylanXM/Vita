@@ -147,6 +147,9 @@ func (s *Service) Run(ctx context.Context, interval time.Duration) {
 }
 
 func (s *Service) runTick(ctx context.Context) {
+	if err := s.ProcessPendingStoryboard(ctx); err != nil {
+		log.Printf("storyboard generation: %v", err)
+	}
 	if err := s.DispatchDueReplies(ctx); err != nil {
 		log.Printf("agent delayed replies: %v", err)
 	}

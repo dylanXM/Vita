@@ -10,13 +10,16 @@ import (
 
 func TestModelScenarioCallsTheSelectedRuntimeEndpoint(t *testing.T) {
 	tests := map[string]string{
-		"text_chat":             "/v1/chat/completions",
-		"text_life_plan":        "/v1/chat/completions",
-		"text_proactive":        "/v1/chat/completions",
-		"image_life_photo":      "/v1/images/generations",
-		"image_requested_photo": "/v1/images/generations",
-		"audio_speech":          "/v1/audio/speech",
-		"audio_transcription":   "/v1/audio/transcriptions",
+		"text_chat":              "/v1/chat/completions",
+		"text_life_plan":         "/v1/chat/completions",
+		"text_proactive":         "/v1/chat/completions",
+		"text_story_chapter":     "/v1/chat/completions",
+		"text_storyboard":        "/v1/chat/completions",
+		"image_life_photo":       "/v1/images/generations",
+		"image_requested_photo":  "/v1/images/generations",
+		"image_storyboard_frame": "/v1/images/generations",
+		"audio_speech":           "/v1/audio/speech",
+		"audio_transcription":    "/v1/audio/transcriptions",
 	}
 	for scenario, expectedPath := range tests {
 		t.Run(scenario, func(t *testing.T) {

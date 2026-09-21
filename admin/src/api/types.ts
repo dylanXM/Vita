@@ -359,8 +359,11 @@ export type AIModelScenario =
   | "text_life_plan"
   | "text_proactive"
   | "text_character_profile"
+  | "text_story_chapter"
+  | "text_storyboard"
   | "image_life_photo"
   | "image_requested_photo"
+  | "image_storyboard_frame"
   | "audio_transcription"
   | "audio_speech"
   | "video_life_clip"
@@ -433,7 +436,7 @@ export interface AgentConfig {
 export type MediaModelType = "text" | "image" | "audio" | "video";
 
 export interface MediaModelRoute {
-  route_key: "text_chat" | "text_life_plan" | "text_proactive" | "text_character_profile" | "image_life_photo" | "image_requested_photo" | "audio_transcription" | "audio_speech" | "video_life_clip" | "video_realtime_avatar";
+  route_key: "text_chat" | "text_life_plan" | "text_proactive" | "text_character_profile" | "text_story_chapter" | "text_storyboard" | "image_life_photo" | "image_requested_photo" | "image_storyboard_frame" | "audio_transcription" | "audio_speech" | "video_life_clip" | "video_realtime_avatar";
   media_type: MediaModelType;
   enabled: boolean;
   primary_model_id: string | null;
@@ -543,3 +546,30 @@ export interface AdminMessage {
   delivery_status: string;
   created_at: string;
 }
+
+export interface StoryConfig {
+  environment: Environment;
+  free_chapter_limit: number;
+  custom_background_limit: number;
+  storyboard_unlock_chapters: number;
+  storyboard_panel_count: number;
+  chapter_coins: number;
+  storyboard_coins: number;
+}
+
+export interface StoryBackground {
+  id: string;
+  environment: Environment;
+  title: string;
+  cover_url: string;
+  synopsis: string;
+  world_setting: string;
+  opening: string;
+  genre: string;
+  character_constraints: string;
+  story_goal: string;
+  sort_order: number;
+  enabled: boolean;
+}
+
+export type StoryBackgroundInput = Omit<StoryBackground, "id">;

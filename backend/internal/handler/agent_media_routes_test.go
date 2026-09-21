@@ -12,8 +12,11 @@ func mediaRouteFixture() []mediaModelRoute {
 		{RouteKey: "text_life_plan", MediaType: "text"},
 		{RouteKey: "text_proactive", MediaType: "text"},
 		{RouteKey: "text_character_profile", MediaType: "text"},
+		{RouteKey: "text_story_chapter", MediaType: "text"},
+		{RouteKey: "text_storyboard", MediaType: "text"},
 		{RouteKey: "image_life_photo", MediaType: "image"},
 		{RouteKey: "image_requested_photo", MediaType: "image"},
+		{RouteKey: "image_storyboard_frame", MediaType: "image"},
 		{RouteKey: "audio_transcription", MediaType: "audio"},
 		{RouteKey: "audio_speech", MediaType: "audio"},
 		{RouteKey: "video_life_clip", MediaType: "video"},
@@ -141,7 +144,7 @@ func TestScenariosForCapabilitiesKeepsLegacyCreateRequestsCompatible(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "text_chat,text_life_plan,text_proactive,text_character_profile,audio_transcription,audio_speech"
+	want := "text_chat,text_life_plan,text_proactive,text_character_profile,text_story_chapter,text_storyboard,audio_transcription,audio_speech"
 	if strings.Join(scenarios, ",") != want {
 		t.Fatalf("scenarios = %#v", scenarios)
 	}

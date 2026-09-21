@@ -13,7 +13,7 @@ type ModelTestAudio struct {
 
 func TestModelScenario(ctx context.Context, client *Client, model Model, scenario string, audio *ModelTestAudio) error {
 	switch scenario {
-	case "text_chat":
+	case "text_chat", "text_story_chapter", "text_storyboard":
 		_, err := client.GenerateText(ctx, model, GenerateRequest{
 			System:      "You are an AI companion in a private chat. Reply naturally and briefly.",
 			Messages:    []ChatMessage{{Role: "user", Content: "Say hello in one short sentence."}},
@@ -63,7 +63,7 @@ func TestModelScenario(ctx context.Context, client *Client, model Model, scenari
 	case "image_life_photo":
 		_, err := client.GenerateImage(ctx, model, GenerateImageRequest{Prompt: "A natural smartphone photo of a quiet afternoon coffee on a cafe table, no text", Size: "1024x1024"})
 		return err
-	case "image_requested_photo":
+	case "image_requested_photo", "image_storyboard_frame":
 		_, err := client.GenerateImage(ctx, model, GenerateImageRequest{Prompt: "A natural smartphone photo of a city park in daylight, no text", Size: "1024x1024"})
 		return err
 	case "audio_speech":
