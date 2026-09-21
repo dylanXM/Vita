@@ -55,7 +55,6 @@ type storyConfig struct {
 	FreeChapterLimit         int    `json:"free_chapter_limit"`
 	CustomBackgroundLimit    int    `json:"custom_background_limit"`
 	StoryboardUnlockChapters int    `json:"storyboard_unlock_chapters"`
-	StoryboardPanelCount     int    `json:"storyboard_panel_count"`
 	ChapterCoins             int    `json:"chapter_coins"`
 	StoryboardCoins          int    `json:"storyboard_coins"`
 }
@@ -75,10 +74,10 @@ const storyBackgroundColumns = `id,environment,owner_user_id,title,cover_url,syn
 func loadStoryConfig(ctx context.Context, environment string) (storyConfig, error) {
 	var result storyConfig
 	result.Environment = environment
-	err := db.Get().QueryRowContext(ctx, `SELECT free_chapter_limit,custom_background_limit,storyboard_unlock_chapters,storyboard_panel_count,
+	err := db.Get().QueryRowContext(ctx, `SELECT free_chapter_limit,custom_background_limit,storyboard_unlock_chapters,
 		COALESCE((SELECT coins FROM credit_products WHERE environment=$1 AND product_key='story_chapter'),10),
 		COALESCE((SELECT coins FROM credit_products WHERE environment=$1 AND product_key='story_storyboard'),80)
-		FROM story_settings WHERE environment=$1`, environment).Scan(&result.FreeChapterLimit, &result.CustomBackgroundLimit, &result.StoryboardUnlockChapters, &result.StoryboardPanelCount, &result.ChapterCoins, &result.StoryboardCoins)
+		FROM story_settings WHERE environment=$1`, environment).Scan(&result.FreeChapterLimit, &result.CustomBackgroundLimit, &result.StoryboardUnlockChapters, &result.ChapterCoins, &result.StoryboardCoins)
 	return result, err
 }
 
@@ -327,16 +326,17 @@ func writeStoryDetail(c *gin.Context, storyID, userID string) {
 		}
 	}
 	storyboards := []gin.H{}
-	boardRows, _ := db.Get().Query(`SELECT id,status,summary,panels::text,failure_reason,created_at FROM storyboards WHERE story_id=$1 ORDER BY created_at DESC`, id)
+	boardRows, _ := db.Get().Query(`SELECT id,status,summary,image_url,panel_count,panels::text,failure_reason,created_at FROM storyboards WHERE story_id=$1 ORDER BY created_at DESC`, id)
 	if boardRows != nil {
 		defer boardRows.Close()
 		for boardRows.Next() {
-			var bid, bstatus, summary, panelsRaw, failure string
+			var bid, bstatus, summary, imageURL, panelsRaw, failure string
+			var panelCount int
 			var at time.Time
-			if boardRows.Scan(&bid, &bstatus, &summary, &panelsRaw, &failure, &at) == nil {
+			if boardRows.Scan(&bid, &bstatus, &summary, &imageURL, &panelCount, &panelsRaw, &failure, &at) == nil {
 				var panels any
 				_ = json.Unmarshal([]byte(panelsRaw), &panels)
-				storyboards = append(storyboards, gin.H{"id": bid, "status": bstatus, "summary": summary, "panels": panels, "failure_reason": failure, "created_at": at})
+				storyboards = append(storyboards, gin.H{"id": bid, "status": bstatus, "summary": summary, "image_url": imageURL, "panel_count": panelCount, "panels": panels, "failure_reason": failure, "created_at": at})
 			}
 		}
 	}
@@ -452,6 +452,11 @@ func AdvanceStory(c *gin.Context) {
 
 type storyboardInput struct {
 	IdempotencyKey string `json:"idempotency_key"`
+	PanelCount     int    `json:"panel_count"`
+}
+
+func validStoryboardPanelCount(value int) bool {
+	return value == 4 || value == 6 || value == 8 || value == 9
 }
 
 func GenerateStoryBoard(c *gin.Context) {
@@ -460,8 +465,8 @@ func GenerateStoryBoard(c *gin.Context) {
 		return
 	}
 	var input storyboardInput
-	if err := c.ShouldBindJSON(&input); err != nil || strings.TrimSpace(input.IdempotencyKey) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "idempotency key is required"})
+	if err := c.ShouldBindJSON(&input); err != nil || strings.TrimSpace(input.IdempotencyKey) == "" || !validStoryboardPanelCount(input.PanelCount) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "idempotency key and a panel count of 4, 6, 8, or 9 are required"})
 		return
 	}
 	userID, storyID := c.GetString("user_id"), c.Param("id")
@@ -486,7 +491,7 @@ func GenerateStoryBoard(c *gin.Context) {
 		return
 	}
 	id := uuid.New().String()
-	_, err = db.Get().Exec(`INSERT INTO storyboards(id,story_id,status,spend_id) VALUES($1,$2,'pending',$3)`, id, storyID, reservation.ID)
+	_, err = db.Get().Exec(`INSERT INTO storyboards(id,story_id,status,panel_count,spend_id) VALUES($1,$2,'pending',$3,$4)`, id, storyID, input.PanelCount, reservation.ID)
 	if err != nil {
 		refundStorySpend(reservation.ID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to queue storyboard", "refunded": true})
@@ -518,13 +523,13 @@ func AdminGetStoryConfig(c *gin.Context) {
 
 func AdminUpdateStoryConfig(c *gin.Context) {
 	var input storyConfig
-	if err := c.ShouldBindJSON(&input); err != nil || (input.Environment != "dev" && input.Environment != "beta" && input.Environment != "prod") || input.FreeChapterLimit < 0 || input.CustomBackgroundLimit < 0 || input.StoryboardUnlockChapters < 1 || input.StoryboardPanelCount < 1 || input.StoryboardPanelCount > 12 || input.ChapterCoins < 1 || input.StoryboardCoins < 1 {
+	if err := c.ShouldBindJSON(&input); err != nil || (input.Environment != "dev" && input.Environment != "beta" && input.Environment != "prod") || input.FreeChapterLimit < 0 || input.CustomBackgroundLimit < 0 || input.StoryboardUnlockChapters < 1 || input.ChapterCoins < 1 || input.StoryboardCoins < 1 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid story settings"})
 		return
 	}
 	tx, err := db.Get().BeginTx(c.Request.Context(), nil)
 	if err == nil {
-		_, err = tx.Exec(`INSERT INTO story_settings(environment,free_chapter_limit,custom_background_limit,storyboard_unlock_chapters,storyboard_panel_count) VALUES($1,$2,$3,$4,$5) ON CONFLICT(environment) DO UPDATE SET free_chapter_limit=EXCLUDED.free_chapter_limit,custom_background_limit=EXCLUDED.custom_background_limit,storyboard_unlock_chapters=EXCLUDED.storyboard_unlock_chapters,storyboard_panel_count=EXCLUDED.storyboard_panel_count,updated_at=CURRENT_TIMESTAMP`, input.Environment, input.FreeChapterLimit, input.CustomBackgroundLimit, input.StoryboardUnlockChapters, input.StoryboardPanelCount)
+		_, err = tx.Exec(`INSERT INTO story_settings(environment,free_chapter_limit,custom_background_limit,storyboard_unlock_chapters) VALUES($1,$2,$3,$4) ON CONFLICT(environment) DO UPDATE SET free_chapter_limit=EXCLUDED.free_chapter_limit,custom_background_limit=EXCLUDED.custom_background_limit,storyboard_unlock_chapters=EXCLUDED.storyboard_unlock_chapters,updated_at=CURRENT_TIMESTAMP`, input.Environment, input.FreeChapterLimit, input.CustomBackgroundLimit, input.StoryboardUnlockChapters)
 	}
 	if err == nil {
 		_, err = tx.Exec(`UPDATE credit_products SET coins=$3,updated_at=CURRENT_TIMESTAMP WHERE environment=$1 AND product_key=$2`, input.Environment, "story_chapter", input.ChapterCoins)

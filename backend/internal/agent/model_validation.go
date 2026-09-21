@@ -63,7 +63,7 @@ func TestModelScenario(ctx context.Context, client *Client, model Model, scenari
 	case "image_life_photo":
 		_, err := client.GenerateImage(ctx, model, GenerateImageRequest{Prompt: "A natural smartphone photo of a quiet afternoon coffee on a cafe table, no text", Size: "1024x1024"})
 		return err
-	case "image_requested_photo", "image_storyboard_frame":
+	case "image_requested_photo", "image_storyboard_sheet":
 		_, err := client.GenerateImage(ctx, model, GenerateImageRequest{Prompt: "A natural smartphone photo of a city park in daylight, no text", Size: "1024x1024"})
 		return err
 	case "audio_speech":

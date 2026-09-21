@@ -229,6 +229,8 @@ class VitaTranslations extends Translations {
       'storyHub.subscribeContinue':
           'The free chapter limit has been reached. Subscribe to continue.',
       'storyHub.generateStoryboard': 'Generate storyboard',
+      'storyHub.choosePanelCount': 'Choose storyboard layout',
+      'storyHub.panelsCount': '@count panels',
       'storyHub.storyboards': 'Storyboards',
       'storyHub.storyboard': 'Storyboard',
       'storyHub.storyboardGenerating': 'Generating storyboard…',
@@ -637,6 +639,8 @@ class VitaTranslations extends Translations {
       'storyHub.chooseNext': '接下来会发生什么？',
       'storyHub.subscribeContinue': '普通用户章节数已达上限，订阅后可继续。',
       'storyHub.generateStoryboard': '生成故事板',
+      'storyHub.choosePanelCount': '选择故事板分镜数量',
+      'storyHub.panelsCount': '@count 格分镜',
       'storyHub.storyboards': '故事板',
       'storyHub.storyboard': '故事板',
       'storyHub.storyboardGenerating': '故事板生成中…',

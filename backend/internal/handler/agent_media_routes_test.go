@@ -16,7 +16,7 @@ func mediaRouteFixture() []mediaModelRoute {
 		{RouteKey: "text_storyboard", MediaType: "text"},
 		{RouteKey: "image_life_photo", MediaType: "image"},
 		{RouteKey: "image_requested_photo", MediaType: "image"},
-		{RouteKey: "image_storyboard_frame", MediaType: "image"},
+		{RouteKey: "image_storyboard_sheet", MediaType: "image"},
 		{RouteKey: "audio_transcription", MediaType: "audio"},
 		{RouteKey: "audio_speech", MediaType: "audio"},
 		{RouteKey: "video_life_clip", MediaType: "video"},

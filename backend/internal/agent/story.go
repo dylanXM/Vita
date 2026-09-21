@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"vita/internal/credits"
@@ -28,12 +27,12 @@ type StoryPanel struct {
 	Description string `json:"description"`
 	Dialogue    string `json:"dialogue"`
 	ImagePrompt string `json:"image_prompt"`
-	ImageURL    string `json:"image_url"`
 }
 
 type Storyboard struct {
-	Summary string       `json:"summary"`
-	Panels  []StoryPanel `json:"panels"`
+	Summary  string       `json:"summary"`
+	ImageURL string       `json:"image_url"`
+	Panels   []StoryPanel `json:"panels"`
 }
 
 func cleanJSON(raw string) string {
@@ -84,7 +83,7 @@ func (s *Service) GenerateStoryChapter(ctx context.Context, userID, companionID,
 }
 
 func (s *Service) GenerateStoryboard(ctx context.Context, userID, companionID, story string, panelCount int) (Storyboard, error) {
-	if panelCount < 1 || panelCount > 12 {
+	if panelCount != 4 && panelCount != 6 && panelCount != 8 && panelCount != 9 {
 		panelCount = 8
 	}
 	if s.mock {
@@ -107,33 +106,21 @@ func (s *Service) GenerateStoryboard(ctx context.Context, userID, companionID, s
 	if err := json.Unmarshal([]byte(cleanJSON(raw)), &result); err != nil || len(result.Panels) != panelCount {
 		return Storyboard{}, fmt.Errorf("decode storyboard response: %w", err)
 	}
-	imageModels, err := s.loadModelRouteModels(ctx, "image_storyboard_frame", userID)
+	imageModels, err := s.loadModelRouteModels(ctx, "image_storyboard_sheet", userID)
 	if err != nil {
 		return Storyboard{}, err
 	}
-	var wg sync.WaitGroup
-	var firstErr error
-	var errMu sync.Mutex
-	for i := range result.Panels {
-		wg.Add(1)
-		go func(index int) {
-			defer wg.Done()
-			url, _, imageErr := s.generateImageWithFallback(ctx, companionID, "storyboard_frame", imageModels, GenerateImageRequest{Prompt: result.Panels[index].ImagePrompt, Size: "1024x1024"})
-			if imageErr != nil {
-				errMu.Lock()
-				if firstErr == nil {
-					firstErr = imageErr
-				}
-				errMu.Unlock()
-				return
-			}
-			result.Panels[index].ImageURL = url
-		}(i)
+	layout := map[int]string{4: "2 columns by 2 rows", 6: "3 columns by 2 rows", 8: "4 columns by 2 rows", 9: "3 columns by 3 rows"}[panelCount]
+	var prompt strings.Builder
+	fmt.Fprintf(&prompt, "Create ONE single storyboard sheet image containing exactly %d clearly separated cinematic panels in a %s grid. Keep the same protagonist appearance and one consistent visual style across every panel. Do not add captions, speech bubbles, letters, numbers, watermarks, or extra panels. Panel descriptions in reading order:\n", panelCount, layout)
+	for i, panel := range result.Panels {
+		fmt.Fprintf(&prompt, "%d. %s\n", i+1, panel.ImagePrompt)
 	}
-	wg.Wait()
-	if firstErr != nil {
-		return Storyboard{}, firstErr
+	url, _, imageErr := s.generateImageWithFallback(ctx, companionID, "storyboard_frame", imageModels, GenerateImageRequest{Prompt: prompt.String(), Size: "1024x1024"})
+	if imageErr != nil {
+		return Storyboard{}, imageErr
 	}
+	result.ImageURL = url
 	return result, nil
 }
 
@@ -152,9 +139,8 @@ func (s *Service) ProcessPendingStoryboard(ctx context.Context) error {
 	defer tx.Rollback()
 	var boardID, storyID, spendID, userID, companionID string
 	var panelCount int
-	err = tx.QueryRowContext(ctx, `SELECT b.id,b.story_id,COALESCE(b.spend_id,''),s.user_id,s.companion_id,settings.storyboard_panel_count
-		FROM storyboards b JOIN stories s ON s.id=b.story_id JOIN users u ON u.id=s.user_id
-		JOIN story_settings settings ON settings.environment=u.environment
+	err = tx.QueryRowContext(ctx, `SELECT b.id,b.story_id,COALESCE(b.spend_id,''),s.user_id,s.companion_id,b.panel_count
+		FROM storyboards b JOIN stories s ON s.id=b.story_id
 		WHERE b.status='pending' ORDER BY b.created_at FOR UPDATE OF b SKIP LOCKED LIMIT 1`).Scan(&boardID, &storyID, &spendID, &userID, &companionID, &panelCount)
 	if err == sql.ErrNoRows {
 		return nil
@@ -187,7 +173,7 @@ func (s *Service) ProcessPendingStoryboard(ctx context.Context) error {
 		board, err = s.GenerateStoryboard(ctx, userID, companionID, story.String(), panelCount)
 		if err == nil {
 			panels, _ := json.Marshal(board.Panels)
-			_, err = s.db.ExecContext(ctx, `UPDATE storyboards SET status='completed',summary=$2,panels=$3,failure_reason='',updated_at=CURRENT_TIMESTAMP WHERE id=$1`, boardID, board.Summary, panels)
+			_, err = s.db.ExecContext(ctx, `UPDATE storyboards SET status='completed',summary=$2,image_url=$3,panels=$4,failure_reason='',updated_at=CURRENT_TIMESTAMP WHERE id=$1`, boardID, board.Summary, board.ImageURL, panels)
 		}
 	}
 	settlementCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

@@ -244,7 +244,7 @@ var modelScenarioCapabilities = map[string]string{
 	"text_storyboard":        "text",
 	"image_life_photo":       "image",
 	"image_requested_photo":  "image",
-	"image_storyboard_frame": "image",
+	"image_storyboard_sheet": "image",
 	"audio_transcription":    "audio",
 	"audio_speech":           "audio",
 	"video_life_clip":        "video",
@@ -253,7 +253,7 @@ var modelScenarioCapabilities = map[string]string{
 
 var orderedModelScenarios = []string{
 	"text_chat", "text_life_plan", "text_proactive", "text_character_profile", "text_story_chapter", "text_storyboard",
-	"image_life_photo", "image_requested_photo", "image_storyboard_frame",
+	"image_life_photo", "image_requested_photo", "image_storyboard_sheet",
 	"audio_transcription", "audio_speech",
 	"video_life_clip", "video_realtime_avatar",
 }
@@ -624,7 +624,7 @@ var mediaRouteTypes = map[string]string{
 	"text_storyboard":        "text",
 	"image_life_photo":       "image",
 	"image_requested_photo":  "image",
-	"image_storyboard_frame": "image",
+	"image_storyboard_sheet": "image",
 	"audio_transcription":    "audio",
 	"audio_speech":           "audio",
 	"video_life_clip":        "video",

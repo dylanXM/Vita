@@ -47,16 +47,48 @@ void main() {
   testWidgets('storyboard offers external system sharing', (tester) async {
     await tester.pumpWidget(app(const StoryboardPage(board: {
       'summary': 'A shared journey.',
+      'image_url': '',
+      'panel_count': 4,
       'panels': [
         {
           'title': 'Departure',
           'dialogue': 'Let us go.',
-          'image_url': '',
         },
+        {'title': 'Crossing', 'dialogue': ''},
+        {'title': 'Discovery', 'dialogue': ''},
+        {'title': 'Return', 'dialogue': ''},
       ],
     })));
 
     expect(find.text('Share to another app'), findsOneWidget);
     expect(find.text('A shared journey.'), findsOneWidget);
+    expect(find.byType(AspectRatio), findsOneWidget);
+  });
+
+  testWidgets('user chooses 4, 6, 8, or 9 panels before generation',
+      (tester) async {
+    await tester.pumpWidget(app(const StoryDetailPage(initial: {
+      'id': 'story-1',
+      'title': 'Moonlit Train',
+      'storyboard_unlocked': true,
+      'can_continue': true,
+      'chapters': [
+        {
+          'title': 'Chapter 8',
+          'content': 'The train reaches the final station.',
+          'selected_choice_id': '',
+          'choices': [],
+        },
+      ],
+      'storyboards': [],
+    })));
+
+    await tester.tap(find.text('Generate storyboard'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose storyboard layout'), findsOneWidget);
+    for (final count in [4, 6, 8, 9]) {
+      expect(find.text('$count panels'), findsOneWidget);
+    }
   });
 }

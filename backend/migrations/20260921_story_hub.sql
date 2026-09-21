@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS story_settings (
   free_chapter_limit INTEGER NOT NULL DEFAULT 3 CHECK (free_chapter_limit >= 0),
   custom_background_limit INTEGER NOT NULL DEFAULT 3 CHECK (custom_background_limit >= 0),
   storyboard_unlock_chapters INTEGER NOT NULL DEFAULT 8 CHECK (storyboard_unlock_chapters > 0),
-  storyboard_panel_count INTEGER NOT NULL DEFAULT 8 CHECK (storyboard_panel_count BETWEEN 1 AND 12),
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 INSERT INTO story_settings(environment) VALUES('dev'),('beta'),('prod') ON CONFLICT(environment) DO NOTHING;
@@ -71,12 +70,23 @@ CREATE TABLE IF NOT EXISTS storyboards (
   story_id TEXT NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','generating','completed','failed')),
   summary TEXT NOT NULL DEFAULT '',
+  image_url TEXT NOT NULL DEFAULT '',
+  panel_count INTEGER NOT NULL CHECK (panel_count IN (4,6,8,9)),
   panels JSONB NOT NULL DEFAULT '[]'::jsonb,
   spend_id TEXT,
   failure_reason TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE storyboards ADD COLUMN IF NOT EXISTS image_url TEXT NOT NULL DEFAULT '';
+ALTER TABLE storyboards ADD COLUMN IF NOT EXISTS panel_count INTEGER NOT NULL DEFAULT 8;
+ALTER TABLE storyboards DROP CONSTRAINT IF EXISTS storyboards_status_check;
+ALTER TABLE storyboards ADD CONSTRAINT storyboards_status_check CHECK (status IN ('pending','generating','completed','failed'));
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='storyboards_panel_count_check') THEN
+    ALTER TABLE storyboards ADD CONSTRAINT storyboards_panel_count_check CHECK (panel_count IN (4,6,8,9));
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_storyboards_story ON storyboards(story_id,created_at DESC);
 
 ALTER TABLE credit_products DROP CONSTRAINT IF EXISTS credit_products_category_check;
@@ -90,15 +100,15 @@ SELECT env,'story_storyboard','story','credits.product.storyboard.name','credits
 FROM (VALUES('dev'),('beta'),('prod')) environments(env) ON CONFLICT(environment,product_key) DO NOTHING;
 
 INSERT INTO agent_media_routes(route_key,media_type,enabled,fallback_model_ids)
-VALUES ('text_story_chapter','text',false,'[]'::jsonb),('text_storyboard','text',false,'[]'::jsonb),('image_storyboard_frame','image',false,'[]'::jsonb)
+VALUES ('text_story_chapter','text',false,'[]'::jsonb),('text_storyboard','text',false,'[]'::jsonb),('image_storyboard_sheet','image',false,'[]'::jsonb)
 ON CONFLICT(route_key) DO NOTHING;
 UPDATE agent_media_routes target SET primary_model_id=source.primary_model_id,fallback_model_ids=source.fallback_model_ids,enabled=source.enabled
 FROM agent_media_routes source WHERE source.route_key='text_chat' AND target.route_key IN ('text_story_chapter','text_storyboard') AND target.primary_model_id IS NULL;
 UPDATE agent_media_routes target SET primary_model_id=source.primary_model_id,fallback_model_ids=source.fallback_model_ids,enabled=source.enabled
-FROM agent_media_routes source WHERE source.route_key='image_requested_photo' AND target.route_key='image_storyboard_frame' AND target.primary_model_id IS NULL;
+FROM agent_media_routes source WHERE source.route_key='image_requested_photo' AND target.route_key='image_storyboard_sheet' AND target.primary_model_id IS NULL;
 UPDATE ai_models SET configured_scenarios = configured_scenarios || '["text_story_chapter"]'::jsonb
 WHERE capabilities ? 'text' AND NOT configured_scenarios ? 'text_story_chapter';
 UPDATE ai_models SET configured_scenarios = configured_scenarios || '["text_storyboard"]'::jsonb
 WHERE capabilities ? 'text' AND NOT configured_scenarios ? 'text_storyboard';
-UPDATE ai_models SET configured_scenarios = configured_scenarios || '["image_storyboard_frame"]'::jsonb
-WHERE capabilities ? 'image' AND NOT configured_scenarios ? 'image_storyboard_frame';
+UPDATE ai_models SET configured_scenarios = configured_scenarios || '["image_storyboard_sheet"]'::jsonb
+WHERE capabilities ? 'image' AND NOT configured_scenarios ? 'image_storyboard_sheet';

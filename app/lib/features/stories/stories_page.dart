@@ -379,11 +379,43 @@ class _StoryDetailPageState extends State<StoryDetailPage> {
     }
   }
 
-  Future<void> _storyboard() async {
+  Future<void> _chooseStoryboardCount() async {
+    final count = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: context.vita.surface,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('storyHub.choosePanelCount'.tr,
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w600)),
+            ),
+            for (final value in const [4, 6, 8, 9])
+              ListTile(
+                title: Text('storyHub.panelsCount'
+                    .trParams({'count': value.toString()})),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(sheetContext).pop(value),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (count != null && mounted) await _storyboard(count);
+  }
+
+  Future<void> _storyboard(int panelCount) async {
     setState(() => loading = true);
     try {
-      data = _map(await ApiClient.instance.post('/v1/stories/$id/storyboards',
-          data: {'idempotency_key': _requestKey()}));
+      data = _map(
+          await ApiClient.instance.post('/v1/stories/$id/storyboards', data: {
+        'idempotency_key': _requestKey(),
+        'panel_count': panelCount,
+      }));
       for (var attempt = 0; attempt < 50; attempt++) {
         final boards = _maps(data['storyboards']);
         final status = boards.isEmpty ? '' : '${boards.first['status'] ?? ''}';
@@ -470,7 +502,7 @@ class _StoryDetailPageState extends State<StoryDetailPage> {
                     Padding(
                       padding: const EdgeInsets.all(16),
                       child: OutlinedButton.icon(
-                        onPressed: loading ? null : _storyboard,
+                        onPressed: loading ? null : _chooseStoryboardCount,
                         icon: const Icon(Icons.movie_creation_outlined),
                         label: Text('storyHub.generateStoryboard'.tr),
                       ),
@@ -499,12 +531,17 @@ class _StoryDetailPageState extends State<StoryDetailPage> {
                                         : 'storyHub.storyboardGenerating'.tr,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis),
+                            subtitle: Text('storyHub.panelsCount'.trParams(
+                                {'count': '${board['panel_count'] ?? 0}'})),
                             trailing: ready
                                 ? const Icon(Icons.chevron_right)
-                                : const SizedBox.square(
-                                    dimension: 18,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2)),
+                                : status == 'failed'
+                                    ? const Icon(Icons.error_outline,
+                                        color: Colors.redAccent)
+                                    : const SizedBox.square(
+                                        dimension: 18,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2)),
                             onTap: ready
                                 ? () => Get.to(
                                     () => StoryboardPage(board: board),
@@ -533,6 +570,7 @@ class StoryboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final panels = _maps(board['panels']);
+    final imageURL = '${board['image_url'] ?? ''}';
     return Scaffold(
       backgroundColor: context.vita.pageBg,
       appBar: AppBar(title: Text('storyHub.storyboard'.tr)),
@@ -540,46 +578,56 @@ class StoryboardPage extends StatelessWidget {
         padding: const EdgeInsets.only(top: 12, bottom: 30),
         children: [
           VitaCard(
-              radius: 0,
-              child: Text('${board['summary'] ?? ''}',
-                  style: const TextStyle(fontSize: 16, height: 1.6))),
+            radius: 0,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AspectRatio(
+                  aspectRatio: 1,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: imageURL.isEmpty
+                        ? Container(color: context.vita.pageBg)
+                        : VitaMediaImage(url: imageURL),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text('${board['summary'] ?? ''}',
+                    style: const TextStyle(fontSize: 16, height: 1.6)),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: imageURL.isEmpty
+                        ? null
+                        : () => _share(imageURL, 'storyHub.storyboard'.tr),
+                    icon: const Icon(Icons.ios_share, size: 18),
+                    label: Text('storyHub.shareExternal'.tr),
+                  ),
+                ),
+              ],
+            ),
+          ),
           ...panels.asMap().entries.map((entry) {
             final panel = entry.value;
-            final url = '${panel['image_url'] ?? ''}';
             return VitaCard(
               radius: 0,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AspectRatio(
-                    aspectRatio: 1,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: url.isEmpty
-                          ? Container(color: context.vita.pageBg)
-                          : VitaMediaImage(url: url),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
                   Text('${entry.key + 1}. ${panel['title'] ?? ''}',
                       style: const TextStyle(
                           fontWeight: FontWeight.w600, fontSize: 16)),
+                  if ('${panel['description'] ?? ''}'.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text('${panel['description']}'),
+                    ),
                   if ('${panel['dialogue'] ?? ''}'.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text('${panel['dialogue']}',
                           style: TextStyle(color: context.vita.subText)),
                     ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: url.isEmpty
-                          ? null
-                          : () => _share(url, '${panel['title'] ?? ''}'),
-                      icon: const Icon(Icons.ios_share, size: 18),
-                      label: Text('storyHub.shareExternal'.tr),
-                    ),
-                  ),
                 ],
               ),
             );

@@ -17,7 +17,7 @@ func TestModelScenarioCallsTheSelectedRuntimeEndpoint(t *testing.T) {
 		"text_storyboard":        "/v1/chat/completions",
 		"image_life_photo":       "/v1/images/generations",
 		"image_requested_photo":  "/v1/images/generations",
-		"image_storyboard_frame": "/v1/images/generations",
+		"image_storyboard_sheet": "/v1/images/generations",
 		"audio_speech":           "/v1/audio/speech",
 		"audio_transcription":    "/v1/audio/transcriptions",
 	}

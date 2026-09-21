@@ -29,7 +29,7 @@ describe("admin translations", () => {
       "route.text_storyboard",
       "route.image_life_photo",
       "route.image_requested_photo",
-      "route.image_storyboard_frame",
+      "route.image_storyboard_sheet",
       "route.audio_transcription",
       "route.audio_speech",
       "route.video_life_clip",
