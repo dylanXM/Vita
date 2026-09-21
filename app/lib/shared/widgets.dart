@@ -193,7 +193,7 @@ class VitaCompanionChips extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               decoration: BoxDecoration(
                 color: selected ? context.vita.green : context.vita.surface,
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(6),
                 border: Border.all(
                   color: selected ? context.vita.green : context.vita.divider,
                 ),
@@ -424,7 +424,7 @@ class VitaListTile extends StatelessWidget {
                   color: customIcon == null
                       ? accent.withValues(alpha: 0.1)
                       : Colors.transparent,
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: customIcon ?? Icon(icon, color: accent, size: 18),
               ),
@@ -502,8 +502,7 @@ class VitaDateChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
             color: context.vita.surface,
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: context.vita.divider),
+            borderRadius: BorderRadius.circular(6),
           ),
           child: Text(label, style: context.vita.caption),
         ),
