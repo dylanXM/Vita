@@ -14,6 +14,7 @@ import '../billing/credits_page.dart';
 import '../billing/subscription_page.dart';
 import '../settings/settings_page.dart';
 import '../../core/theme.dart';
+import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
 
 /// Me tab — profile header, credits, subscription and settings.
@@ -73,12 +74,18 @@ class MePage extends StatelessWidget {
                 child: Row(
                   children: [
                     ClipOval(
-                      child: Image.asset(
-                        'assets/icons/profile_default.png',
-                        width: 62,
-                        height: 62,
-                        fit: BoxFit.cover,
-                      ),
+                      child: auth.avatarUrl.isEmpty
+                          ? Image.asset(
+                              'assets/icons/profile_default.png',
+                              width: 62,
+                              height: 62,
+                              fit: BoxFit.cover,
+                            )
+                          : SizedBox(
+                              width: 62,
+                              height: 62,
+                              child: VitaMediaImage(url: auth.avatarUrl),
+                            ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -86,7 +93,11 @@ class MePage extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            auth.email.isEmpty ? 'me.account'.tr : auth.email,
+                            auth.nickname.isNotEmpty
+                                ? auth.nickname
+                                : (auth.email.isEmpty
+                                    ? 'me.account'.tr
+                                    : auth.email),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(

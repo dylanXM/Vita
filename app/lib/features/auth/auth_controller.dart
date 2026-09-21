@@ -148,6 +148,26 @@ class AuthController extends GetxController {
 
   String get email => profile.value?['email'] as String? ?? '';
 
+  /// Display name chosen by the user. Falls back to the email on the UI
+  /// layer when empty.
+  String get nickname => profile.value?['nickname'] as String? ?? '';
+
+  /// Media path returned by POST /v1/media/upload (e.g. `/v1/media/<id>`).
+  /// Empty means the bundled default avatar should be used.
+  String get avatarUrl => profile.value?['avatar_url'] as String? ?? '';
+
+  /// Updates the signed-in user's display name and/or avatar. Pass null for
+  /// a field you do not want to change; pass an empty string to clear it.
+  /// Refreshes the in-memory profile on success.
+  Future<void> updateProfile({String? nickname, String? avatarUrl}) async {
+    final data = <String, dynamic>{};
+    if (nickname != null) data['nickname'] = nickname.trim();
+    if (avatarUrl != null) data['avatar_url'] = avatarUrl.trim();
+    if (data.isEmpty) return;
+    await ApiClient.instance.put('/v1/me/profile', data: data);
+    await fetchProfile();
+  }
+
   Future<void> logout() async {
     AnalyticsService.to.track('auth_logout', category: 'auth');
     await AnalyticsService.to.flush();

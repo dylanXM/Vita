@@ -148,6 +148,11 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		FROM (VALUES ('dev'),('beta'),('prod')) AS environments(environment)
 		ON CONFLICT(environment,document_type,version) DO NOTHING`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_locale TEXT NOT NULL DEFAULT 'en'`,
+		// User-editable profile fields shown on the Me tab and used as the
+		// chat sender identity. Empty nickname/avatar fall back to the email
+		// and the bundled default avatar on the client.
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_code TEXT`,
 		`UPDATE users SET invite_code=UPPER(SUBSTRING(MD5(id || email) FROM 1 FOR 10)) WHERE invite_code IS NULL OR invite_code=''`,
 		`ALTER TABLE users ALTER COLUMN invite_code SET DEFAULT UPPER(SUBSTRING(MD5(RANDOM()::TEXT || CLOCK_TIMESTAMP()::TEXT) FROM 1 FOR 10))`,
@@ -679,7 +684,11 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`ALTER TABLE credit_products DROP CONSTRAINT IF EXISTS credit_products_category_check`,
-		`ALTER TABLE credit_products ADD CONSTRAINT credit_products_category_check CHECK (category IN ('gift','photo','voice','date','keepsake','outfit','call','pet'))`,
+		// The category list must stay a superset of every category inserted
+		// by later migrations (including 'story' added further below), or a
+		// re-run on a database that already has those rows will violate the
+		// constraint when it is re-added here.
+		`ALTER TABLE credit_products ADD CONSTRAINT credit_products_category_check CHECK (category IN ('gift','photo','voice','date','keepsake','outfit','call','pet','story'))`,
 		`INSERT INTO credit_products(environment,product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata)
 		 SELECT env,'ai_pet_feed','pet','credits.product.petFeed.name','credits.product.petFeed.description','🥣',5,true,5,'{"hidden_from_catalog":true}'::jsonb
 		 FROM (VALUES('dev'),('beta'),('prod')) AS environments(env)
