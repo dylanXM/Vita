@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -184,11 +187,14 @@ class _BreedCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(children: [
-            VitaAvatar(
-                name: '${breed['name'] ?? ''}',
-                radius: 38,
-                imageUrl: '${breed['avatar_url'] ?? ''}',
-                borderRadius: BorderRadius.circular(16)),
+            ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: SizedBox(
+                    width: 76,
+                    height: 76,
+                    child: _PetImage(
+                        name: '${breed['name'] ?? ''}',
+                        imageUrl: '${breed['avatar_url'] ?? ''}'))),
             const SizedBox(width: 14),
             Expanded(
                 child: Column(
@@ -256,6 +262,8 @@ class _AIPetHomePageState extends State<AIPetHomePage> {
   Map<String, dynamic>? _state;
   bool _loading = true;
   bool _feeding = false;
+  _PetAction _action = _PetAction.idle;
+  Timer? _actionTimer;
 
   Map<String, dynamic> get _companion => {
         'id': widget.companionId,
@@ -272,12 +280,38 @@ class _AIPetHomePageState extends State<AIPetHomePage> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _actionTimer?.cancel();
+    super.dispose();
+  }
+
+  void _showAction(_PetAction action, {Duration? duration}) {
+    _actionTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _action = action);
+    if (duration != null) {
+      _actionTimer = Timer(duration, () {
+        if (!mounted) return;
+        final energy = (_state?['energy'] as num?)?.toInt() ?? 100;
+        setState(() =>
+            _action = energy < 20 ? _PetAction.sleeping : _PetAction.idle);
+      });
+    }
+  }
+
   Future<void> _load() async {
     try {
       final data = await ApiClient.instance
           .get('/v1/ai-pets/${widget.companionId}/state');
       if (mounted && data is Map) {
-        setState(() => _state = Map<String, dynamic>.from(data));
+        final nextState = Map<String, dynamic>.from(data);
+        setState(() {
+          _state = nextState;
+          _action = ((nextState['energy'] as num?)?.toInt() ?? 100) < 20
+              ? _PetAction.sleeping
+              : _PetAction.idle;
+        });
       }
     } on ApiException catch (error) {
       if (mounted) Get.snackbar('aiPets.error'.tr, error.message);
@@ -288,7 +322,11 @@ class _AIPetHomePageState extends State<AIPetHomePage> {
 
   Future<void> _feed() async {
     if (_feeding) return;
-    setState(() => _feeding = true);
+    final previousLevel = (_state?['level'] as num?)?.toInt() ?? 1;
+    setState(() {
+      _feeding = true;
+      _action = _PetAction.feeding;
+    });
     try {
       final data = await ApiClient.instance
           .post('/v1/ai-pets/${widget.companionId}/feed', data: {
@@ -297,10 +335,17 @@ class _AIPetHomePageState extends State<AIPetHomePage> {
       });
       final state = data is Map ? data['state'] : null;
       if (mounted && state is Map) {
-        setState(() => _state = Map<String, dynamic>.from(state));
+        final nextState = Map<String, dynamic>.from(state);
+        final nextLevel =
+            (nextState['level'] as num?)?.toInt() ?? previousLevel;
+        setState(() => _state = nextState);
+        _showAction(
+            nextLevel > previousLevel ? _PetAction.levelUp : _PetAction.happy,
+            duration: const Duration(milliseconds: 1800));
       }
       Get.snackbar('aiPets.fed'.tr, 'aiPets.fedSub'.tr);
     } on ApiException catch (error) {
+      _showAction(_PetAction.idle);
       if (error.code == 'insufficient_credits') {
         Get.snackbar('aiPets.notEnoughCoins'.tr, 'aiPets.notEnoughCoinsSub'.tr);
         Get.toNamed('/credits');
@@ -325,14 +370,15 @@ class _AIPetHomePageState extends State<AIPetHomePage> {
               child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
                   children: [
+                    _AnimatedPetScene(
+                        name: widget.name,
+                        imageUrl: widget.avatarUrl,
+                        action: _action,
+                        onTap: () => _showAction(_PetAction.happy,
+                            duration: const Duration(milliseconds: 1400))),
+                    const SizedBox(height: 12),
                     VitaCard(
                         child: Column(children: [
-                      VitaAvatar(
-                          name: widget.name,
-                          radius: 58,
-                          imageUrl: widget.avatarUrl,
-                          borderRadius: BorderRadius.circular(24)),
-                      const SizedBox(height: 12),
                       Text(widget.name,
                           style: TextStyle(
                               fontSize: 22,
@@ -410,6 +456,226 @@ class _AIPetHomePageState extends State<AIPetHomePage> {
                   ]),
             ),
     );
+  }
+}
+
+enum _PetAction { idle, happy, feeding, sleeping, levelUp }
+
+class _AnimatedPetScene extends StatefulWidget {
+  const _AnimatedPetScene({
+    required this.name,
+    required this.imageUrl,
+    required this.action,
+    required this.onTap,
+  });
+
+  final String name;
+  final String imageUrl;
+  final _PetAction action;
+  final VoidCallback onTap;
+
+  @override
+  State<_AnimatedPetScene> createState() => _AnimatedPetSceneState();
+}
+
+class _AnimatedPetSceneState extends State<_AnimatedPetScene>
+    with TickerProviderStateMixin {
+  late final AnimationController _idleController;
+  late final AnimationController _actionController;
+
+  @override
+  void initState() {
+    super.initState();
+    _idleController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 2200))
+      ..repeat();
+    _actionController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 850));
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedPetScene oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.action != widget.action) {
+      _actionController.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _idleController.dispose();
+    _actionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: widget.name,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          height: 330,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFFFE4CF), Color(0xFFFFF6E8)],
+            ),
+          ),
+          child: Stack(children: [
+            const Positioned(
+                top: 28,
+                left: 26,
+                child: _SceneBubble(size: 64, color: Color(0x66FFFFFF))),
+            const Positioned(
+                top: 72,
+                right: 28,
+                child: _SceneBubble(size: 38, color: Color(0x55F6A96C))),
+            Positioned(
+              left: -30,
+              right: -30,
+              bottom: -48,
+              child: Container(
+                height: 135,
+                decoration: const BoxDecoration(
+                    color: Color(0xFFFFD7AE), shape: BoxShape.circle),
+              ),
+            ),
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation:
+                    Listenable.merge([_idleController, _actionController]),
+                builder: (context, child) {
+                  final idle = math.sin(_idleController.value * math.pi * 2);
+                  final actionWave =
+                      math.sin(_actionController.value * math.pi);
+                  var dy = idle * 4;
+                  var scale = 1.0;
+                  var angle = 0.0;
+                  switch (widget.action) {
+                    case _PetAction.happy:
+                      dy -= actionWave * 24;
+                      scale += actionWave * .06;
+                      break;
+                    case _PetAction.feeding:
+                      dy += math.sin(_actionController.value * math.pi * 4) * 7;
+                      angle = math.sin(_actionController.value * math.pi * 4) *
+                          .025;
+                      break;
+                    case _PetAction.sleeping:
+                      dy = idle * 2 + 7;
+                      angle = idle * .012;
+                      break;
+                    case _PetAction.levelUp:
+                      dy -= actionWave * 18;
+                      scale += actionWave * .12;
+                      break;
+                    case _PetAction.idle:
+                      break;
+                  }
+                  return Transform.translate(
+                    offset: Offset(0, dy),
+                    child: Transform.rotate(
+                      angle: angle,
+                      child: Transform.scale(scale: scale, child: child),
+                    ),
+                  );
+                },
+                child: Align(
+                  alignment: const Alignment(0, .35),
+                  child: SizedBox(
+                    width: 245,
+                    height: 245,
+                    child:
+                        _PetImage(name: widget.name, imageUrl: widget.imageUrl),
+                  ),
+                ),
+              ),
+            ),
+            if (widget.action == _PetAction.happy)
+              const Positioned(
+                  top: 58,
+                  right: 54,
+                  child: Text('♥',
+                      style:
+                          TextStyle(fontSize: 42, color: Color(0xFFF06A89)))),
+            if (widget.action == _PetAction.feeding)
+              const Positioned(
+                  bottom: 22,
+                  left: 0,
+                  right: 0,
+                  child: Text('🥣',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 54))),
+            if (widget.action == _PetAction.sleeping)
+              const Positioned(
+                  top: 58,
+                  right: 48,
+                  child: Text('Zzz',
+                      style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF776A9E)))),
+            if (widget.action == _PetAction.levelUp) ...const [
+              Positioned(top: 50, left: 48, child: _SceneStar()),
+              Positioned(top: 78, right: 42, child: _SceneStar(size: 34)),
+              Positioned(bottom: 82, right: 58, child: _SceneStar(size: 24)),
+            ],
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _SceneBubble extends StatelessWidget {
+  const _SceneBubble({required this.size, required this.color});
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle));
+}
+
+class _SceneStar extends StatelessWidget {
+  const _SceneStar({this.size = 28});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) =>
+      Icon(Icons.star_rounded, size: size, color: const Color(0xFFFFB930));
+}
+
+class _PetImage extends StatelessWidget {
+  const _PetImage({required this.name, required this.imageUrl});
+  final String name;
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget fallback() => ColoredBox(
+          color: const Color(0xFFFFE9D7),
+          child: Center(
+              child: Icon(Icons.pets_rounded,
+                  size: 52, color: context.vita.green)),
+        );
+
+    if (imageUrl.startsWith('asset://')) {
+      return Image.asset(imageUrl.substring('asset://'.length),
+          fit: BoxFit.contain, errorBuilder: (_, __, ___) => fallback());
+    }
+    if (imageUrl.isNotEmpty) {
+      return Image.network(imageUrl,
+          fit: BoxFit.contain, errorBuilder: (_, __, ___) => fallback());
+    }
+    return fallback();
   }
 }
 

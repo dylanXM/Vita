@@ -644,6 +644,18 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_ai_pet_breeds_scope ON ai_pet_breeds(environment,enabled,sort_order,name)`,
+		`INSERT INTO ai_pet_breeds(id,environment,name,species,personality,description,avatar_url,sort_order,enabled)
+		 SELECT 'system-ai-pet-' || env || '-' || slug,env,name,species,personality,description,avatar_url,sort_order,true
+		 FROM (VALUES('dev'),('beta'),('prod')) AS environments(env)
+		 CROSS JOIN (VALUES
+			('orange-tabby','Mochi','Cat','Playful and curious','A sunny orange tabby who loves snacks, warm naps, and following you everywhere.','asset://assets/ai_pets/cat_orange.png',10),
+			('tuxedo-cat','Oreo','Cat','Clever and affectionate','A smart tuxedo cat with a gentle heart and a talent for cheering you up.','asset://assets/ai_pets/cat_tuxedo.png',20),
+			('ragdoll-cat','Luna','Cat','Calm and sweet','A soft ragdoll cat who enjoys quiet company, cozy evenings, and kind conversations.','asset://assets/ai_pets/cat_ragdoll.png',30),
+			('corgi','Biscuit','Dog','Cheerful and energetic','A happy corgi who turns every day into a tiny adventure.','asset://assets/ai_pets/dog_corgi.png',40),
+			('shiba','Momo','Dog','Loyal and independent','A confident Shiba Inu who may act cool but always stays close when you need a friend.','asset://assets/ai_pets/dog_shiba.png',50),
+			('golden-retriever','Sunny','Dog','Friendly and caring','A warm golden retriever who loves playtime, encouragement, and making new memories.','asset://assets/ai_pets/dog_retriever.png',60)
+		 ) AS defaults(slug,name,species,personality,description,avatar_url,sort_order)
+		 ON CONFLICT(id) DO NOTHING`,
 		`CREATE TABLE IF NOT EXISTS ai_pet_breed_subscription_plans (
 			breed_id TEXT NOT NULL REFERENCES ai_pet_breeds(id) ON DELETE CASCADE,
 			subscription_plan_id TEXT NOT NULL REFERENCES subscription_plans(id) ON DELETE CASCADE,

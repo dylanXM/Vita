@@ -118,7 +118,7 @@ export function AIPetsPage() {
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {(breeds.data?.items ?? []).map((breed) => <Card key={breed.id}>
         <CardContent className="flex gap-4 p-4">
-          <div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-xl bg-muted">{breed.avatar_url ? <img src={breed.avatar_url} alt="" className="size-full object-cover" /> : <PawPrint className="size-8 text-muted-foreground" />}</div>
+          <div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-xl bg-muted">{breed.avatar_url && !breed.avatar_url.startsWith("asset://") ? <img src={breed.avatar_url} alt="" className="size-full object-cover" /> : <PawPrint className="size-8 text-muted-foreground" />}</div>
           <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><div className="font-semibold">{breed.name}</div><Badge variant={breed.enabled ? "success" : "outline"}>{breed.enabled ? t("content.enabled") : t("content.disabled")}</Badge></div><div className="text-sm text-muted-foreground">{breed.species}</div><p className="mt-2 line-clamp-2 text-sm">{breed.description}</p><div className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><span>{breed.subscription_plan_ids.length ? t("aiPets.selectedPlans", { count: breed.subscription_plan_ids.length }) : t("aiPets.allPlans")}</span><Button size="sm" variant="outline" onClick={() => edit(breed)}><Pencil />{t("users.edit")}</Button></div></div>
         </CardContent>
       </Card>)}
