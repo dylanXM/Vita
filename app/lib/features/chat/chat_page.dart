@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
@@ -180,6 +181,25 @@ class _ChatPageState extends State<ChatPage> {
     if (_input.text.isNotEmpty) return;
     _input.text = text;
     _input.selection = TextSelection.collapsed(offset: text.length);
+  }
+
+  /// True while the IME is composing (e.g. pinyin candidates), when Enter
+  /// should confirm the composition instead of sending.
+  bool _isComposing() {
+    final composing = _input.value.composing;
+    return composing.isValid && composing.end > composing.start;
+  }
+
+  /// Sends on Enter (desktop); Shift+Enter keeps inserting a line break.
+  KeyEventResult _onInputKey(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.enter &&
+        !HardwareKeyboard.instance.isShiftPressed &&
+        !_isComposing()) {
+      _send();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   /// Reports a send that did not go through: either nothing was queued (the
@@ -479,7 +499,7 @@ class _ChatPageState extends State<ChatPage> {
   Widget _buildInputBar({required bool locked}) {
     return Container(
       decoration: BoxDecoration(
-        color: context.vita.surface,
+        color: context.vita.pageBg,
         border:
             Border(top: BorderSide(color: context.vita.divider, width: 0.5)),
       ),
@@ -500,10 +520,13 @@ class _ChatPageState extends State<ChatPage> {
                 color: context.vita.surface,
                 borderRadius: BorderRadius.circular(6),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SizedBox(
-                      height: 40,
-                      child: TextField(
+              child: Focus(
+                canRequestFocus: false,
+                skipTraversal: true,
+                onKeyEvent: _onInputKey,
+                child: SizedBox(
+                    height: 40,
+                    child: TextField(
                 controller: _input,
                 enabled: !locked,
                 minLines: 1,
@@ -516,15 +539,18 @@ class _ChatPageState extends State<ChatPage> {
                   hintText: locked ? 'chat.cannotSend'.tr : 'chat.message'.tr,
                   hintStyle:
                       TextStyle(color: context.vita.hint, fontSize: 15),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: Color(0xFFDDDDDD))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: Color(0xFFDDDDDD))),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: context.vita.green, width: 1.5)),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
                   contentPadding:
-                      const EdgeInsets.symmetric(vertical: 6),
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 ),
               ),
               ),
             ),
+          ),
           ),
           const SizedBox(width: 8),
           _RoundIconButton(
