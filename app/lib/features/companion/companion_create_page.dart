@@ -89,7 +89,7 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
     }
     setState(() => _busy = true);
     try {
-      final result = await ApiClient.instance.post('/v1/companions', data: {
+      final result = await ApiClient.instance.post('/v1/companions/', data: {
         'name': _name.text.trim(),
         'gender': _gender,
         'city': _city.text.trim(),

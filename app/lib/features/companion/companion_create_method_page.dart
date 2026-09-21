@@ -225,7 +225,7 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
         ? 'user_description'
         : 'meet_file';
     try {
-      final result = await ApiClient.instance.post('/v1/companions', data: {
+      final result = await ApiClient.instance.post('/v1/companions/', data: {
         for (final entry in _fields.entries)
           if (entry.key != 'personality_tags')
             entry.key: entry.value.text.trim(),

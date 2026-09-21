@@ -92,7 +92,7 @@ class AnalyticsService extends GetxService with WidgetsBindingObserver {
     final batch = List<Map<String, dynamic>>.from(_queue);
     _queue.clear();
     try {
-      await ApiClient.instance.post('/v1/events', data: {'events': batch});
+      await ApiClient.instance.post('/v1/events/', data: {'events': batch});
     } catch (_) {
       _queue.insertAll(0, batch);
     } finally {

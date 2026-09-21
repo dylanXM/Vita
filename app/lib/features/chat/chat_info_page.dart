@@ -63,11 +63,6 @@ class ChatInfoPage extends StatelessWidget {
                 transition: Transition.cupertino,
               ),
             ),
-            _InfoRow(
-              icon: Icons.today_outlined,
-              title: 'chatInfo.life'.tr,
-              onTap: _openLifeDetail,
-            ),
           ]),
           _group([
             _InfoRow(
@@ -354,7 +349,7 @@ class _ChatMediaPageState extends State<ChatMediaPage> {
       }
       if (_conversationId == null) {
         final conversation = await ApiClient.instance.post(
-          '/v1/conversations',
+          '/v1/conversations/',
           data: {'companion_id': widget.companionId},
         );
         _conversationId = conversation is Map

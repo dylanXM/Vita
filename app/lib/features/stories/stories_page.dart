@@ -38,7 +38,7 @@ class StoriesController extends GetxController {
     try {
       final values = await Future.wait([
         ApiClient.instance.get('/v1/stories/catalog'),
-        ApiClient.instance.get('/v1/stories'),
+        ApiClient.instance.get('/v1/stories/'),
         ApiClient.instance.get('/v1/companions'),
       ]);
       catalog.assignAll(_map(values[0]));
@@ -55,7 +55,7 @@ class StoriesController extends GetxController {
       Map<String, dynamic> background, Map<String, dynamic> companion) async {
     loading.value = true;
     try {
-      final result = await ApiClient.instance.post('/v1/stories', data: {
+      final result = await ApiClient.instance.post('/v1/stories/', data: {
         'background_id': background['id'],
         'companion_id': companion['id'],
         'idempotency_key': _requestKey()
@@ -318,7 +318,7 @@ class _CustomStoryBackgroundPageState extends State<CustomStoryBackgroundPage> {
     }
     setState(() => saving = true);
     try {
-      await ApiClient.instance.post('/v1/story-backgrounds', data: {
+      await ApiClient.instance.post('/v1/story-backgrounds/', data: {
         'title': title.text,
         'synopsis': synopsis.text,
         'world_setting': world.text,
