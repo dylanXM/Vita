@@ -11,7 +11,6 @@ import '../../shared/widgets.dart';
 import '../chat/chat_list_controller.dart';
 import '../chat/chat_page.dart';
 import '../life/life_detail_page.dart';
-import '../life/life_page.dart';
 import '../memories/memories_page.dart';
 import 'ai_pet_avatar.dart';
 import 'ai_pet_desktop_controller.dart';
@@ -114,7 +113,6 @@ class _AIPetsPageState extends State<AIPetsPage> {
           });
       await Future.wait([
         ChatListController.to.load(),
-        LifeController.to.loadCompanions(),
         MemoriesController.to.loadCompanions(),
         if (Get.isRegistered<AIPetDesktopController>())
           AIPetDesktopController.to.refreshPet(),
