@@ -109,13 +109,13 @@ class _NavItem {
 const List<_NavItem> _kTabs = [
   _NavItem(
     labelKey: 'tab.chat',
-    icon: Icons.textsms_outlined,
-    activeIcon: Icons.textsms_rounded,
+    icon: Icons.chat_bubble_outline_rounded,
+    activeIcon: Icons.chat_bubble_rounded,
   ),
   _NavItem(
     labelKey: 'tab.memories',
-    icon: Icons.menu_book_outlined,
-    activeIcon: Icons.menu_book_rounded,
+    icon: Icons.auto_stories_outlined,
+    activeIcon: Icons.auto_stories_rounded,
   ),
   _NavItem(
     labelKey: 'tab.explore',
@@ -162,8 +162,8 @@ class VitaTabBar extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: vita.glassShadow,
-                blurRadius: 24,
-                offset: const Offset(0, 8),
+                blurRadius: dark ? 32 : 24,
+                offset: Offset(0, dark ? 12 : 8),
               ),
             ],
           ),
@@ -173,11 +173,17 @@ class VitaTabBar extends StatelessWidget {
               filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: vita.glass.withValues(alpha: dark ? 0.44 : 0.58),
+                  // Dark mode: a light white tint reads as glass, while the
+                  // gray token just smudges the near-black canvas.
+                  color: dark
+                      ? const Color(0x29FFFFFF)
+                      : vita.glass.withValues(alpha: 0.58),
                   borderRadius: BorderRadius.circular(VitaRadius.pill),
                   border: Border.all(
-                    color: vita.glassRing.withValues(alpha: dark ? 0.55 : 0.7),
-                    width: 0.5,
+                    color: dark
+                        ? Colors.white.withValues(alpha: 0.16)
+                        : vita.glassRing.withValues(alpha: 0.7),
+                    width: dark ? 0.75 : 0.5,
                   ),
                 ),
                 child: SizedBox(
@@ -306,7 +312,7 @@ class _LiquidGlassPill extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: dark
-                ? const Color(0x2EFFFFFF)
+                ? const Color(0x3DFFFFFF)
                 : const Color(0x80FFFFFF),
             borderRadius: BorderRadius.circular(VitaRadius.pill),
           ),
