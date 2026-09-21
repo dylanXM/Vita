@@ -286,17 +286,38 @@ class _ChatPageState extends State<ChatPage> {
                         child: Text('subscription.continue'.tr)),
                   ]),
                 )),
-          Expanded(child: Obx(() => _buildMessages(ctrl))),
-          Obx(() => _buildInputBar(
-                locked: ctrl.accessError.value != null,
-                ready: ctrl.ready && !ctrl.loading.value,
-              )),
+          Expanded(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Obx(
+                    () => _buildMessages(
+                      ctrl,
+                      bottomPadding: _inputBarReservedHeight(context),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Obx(() => _buildInputBar(
+                        locked: ctrl.accessError.value != null,
+                        ready: ctrl.ready && !ctrl.loading.value,
+                      )),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildMessages(ChatController ctrl) {
+  double _inputBarReservedHeight(BuildContext context) =>
+      72 + MediaQuery.of(context).padding.bottom;
+
+  Widget _buildMessages(ChatController ctrl, {double bottomPadding = 0}) {
     if (ctrl.loading.value && ctrl.messages.isEmpty) {
       return const Center(
           child: VitaSkeleton(width: 220, height: 44, radius: 14));
@@ -408,7 +429,7 @@ class _ChatPageState extends State<ChatPage> {
 
     return ListView(
       controller: _scroll,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: EdgeInsets.fromLTRB(14, 10, 14, 10 + bottomPadding),
       children: items,
     );
   }

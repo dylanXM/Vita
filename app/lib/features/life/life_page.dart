@@ -105,29 +105,33 @@ class LifePage extends StatelessWidget {
         subtitle: 'contacts.noResultsSub'.tr,
       );
     }
-    return Column(
-      children: [
-        Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.only(top: 1, bottom: 12),
-            itemCount: list.length,
-            separatorBuilder: (_, __) => Divider(
+    return ListView.separated(
+      padding: const EdgeInsets.only(top: 1, bottom: 90),
+      itemCount: list.length + 1,
+      separatorBuilder: (context, i) => i >= list.length - 1
+          ? const SizedBox.shrink()
+          : Divider(
               indent: 68,
               height: 0.5,
               color: context.vita.divider,
             ),
-            itemBuilder: (context, i) => _ContactTile(companion: list[i]),
-          ),
-        ),
-        // WeChat-style footer: total contact count.
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Text(
-            '${list.length}',
-            style: TextStyle(fontSize: 12, color: context.vita.hint),
-          ),
-        ),
-      ],
+      itemBuilder: (context, i) {
+        if (i == list.length) {
+          // WeChat-style footer: total contact count. It is part of the
+          // scrollable content so it can pass under the floating dock, then
+          // settle above it when scrolled to the end.
+          return Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Center(
+              child: Text(
+                '${list.length}',
+                style: TextStyle(fontSize: 12, color: context.vita.hint),
+              ),
+            ),
+          );
+        }
+        return _ContactTile(companion: list[i]);
+      },
     );
   }
 }
