@@ -17,13 +17,16 @@ class ChatController extends GetxController {
   final sending = false.obs;
   final messages = <Map<String, dynamic>>[].obs;
   final accessError = RxnString();
+
+  /// Reason of the last failed send attempt: set when nothing could be queued
+  /// or when a queued message failed to deliver. Cleared on a new attempt, so
+  /// the chat page can report why a send did not work.
+  final sendError = RxnString();
   final companionStatus = ''.obs;
   final companionBusy = false.obs;
   String? _conversationId;
   Timer? _pollTimer;
   bool _polling = false;
-
-  bool get ready => _conversationId != null;
 
   @override
   void onInit() {
@@ -43,30 +46,9 @@ class ChatController extends GetxController {
     loading.value = true;
     try {
       accessError.value = null;
-      final conv = await ApiClient.instance.post(
-        '/v1/conversations',
-        data: {'companion_id': companionId},
-      );
-      _conversationId = conv['conversation_id'] as String?;
-      final status = conv['companion_status'];
-      if (status is Map) {
-        companionStatus.value = status['title'] as String? ?? '';
-        companionBusy.value = status['busy'] == true;
-      }
-      if (conv['can_send'] == false) {
-        accessError.value =
-            conv['access_code'] as String? ?? 'subscription_required';
-      }
+      await _syncConversation();
       if (_conversationId != null) {
-        final data = await ApiClient.instance
-            .get('/v1/conversations/$_conversationId/messages');
-        if (data is List) {
-          messages.assignAll(
-            data
-                .whereType<Map<String, dynamic>>()
-                .map((e) => Map<String, dynamic>.from(e)),
-          );
-        }
+        await _loadMessages();
         _pollTimer ??=
             Timer.periodic(const Duration(seconds: 15), (_) => poll());
       }
@@ -74,9 +56,58 @@ class ChatController extends GetxController {
       if (e.action == 'open_subscription') {
         accessError.value = e.code ?? 'subscription_required';
       }
-      // chat stays usable; send() reports failures
+      // The chat stays usable: send() resolves the conversation again on
+      // demand and reports its own failures.
     } finally {
       loading.value = false;
+    }
+  }
+
+  /// `POST /v1/conversations` (get or create) and picks up the conversation
+  /// level state carried by the response.
+  Future<void> _syncConversation() async {
+    final conv = await ApiClient.instance.post(
+      '/v1/conversations',
+      data: {'companion_id': companionId},
+    );
+    final rawId = conv is Map ? conv['conversation_id'] : null;
+    _conversationId = rawId is String && rawId.isNotEmpty ? rawId : null;
+    final status = conv is Map ? conv['companion_status'] : null;
+    if (status is Map) {
+      companionStatus.value = status['title'] as String? ?? '';
+      companionBusy.value = status['busy'] == true;
+    }
+    if (conv is Map && conv['can_send'] == false) {
+      accessError.value =
+          conv['access_code'] as String? ?? 'subscription_required';
+    }
+  }
+
+  /// Resolves the conversation, creating it on first use.
+  ///
+  /// Sending goes through here instead of waiting for a successful [load], so
+  /// a failed load never leaves the user unable to send.
+  Future<String> ensureConversation() async {
+    final existing = _conversationId;
+    if (existing != null) return existing;
+    await _syncConversation();
+    final id = _conversationId;
+    if (id == null) {
+      throw ApiException('conversation unavailable',
+          code: 'conversation_unavailable');
+    }
+    return id;
+  }
+
+  Future<void> _loadMessages() async {
+    final data = await ApiClient.instance
+        .get('/v1/conversations/$_conversationId/messages');
+    if (data is List) {
+      messages.assignAll(
+        data
+            .whereType<Map<String, dynamic>>()
+            .map((e) => Map<String, dynamic>.from(e)),
+      );
     }
   }
 
@@ -113,13 +144,28 @@ class ChatController extends GetxController {
     }
   }
 
-  Future<void> send(String text) async {
+  /// Sends [text], resolving the conversation on first use.
+  ///
+  /// Returns `true` when the message was queued — a queued message that fails
+  /// to deliver shows up as a failed bubble in the list. Returns `false` when
+  /// nothing could be queued, so the caller keeps the draft, and records the
+  /// reason in [sendError].
+  Future<bool> send(String text) async {
     final content = text.trim();
-    if (content.isEmpty || _conversationId == null) return;
+    if (content.isEmpty) return false;
+    if (sending.value) return false;
+    sendError.value = null;
+    final String conversationId;
+    try {
+      conversationId = await ensureConversation();
+    } on ApiException catch (e) {
+      sendError.value = e.message;
+      return false;
+    }
     final optimisticId = 'local-${DateTime.now().microsecondsSinceEpoch}';
     messages.add({
       'id': optimisticId,
-      'conversation_id': _conversationId,
+      'conversation_id': conversationId,
       'content': content,
       'sender_type': 'user',
       'message_type': 'text',
@@ -131,7 +177,7 @@ class ChatController extends GetxController {
     sending.value = true;
     try {
       final data = await ApiClient.instance.post(
-        '/v1/conversations/$_conversationId/messages',
+        '/v1/conversations/$conversationId/messages',
         data: {'content': content, 'message_type': 'text'},
       );
       if (data is Map) {
@@ -158,7 +204,7 @@ class ChatController extends GetxController {
         AnalyticsService.to
             .track('message_sent', category: 'chat', properties: {
           'companion_id': companionId,
-          'conversation_id': _conversationId ?? '',
+          'conversation_id': conversationId,
           'message_type': 'text',
           'character_count': content.length,
         });
@@ -175,11 +221,14 @@ class ChatController extends GetxController {
       if (e.action == 'open_subscription') {
         accessError.value = e.code ?? 'subscription_required';
       } else {
-        rethrow;
+        // The failed bubble is already visible in the list; hand the reason to
+        // the page so it can report it too.
+        sendError.value = e.message;
       }
     } finally {
       sending.value = false;
     }
+    return true;
   }
 
   Future<void> experienceCompleted(Map<String, dynamic> response) async {
@@ -199,20 +248,29 @@ class ChatController extends GetxController {
     await poll();
   }
 
-  Future<void> sendVoice(String filePath) async {
-    if (_conversationId == null || sending.value) return;
+  /// Sends a recorded voice message. Same contract as [send].
+  Future<bool> sendVoice(String filePath) async {
+    if (sending.value) return false;
+    sendError.value = null;
+    final String conversationId;
+    try {
+      conversationId = await ensureConversation();
+    } on ApiException catch (e) {
+      sendError.value = e.message;
+      return false;
+    }
     sending.value = true;
     String? optimisticId;
     try {
       final uploaded = await ApiClient.instance
           .upload('/v1/media/upload', filePath, kind: 'audio');
-      if (uploaded is! Map || uploaded['id'] is! String) return;
+      if (uploaded is! Map || uploaded['id'] is! String) return false;
       final mediaID = uploaded['id'] as String;
       final mediaURL = uploaded['url'] as String? ?? '/v1/media/$mediaID';
       optimisticId = 'local-${DateTime.now().microsecondsSinceEpoch}';
       messages.add({
         'id': optimisticId,
-        'conversation_id': _conversationId,
+        'conversation_id': conversationId,
         'content': '',
         'sender_type': 'user',
         'message_type': 'voice',
@@ -223,7 +281,7 @@ class ChatController extends GetxController {
         'created_at': DateTime.now().toUtc().toIso8601String(),
       });
       final data = await ApiClient.instance.post(
-        '/v1/conversations/$_conversationId/messages',
+        '/v1/conversations/$conversationId/messages',
         data: {'message_type': 'voice', 'media_id': mediaID},
       );
       if (data is Map) {
@@ -244,11 +302,12 @@ class ChatController extends GetxController {
       if (e.action == 'open_subscription') {
         accessError.value = e.code ?? 'subscription_required';
       } else {
-        rethrow;
+        sendError.value = e.message;
       }
     } finally {
       sending.value = false;
     }
+    return true;
   }
 
   void _addIfNew(Map<String, dynamic> message) {

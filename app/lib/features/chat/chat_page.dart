@@ -115,7 +115,10 @@ class _ChatPageState extends State<ChatPage> {
       _recordingTimer?.cancel();
       final path = await _recorder.stop();
       if (mounted) setState(() => _recording = false);
-      if (path != null) await ctrl.sendVoice(path);
+      if (path != null) {
+        final queued = await ctrl.sendVoice(path);
+        if (mounted) _reportSendResult(queued);
+      }
       return;
     }
     if (!await _recorder.hasPermission()) return;
@@ -158,19 +161,36 @@ class _ChatPageState extends State<ChatPage> {
       Get.toNamed('/subscription');
       return;
     }
-    if (!ctrl.ready) return;
     final text = _input.text.trim();
     if (text.isEmpty) return;
     _input.clear();
     final send = ctrl.send(text);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-    try {
-      await send;
-    } on ApiException catch (error) {
-      if (mounted) Get.snackbar('chat.message'.tr, error.message);
-    }
-    if (mounted) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    final queued = await send;
+    if (!mounted) return;
+    // Nothing reached the conversation: put the draft back so it is not lost.
+    if (!queued) _restoreDraft(text);
+    _reportSendResult(queued);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+  }
+
+  /// Puts [text] back in the input when a send could not even be queued. Never
+  /// overwrites something the user typed in the meantime.
+  void _restoreDraft(String text) {
+    if (_input.text.isNotEmpty) return;
+    _input.text = text;
+    _input.selection = TextSelection.collapsed(offset: text.length);
+  }
+
+  /// Reports a send that did not go through: either nothing was queued (the
+  /// draft is kept) or the queued message failed to deliver (it is already
+  /// visible as a failed bubble in the list).
+  void _reportSendResult(bool queued) {
+    final reason = ctrl.sendError.value;
+    if (!queued) {
+      Get.snackbar('chat.message'.tr, 'chat.sendFailed'.tr);
+    } else if (reason != null && reason.isNotEmpty) {
+      Get.snackbar('chat.message'.tr, reason);
     }
   }
 
@@ -303,7 +323,6 @@ class _ChatPageState extends State<ChatPage> {
                   bottom: 0,
                   child: Obx(() => _buildInputBar(
                         locked: ctrl.accessError.value != null,
-                        ready: ctrl.ready && !ctrl.loading.value,
                       )),
                 ),
               ],
@@ -434,7 +453,7 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  Widget _buildInputBar({required bool locked, required bool ready}) {
+  Widget _buildInputBar({required bool locked}) {
     return Container(
       decoration: BoxDecoration(
         color: context.vita.pageBg,
@@ -446,9 +465,7 @@ class _ChatPageState extends State<ChatPage> {
       child: Row(
         children: [
           IconButton(
-            onPressed: locked || !ready || ctrl.sending.value
-                ? null
-                : _toggleRecording,
+            onPressed: locked || ctrl.sending.value ? null : _toggleRecording,
             tooltip: _recording ? 'chat.voiceStop'.tr : 'chat.voice'.tr,
             icon: Icon(_recording ? Icons.stop_circle_outlined : Icons.mic_none,
                 color: _recording ? Colors.red : context.vita.subText),
@@ -493,11 +510,9 @@ class _ChatPageState extends State<ChatPage> {
           SizedBox(
             height: 40,
             child: ElevatedButton(
-              onPressed: locked
-                  ? () => Get.toNamed('/subscription')
-                  : ready
-                      ? _send
-                      : null,
+              // Never disabled: sending may fail, but the user must always be
+              // able to try — the controller resolves the conversation on send.
+              onPressed: locked ? () => Get.toNamed('/subscription') : _send,
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(64, 40),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
