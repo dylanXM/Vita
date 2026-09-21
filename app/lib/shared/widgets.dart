@@ -425,7 +425,9 @@ class VitaListTile extends StatelessWidget {
                 width: 30,
                 height: 30,
                 decoration: BoxDecoration(
-                  color: customIcon == null ? accent.withValues(alpha: 0.1) : Colors.transparent,
+                  color: customIcon == null
+                      ? accent.withValues(alpha: 0.1)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: customIcon ?? Icon(icon, color: accent, size: 18),
@@ -464,6 +466,27 @@ class VitaListTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Flat, single-stroke menu icon used by the Explore, Me and Settings lists.
+///
+/// The fixed canvas keeps icons from different Material families visually
+/// aligned while the semantic color makes each destination easy to scan.
+class VitaMenuIcon extends StatelessWidget {
+  const VitaMenuIcon({
+    super.key,
+    required this.icon,
+    required this.color,
+  });
+
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+        dimension: 30,
+        child: Center(child: Icon(icon, size: 24, color: color)),
+      );
 }
 
 /// Centered pill chip used for chat date separators.

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 
 import '../../core/analytics_service.dart';
@@ -64,10 +63,9 @@ class ExplorePage extends StatelessWidget {
               radius: 0,
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: VitaListTile(
-                customIcon: SvgPicture.asset(
-                  'assets/icons/menu_moments.svg',
-                  width: 18,
-                  height: 18,
+                customIcon: const VitaMenuIcon(
+                  icon: Icons.camera_alt_outlined,
+                  color: Color(0xFF07C160),
                 ),
                 title: 'explore.moments'.tr,
                 borderRadius: BorderRadius.zero,
@@ -82,7 +80,10 @@ class ExplorePage extends StatelessWidget {
               radius: 0,
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: VitaListTile(
-                icon: Icons.pets_outlined,
+                customIcon: const VitaMenuIcon(
+                  icon: Icons.pets_outlined,
+                  color: Color(0xFFF29C38),
+                ),
                 title: 'aiPets.title'.tr,
                 borderRadius: BorderRadius.zero,
                 onTap: () => Get.to(
@@ -96,10 +97,9 @@ class ExplorePage extends StatelessWidget {
               radius: 0,
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: VitaListTile(
-                customIcon: SvgPicture.asset(
-                  'assets/icons/menu_memories.svg',
-                  width: 18,
-                  height: 18,
+                customIcon: const VitaMenuIcon(
+                  icon: Icons.menu_book_outlined,
+                  color: Color(0xFF7A6FF0),
                 ),
                 title: 'explore.memories'.tr,
                 borderRadius: BorderRadius.zero,
@@ -160,7 +160,7 @@ class _MomentsFeed extends StatelessWidget {
             SizedBox(
               height: MediaQuery.sizeOf(context).height * 0.58,
               child: VitaEmpty(
-                icon: Icons.dynamic_feed_outlined,
+                icon: Icons.photo_camera_back_outlined,
                 title: 'explore.empty'.tr,
                 subtitle: 'explore.emptySub'.tr,
               ),
@@ -290,7 +290,7 @@ class _MomentMedia extends StatelessWidget {
             errorBuilder: (_, __, ___) => Container(
               color: context.vita.pageBg,
               child: Icon(
-                Icons.image_not_supported_outlined,
+                Icons.broken_image_outlined,
                 color: context.vita.subText,
               ),
             ),

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -39,10 +38,9 @@ class SettingsPage extends StatelessWidget {
               children: [
                 Obx(
                   () => VitaListTile(
-                    customIcon: SvgPicture.asset(
-                      'assets/icons/menu_language.svg',
-                      width: 18,
-                      height: 18,
+                    customIcon: const VitaMenuIcon(
+                      icon: Icons.language_rounded,
+                      color: Color(0xFF4A90E2),
                     ),
                     title: 'lang.title'.tr,
                     subtitle: _langLabel(context, settings.locale.value),
@@ -57,10 +55,9 @@ class SettingsPage extends StatelessWidget {
                 const Divider(indent: 52, height: 0.5),
                 Obx(
                   () => VitaListTile(
-                    customIcon: SvgPicture.asset(
-                      'assets/icons/menu_theme.svg',
-                      width: 18,
-                      height: 18,
+                    customIcon: const VitaMenuIcon(
+                      icon: Icons.dark_mode_outlined,
+                      color: Color(0xFF7A6FF0),
                     ),
                     title: 'theme.title'.tr,
                     subtitle: _themeLabel(context, settings.themeMode.value),
@@ -74,10 +71,9 @@ class SettingsPage extends StatelessWidget {
                 ),
                 const Divider(indent: 52, height: 0.5),
                 VitaListTile(
-                  customIcon: SvgPicture.asset(
-                    'assets/icons/menu_notifications.svg',
-                    width: 18,
-                    height: 18,
+                  customIcon: const VitaMenuIcon(
+                    icon: Icons.notifications_none_rounded,
+                    color: Color(0xFFF29C38),
                   ),
                   title: 'settings.notifications'.tr,
                   subtitle: 'settings.notifications.subtitle'.tr,
@@ -99,10 +95,9 @@ class SettingsPage extends StatelessWidget {
             child: Column(
               children: [
                 VitaListTile(
-                  customIcon: SvgPicture.asset(
-                    'assets/icons/menu_privacy.svg',
-                    width: 18,
-                    height: 18,
+                  customIcon: const VitaMenuIcon(
+                    icon: Icons.shield_outlined,
+                    color: Color(0xFF20A58A),
                   ),
                   title: 'settings.privacy'.tr,
                   borderRadius: BorderRadius.zero,
@@ -110,10 +105,9 @@ class SettingsPage extends StatelessWidget {
                 ),
                 const Divider(indent: 52, height: 0.5),
                 VitaListTile(
-                  customIcon: SvgPicture.asset(
-                    'assets/icons/menu_terms.svg',
-                    width: 18,
-                    height: 18,
+                  customIcon: const VitaMenuIcon(
+                    icon: Icons.description_outlined,
+                    color: Color(0xFF7C8796),
                   ),
                   title: 'settings.terms'.tr,
                   borderRadius: BorderRadius.zero,
@@ -135,7 +129,10 @@ class SettingsPage extends StatelessWidget {
             child: Column(
               children: [
                 VitaListTile(
-                  icon: Icons.restore_from_trash_outlined,
+                  customIcon: const VitaMenuIcon(
+                    icon: Icons.restore_from_trash_outlined,
+                    color: Color(0xFF07C160),
+                  ),
                   title: 'settings.deletedCompanions'.tr,
                   subtitle: 'settings.deletedCompanions.subtitle'.tr,
                   borderRadius: BorderRadius.zero,
@@ -147,10 +144,9 @@ class SettingsPage extends StatelessWidget {
                 ),
                 const Divider(indent: 52, height: 0.5),
                 VitaListTile(
-                  customIcon: SvgPicture.asset(
-                    'assets/icons/menu_logout.svg',
-                    width: 18,
-                    height: 18,
+                  customIcon: VitaMenuIcon(
+                    icon: Icons.logout_rounded,
+                    color: vita.red,
                   ),
                   title: 'common.signout'.tr,
                   iconColor: vita.red,
@@ -207,7 +203,7 @@ class SettingsPage extends StatelessWidget {
                   color: vita.red.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.logout, size: 26, color: vita.red),
+                child: Icon(Icons.logout_rounded, size: 26, color: vita.red),
               ),
               const SizedBox(height: 14),
               Text(
@@ -352,7 +348,7 @@ class _OptionRow extends StatelessWidget {
               ),
             ),
             if (option.selected)
-              Icon(Icons.check, size: 20, color: vita.green)
+              Icon(Icons.check_rounded, size: 20, color: vita.green)
             else
               const SizedBox(width: 20),
           ],
