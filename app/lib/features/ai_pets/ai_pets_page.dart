@@ -264,6 +264,8 @@ class _AIPetHomePageState extends State<AIPetHomePage> {
   bool _feeding = false;
   _PetAction _action = _PetAction.idle;
   Timer? _actionTimer;
+  Timer? _ambientTimer;
+  final math.Random _random = math.Random();
 
   Map<String, dynamic> get _companion => {
         'id': widget.companionId,
@@ -283,19 +285,38 @@ class _AIPetHomePageState extends State<AIPetHomePage> {
   @override
   void dispose() {
     _actionTimer?.cancel();
+    _ambientTimer?.cancel();
     super.dispose();
+  }
+
+  bool get _needsSleep => ((_state?['energy'] as num?)?.toInt() ?? 100) < 20;
+
+  void _scheduleAmbientAction() {
+    _ambientTimer?.cancel();
+    if (!mounted || _feeding || _needsSleep) return;
+    _ambientTimer = Timer(Duration(seconds: 3 + _random.nextInt(4)), () {
+      if (!mounted || _feeding || _needsSleep) return;
+      setState(() => _action = _PetAction.walking);
+      _ambientTimer = Timer(const Duration(seconds: 6), () {
+        if (!mounted || _feeding) return;
+        setState(() =>
+            _action = _needsSleep ? _PetAction.sleeping : _PetAction.idle);
+        _scheduleAmbientAction();
+      });
+    });
   }
 
   void _showAction(_PetAction action, {Duration? duration}) {
     _actionTimer?.cancel();
+    _ambientTimer?.cancel();
     if (!mounted) return;
     setState(() => _action = action);
     if (duration != null) {
       _actionTimer = Timer(duration, () {
         if (!mounted) return;
-        final energy = (_state?['energy'] as num?)?.toInt() ?? 100;
         setState(() =>
-            _action = energy < 20 ? _PetAction.sleeping : _PetAction.idle);
+            _action = _needsSleep ? _PetAction.sleeping : _PetAction.idle);
+        _scheduleAmbientAction();
       });
     }
   }
@@ -312,6 +333,7 @@ class _AIPetHomePageState extends State<AIPetHomePage> {
               ? _PetAction.sleeping
               : _PetAction.idle;
         });
+        _scheduleAmbientAction();
       }
     } on ApiException catch (error) {
       if (mounted) Get.snackbar('aiPets.error'.tr, error.message);
@@ -323,6 +345,7 @@ class _AIPetHomePageState extends State<AIPetHomePage> {
   Future<void> _feed() async {
     if (_feeding) return;
     final previousLevel = (_state?['level'] as num?)?.toInt() ?? 1;
+    final animationStartedAt = DateTime.now();
     setState(() {
       _feeding = true;
       _action = _PetAction.feeding;
@@ -333,6 +356,11 @@ class _AIPetHomePageState extends State<AIPetHomePage> {
         'idempotency_key':
             'pet-feed-${widget.companionId}-${DateTime.now().microsecondsSinceEpoch}'
       });
+      final animationElapsed = DateTime.now().difference(animationStartedAt);
+      const minimumFeedingDuration = Duration(milliseconds: 1200);
+      if (animationElapsed < minimumFeedingDuration) {
+        await Future<void>.delayed(minimumFeedingDuration - animationElapsed);
+      }
       final state = data is Map ? data['state'] : null;
       if (mounted && state is Map) {
         final nextState = Map<String, dynamic>.from(state);
@@ -353,7 +381,10 @@ class _AIPetHomePageState extends State<AIPetHomePage> {
         Get.snackbar('aiPets.error'.tr, error.message);
       }
     } finally {
-      if (mounted) setState(() => _feeding = false);
+      if (mounted) {
+        setState(() => _feeding = false);
+        if (_action == _PetAction.idle) _scheduleAmbientAction();
+      }
     }
   }
 
@@ -459,7 +490,7 @@ class _AIPetHomePageState extends State<AIPetHomePage> {
   }
 }
 
-enum _PetAction { idle, happy, feeding, sleeping, levelUp }
+enum _PetAction { idle, walking, happy, feeding, sleeping, levelUp }
 
 class _AnimatedPetScene extends StatefulWidget {
   const _AnimatedPetScene({
@@ -482,6 +513,7 @@ class _AnimatedPetSceneState extends State<_AnimatedPetScene>
     with TickerProviderStateMixin {
   late final AnimationController _idleController;
   late final AnimationController _actionController;
+  late final AnimationController _blinkController;
 
   @override
   void initState() {
@@ -491,13 +523,40 @@ class _AnimatedPetSceneState extends State<_AnimatedPetScene>
       ..repeat();
     _actionController = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 850));
+    _blinkController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 4200))
+      ..repeat();
+    _syncActionAnimation();
   }
 
   @override
   void didUpdateWidget(covariant _AnimatedPetScene oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.action != widget.action) {
-      _actionController.forward(from: 0);
+      _syncActionAnimation();
+    }
+  }
+
+  void _syncActionAnimation() {
+    switch (widget.action) {
+      case _PetAction.walking:
+        _actionController.duration = const Duration(milliseconds: 6000);
+        _actionController.repeat();
+        break;
+      case _PetAction.feeding:
+        _actionController.duration = const Duration(milliseconds: 560);
+        _actionController.repeat();
+        break;
+      case _PetAction.happy:
+      case _PetAction.levelUp:
+        _actionController.duration = const Duration(milliseconds: 900);
+        _actionController.repeat();
+        break;
+      case _PetAction.sleeping:
+      case _PetAction.idle:
+        _actionController.stop();
+        _actionController.value = 0;
+        break;
     }
   }
 
@@ -505,7 +564,14 @@ class _AnimatedPetSceneState extends State<_AnimatedPetScene>
   void dispose() {
     _idleController.dispose();
     _actionController.dispose();
+    _blinkController.dispose();
     super.dispose();
+  }
+
+  double _blinkAmount(double progress) {
+    if (progress < .86 || progress > .96) return 0;
+    if (progress < .91) return (progress - .86) / .05;
+    return 1 - ((progress - .91) / .05);
   }
 
   @override
@@ -547,53 +613,84 @@ class _AnimatedPetSceneState extends State<_AnimatedPetScene>
             ),
             Positioned.fill(
               child: AnimatedBuilder(
-                animation:
-                    Listenable.merge([_idleController, _actionController]),
-                builder: (context, child) {
+                animation: Listenable.merge([
+                  _idleController,
+                  _actionController,
+                  _blinkController,
+                ]),
+                builder: (context, _) {
                   final idle = math.sin(_idleController.value * math.pi * 2);
-                  final actionWave =
-                      math.sin(_actionController.value * math.pi);
+                  final cycle = _actionController.value;
+                  final actionWave = math.sin(cycle * math.pi);
+                  final repeatingWave = math.sin(cycle * math.pi * 2);
+                  final blink = widget.action == _PetAction.sleeping
+                      ? 1.0
+                      : widget.action == _PetAction.feeding
+                          ? 0.0
+                          : _blinkAmount(_blinkController.value);
+                  final hasBlinkFrame =
+                      _closedEyeAssetPath(widget.imageUrl) != null;
                   var dy = idle * 4;
+                  var dx = 0.0;
                   var scale = 1.0;
+                  var scaleY = 1.0 - (hasBlinkFrame ? 0 : blink * .09);
                   var angle = 0.0;
+                  var faceLeft = false;
                   switch (widget.action) {
+                    case _PetAction.walking:
+                      final travel = .5 - .5 * math.cos(cycle * math.pi * 2);
+                      dx = -62 + travel * 124;
+                      dy = -repeatingWave.abs() * 7;
+                      angle = repeatingWave * .025;
+                      scaleY -= repeatingWave.abs() * .025;
+                      faceLeft = cycle >= .5;
+                      break;
                     case _PetAction.happy:
-                      dy -= actionWave * 24;
+                      dy -= actionWave.abs() * 24;
                       scale += actionWave * .06;
                       break;
                     case _PetAction.feeding:
-                      dy += math.sin(_actionController.value * math.pi * 4) * 7;
-                      angle = math.sin(_actionController.value * math.pi * 4) *
-                          .025;
+                      dy += 28 + repeatingWave.abs() * 12;
+                      angle = -.055 + repeatingWave * .018;
+                      scaleY = .94 - repeatingWave.abs() * .035;
                       break;
                     case _PetAction.sleeping:
-                      dy = idle * 2 + 7;
-                      angle = idle * .012;
+                      dy = 27 + idle * 2;
+                      scale = .92 + idle * .008;
+                      scaleY = .84 + idle * .012;
+                      angle = -.075 + idle * .008;
                       break;
                     case _PetAction.levelUp:
-                      dy -= actionWave * 18;
-                      scale += actionWave * .12;
+                      dy -= actionWave.abs() * 18;
+                      scale += actionWave.abs() * .12;
                       break;
                     case _PetAction.idle:
                       break;
                   }
                   return Transform.translate(
-                    offset: Offset(0, dy),
+                    offset: Offset(dx, dy),
                     child: Transform.rotate(
                       angle: angle,
-                      child: Transform.scale(scale: scale, child: child),
+                      child: Transform.scale(
+                        scaleX: (faceLeft ? -1.0 : 1.0) * scale,
+                        scaleY: scale * scaleY,
+                        alignment: const Alignment(0, .55),
+                        child: Align(
+                          alignment: const Alignment(0, .35),
+                          child: SizedBox(
+                            width: 245,
+                            height: 245,
+                            child: _PetImage(
+                              name: widget.name,
+                              imageUrl: widget.imageUrl,
+                              blinkAmount: blink,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   );
                 },
-                child: Align(
-                  alignment: const Alignment(0, .35),
-                  child: SizedBox(
-                    width: 245,
-                    height: 245,
-                    child:
-                        _PetImage(name: widget.name, imageUrl: widget.imageUrl),
-                  ),
-                ),
               ),
             ),
             if (widget.action == _PetAction.happy)
@@ -604,13 +701,19 @@ class _AnimatedPetSceneState extends State<_AnimatedPetScene>
                       style:
                           TextStyle(fontSize: 42, color: Color(0xFFF06A89)))),
             if (widget.action == _PetAction.feeding)
-              const Positioned(
-                  bottom: 22,
+              Positioned(
+                  bottom: 15,
                   left: 0,
                   right: 0,
-                  child: Text('🥣',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 54))),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const Text('🥣', style: TextStyle(fontSize: 56)),
+                    Container(
+                        width: 78,
+                        height: 8,
+                        decoration: BoxDecoration(
+                            color: const Color(0x22000000),
+                            borderRadius: BorderRadius.circular(100))),
+                  ])),
             if (widget.action == _PetAction.sleeping)
               const Positioned(
                   top: 58,
@@ -654,9 +757,14 @@ class _SceneStar extends StatelessWidget {
 }
 
 class _PetImage extends StatelessWidget {
-  const _PetImage({required this.name, required this.imageUrl});
+  const _PetImage({
+    required this.name,
+    required this.imageUrl,
+    this.blinkAmount = 0,
+  });
   final String name;
   final String imageUrl;
+  final double blinkAmount;
 
   @override
   Widget build(BuildContext context) {
@@ -668,8 +776,17 @@ class _PetImage extends StatelessWidget {
         );
 
     if (imageUrl.startsWith('asset://')) {
-      return Image.asset(imageUrl.substring('asset://'.length),
+      final assetPath = imageUrl.substring('asset://'.length);
+      final closedEyeAsset = _closedEyeAssetPath(imageUrl);
+      final openEyes = Image.asset(assetPath,
           fit: BoxFit.contain, errorBuilder: (_, __, ___) => fallback());
+      if (closedEyeAsset == null) return openEyes;
+      return Stack(fit: StackFit.expand, children: [
+        openEyes,
+        Opacity(
+            opacity: blinkAmount.clamp(0.0, 1.0),
+            child: Image.asset(closedEyeAsset, fit: BoxFit.contain)),
+      ]);
     }
     if (imageUrl.isNotEmpty) {
       return Image.network(imageUrl,
@@ -677,6 +794,24 @@ class _PetImage extends StatelessWidget {
     }
     return fallback();
   }
+}
+
+String? _closedEyeAssetPath(String imageUrl) {
+  if (!imageUrl.startsWith('asset://assets/ai_pets/') ||
+      imageUrl.endsWith('_blink.png')) {
+    return null;
+  }
+  final assetPath = imageUrl.substring('asset://'.length);
+  const supportedAssets = {
+    'assets/ai_pets/cat_orange.png',
+    'assets/ai_pets/cat_ragdoll.png',
+    'assets/ai_pets/cat_tuxedo.png',
+    'assets/ai_pets/dog_corgi.png',
+    'assets/ai_pets/dog_retriever.png',
+    'assets/ai_pets/dog_shiba.png',
+  };
+  if (!supportedAssets.contains(assetPath)) return null;
+  return assetPath.replaceFirst('.png', '_blink.png');
 }
 
 class _StatusBar extends StatelessWidget {
