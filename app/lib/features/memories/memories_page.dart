@@ -14,6 +14,20 @@ class MemoriesController extends GetxController {
   final companions = <Map<String, dynamic>>[].obs;
   final memories = <Map<String, dynamic>>[].obs;
   final activeCompanionId = RxnString();
+  final searchQuery = ''.obs;
+
+  /// Companions filtered by name / city / occupation for the search box.
+  List<Map<String, dynamic>> get filteredCompanions {
+    final q = searchQuery.value.trim().toLowerCase();
+    if (q.isEmpty) return List.of(companions);
+    return companions.where((companion) {
+      final name = (companion['name'] as String? ?? '').toLowerCase();
+      final city = (companion['city'] as String? ?? '').toLowerCase();
+      final occupation =
+          (companion['occupation'] as String? ?? '').toLowerCase();
+      return name.contains(q) || city.contains(q) || occupation.contains(q);
+    }).toList();
+  }
 
   @override
   void onInit() {
@@ -90,6 +104,9 @@ class MemoriesController extends GetxController {
 
 /// First level: a contact-style list. Memories from different companions are
 /// deliberately kept separate instead of sharing an in-page selector.
+///
+/// It is a root dock tab, so it carries the same borderless top header as the
+/// other tabs and its list scrolls behind the floating glass tab bar.
 class MemoriesPage extends StatelessWidget {
   const MemoriesPage({super.key});
 
@@ -98,10 +115,17 @@ class MemoriesPage extends StatelessWidget {
     final controller = MemoriesController.to;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(title: Text('memories.title'.tr)),
+      // Bottom is open so the list scrolls behind the glass tab bar.
       body: SafeArea(
         bottom: false,
-        child: Obx(() => _buildBody(context, controller)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            VitaTabHeader(title: 'memories.title'.tr, showDivider: false),
+            const _MemorySearchBox(),
+            Expanded(child: Obx(() => _buildBody(context, controller))),
+          ],
+        ),
       ),
     );
   }
@@ -109,6 +133,7 @@ class MemoriesPage extends StatelessWidget {
   Widget _buildBody(BuildContext context, MemoriesController controller) {
     if (controller.companionsLoading.value && controller.companions.isEmpty) {
       return ListView.builder(
+        padding: const EdgeInsets.only(bottom: 90),
         itemCount: 6,
         itemBuilder: (_, __) => const VitaSkeletonCard(withAvatar: true),
       );
@@ -132,19 +157,66 @@ class MemoriesPage extends StatelessWidget {
       );
     }
 
+    final list = controller.filteredCompanions;
+    if (list.isEmpty) {
+      return VitaEmpty(
+        icon: Icons.search,
+        title: 'memories.noResults'.tr,
+        subtitle: 'memories.noResultsSub'.tr,
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: controller.loadCompanions,
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(top: 8, bottom: 24),
-        itemCount: controller.companions.length,
+        padding: const EdgeInsets.only(top: 8, bottom: 90),
+        itemCount: list.length,
         separatorBuilder: (_, __) => Divider(
           height: 0.5,
           indent: 72,
           color: context.vita.divider,
         ),
         itemBuilder: (context, index) => _MemoryContactTile(
-          companion: controller.companions[index],
+          companion: list[index],
+        ),
+      ),
+    );
+  }
+}
+
+/// WeChat-style rounded search field filtering the companion list.
+class _MemorySearchBox extends StatelessWidget {
+  const _MemorySearchBox();
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = MemoriesController.to;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
+      child: TextField(
+        onChanged: (v) => controller.searchQuery.value = v,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: 'memories.search'.tr,
+          hintStyle: TextStyle(color: context.vita.hint, fontSize: 14),
+          prefixIcon: Icon(Icons.search, size: 18, color: context.vita.hint),
+          filled: true,
+          fillColor: context.vita.surface,
+          contentPadding: const EdgeInsets.symmetric(vertical: 0),
+          isDense: true,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.zero,
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.zero,
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.zero,
+            borderSide: BorderSide.none,
+          ),
         ),
       ),
     );

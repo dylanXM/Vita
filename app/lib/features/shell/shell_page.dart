@@ -8,13 +8,13 @@ import '../../core/app_content_controller.dart';
 import '../../core/analytics_service.dart';
 import '../../core/theme.dart';
 import '../chat/chat_list_page.dart';
-import '../life/life_page.dart';
 import '../me/me_page.dart';
+import '../memories/memories_page.dart';
 import '../explore/explore_page.dart';
 import '../whats_new/whats_new_sheet.dart';
 
 /// Main shell — content scrolls edge to edge behind a floating glass dock
-/// (Chat | Contacts | Explore | Me), matching the reference app chrome.
+/// (Chat | Memories | Explore | Me), matching the reference app chrome.
 class ShellController extends GetxController {
   static ShellController get to => Get.find();
 
@@ -22,13 +22,13 @@ class ShellController extends GetxController {
 
   void switchTo(int i) {
     if (i == index.value) return;
-    const tabs = ['chat', 'contacts', 'explore', 'me'];
+    const tabs = ['chat', 'memories', 'explore', 'me'];
     AnalyticsService.to.track('tab_selected',
         category: 'navigation',
         properties: {'from': tabs[index.value], 'to': tabs[i]});
     index.value = i;
     if (i == 1) {
-      LifeController.to.loadCompanions();
+      MemoriesController.to.loadCompanions();
     } else if (i == 2) {
       ExploreController.to.loadPosts();
     }
@@ -77,7 +77,7 @@ class _ShellPageState extends State<ShellPage> {
                 index: ctrl.index.value,
                 children: const [
                   ChatListPage(),
-                  LifePage(),
+                  MemoriesPage(),
                   ExplorePage(),
                   MePage(),
                 ],
@@ -113,9 +113,9 @@ const List<_NavItem> _kTabs = [
     activeIcon: Icons.textsms_rounded,
   ),
   _NavItem(
-    labelKey: 'tab.contacts',
-    icon: Icons.people_alt_outlined,
-    activeIcon: Icons.people_alt_rounded,
+    labelKey: 'tab.memories',
+    icon: Icons.menu_book_outlined,
+    activeIcon: Icons.menu_book_rounded,
   ),
   _NavItem(
     labelKey: 'tab.explore',
