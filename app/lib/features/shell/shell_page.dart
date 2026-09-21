@@ -13,8 +13,8 @@ import '../me/me_page.dart';
 import '../explore/explore_page.dart';
 import '../whats_new/whats_new_sheet.dart';
 
-/// Main shell — iOS default style: content scrolls edge to edge behind a
-/// flush, full-width frosted UITabBar (Chat | Contacts | Explore | Me).
+/// Main shell — content scrolls edge to edge behind a floating glass dock
+/// (Chat | Contacts | Explore | Me), matching the reference app chrome.
 class ShellController extends GetxController {
   static ShellController get to => Get.find();
 
@@ -60,16 +60,31 @@ class _ShellPageState extends State<ShellPage> {
     return Scaffold(
       backgroundColor: context.vita.pageBg,
       extendBody: true,
-      body: Obx(
-        () => IndexedStack(
-          index: ctrl.index.value,
-          children: const [
-            ChatListPage(),
-            LifePage(),
-            ExplorePage(),
-            MePage(),
-          ],
-        ),
+      body: Builder(
+        builder: (context) {
+          final mq = MediaQuery.of(context);
+          final safeBottom = mq.padding.bottom;
+          return MediaQuery(
+            // Match the reference app: tab pages receive an extra bottom inset
+            // for the floating dock while the background still extends behind it.
+            data: mq.copyWith(
+              padding: mq.padding.copyWith(
+                bottom: safeBottom + VitaTabBar.reservedHeight,
+              ),
+            ),
+            child: Obx(
+              () => IndexedStack(
+                index: ctrl.index.value,
+                children: const [
+                  ChatListPage(),
+                  LifePage(),
+                  ExplorePage(),
+                  MePage(),
+                ],
+              ),
+            ),
+          );
+        },
       ),
       bottomNavigationBar: Obx(
         () => VitaTabBar(index: ctrl.index.value, onTap: ctrl.switchTo),
@@ -114,53 +129,97 @@ const List<_NavItem> _kTabs = [
   ),
 ];
 
-/// iOS default bottom navigation — a flush, full-width frosted strip.
+/// Floating glass bottom dock matching the reference app.
 ///
-/// Matches the native UITabBar appearance: ultra-thin material blur, a single
-/// 0.5pt hairline on top, evenly-spaced icon-over-label cells, no floating
-/// capsule, no selection pill, no drop shadow.
+/// It is hosted inside [SafeArea] instead of relying on Scaffold defaults, so
+/// the pill always floats above the home indicator/navigation gesture area.
 class VitaTabBar extends StatelessWidget {
   const VitaTabBar({super.key, required this.index, required this.onTap});
 
   final int index;
   final ValueChanged<int> onTap;
 
-  // Native UITabBar metrics (pt).
-  static const double _barHeight = 49;
+  static const double pillHeight = 60;
+  static const double edgeInset = 8;
+  static const double reservedHeight = pillHeight + edgeInset * 2;
   static const double _iconSize = 24;
 
   @override
   Widget build(BuildContext context) {
     final vita = context.vita;
     final dark = vita.brightness == Brightness.dark;
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, edgeInset, 14, edgeInset),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: vita.glass.withValues(alpha: dark ? 0.72 : 0.82),
-            border: Border(
-              top: BorderSide(
-                color: vita.divider.withValues(alpha: dark ? 0.6 : 0.8),
-                width: 0.5,
+            borderRadius: BorderRadius.circular(VitaRadius.pill),
+            boxShadow: [
+              BoxShadow(
+                color: vita.glassShadow,
+                blurRadius: 24,
+                offset: const Offset(0, 8),
               ),
-            ),
+            ],
           ),
-          child: SafeArea(
-            top: false,
-            child: SizedBox(
-              height: _barHeight,
-              child: Row(
-                children: [
-                  for (var i = 0; i < _kTabs.length; i++)
-                    Expanded(
-                      child: _TabButton(
-                        item: _kTabs[i],
-                        selected: i == index,
-                        onTap: () => onTap(i),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(VitaRadius.pill),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: vita.glass.withValues(alpha: dark ? 0.44 : 0.58),
+                  borderRadius: BorderRadius.circular(VitaRadius.pill),
+                  border: Border.all(
+                    color: vita.glassRing.withValues(alpha: dark ? 0.55 : 0.7),
+                    width: 0.5,
+                  ),
+                ),
+                child: SizedBox(
+                  height: pillHeight,
+                  child: Stack(
+                    children: [
+                      AnimatedAlign(
+                        alignment: Alignment(
+                          -1 + (index * 2 / (_kTabs.length - 1)),
+                          0,
+                        ),
+                        duration: const Duration(milliseconds: 260),
+                        curve: Curves.easeOutCubic,
+                        child: FractionallySizedBox(
+                          widthFactor: 1 / _kTabs.length,
+                          heightFactor: 1,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 2,
+                              vertical: 6,
+                            ),
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: vita.green,
+                                borderRadius:
+                                    BorderRadius.circular(VitaRadius.pill),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                ],
+                      Row(
+                        children: [
+                          for (var i = 0; i < _kTabs.length; i++)
+                            Expanded(
+                              child: _TabButton(
+                                item: _kTabs[i],
+                                selected: i == index,
+                                onTap: () => onTap(i),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -192,7 +251,7 @@ class _TabButtonState extends State<_TabButton> {
   Widget build(BuildContext context) {
     final vita = context.vita;
     final label = widget.item.labelKey.tr;
-    final color = widget.selected ? vita.green : vita.tabInactive;
+    final color = widget.selected ? const Color(0xFF0F0F11) : vita.tabInactive;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => setState(() => _pressed = true),
