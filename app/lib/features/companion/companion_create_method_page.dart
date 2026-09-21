@@ -23,28 +23,48 @@ class CompanionCreateMethodPage extends StatelessWidget {
       backgroundColor: context.vita.pageBg,
       appBar: AppBar(title: Text('companion.create.chooseMethod'.tr)),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.fromLTRB(0, 12, 0, 28),
         children: [
-          _method(
-              context,
-              Icons.dashboard_outlined,
-              'companion.create.method.template',
-              'companion.create.method.templateDesc',
-              () => Get.to(() => const CompanionCreatePage())),
-          _method(
-              context,
-              Icons.edit_note,
-              'companion.create.method.description',
-              'companion.create.method.descriptionDesc',
-              () => Get.to(() => const AICompanionCreatePage(
-                  mode: AICompanionCreateMode.description))),
-          _method(
-              context,
-              Icons.person_search_outlined,
-              'companion.create.method.meet',
-              'companion.create.method.meetDesc',
-              () => Get.to(() => const AICompanionCreatePage(
-                  mode: AICompanionCreateMode.meet))),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text('companion.create.methodHint'.tr,
+                style: TextStyle(fontSize: 13, color: context.vita.subText)),
+          ),
+          Material(
+            color: context.vita.surface,
+            child: Column(children: [
+              _method(
+                  context,
+                  Icons.dashboard_outlined,
+                  'companion.create.method.template',
+                  'companion.create.method.templateDesc',
+                  () => Get.to(() => const CompanionCreatePage())),
+              Divider(
+                  height: 0.5,
+                  thickness: 0.5,
+                  indent: 72,
+                  color: context.vita.divider),
+              _method(
+                  context,
+                  Icons.edit_note,
+                  'companion.create.method.description',
+                  'companion.create.method.descriptionDesc',
+                  () => Get.to(() => const AICompanionCreatePage(
+                      mode: AICompanionCreateMode.description))),
+              Divider(
+                  height: 0.5,
+                  thickness: 0.5,
+                  indent: 72,
+                  color: context.vita.divider),
+              _method(
+                  context,
+                  Icons.person_search_outlined,
+                  'companion.create.method.meet',
+                  'companion.create.method.meetDesc',
+                  () => Get.to(() => const AICompanionCreatePage(
+                      mode: AICompanionCreateMode.meet))),
+            ]),
+          ),
         ],
       ),
     );
@@ -52,20 +72,25 @@ class CompanionCreateMethodPage extends StatelessWidget {
 
   Widget _method(BuildContext context, IconData icon, String title,
       String subtitle, VoidCallback onTap) {
-    return Material(
-      color: context.vita.surface,
-      child: ListTile(
-        minTileHeight: 76,
-        leading: Icon(icon, color: context.vita.green, size: 28),
-        title: Text(title.tr,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(subtitle.tr),
-        ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
+    return ListTile(
+      minTileHeight: 82,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+            color: context.vita.greenTint,
+            borderRadius: BorderRadius.circular(8)),
+        child: Icon(icon, color: context.vita.green, size: 23),
       ),
+      title: Text(title.tr,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Text(subtitle.tr),
+      ),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: onTap,
     );
   }
 }
@@ -243,7 +268,7 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
               .tr)),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
           children: _hasDraft ? _draftFields(context) : _sourceFields(context),
         ),
       ),
@@ -310,35 +335,44 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
       Text('companion.create.reviewDraft'.tr,
           style: TextStyle(color: context.vita.subText)),
       const SizedBox(height: 16),
-      for (final entry in labels.entries) ...[
-        Text(entry.value.tr,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 6),
-        _input(_fields[entry.key]!, entry.value,
-            maxLines:
-                const {'persona', 'appearance', 'backstory'}.contains(entry.key)
-                    ? 4
-                    : 1),
-        const SizedBox(height: 12),
-      ],
-      DropdownButtonFormField<String>(
-        initialValue: _gender,
-        decoration: InputDecoration(labelText: 'companion.create.who'.tr),
-        items: const ['girlfriend', 'boyfriend', 'friend', 'custom']
-            .map((value) => DropdownMenuItem(
-                value: value, child: Text('relation.$value'.tr)))
-            .toList(),
-        onChanged: (value) => _gender = value ?? 'custom',
-      ),
-      const SizedBox(height: 12),
-      DropdownButtonFormField<String>(
-        initialValue: _relationship,
-        decoration: InputDecoration(labelText: 'companion.create.closeness'.tr),
-        items: const ['stranger', 'acquaintance', 'close', 'partner']
-            .map((value) =>
-                DropdownMenuItem(value: value, child: Text('stage.$value'.tr)))
-            .toList(),
-        onChanged: (value) => _relationship = value ?? 'stranger',
+      Container(
+        color: context.vita.surface,
+        child: Column(children: [
+          for (var i = 0; i < labels.length; i++) ...[
+            _reviewRow(
+              labels.values.elementAt(i).tr,
+              _fields[labels.keys.elementAt(i)]!,
+              multiline: const {'persona', 'appearance', 'backstory'}
+                  .contains(labels.keys.elementAt(i)),
+            ),
+            if (i < labels.length - 1)
+              Divider(
+                  height: 0.5,
+                  thickness: 0.5,
+                  indent: 104,
+                  color: context.vita.divider),
+          ],
+          Divider(height: 0.5, thickness: 0.5, color: context.vita.divider),
+          _selectRow(
+            'companion.create.who'.tr,
+            _gender,
+            const ['girlfriend', 'boyfriend', 'friend', 'custom'],
+            (value) => setState(() => _gender = value),
+            (value) => 'relation.$value'.tr,
+          ),
+          Divider(
+              height: 0.5,
+              thickness: 0.5,
+              indent: 104,
+              color: context.vita.divider),
+          _selectRow(
+            'companion.create.closeness'.tr,
+            _relationship,
+            const ['stranger', 'acquaintance', 'close', 'partner'],
+            (value) => setState(() => _relationship = value),
+            (value) => 'stage.$value'.tr,
+          ),
+        ]),
       ),
       const SizedBox(height: 24),
       OutlinedButton(
@@ -360,8 +394,83 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
         hintText: hint.tr,
         filled: true,
         fillColor: context.vita.surface,
-        border: const OutlineInputBorder(),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        border: const OutlineInputBorder(borderSide: BorderSide.none),
+        enabledBorder: const OutlineInputBorder(borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: context.vita.green, width: 1)),
       ),
+    );
+  }
+
+  Widget _reviewRow(String label, TextEditingController controller,
+      {bool multiline = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: multiline
+          ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Text(label,
+                    style: TextStyle(fontSize: 14, color: context.vita.text)),
+              ),
+              TextField(
+                controller: controller,
+                minLines: 2,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                    border: InputBorder.none, isDense: true),
+              ),
+            ])
+          : Row(children: [
+              SizedBox(
+                  width: 88,
+                  child: Text(label,
+                      style:
+                          TextStyle(fontSize: 14, color: context.vita.text))),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  textAlign: TextAlign.end,
+                  decoration: InputDecoration(
+                      border: InputBorder.none,
+                      hintText: label,
+                      hintStyle: TextStyle(color: context.vita.hint)),
+                ),
+              ),
+            ]),
+    );
+  }
+
+  Widget _selectRow(String label, String value, List<String> values,
+      ValueChanged<String> onChanged, String Function(String) display) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(children: [
+        SizedBox(
+            width: 88,
+            child: Text(label,
+                style: TextStyle(fontSize: 14, color: context.vita.text))),
+        Expanded(
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              alignment: AlignmentDirectional.centerEnd,
+              items: values
+                  .map((item) => DropdownMenuItem(
+                      value: item,
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: Text(display(item))))
+                  .toList(),
+              onChanged: (next) {
+                if (next != null) onChanged(next);
+              },
+            ),
+          ),
+        ),
+      ]),
     );
   }
 

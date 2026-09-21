@@ -137,23 +137,20 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(color: context.vita.hint, fontSize: 14.5),
-        filled: true,
-        fillColor: context.vita.pageBg,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(4),
-            borderSide: BorderSide.none),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(4),
-            borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
-          borderSide: BorderSide(color: context.vita.green, width: 1.5),
-        ),
+        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: context.vita.green, width: 1)),
       ),
     );
   }
+
+  Widget _sectionTitle(String key) => Padding(
+        padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
+        child: Text(key.tr,
+            style: TextStyle(fontSize: 13, color: context.vita.subText)),
+      );
 
   Widget _chipRow(
       List<String> options, String selected, ValueChanged<String> onSelected) {
@@ -189,7 +186,7 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
       appBar: AppBar(title: Text('companion.create.title'.tr)),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -202,38 +199,25 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
               Text('companion.create.sub'.tr,
                   style: TextStyle(fontSize: 13, color: context.vita.subText)),
               const SizedBox(height: 20),
-              Text('companion.create.basics'.tr,
-                  style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: context.vita.subText,
-                      letterSpacing: 0.8)),
-              const SizedBox(height: 10),
+              _sectionTitle('companion.create.basics'),
               VitaCard(
                 child: Column(
                   children: [
                     _field(controller: _name, hint: 'companion.create.name'.tr),
-                    const SizedBox(height: 12),
+                    Divider(height: 0.5, color: context.vita.divider),
                     _field(controller: _city, hint: 'companion.create.city'.tr),
-                    const SizedBox(height: 12),
+                    Divider(height: 0.5, color: context.vita.divider),
                     _field(
                         controller: _occupation,
                         hint: 'companion.create.occupation'.tr),
-                    const SizedBox(height: 12),
+                    Divider(height: 0.5, color: context.vita.divider),
                     _field(
                         controller: _interests,
                         hint: 'companion.create.interests'.tr),
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Text('companion.create.personality'.tr,
-                  style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: context.vita.subText,
-                      letterSpacing: 0.8)),
-              const SizedBox(height: 10),
+              _sectionTitle('companion.create.personality'),
               VitaCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -265,14 +249,7 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Text('companion.create.appearance'.tr,
-                  style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: context.vita.subText,
-                      letterSpacing: 0.8)),
-              const SizedBox(height: 10),
+              _sectionTitle('companion.create.appearance'),
               VitaCard(
                 child: _loadingOptions
                     ? const Center(
@@ -338,14 +315,7 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
                             }).toList(),
                           ),
               ),
-              const SizedBox(height: 8),
-              Text('companion.create.relationship'.tr,
-                  style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: context.vita.subText,
-                      letterSpacing: 0.8)),
-              const SizedBox(height: 10),
+              _sectionTitle('companion.create.relationship'),
               VitaCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
