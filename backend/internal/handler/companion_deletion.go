@@ -23,7 +23,7 @@ func ListDeletedCompanions(c *gin.Context) {
 	}
 	rows, err := db.Get().QueryContext(c.Request.Context(), `
 		SELECT c.id,c.name,COALESCE(c.city,''),COALESCE(c.occupation,''),
-		       COALESCE(p.image_url,''),c.deleted_at,c.purge_after,
+		       COALESCE(NULLIF(c.avatar_url,''),p.image_url,''),c.deleted_at,c.purge_after,
 		       EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active'
 		         AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP))
 		FROM companions c LEFT JOIN companion_portraits p ON p.id=c.portrait_id

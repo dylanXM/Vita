@@ -195,6 +195,13 @@ func main() {
 			memories.DELETE("/:memory_id", handler.DeleteMemory)
 		}
 		api.GET("/explore/posts", middleware.RequireAuth(), handler.GetExplorePosts)
+		aiPets := api.Group("/ai-pets", middleware.RequireAuth())
+		{
+			aiPets.GET("/breeds", handler.ListAIPetBreeds)
+			aiPets.POST("/adopt", handler.AdoptAIPet)
+			aiPets.GET("/:id/state", handler.GetAIPetState)
+			aiPets.POST("/:id/feed", handler.FeedAIPet)
+		}
 
 		media := api.Group("/media")
 		{
@@ -244,6 +251,9 @@ func main() {
 			admin.PUT("/legal-documents/:id", handler.AdminUpdateLegalDocument)
 			admin.POST("/legal-documents/:id/activate", handler.AdminActivateLegalDocument)
 			admin.DELETE("/legal-documents/:id", handler.AdminDeleteLegalDocument)
+			admin.GET("/ai-pet-breeds", handler.AdminListAIPetBreeds)
+			admin.POST("/ai-pet-breeds", handler.AdminCreateAIPetBreed)
+			admin.PUT("/ai-pet-breeds/:id", handler.AdminUpdateAIPetBreed)
 
 			users := admin.Group("/users")
 			{

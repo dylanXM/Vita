@@ -170,7 +170,7 @@ export interface CreditLedgerEntry {
 
 export interface CreditProduct {
   key: string;
-  category: "gift" | "photo" | "voice" | "date" | "keepsake" | "outfit" | "call";
+  category: "gift" | "photo" | "voice" | "date" | "keepsake" | "outfit" | "call" | "pet";
   name_key: string;
   description_key: string;
   emoji: string;
@@ -179,6 +179,21 @@ export interface CreditProduct {
   sort_order: number;
   metadata: Record<string, unknown>;
 }
+
+export interface AIPetBreed {
+  id: string;
+  environment: Environment;
+  name: string;
+  species: string;
+  personality: string;
+  description: string;
+  avatar_url: string;
+  sort_order: number;
+  enabled: boolean;
+  subscription_plan_ids: string[];
+}
+
+export type AIPetBreedInput = Omit<AIPetBreed, "id">;
 
 export interface BillingList<T> {
   items: T[];

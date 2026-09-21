@@ -51,7 +51,7 @@ func AdminListManagedCompanions(c *gin.Context) {
 	args = append(args, pageSize, (page-1)*pageSize)
 	query := `SELECT c.id,c.user_id,u.email,u.environment,c.name,COALESCE(c.gender,''),COALESCE(c.city,''),
 		COALESCE(c.occupation,''),COALESCE(c.relationship_stage,'stranger'),c.active,c.proactive_enabled,
-		c.voice_enabled,COALESCE(p.image_url,''),COUNT(DISTINCT cv.id),COUNT(DISTINCT m.id),c.created_at,c.updated_at
+		c.voice_enabled,COALESCE(NULLIF(c.avatar_url,''),p.image_url,''),COUNT(DISTINCT cv.id),COUNT(DISTINCT m.id),c.created_at,c.updated_at
 		FROM companions c JOIN users u ON u.id=c.user_id
 		LEFT JOIN companion_portraits p ON p.id=c.portrait_id
 		LEFT JOIN conversations cv ON cv.companion_id=c.id
@@ -100,7 +100,7 @@ func AdminGetManagedCompanion(c *gin.Context) {
 		COALESCE(c.city,''),COALESCE(c.occupation,''),COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),
 		c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.model_id,c.portrait_id,
 		c.creation_source,c.proactive_enabled,c.active,c.life_enabled,c.friendship_active,c.subscription_paused_at,c.voice_enabled,
-		c.voice_config::text,COALESCE(p.image_url,''),COALESCE(am.display_name,''),c.created_at,c.updated_at,
+		c.voice_config::text,COALESCE(NULLIF(c.avatar_url,''),p.image_url,''),COALESCE(am.display_name,''),c.created_at,c.updated_at,
 		(SELECT COUNT(*) FROM conversations WHERE companion_id=c.id),
 		(SELECT COUNT(*) FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE companion_id=c.id)),
 		(SELECT COUNT(*) FROM memories WHERE companion_id=c.id),(SELECT COUNT(*) FROM life_events WHERE companion_id=c.id),

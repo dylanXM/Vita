@@ -8,6 +8,7 @@ import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../../shared/media_image.dart';
 import '../memories/memories_page.dart';
+import '../ai_pets/ai_pets_page.dart';
 
 class ExploreController extends GetxController {
   static ExploreController get to => Get.find();
@@ -72,6 +73,20 @@ class ExplorePage extends StatelessWidget {
                 borderRadius: BorderRadius.zero,
                 onTap: () => Get.to(
                   () => const MomentsPage(),
+                  transition: Transition.cupertino,
+                  duration: const Duration(milliseconds: 300),
+                ),
+              ),
+            ),
+            VitaCard(
+              radius: 0,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: VitaListTile(
+                icon: Icons.pets_outlined,
+                title: 'aiPets.title'.tr,
+                borderRadius: BorderRadius.zero,
+                onTap: () => Get.to(
+                  () => const AIPetsPage(),
                   transition: Transition.cupertino,
                   duration: const Duration(milliseconds: 300),
                 ),

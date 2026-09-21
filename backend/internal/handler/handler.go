@@ -1110,7 +1110,7 @@ func GetCompanion(c *gin.Context) {
 	var comp Companion
 	var tags string
 	var portraitID, modelID sql.NullString
-	err := db.Get().QueryRow(`SELECT c.id,c.user_id,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.appearance,''),COALESCE(c.city,''),COALESCE(c.occupation,''),COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.portrait_id,COALESCE(p.image_url,''),c.model_id,c.creation_source,c.proactive_enabled,c.active,c.is_default,c.life_enabled,c.friendship_active,c.created_at,c.updated_at FROM companions c LEFT JOIN companion_portraits p ON p.id=c.portrait_id WHERE c.id=$1 AND c.user_id=$2`, id, c.GetString("user_id")).Scan(
+	err := db.Get().QueryRow(`SELECT c.id,c.user_id,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.appearance,''),COALESCE(c.city,''),COALESCE(c.occupation,''),COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.portrait_id,COALESCE(NULLIF(c.avatar_url,''),p.image_url,''),c.model_id,c.creation_source,c.proactive_enabled,c.active,c.is_default,c.life_enabled,c.friendship_active,c.created_at,c.updated_at FROM companions c LEFT JOIN companion_portraits p ON p.id=c.portrait_id WHERE c.id=$1 AND c.user_id=$2`, id, c.GetString("user_id")).Scan(
 		&comp.ID, &comp.UserID, &comp.Name, &comp.Gender, &comp.Persona, &comp.Appearance, &comp.City, &comp.Occupation, &comp.Interests, &comp.RelationshipStage, &tags, &comp.SpeakingStyle, &comp.Likes, &comp.Dislikes, &comp.LifeHabits, &comp.LifeGoal, &comp.Backstory, &portraitID, &comp.PortraitURL, &modelID, &comp.CreationSource, &comp.ProactiveEnabled, &comp.Active, &comp.IsDefault, &comp.LifeEnabled, &comp.FriendshipActive, &comp.CreatedAt, &comp.UpdatedAt)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "companion not found"})
@@ -1129,7 +1129,7 @@ func ListCompanions(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to prepare default companions"})
 		return
 	}
-	rows, err := db.Get().Query(`SELECT c.id,c.user_id,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.appearance,''),COALESCE(c.city,''),COALESCE(c.occupation,''),COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.portrait_id,COALESCE(p.image_url,''),c.model_id,c.creation_source,c.proactive_enabled,c.active,c.is_default,c.life_enabled,c.friendship_active,c.created_at,c.updated_at,
+	rows, err := db.Get().Query(`SELECT c.id,c.user_id,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.appearance,''),COALESCE(c.city,''),COALESCE(c.occupation,''),COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.portrait_id,COALESCE(NULLIF(c.avatar_url,''),p.image_url,''),c.model_id,c.creation_source,c.proactive_enabled,c.active,c.is_default,c.life_enabled,c.friendship_active,c.created_at,c.updated_at,
 		COALESCE(latest.content,''),COALESCE(latest.message_type,'text'),latest.created_at,COALESCE(unread.count,0)
 		FROM companions c
 		LEFT JOIN companion_portraits p ON p.id=c.portrait_id
@@ -1692,8 +1692,8 @@ func GetExplorePosts(c *gin.Context) {
 			WHERE r.status='active'
 		)
 		SELECT p.id,p.post_type,p.content,p.media_urls::text,p.payload::text,p.published_at,
-		       author.id,author.name,COALESCE(ap.image_url,''),
-		       related.id,related.name,COALESCE(rp.image_url,''),
+		       author.id,author.name,COALESCE(NULLIF(author.avatar_url,''),ap.image_url,''),
+		       related.id,related.name,COALESCE(NULLIF(related.avatar_url,''),rp.image_url,''),
 		       (author.user_id=$1)
 		FROM moment_posts p
 		JOIN visible v ON v.id=p.author_companion_id

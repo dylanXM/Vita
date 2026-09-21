@@ -175,6 +175,17 @@ func TestLifePlanPromptCarriesIdentityAndContinuity(t *testing.T) {
 	}
 }
 
+func TestLifePlanPromptUsesPetRules(t *testing.T) {
+	prompt := lifePlanPrompt(companionContext{
+		Name: "Mochi", Gender: "pet", Occupation: "Shiba Inu", PersonalityTags: "playful",
+	}, "2026-09-21", "Asia/Shanghai", "none", 8, 10, 2)
+	for _, expected := range []string{"fictional AI pet", "never a person", "Shiba Inu", "sleeping, eating, playing"} {
+		if !strings.Contains(prompt, expected) {
+			t.Fatalf("pet prompt missing %q: %s", expected, prompt)
+		}
+	}
+}
+
 func TestReasonableSocialHour(t *testing.T) {
 	for _, hour := range []int{8, 12, 20} {
 		if !reasonableSocialHour(hour) {

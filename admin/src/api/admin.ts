@@ -48,6 +48,8 @@ import type {
   LegalDocument,
   LegalDocumentInput,
   LegalDocumentType,
+  AIPetBreed,
+  AIPetBreedInput,
 } from "./types";
 
 /** Admin sign-in. The API also accepts a 6-digit code for the same accounts. */
@@ -165,6 +167,14 @@ export const socialLinksApi = {
   save: (environment: Environment, body: Pick<SocialMediaLinksConfig,
     "social_instagram_url" | "social_tiktok_url" | "social_x_url" | "social_discord_url">) =>
     http.put<SocialMediaLinksConfig>("/admin/social-links", body, { params: { environment } }),
+};
+
+export const aiPetBreedsApi = {
+  list: (environment: Environment, signal?: AbortSignal) =>
+    http.get<BillingList<AIPetBreed>>("/admin/ai-pet-breeds", { params: { environment }, signal }),
+  create: (body: AIPetBreedInput) => http.post<AIPetBreed>("/admin/ai-pet-breeds", body),
+  update: (id: string, body: AIPetBreedInput) =>
+    http.put<AIPetBreed>(`/admin/ai-pet-breeds/${id}`, body),
 };
 
 export const legalDocumentsApi = {

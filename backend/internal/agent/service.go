@@ -822,6 +822,23 @@ func lifePlanPrompt(profile companionContext, localDate, timezone, recentLife st
 	if parsed, err := time.Parse("2006-01-02", localDate); err == nil {
 		weekday = parsed.Weekday().String()
 	}
+	if profile.Gender == "pet" {
+		return fmt.Sprintf(`Create one believable ordinary day for a fictional AI pet.
+Date: %s (%s). Timezone: %s.
+Pet name: %s. Breed/species: %s. Personality: %s. Speaking style: %s.
+Likes: %s. Habits: %s. Growth goal: %s. Backstory/persona: %s %s.
+Recent life from earlier days (do not repeat it unless continuity requires it): %s.
+
+Return only a JSON array with %d to %d objects. Fields: type, title, description, location, start (HH:MM), end (HH:MM), emotion, importance (0-100), user_relevance (0-100), share (boolean), moment (boolean), moment_text, media_urls.
+Rules:
+- The subject is a pet, never a person. Use simple pet activities such as sleeping, eating, playing, exploring the home, waiting, learning, and noticing its owner.
+- Times must be valid, chronological, and non-overlapping. Keep events ordinary and warm; never invent illness, travel, purchases, or human employment.
+- No more than %d events may have share=true. At most 2 events may have moment=true. moment_text must sound like the pet's short, playful thought.
+- media_urls must be an empty array until a real generated image URL is available.`,
+			localDate, weekday, timezone, profile.Name, profile.Occupation, profile.PersonalityTags, profile.SpeakingStyle,
+			profile.Likes, profile.LifeHabits, profile.LifeGoal, profile.Backstory, profile.Persona, recentLife,
+			minEvents, maxEvents, proactiveLimit)
+	}
 	return fmt.Sprintf(`Create one believable ordinary day for a fictional person.
 Date: %s (%s). Timezone: %s. City: %s.
 Name: %s. Occupation: %s. Interests: %s. Personality: %s. Speaking style: %s.
@@ -1526,6 +1543,7 @@ func (s *Service) loadCompanionForConversation(ctx context.Context, conversation
 
 func (s *Service) companionPrompt(ctx context.Context, profile companionContext) string {
 	var life, memories []string
+	petStatusLine := ""
 	rows, err := s.db.QueryContext(ctx, `SELECT COALESCE(title, ''), COALESCE(description, '') FROM life_events WHERE companion_id = $1 AND start_time <= CURRENT_TIMESTAMP ORDER BY start_time DESC LIMIT 6`, profile.ID)
 	if err == nil {
 		defer rows.Close()
@@ -1546,6 +1564,12 @@ func (s *Service) companionPrompt(ctx context.Context, profile companionContext)
 			}
 		}
 	}
+	if profile.Gender == "pet" {
+		var hunger, happiness, energy, health, level int
+		if s.db.QueryRowContext(ctx, `SELECT hunger,happiness,energy,health,level FROM ai_pet_states WHERE companion_id=$1`, profile.ID).Scan(&hunger, &happiness, &energy, &health, &level) == nil {
+			petStatusLine = fmt.Sprintf("- Pet care status: level=%d, fullness=%d/100, happiness=%d/100, energy=%d/100, health=%d/100\n", level, hunger, happiness, energy, health)
+		}
+	}
 	return fmt.Sprintf(`%s
 
 Identity:
@@ -1558,11 +1582,12 @@ Identity:
 - Habits: %s; life goal: %s
 - Backstory/persona: %s %s
 - Current outfit selection: %s
+%s
 
 Recent life: %s
 Important memories: %s`, companionSystemBoundary, profile.Name, profile.Gender, profile.RelationshipStage,
 		profile.City, profile.Occupation, profile.Interests, profile.PersonalityTags, profile.SpeakingStyle,
-		profile.Likes, profile.Dislikes, profile.LifeHabits, profile.LifeGoal, profile.Backstory, profile.Persona, profile.EquippedOutfit,
+		profile.Likes, profile.Dislikes, profile.LifeHabits, profile.LifeGoal, profile.Backstory, profile.Persona, profile.EquippedOutfit, petStatusLine,
 		strings.Join(life, " | "), strings.Join(memories, " | "))
 }
 
