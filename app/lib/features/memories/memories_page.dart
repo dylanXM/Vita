@@ -200,11 +200,19 @@ class _MemorySearchBox extends StatelessWidget {
         decoration: InputDecoration(
           hintText: 'memories.search'.tr,
           hintStyle: TextStyle(color: context.vita.hint, fontSize: 14),
-          prefixIcon: Icon(Icons.search, size: 18, color: context.vita.hint),
+          prefixIcon: const SizedBox(
+            height: 40,
+            width: 38,
+            child: Center(
+              child: Icon(Icons.search, size: 18, color: Color(0xFFBBBBBB)),
+            ),
+          ),
           filled: true,
           fillColor: context.vita.surface,
-          contentPadding: const EdgeInsets.symmetric(vertical: 0),
+          contentPadding: const EdgeInsets.symmetric(vertical: 8),
           isDense: true,
+          prefixIconConstraints:
+              const BoxConstraints(minWidth: 38, minHeight: 40),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.zero,
             borderSide: BorderSide.none,
@@ -254,16 +262,18 @@ class _MemoryContactTile extends StatelessWidget {
                   duration: const Duration(milliseconds: 300),
                 );
               },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-          child: Row(
-            children: [
-              VitaAvatar(
-                name: name,
-                radius: 22,
-                imageUrl: companion['portrait_url'] as String?,
-                borderRadius: BorderRadius.circular(10),
-              ),
+        child: SizedBox(
+          height: 72,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                VitaAvatar(
+                  name: name,
+                  radius: 22,
+                  imageUrl: companion['portrait_url'] as String?,
+                  borderRadius: BorderRadius.circular(8),
+                ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -293,6 +303,7 @@ class _MemoryContactTile extends StatelessWidget {
               Icon(Icons.chevron_right, size: 20, color: context.vita.chevron),
             ],
           ),
+        ),
         ),
       ),
     );
