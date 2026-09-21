@@ -159,7 +159,15 @@ func fulfillCatalogGift(ctx context.Context, userID, companionID string, product
 		return nil, "", err
 	}
 	messageID := uuid.New().String()
-	messagePayload, _ := json.Marshal(map[string]any{"product_key": product.Key, "gift_id": id})
+	createdAt := time.Now().UTC()
+	messageData := map[string]any{
+		"product_key": product.Key,
+		"gift_id":     id,
+		"name_key":    product.NameKey,
+		"emoji":       product.Emoji,
+		"coins":       product.Coins,
+	}
+	messagePayload, _ := json.Marshal(messageData)
 	tx, err := db.Get().BeginTx(ctx, nil)
 	if err != nil {
 		return nil, "", err
@@ -175,14 +183,25 @@ func fulfillCatalogGift(ctx context.Context, userID, companionID string, product
 		familiarity=LEAST(100,relationship_states.familiarity+1),enthusiasm=LEAST(100,relationship_states.enthusiasm+$3),updated_at=CURRENT_TIMESTAMP`, companionID, intimacy, enthusiasm); err != nil {
 		return nil, "", err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO messages(id,conversation_id,sender_type,message_type,content,payload,source,delivery_status)
-		VALUES($1,$2,'assistant','scene_card',$3,$4,'paid_gift','delivered')`, messageID, conversationID, product.Emoji, messagePayload); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO messages(id,conversation_id,sender_type,message_type,content,payload,source,delivery_status,created_at)
+		VALUES($1,$2,'user','gift',$3,$4,'paid_gift','delivered',$5)`, messageID, conversationID, product.Emoji, messagePayload, createdAt); err != nil {
 		return nil, "", err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, "", err
 	}
-	return map[string]any{"gift_id": id, "message_id": messageID, "emoji": product.Emoji, "intimacy_delta": intimacy, "enthusiasm_delta": enthusiasm}, id, nil
+	message := map[string]any{
+		"id": messageID, "conversation_id": conversationID,
+		"sender_type": "user", "message_type": "gift",
+		"content": product.Emoji, "media_url": "", "payload": messageData,
+		"source": "paid_gift", "life_event_id": "",
+		"delivery_status": "delivered", "created_at": createdAt,
+	}
+	return map[string]any{
+		"gift_id": id, "message_id": messageID, "emoji": product.Emoji,
+		"intimacy_delta": intimacy, "enthusiasm_delta": enthusiasm,
+		"message": message,
+	}, id, nil
 }
 
 func fulfillVirtualDate(ctx context.Context, userID, companionID string, product credits.Product) (map[string]any, string, error) {

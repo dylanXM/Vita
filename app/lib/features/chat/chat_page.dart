@@ -82,12 +82,17 @@ class _ChatPageState extends State<ChatPage> {
   final _scroll = ScrollController();
   final _recorder = AudioRecorder();
   final _player = AudioPlayer();
+  late final Worker _messageWorker;
   Timer? _recordingTimer;
   bool _recording = false;
 
   @override
   void initState() {
     super.initState();
+    _messageWorker = ever(ctrl.messages, (_) {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    });
     if (widget.companion?['friendship_active'] == false) {
       ctrl.accessError.value = 'friendship_inactive';
     }
@@ -97,6 +102,7 @@ class _ChatPageState extends State<ChatPage> {
   void dispose() {
     _recorder.dispose();
     _player.dispose();
+    _messageWorker.dispose();
     _recordingTimer?.cancel();
     _input.dispose();
     _scroll.dispose();
@@ -147,20 +153,34 @@ class _ChatPageState extends State<ChatPage> {
     await _player.play(UrlSource(resolved));
   }
 
-  void _send() {
+  Future<void> _send() async {
     if (ctrl.accessError.value != null) {
       Get.toNamed('/subscription');
       return;
     }
-    final text = _input.text;
-    ctrl.send(text).then((_) {
-      _input.clear();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scroll.hasClients) {
-          _scroll.jumpTo(_scroll.position.maxScrollExtent);
-        }
-      });
-    });
+    if (!ctrl.ready) return;
+    final text = _input.text.trim();
+    if (text.isEmpty) return;
+    _input.clear();
+    final send = ctrl.send(text);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    try {
+      await send;
+    } on ApiException catch (error) {
+      if (mounted) Get.snackbar('chat.message'.tr, error.message);
+    }
+    if (mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    }
+  }
+
+  void _scrollToBottom() {
+    if (!_scroll.hasClients) return;
+    _scroll.animateTo(
+      _scroll.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+    );
   }
 
   void _insertEmoji(String emoji) {
@@ -218,6 +238,7 @@ class _ChatPageState extends State<ChatPage> {
       () => ChatInfoPage(
         companion: companion,
         onExperienceCompleted: ctrl.poll,
+        onExperienceResult: ctrl.experienceCompleted,
       ),
       transition: Transition.cupertino,
       duration: const Duration(milliseconds: 300),
@@ -266,7 +287,10 @@ class _ChatPageState extends State<ChatPage> {
                   ]),
                 )),
           Expanded(child: Obx(() => _buildMessages(ctrl))),
-          Obx(() => _buildInputBar(locked: ctrl.accessError.value != null)),
+          Obx(() => _buildInputBar(
+                locked: ctrl.accessError.value != null,
+                ready: ctrl.ready && !ctrl.loading.value,
+              )),
         ],
       ),
     );
@@ -314,6 +338,9 @@ class _ChatPageState extends State<ChatPage> {
       prevDate = dt;
 
       final isUser = m['sender_type'] == 'user';
+      final parsed = ChatMessageContent.from(m);
+      final isGift = parsed.isGift;
+      final deliveryStatus = m['delivery_status'] as String? ?? 'delivered';
       items.add(
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
@@ -334,14 +361,17 @@ class _ChatPageState extends State<ChatPage> {
                   constraints: BoxConstraints(
                     maxWidth: MediaQuery.of(context).size.width * 0.66,
                   ),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+                  padding: isGift
+                      ? EdgeInsets.zero
+                      : const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
                   decoration: BoxDecoration(
-                    color: isUser
-                        ? context.vita.bubbleGreen
-                        : context.vita.surface,
+                    color: isGift
+                        ? Colors.transparent
+                        : isUser
+                            ? context.vita.bubbleGreen
+                            : context.vita.surface,
                     borderRadius: BorderRadius.circular(4),
-                    border: isUser
+                    border: isUser || isGift
                         ? null
                         : Border.all(color: context.vita.divider, width: 0.5),
                   ),
@@ -352,6 +382,20 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 ),
               ),
+              if (isUser && deliveryStatus != 'delivered') ...[
+                const SizedBox(width: 6),
+                if (deliveryStatus == 'sending')
+                  SizedBox.square(
+                    dimension: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.5,
+                      color: context.vita.subText,
+                    ),
+                  )
+                else
+                  Icon(Icons.error_outline_rounded,
+                      size: 17, color: context.vita.red),
+              ],
               if (isUser) ...[
                 const SizedBox(width: 10),
                 VitaAvatar(name: AuthController.to.email, radius: 20),
@@ -369,7 +413,7 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  Widget _buildInputBar({required bool locked}) {
+  Widget _buildInputBar({required bool locked, required bool ready}) {
     return Container(
       decoration: BoxDecoration(
         color: context.vita.pageBg,
@@ -381,7 +425,9 @@ class _ChatPageState extends State<ChatPage> {
       child: Row(
         children: [
           IconButton(
-            onPressed: locked || ctrl.sending.value ? null : _toggleRecording,
+            onPressed: locked || !ready || ctrl.sending.value
+                ? null
+                : _toggleRecording,
             tooltip: _recording ? 'chat.voiceStop'.tr : 'chat.voice'.tr,
             icon: Icon(_recording ? Icons.stop_circle_outlined : Icons.mic_none,
                 color: _recording ? Colors.red : context.vita.subText),
@@ -426,7 +472,11 @@ class _ChatPageState extends State<ChatPage> {
           SizedBox(
             height: 40,
             child: ElevatedButton(
-              onPressed: locked ? () => Get.toNamed('/subscription') : _send,
+              onPressed: locked
+                  ? () => Get.toNamed('/subscription')
+                  : ready
+                      ? _send
+                      : null,
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(64, 40),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -460,6 +510,13 @@ class _ChatMessageBody extends StatelessWidget {
     final displayContent =
         parsed.contentIsTranslationKey ? parsed.text.tr : parsed.text;
     final children = <Widget>[];
+    if (parsed.isGift) {
+      return _AnimatedGiftCard(
+        key: ValueKey(message['id']),
+        content: parsed,
+        animate: message['_animate_gift'] == true,
+      );
+    }
     if (parsed.mediaKind == ChatMediaKind.voice) {
       children.add(InkWell(
         onTap: () => onPlayVoice(mediaURL),
@@ -529,5 +586,147 @@ class _ChatMessageBody extends StatelessWidget {
     }
     return Column(
         crossAxisAlignment: CrossAxisAlignment.start, children: children);
+  }
+}
+
+class _AnimatedGiftCard extends StatefulWidget {
+  const _AnimatedGiftCard({
+    super.key,
+    required this.content,
+    required this.animate,
+  });
+
+  final ChatMessageContent content;
+  final bool animate;
+
+  @override
+  State<_AnimatedGiftCard> createState() => _AnimatedGiftCardState();
+}
+
+class _AnimatedGiftCardState extends State<_AnimatedGiftCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+      value: widget.animate ? 0 : 1,
+    );
+    if (widget.animate) _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String get _nameKey {
+    final configured = widget.content.payload['name_key'];
+    if (configured is String && configured.isNotEmpty) return configured;
+    return switch (widget.content.payload['product_key']) {
+      'gift_coffee' || 'legacy_gift_10' => 'experience.gift.coffee',
+      'gift_flowers' => 'experience.gift.flowers',
+      'gift_cake' || 'legacy_gift_50' => 'experience.gift.cake',
+      'gift_keepsake' || 'legacy_gift_100' => 'experience.gift.keepsake',
+      _ => 'gift.sent.title',
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final payloadEmoji = widget.content.payload['emoji'];
+    final emoji = payloadEmoji is String && payloadEmoji.isNotEmpty
+        ? payloadEmoji
+        : widget.content.text.isNotEmpty
+            ? widget.content.text
+            : '🎁';
+    final coins = widget.content.payload['coins'];
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final entrance = Curves.elasticOut.transform(_controller.value);
+        return Opacity(
+          opacity: _controller.value.clamp(0, 1),
+          child: Transform.translate(
+            offset: Offset(0, (1 - _controller.value) * 18),
+            child: Transform.scale(
+              scale: .68 + entrance * .32,
+              child: child,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        width: 190,
+        padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFFFB45C), Color(0xFFF47C57)],
+          ),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x33E56A3C),
+              blurRadius: 12,
+              offset: Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Stack(children: [
+          const Positioned(
+            right: 2,
+            top: 0,
+            child: Icon(Icons.auto_awesome_rounded,
+                size: 20, color: Color(0xCCFFF0B8)),
+          ),
+          Row(children: [
+            Container(
+              width: 56,
+              height: 56,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: .22),
+                shape: BoxShape.circle,
+              ),
+              child: Text(emoji, style: const TextStyle(fontSize: 34)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _nameKey.tr,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (coins is num) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      'gift.coins'.trParams({'coins': '${coins.toInt()}'}),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: .86),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ]),
+        ]),
+      ),
+    );
   }
 }

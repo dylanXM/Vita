@@ -42,4 +42,22 @@ void main() {
     expect(content.mediaKind, ChatMediaKind.none);
     expect(content.payload, isEmpty);
   });
+
+  test('recognizes current and legacy gift timeline messages', () {
+    final current = ChatMessageContent.from({
+      'message_type': 'gift',
+      'content': '💐',
+      'source': 'paid_gift',
+      'payload': {'product_key': 'gift_flowers', 'coins': 30},
+    });
+    final legacy = ChatMessageContent.from({
+      'message_type': 'scene_card',
+      'content': '☕',
+      'source': 'paid_gift',
+    });
+
+    expect(current.isGift, isTrue);
+    expect(current.payload['coins'], 30);
+    expect(legacy.isGift, isTrue);
+  });
 }

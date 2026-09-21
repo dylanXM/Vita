@@ -9,10 +9,14 @@ import '../billing/billing_controller.dart';
 
 class ExperienceSheet extends StatefulWidget {
   const ExperienceSheet(
-      {super.key, required this.companionId, required this.onCompleted});
+      {super.key,
+      required this.companionId,
+      required this.onCompleted,
+      this.onResult});
 
   final String companionId;
   final Future<void> Function() onCompleted;
+  final Future<void> Function(Map<String, dynamic> response)? onResult;
 
   @override
   State<ExperienceSheet> createState() => _ExperienceSheetState();
@@ -96,7 +100,11 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
         _balance = data['balance'] as int;
       }
       await BillingController.to.refreshCredits();
-      await widget.onCompleted();
+      if (data is Map && widget.onResult != null) {
+        await widget.onResult!(Map<String, dynamic>.from(data));
+      } else {
+        await widget.onCompleted();
+      }
       AnalyticsService.to
           .track('experience_purchased', category: 'billing', properties: {
         'companion_id': widget.companionId,

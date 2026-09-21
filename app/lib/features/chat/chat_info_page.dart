@@ -23,10 +23,13 @@ class ChatInfoPage extends StatelessWidget {
     super.key,
     required this.companion,
     required this.onExperienceCompleted,
+    this.onExperienceResult,
   });
 
   final Map<String, dynamic> companion;
   final Future<void> Function() onExperienceCompleted;
+  final Future<void> Function(Map<String, dynamic> response)?
+      onExperienceResult;
 
   String get companionId => companion['id'] as String? ?? '';
   String get name => companion['name'] as String? ?? 'chat.companion'.tr;
@@ -157,6 +160,7 @@ class ChatInfoPage extends StatelessWidget {
       builder: (_) => ExperienceSheet(
         companionId: companionId,
         onCompleted: onExperienceCompleted,
+        onResult: onExperienceResult,
       ),
     );
   }
