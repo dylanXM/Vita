@@ -556,6 +556,8 @@ class _ChatPageState extends State<ChatPage> {
           _RoundIconButton(
             icon: Icons.sentiment_satisfied_alt_outlined,
             onTap: locked ? null : _showEmojiPicker,
+            showBorder: false,
+            iconSize: 30,
           ),
           const SizedBox(width: 8),
           _RoundIconButton(
@@ -851,11 +853,15 @@ class _RoundIconButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.active = false,
+    this.showBorder = true,
+    this.iconSize = 22,
   });
 
   final IconData icon;
   final VoidCallback? onTap;
   final bool active;
+  final bool showBorder;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
@@ -868,15 +874,19 @@ class _RoundIconButton extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: active ? context.vita.green : context.vita.surface,
-          border: Border.all(
-            color: active ? context.vita.green : context.vita.divider,
-            width: 1,
-          ),
+          color: !showBorder
+              ? Colors.transparent
+              : (active ? context.vita.green : context.vita.surface),
+          border: showBorder
+              ? Border.all(
+                  color: active ? context.vita.green : context.vita.divider,
+                  width: 1,
+                )
+              : null,
         ),
         child: Icon(
           icon,
-          size: 22,
+          size: iconSize,
           color: active
               ? Colors.white
               : enabled
