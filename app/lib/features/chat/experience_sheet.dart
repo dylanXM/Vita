@@ -138,29 +138,37 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.72,
         child: Column(children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 12, 8),
-            child: Row(children: [
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text('experience.title'.tr,
-                        style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: context.vita.text)),
-                    const SizedBox(height: 3),
-                    Text('experience.balance'.trParams({'coins': '$_balance'}),
-                        style: TextStyle(
-                            fontSize: 13, color: context.vita.subText)),
-                  ])),
-              IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close)),
+          // Header — centered title, matching the app nav-bar style.
+          SizedBox(
+            height: 52,
+            child: Stack(alignment: Alignment.center, children: [
+              Text('experience.title'.tr,
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      color: context.vita.text)),
+              Positioned(
+                  right: 8,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                      child: IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: Icon(Icons.close,
+                              size: 22, color: context.vita.subText)))),
             ]),
           ),
-          Divider(height: 1, color: context.vita.divider),
+          Divider(height: 0.5, thickness: 0.5, color: context.vita.divider),
+          // Balance strip.
+          Container(
+            width: double.infinity,
+            color: context.vita.pageBg,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              'experience.balance'.trParams({'coins': '$_balance'}),
+              style: TextStyle(fontSize: 13, color: context.vita.subText),
+            ),
+          ),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
@@ -169,18 +177,23 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
                         icon: Icons.auto_awesome_outlined,
                         title: 'experience.empty'.tr,
                         subtitle: '')
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                    : ListView.separated(
+                        padding: const EdgeInsets.only(bottom: 24),
                         itemCount: _products.length,
+                        separatorBuilder: (_, __) => Divider(
+                            height: 0.5,
+                            thickness: 0.5,
+                            indent: 16,
+                            color: context.vita.divider),
                         itemBuilder: (context, index) {
                           final product = _products[index];
                           final key = product['key'] as String? ?? '';
                           final owned = _owned[key] == true;
                           final equipped = _equipped == key;
-                          return VitaCard(
-                            margin: const EdgeInsets.only(bottom: 10),
+                          return Container(
+                            color: context.vita.surface,
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 12),
+                                horizontal: 16, vertical: 12),
                             child: Row(children: [
                               Text(product['emoji'] as String? ?? '✨',
                                   style: const TextStyle(fontSize: 28)),
@@ -209,28 +222,49 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
                                             height: 1.35)),
                                   ])),
                               const SizedBox(width: 10),
-                              FilledButton.tonal(
-                                onPressed: _buying == null && !equipped
-                                    ? () => _purchase(product)
-                                    : null,
-                                child: _buying == key
-                                    ? const SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2))
-                                    : Text(equipped
-                                        ? 'experience.equipped'.tr
-                                        : owned
-                                            ? 'experience.equip'.tr
-                                            : '${product['coins']}'),
-                              ),
+                              _buildActionButton(context, product,
+                                  owned: owned, equipped: equipped),
                             ]),
                           );
                         },
                       ),
           ),
         ]),
+      ),
+    );
+  }
+
+  Widget _buildActionButton(
+      BuildContext context, Map<String, dynamic> product,
+      {required bool owned, required bool equipped}) {
+    final key = product['key'] as String? ?? '';
+    if (equipped) {
+      return Text('experience.equipped'.tr,
+          style: TextStyle(fontSize: 13, color: context.vita.hint));
+    }
+    final buying = _buying == key;
+    return GestureDetector(
+      onTap: (_buying == null && !equipped) ? () => _purchase(product) : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: owned ? context.vita.greenTint : context.vita.green,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: buying
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2))
+            : Text(
+                owned
+                    ? 'experience.equip'.tr
+                    : '${product['coins']}',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: owned ? context.vita.green : Colors.white),
+              ),
       ),
     );
   }
