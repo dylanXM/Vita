@@ -87,7 +87,7 @@ class _ChatPageState extends State<ChatPage> {
   late final Worker _messageWorker;
   Timer? _recordingTimer;
   bool _recording = false;
-  String? _panel; // null | 'emoji' | 'more'
+  final ValueNotifier<String?> _panel = ValueNotifier(null);
   static const double _panelHeight = 210;
 
   @override
@@ -110,6 +110,7 @@ class _ChatPageState extends State<ChatPage> {
     _recordingTimer?.cancel();
     _input.dispose();
     _scroll.dispose();
+    _panel.dispose();
     Get.delete<ChatController>(tag: widget.companionId);
     super.dispose();
   }
@@ -321,33 +322,25 @@ class _ChatPageState extends State<ChatPage> {
                   ]),
                 )),
           Expanded(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: Obx(
-                    () => _buildMessages(
-                      ctrl,
-                      bottomPadding: _inputBarReservedHeight(context),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: SafeArea(
-                    top: false,
-                    child: Obx(() => Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildInputBar(locked: ctrl.accessError.value != null),
-                            if (_panel == 'emoji') _buildEmojiPanel(),
-                            if (_panel == 'more') _buildMorePanel(),
-                          ],
-                        )),
-                  ),
-                ),
-              ],
+            child: Obx(
+              () => _buildMessages(ctrl),
+            ),
+          ),
+          SafeArea(
+            top: false,
+            child: ValueListenableBuilder<String?>(
+              valueListenable: _panel,
+              builder: (context, panel, _) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Obx(() => _buildInputBar(
+                        locked: ctrl.accessError.value != null, panel: panel)),
+                    if (panel == 'emoji') _buildEmojiPanel(),
+                    if (panel == 'more') _buildMorePanel(),
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -355,13 +348,7 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  double _inputBarReservedHeight(BuildContext context) {
-    var h = 72 + MediaQuery.of(context).padding.bottom;
-    if (_panel != null) h += _panelHeight;
-    return h;
-  }
-
-  Widget _buildMessages(ChatController ctrl, {double bottomPadding = 0}) {
+  Widget _buildMessages(ChatController ctrl) {
     if (ctrl.loading.value && ctrl.messages.isEmpty) {
       return const Center(
           child: VitaSkeleton(width: 220, height: 44, radius: 14));
@@ -502,12 +489,12 @@ class _ChatPageState extends State<ChatPage> {
 
     return ListView(
       controller: _scroll,
-      padding: EdgeInsets.fromLTRB(14, 10, 14, 10 + bottomPadding),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
       children: items,
     );
   }
 
-  Widget _buildInputBar({required bool locked}) {
+  Widget _buildInputBar({required bool locked, required String? panel}) {
     return Container(
       decoration: BoxDecoration(
         color: context.vita.pageBg,
@@ -540,7 +527,7 @@ class _ChatPageState extends State<ChatPage> {
                   controller: _input,
                   enabled: !locked,
                   onTap: () {
-                    if (_panel != null) setState(() => _panel = null);
+                    if (_panel.value != null) _panel.value = null;
                   },
                   minLines: 1,
                   maxLines: 5,
@@ -568,15 +555,15 @@ class _ChatPageState extends State<ChatPage> {
           ),
           const SizedBox(width: 8),
           _RoundIconButton(
-            icon: _panel == 'emoji'
+            icon: panel == 'emoji'
                 ? Icons.keyboard
                 : Icons.sentiment_satisfied_alt_outlined,
             onTap: locked
                 ? null
-                : () => setState(() {
+                : () {
                       FocusScope.of(context).unfocus();
-                      _panel = _panel == 'emoji' ? null : 'emoji';
-                    }),
+                      _panel.value = panel == 'emoji' ? null : 'emoji';
+                    },
             showBorder: false,
             iconSize: 30,
           ),
@@ -585,10 +572,10 @@ class _ChatPageState extends State<ChatPage> {
             icon: Icons.add_circle_outline,
             onTap: locked
                 ? null
-                : () => setState(() {
+                : () {
                       FocusScope.of(context).unfocus();
-                      _panel = _panel == 'more' ? null : 'more';
-                    }),
+                      _panel.value = panel == 'more' ? null : 'more';
+                    },
             showBorder: false,
             iconSize: 30,
           ),
@@ -609,7 +596,7 @@ class _ChatPageState extends State<ChatPage> {
             icon: Icons.swap_horiz_rounded,
             label: '转账',
             onTap: () {
-              setState(() => _panel = null);
+              _panel.value = null;
               Get.snackbar('转账', '转账功能即将上线');
             },
           ),
@@ -618,7 +605,7 @@ class _ChatPageState extends State<ChatPage> {
             icon: Icons.card_giftcard_rounded,
             label: '礼物',
             onTap: () {
-              setState(() => _panel = null);
+              _panel.value = null;
               showModalBottomSheet<void>(
                   context: context,
                   isScrollControlled: true,
