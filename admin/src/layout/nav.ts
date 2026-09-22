@@ -1,4 +1,4 @@
-import { Bot, BookOpen, Coins, CreditCard, Database, HeartHandshake, ImagePlay, LayoutDashboard, Megaphone, PanelsTopLeft, PawPrint, ReceiptText, ScrollText, Share2, ShoppingBag, UserPlus, Users, type LucideIcon } from "lucide-react";
+import { Bot, BookOpen, Coins, CreditCard, Database, HeartHandshake, ImagePlay, LayoutDashboard, Megaphone, PanelsTopLeft, PawPrint, Plug, ReceiptText, ScrollText, Share2, ShoppingBag, UserPlus, Users, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   to: string;
@@ -38,6 +38,7 @@ export const NAV: NavGroup[] = [
       { to: "/users", labelKey: "nav.users", icon: Users },
       { to: "/companions", labelKey: "nav.companions", icon: HeartHandshake },
       { to: "/agent", labelKey: "nav.agent", icon: Bot },
+      { to: "/model-services", labelKey: "nav.modelServices", icon: Plug },
       { to: "/media-models", labelKey: "nav.mediaModels", icon: ImagePlay },
       { to: "/storage", labelKey: "nav.storage", icon: Database },
       { to: "/invitation-settings", labelKey: "nav.invitationSettings", icon: UserPlus },

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, ImagePlus, Pencil, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
+import { Bot, ImagePlus, RefreshCw, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { agentApi, envApi } from "@/api/admin";
@@ -8,14 +8,8 @@ import { ENVIRONMENTS, type Environment } from "@/api/types";
 import type {
   AgentSettings,
   AIModel,
-  AIModelInput,
-  AIModelScenario,
-  AIModelTestResult,
-  AIProvider,
-  AIProviderInput,
   AdminCompanion,
   AdminCompanionInput,
-  BillingProduct,
   CompanionPortrait,
 } from "@/api/types";
 import { errorMessage } from "@/api/client";
@@ -31,36 +25,6 @@ import { toast } from "@/components/ui/sonner";
 
 const textareaClass =
   "min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
-
-const emptyProvider: AIProviderInput = {
-  name: "",
-  kind: "openai",
-  base_url: "",
-  api_key: "",
-  enabled: true,
-};
-
-const emptyModel: AIModelInput = {
-  provider_id: "none",
-  model_name: "",
-  display_name: "",
-  capabilities: [],
-  subscription_plan_ids: [],
-  enabled: true,
-};
-
-const modelScenarios: AIModelScenario[] = [
-  "text_chat",
-  "text_life_plan",
-  "text_proactive",
-  "text_character_profile",
-  "image_life_photo",
-  "image_requested_photo",
-  "audio_transcription",
-  "audio_speech",
-  "video_life_clip",
-  "video_realtime_avatar",
-];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -126,13 +90,6 @@ export function AgentPage() {
         <Card><CardContent className="pt-5 text-sm text-destructive">{t("common.failedToLoad")}</CardContent></Card>
       ) : (
         <>
-          <ProviderSection providers={configQuery.data.providers} onSaved={refresh} />
-          <ModelSection
-            providers={configQuery.data.providers}
-            models={configQuery.data.models}
-            subscriptionPlans={(configQuery.data.subscription_plans ?? []).filter((plan) => !activeEnv || plan.environment === activeEnv)}
-            onSaved={refresh}
-          />
           <SettingsSection initial={configQuery.data.settings} onSaved={refresh} />
           <PortraitSection portraits={configQuery.data.portraits} onSaved={refresh} />
         </>
@@ -145,124 +102,6 @@ export function AgentPage() {
         onSaved={refresh}
       />
     </div>
-  );
-}
-
-function ProviderSection({ providers, onSaved }: { providers: AIProvider[]; onSaved: () => void }) {
-  const { t } = useTranslation();
-  const [editing, setEditing] = useState<string | null>(null);
-  const [form, setForm] = useState<AIProviderInput>(emptyProvider);
-  const save = useMutation({
-    mutationFn: () => editing ? agentApi.updateProvider(editing, form) : agentApi.createProvider(form),
-    onSuccess: () => {
-      toast.success(t("agent.saved"));
-      setEditing(null);
-      setForm(emptyProvider);
-      onSaved();
-    },
-    onError: (error) => toast.error(errorMessage(error, t("common.failedToLoad"))),
-  });
-  const remove = useMutation({
-    mutationFn: agentApi.removeProvider,
-    onSuccess: onSaved,
-    onError: (error) => toast.error(errorMessage(error, t("common.failedToLoad"))),
-  });
-  const edit = (provider: AIProvider) => {
-    setEditing(provider.id);
-    setForm({ name: provider.name, kind: provider.kind, base_url: provider.base_url, api_key: "", enabled: provider.enabled });
-  };
-  return (
-    <Card>
-      <CardHeader><CardTitle>{t("agent.providers")}</CardTitle><CardDescription>{t("agent.providersDesc")}</CardDescription></CardHeader>
-      <CardContent className="space-y-5">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <Field label={t("agent.providerName")}><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-          <Field label={t("agent.providerType")}>
-            <Select value={form.kind} onValueChange={(v) => setForm({ ...form, kind: v as AIProviderInput["kind"] })}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="openai">OpenAI-compatible</SelectItem>
-                <SelectItem value="anthropic">Anthropic</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label={t("agent.baseUrl")}><Input placeholder={form.kind === "anthropic" ? "https://api.anthropic.com" : "https://api.openai.com"} value={form.base_url} onChange={(e) => setForm({ ...form, base_url: e.target.value })} /></Field>
-          <Field label={t("agent.apiKey")}><Input type="password" placeholder={editing ? t("agent.keepSecret") : "sk-…"} value={form.api_key ?? ""} onChange={(e) => setForm({ ...form, api_key: e.target.value })} /></Field>
-          <div className="flex items-end gap-2"><Button disabled={!form.name || save.isPending} onClick={() => save.mutate()}>{editing ? <Save /> : <Plus />}{editing ? t("agent.update") : t("agent.add")}</Button>{editing && <Button variant="ghost" onClick={() => { setEditing(null); setForm(emptyProvider); }}>{t("users.cancel")}</Button>}</div>
-        </div>
-        <div className="divide-y rounded-md border">
-          {providers.map((provider) => <div key={provider.id} className="flex flex-wrap items-center gap-3 p-3 text-sm"><div className="min-w-48 flex-1"><div className="font-medium">{provider.name}</div><div className="text-xs text-muted-foreground">{provider.kind} · {provider.base_url || t("agent.defaultEndpoint")}</div></div><Badge variant={provider.api_key_configured ? "success" : "warning"}>{provider.api_key_configured ? t("agent.keyConfigured") : t("agent.keyMissing")}</Badge><Button size="sm" variant="outline" onClick={() => edit(provider)}><Pencil />{t("users.edit")}</Button><Button size="sm" variant="ghost" onClick={() => remove.mutate(provider.id)}><Trash2 /></Button></div>)}
-          {providers.length === 0 && <p className="p-4 text-sm text-muted-foreground">{t("agent.noProviders")}</p>}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ModelSection({ providers, models, subscriptionPlans, onSaved }: { providers: AIProvider[]; models: AIModel[]; subscriptionPlans: BillingProduct[]; onSaved: () => void }) {
-  const { t } = useTranslation();
-  const [editing, setEditing] = useState<string | null>(null);
-  const [form, setForm] = useState<AIModelInput>(emptyModel);
-  const [scenarios, setScenarios] = useState<AIModelScenario[]>([]);
-  const [transcriptionFile, setTranscriptionFile] = useState<File | null>(null);
-  const [testResults, setTestResults] = useState<AIModelTestResult[]>([]);
-  const reset = () => { setEditing(null); setForm(emptyModel); setScenarios([]); setTranscriptionFile(null); setTestResults([]); };
-  const save = useMutation({
-    mutationFn: () => editing
-      ? agentApi.updateModel(editing, form)
-      : agentApi.createModel({ provider_id: form.provider_id === "none" ? "" : form.provider_id, model_name: form.model_name, display_name: form.display_name, scenarios, subscription_plan_ids: form.subscription_plan_ids, enabled: form.enabled }),
-    onSuccess: () => { toast.success(t("agent.saved")); reset(); onSaved(); },
-    onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))),
-  });
-  const testModel = useMutation({
-    mutationFn: () => agentApi.testModel({ provider_id: form.provider_id === "none" ? "" : form.provider_id, model_name: form.model_name, scenarios, transcription_file: transcriptionFile }),
-    onSuccess: ({ results }) => { setTestResults(results); results.every((result) => result.success) ? toast.success(t("agent.modelTestsPassed")) : toast.warning(t("agent.modelTestsHaveFailures")); },
-    onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))),
-  });
-  const remove = useMutation({ mutationFn: agentApi.removeModel, onSuccess: onSaved, onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))) });
-  const edit = (model: AIModel) => { setEditing(model.id); setScenarios(model.configured_scenarios ?? []); setTranscriptionFile(null); setForm({ provider_id: model.provider_id, model_name: model.model_name, display_name: model.display_name, capabilities: model.capabilities, subscription_plan_ids: model.subscription_plan_ids ?? [], enabled: model.enabled }); };
-  const needsAudio = scenarios.includes("audio_transcription");
-  const canSave = Boolean(form.provider_id && form.provider_id !== "none" && form.model_name && form.display_name && (editing || scenarios.length > 0));
-  return (
-    <Card>
-      <CardHeader><CardTitle>{t("agent.models")}</CardTitle><CardDescription>{t("agent.modelsDesc")}</CardDescription></CardHeader>
-      <CardContent className="space-y-5">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Field label={t("agent.provider")}>
-          <Select disabled={Boolean(editing)} value={form.provider_id} onValueChange={(v) => { setForm({ ...form, provider_id: v }); setTestResults([]); }}>
-            <SelectTrigger className="w-full"><SelectValue placeholder={t("mediaModels.notSelected")} /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">{t("mediaModels.notSelected")}</SelectItem>
-              {providers.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </Field>
-          <Field label={t("agent.modelId")}><Input disabled={Boolean(editing)} placeholder="gpt-5-mini / claude-sonnet-4-5" value={form.model_name} onChange={(e) => { setForm({ ...form, model_name: e.target.value }); setTestResults([]); }} /></Field>
-          <Field label={t("agent.displayName")}><Input value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} /></Field>
-          <div className="flex items-end gap-2"><Button disabled={!canSave || save.isPending} onClick={() => save.mutate()}>{save.isPending ? <RefreshCw className="animate-spin" /> : editing ? <Save /> : <Plus />}{editing ? t("agent.update") : t("agent.add")}</Button>{!editing && <Button variant="outline" disabled={!form.provider_id || form.provider_id === "none" || !form.model_name || scenarios.length === 0 || testModel.isPending} onClick={() => testModel.mutate()}>{testModel.isPending && <RefreshCw className="animate-spin" />}{testModel.isPending ? t("agent.testingModel") : t("agent.testAvailability")}</Button>}{editing && <Button variant="ghost" onClick={reset}>{t("users.cancel")}</Button>}</div>
-        </div>
-        <div className="rounded-md border p-4">
-          <div className="font-medium">{t("agent.modelScenarios")}</div>
-          <p className="mt-1 text-xs text-muted-foreground">{editing ? t("agent.verifiedScenariosLocked") : t("agent.modelScenariosDesc")}</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {modelScenarios.map((scenario) => <label key={scenario} className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={Boolean(editing)} checked={scenarios.includes(scenario)} onChange={(event) => { setScenarios(event.target.checked ? [...scenarios, scenario] : scenarios.filter((item) => item !== scenario)); setTestResults([]); }} />{t(`mediaModels.route.${scenario}`)}</label>)}
-          </div>
-          {!editing && <p className="mt-3 text-xs text-muted-foreground">{t("agent.optionalTestDesc")}</p>}
-          {!editing && scenarios.some((scenario) => scenario.startsWith("video_")) && <p className="mt-2 text-xs text-amber-600">{t("agent.videoTestUnavailable")}</p>}
-          {!editing && needsAudio && <div className="mt-4 max-w-md"><Field label={t("agent.transcriptionTestFile")}><Input type="file" accept="audio/*,.m4a,.mp3,.mp4,.mpeg,.mpga,.wav,.webm" onChange={(event) => { setTranscriptionFile(event.target.files?.[0] ?? null); setTestResults([]); }} /></Field></div>}
-          {!editing && testResults.length > 0 && <div className="mt-4 divide-y rounded-md border">{testResults.map((result) => <div key={result.scenario} className="flex items-start gap-3 p-3 text-sm"><Badge variant={result.success ? "success" : "warning"}>{result.success ? t("agent.testPassed") : t("agent.testFailed")}</Badge><div><div>{t(`mediaModels.route.${result.scenario}`)}</div>{result.error && <div className="mt-1 break-all text-xs text-muted-foreground">{result.error}</div>}</div></div>)}</div>}
-        </div>
-        <div className="rounded-md border p-4">
-          <div className="font-medium">{t("agent.subscriptionAccess")}</div>
-          <p className="mt-1 text-xs text-muted-foreground">{t("agent.subscriptionAccessDesc")}</p>
-          <div className="mt-3 grid max-h-52 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
-            {subscriptionPlans.map((plan) => <label key={plan.id} className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5" checked={form.subscription_plan_ids.includes(plan.id)} onChange={(event) => setForm({ ...form, subscription_plan_ids: event.target.checked ? [...form.subscription_plan_ids, plan.id] : form.subscription_plan_ids.filter((id) => id !== plan.id) })} /><span>{plan.name}<span className="block text-xs text-muted-foreground">{t(`billing.env.${plan.environment}`)} · {t(`billing.platform.${plan.platform}`)} · {plan.product_id}</span></span></label>)}
-          </div>
-          {subscriptionPlans.length === 0 && <p className="mt-3 text-sm text-muted-foreground">{t("agent.noSubscriptionPlans")}</p>}
-        </div>
-        <div className="divide-y rounded-md border">{models.map((model) => { const planNames = subscriptionPlans.filter((plan) => model.subscription_plan_ids?.includes(plan.id)).map((plan) => `${plan.name} · ${t(`billing.env.${plan.environment}`)} · ${t(`billing.platform.${plan.platform}`)}`); return <div key={model.id} className="flex flex-wrap items-center gap-3 p-3 text-sm"><div className="min-w-52 flex-1"><div className="font-medium">{model.display_name}</div><div className="text-xs text-muted-foreground">{model.provider_name} · {model.model_name}</div><div className="mt-1 text-xs text-muted-foreground">{(model.configured_scenarios ?? []).map((scenario) => t(`mediaModels.route.${scenario}`)).join(" · ")}</div><div className="mt-1 text-xs text-muted-foreground">{planNames.length > 0 ? `${t("agent.subscriptionOnly")}: ${planNames.join(" · ")}` : t("agent.standardUsers")}</div></div><Badge variant="muted">{model.capabilities.join(" · ")}</Badge><Button size="sm" variant="outline" onClick={() => edit(model)}><Pencil />{t("users.edit")}</Button><Button size="sm" variant="ghost" onClick={() => remove.mutate(model.id)}><Trash2 /></Button></div>; })}{models.length === 0 && <p className="p-4 text-sm text-muted-foreground">{t("agent.noModels")}</p>}</div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -305,7 +144,7 @@ function CompanionSection({ companions, models, portraits, loading, onSaved }: {
     const body: AdminCompanionInput = { ...form };
     return agentApi.updateCompanion(form.id, body);
   }, onSuccess: () => { toast.success(t("agent.saved")); onSaved(); }, onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))) });
-  const chatModels = models.filter((model) => model.enabled && model.capabilities.includes("text") && (model.configured_scenarios ?? []).includes("text_chat"));
+  const chatModels = models.filter((model) => (model.configured_scenarios ?? []).includes("text_chat"));
   if (loading) return <Skeleton className="h-72" />;
   return <Card><CardHeader><CardTitle>{t("agent.companions")}</CardTitle><CardDescription>{t("agent.companionsDesc")}</CardDescription></CardHeader><CardContent className="space-y-4">{companions.length === 0 || !form ? <p className="text-sm text-muted-foreground">{t("agent.noCompanions")}</p> : <><Field label={t("agent.companion")}>
           <Select value={form.id} onValueChange={setSelectedId}>

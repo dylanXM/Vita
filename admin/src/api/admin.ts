@@ -229,15 +229,20 @@ export const agentApi = {
   createModel: (body: AIModelCreateInput) => http.post<AIModel>("/admin/agent/models", body),
   testModel: (body: AIModelTestInput) => {
     const form = new FormData();
-    form.set("provider_id", body.provider_id);
+    if (body.provider_id) form.set("provider_id", body.provider_id);
     form.set("model_name", body.model_name);
     form.set("scenarios", JSON.stringify(body.scenarios));
+    if (body.kind) form.set("kind", body.kind);
+    if (body.base_url) form.set("base_url", body.base_url);
+    if (body.api_key) form.set("api_key", body.api_key);
     if (body.transcription_file) form.set("transcription_file", body.transcription_file);
     return http.post<AIModelTestResponse>("/admin/agent/models/test", form, { timeout: 360_000 });
   },
   updateModel: (id: string, body: AIModelInput) =>
     http.put<AIModel>(`/admin/agent/models/${id}`, body),
   removeModel: (id: string) => http.del<{ message: string }>(`/admin/agent/models/${id}`),
+  testProviderConnection: (body: { kind: string; base_url: string; api_key?: string; provider_id?: string }) =>
+    http.post<{ success: boolean; message: string }>("/admin/agent/providers/test-connection", body, { timeout: 60_000 }),
   mediaRoutes: (signal?: AbortSignal) =>
     http.get<MediaModelRoutesResponse>("/admin/agent/media-routes", { signal }),
   saveMediaRoutes: (routes: MediaModelRoute[]) =>
@@ -253,6 +258,7 @@ export const agentApi = {
   updateCompanion: (id: string, body: AdminCompanionInput) =>
     http.put<{ id: string }>(`/admin/agent/companions/${id}`, body),
 };
+
 
 export interface CompanionFilters {
   page?: number;

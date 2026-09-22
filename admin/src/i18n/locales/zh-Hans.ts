@@ -22,6 +22,7 @@ const zhHans = {
     users: "用户",
     companions: "角色管理",
     agent: "AI 伴侣",
+    modelServices: "模型管理",
     mediaModels: "模型路由",
     storage: "媒体存储",
     invitationSettings: "邀请码配置",
@@ -152,7 +153,7 @@ const zhHans = {
 
   agent: {
     title: "AI 伴侣 Agent",
-    desc: "配置模型服务、Agent 路由、生活事件生成和具体人物。",
+    desc: "配置 Agent 路由、生活事件生成和具体人物；模型服务请在模型管理中维护。",
     providers: "模型服务",
     providersDesc: "支持 OpenAI-compatible 与 Anthropic；密钥只写并加密保存。",
     providerName: "名称",
@@ -245,6 +246,8 @@ const zhHans = {
   },
 
   mediaModels: { title: "模型路由", description: "通过不同类型的标签页，为角色行为配置默认模型与有序备选模型。", save: "保存路由", saved: "模型路由已保存", enabled: "启用该行为", defaultModel: "默认模型", fallbackModels: "备选模型", addFallback: "添加备选", noFallback: "未设置备选模型，默认模型失败后将停止。", notSelected: "未选择", noCompatibleModels: "请先在 AI 伴侣页面创建并启用支持该能力的模型。", "type.text": "文本", "type.text.desc": "配置角色创建、对话、生活规划和主动消息使用的文本模型。", "route.text_chat": "角色对话", "route.text_chat.desc": "生成角色对用户消息的直接回复；角色专属模型会优先于此路由。", "route.text_life_plan": "生活规划", "route.text_life_plan.desc": "生成每日 Life 时间线和角色之间的社交事件。", "route.text_proactive": "主动消息", "route.text_proactive.desc": "生成 Life 事件分享和对用户记忆的后续关心。", "route.text_character_profile": "角色创建", "route.text_character_profile.desc": "根据用户描述或上传文件生成可编辑的角色资料。", "route.text_story_chapter": "故事章节", "route.text_story_chapter.desc": "续写分支故事并生成三个后续选项。", "route.text_storyboard": "故事板脚本", "route.text_storyboard.desc": "将历史故事提炼为摘要和可视化分镜。", "type.image": "图片", "type.image.desc": "根据角色已经发生的生活生成视觉内容。", "type.audio": "音频", "type.audio.desc": "理解用户语音，或让角色使用语音表达。", "type.video": "视频", "type.video.desc": "可选配置生活短视频与实时数字人会话模型。", "route.image_life_photo": "自动生活照片", "route.image_life_photo.desc": "为已发生且适合分享的 Life 事件生成照片。", "route.image_requested_photo": "用户请求照片", "route.image_requested_photo.desc": "根据角色当前 Life 事件生成付费照片。", "route.image_storyboard_sheet": "故事板整图", "route.image_storyboard_sheet.desc": "将用户选择数量的分镜生成在一张可对外分享的故事板整图中。", "route.audio_transcription": "用户语音识别", "route.audio_transcription.desc": "把用户发送的语音转成角色可理解的文字。", "route.audio_speech": "角色语音合成", "route.audio_speech.desc": "把角色回复转换成可播放的语音。", "route.video_life_clip": "生活短视频", "route.video_life_clip.desc": "为基于 Life 事件的异步短视频预留模型路由。", "route.video_realtime_avatar": "实时视频数字人", "route.video_realtime_avatar.desc": "为实时数字人及视频通话预留模型路由。" },
+  modelServices: { title: "模型管理", desc: "登记 AI 伴侣可用的模型服务：连接信息、系统场景与订阅准入。", create: "新建模型服务", edit: "编辑模型服务", editorDesc: "名称、类型、服务地址与密钥用于连通供应商；远端 ID 为模型在供应商侧的标识。", empty: "尚未配置模型服务。", saved: "模型服务已保存", deleted: "模型服务已删除", deleteConfirm: "确定删除模型服务 {{name}}？", name: "名称", kind: "类型", baseUrl: "服务地址", apiKey: "API 密钥", keepSecret: "留空则保留当前密钥", defaultEndpoint: "默认服务地址", keyConfigured: "已配置", keyMissing: "未配置", remoteId: "远端 ID", displayName: "显示名称", enabled: "启用", scenarios: "系统场景", scenariosDesc: "选择该模型支持的系统场景；可稍后在“配置系统场景”中调整。", configureScenarios: "配置系统场景", enableToConfigure: "仅启用的模型可配置系统场景", testConnection: "测试连接", testing: "正在测试…", connectionOk: "连接成功", connectionFailed: "连接失败", subscriptionPlans: "订阅方案", subscriptionPlansDesc: "选择一个或多个订阅方案后，该模型仅供对应方案使用；全部不选则普通用户可用。", noPlans: "尚未配置订阅方案。", testResults: "测试结果", ok: "成功", failed: "失败", testRequest: "入参", testResponse: "出参", noScenariosToTest: "请至少选择一个场景再测试。", remoteIdRequired: "请先填写远端模型 ID。" },
+
   creditProducts: { title: "金币体验", description: "配置角色增值体验的服务端价格与可用状态。", product: "商品", category: "分类", coins: "金币", enabled: "启用", saved: "金币商品已保存" },
   aiPets: { title: "AI 宠物", desc: "配置可领养的 AI 宠物品种及订阅准入。", create: "新增品种", edit: "编辑品种", formDesc: "停用品种后，已领养用户仍可继续使用，但不会再出现在领养列表。", name: "宠物名称", species: "品种", personality: "性格", personalityHint: "温柔、好奇、爱玩", avatarUrl: "头像地址", description: "介绍", sortOrder: "展示顺序", subscriptionAccess: "订阅准入", subscriptionAccessDesc: "不选择时任一有效订阅均可领养；选择后仅对应商店订阅商品可领养。", add: "新增品种", update: "保存修改", saved: "AI 宠物品种已保存", allPlans: "全部有效订阅", selectedPlans: "已选 {{count}} 个订阅" },
   storyHub: { title: "故事汇", desc: "配置默认故事背景、额度、故事板解锁规则和金币消耗。", rules: "规则与计费", freeLimit: "普通用户章节上限", customLimit: "订阅用户自定义背景终身额度", customLimitHint: "删除自定义背景不会返还名额。用户可选择 4、6、8 或 9 格，统一按同一故事板价格收费。", unlock: "故事板解锁章节数", chapterCoins: "每章消耗金币", storyboardCoins: "每次故事板消耗金币", saveRules: "保存规则", saved: "故事汇配置已保存", backgrounds: "默认故事背景", create: "新增背景", edit: "编辑背景", name: "标题", cover: "封面地址", synopsis: "简介", world: "世界设定", opening: "开场", genre: "类型", constraints: "角色约束", goal: "故事目标", sort: "展示顺序", enabled: "启用", saveBackground: "保存背景", delete: "删除", deleted: "背景已删除", deleteConfirm: "确认删除该默认背景？已有故事会保留创建时的背景快照。" },

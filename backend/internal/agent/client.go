@@ -261,6 +261,34 @@ func (c *Client) doJSONWithLimit(ctx context.Context, endpoint, apiKey, anthropi
 	return nil
 }
 
+// TestConnection verifies that the provider endpoint is reachable and the API
+// key is accepted. It only calls the lightweight models listing endpoint and
+// does not invoke the configured model, so it validates the service connection
+// itself rather than end-to-end model behavior.
+func (c *Client) TestConnection(ctx context.Context, model Model) error {
+	endpoint := strings.TrimRight(defaultBaseURL(model.Kind, model.BaseURL), "/") + "/v1/models"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return fmt.Errorf("create provider request: %w", err)
+	}
+	if model.Kind == "anthropic" {
+		req.Header.Set("x-api-key", model.APIKey)
+		req.Header.Set("anthropic-version", "2023-06-01")
+	} else {
+		req.Header.Set("Authorization", "Bearer "+model.APIKey)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("provider request: %w", err)
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxProviderResponseBytes))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("provider returned %s", resp.Status)
+	}
+	return nil
+}
+
 func defaultBaseURL(kind, configured string) string {
 	if strings.TrimSpace(configured) != "" {
 		return strings.TrimSpace(configured)

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"vita/internal/agent"
 )
 
 func mediaRouteFixture() []mediaModelRoute {
@@ -25,11 +27,11 @@ func mediaRouteFixture() []mediaModelRoute {
 }
 
 func TestCollectModelTestResultsKeepsFailuresInformational(t *testing.T) {
-	results := collectModelTestResults([]string{"text_chat", "video_life_clip"}, func(scenario string) error {
+	results := collectModelTestResults([]string{"text_chat", "video_life_clip"}, func(scenario string) (agent.ModelScenarioTest, error) {
 		if scenario == "video_life_clip" {
-			return errors.New("adapter unavailable")
+			return agent.ModelScenarioTest{}, errors.New("adapter unavailable")
 		}
-		return nil
+		return agent.ModelScenarioTest{Request: "r", Response: "ok"}, nil
 	})
 	if len(results) != 2 || !results[0].Success || results[1].Success || results[1].Error != "adapter unavailable" {
 		t.Fatalf("results = %#v", results)

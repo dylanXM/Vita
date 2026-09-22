@@ -45,7 +45,7 @@ func TestModelScenarioCallsTheSelectedRuntimeEndpoint(t *testing.T) {
 			defer server.Close()
 			model := Model{Kind: "openai", BaseURL: server.URL, APIKey: "key", ModelName: "model"}
 			audio := &ModelTestAudio{Filename: "test.m4a", MIMEType: "audio/mp4", Data: []byte("audio")}
-			if err := TestModelScenario(context.Background(), NewClient(), model, scenario, audio); err != nil {
+			if _, err := TestModelScenario(context.Background(), NewClient(), model, scenario, audio); err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -54,10 +54,10 @@ func TestModelScenarioCallsTheSelectedRuntimeEndpoint(t *testing.T) {
 
 func TestModelScenarioRejectsMissingAdapterAndAudio(t *testing.T) {
 	model := Model{Kind: "openai", ModelName: "model"}
-	if err := TestModelScenario(context.Background(), NewClient(), model, "video_life_clip", nil); err == nil {
+	if _, err := TestModelScenario(context.Background(), NewClient(), model, "video_life_clip", nil); err == nil {
 		t.Fatal("expected video scenario to be rejected")
 	}
-	if err := TestModelScenario(context.Background(), NewClient(), model, "audio_transcription", nil); err == nil {
+	if _, err := TestModelScenario(context.Background(), NewClient(), model, "audio_transcription", nil); err == nil {
 		t.Fatal("expected missing transcription audio to be rejected")
 	}
 }

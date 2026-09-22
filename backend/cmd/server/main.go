@@ -314,6 +314,7 @@ func main() {
 				agentAdmin.GET("/config", handler.AdminAgentConfig)
 				agentAdmin.PUT("/settings", handler.AdminUpdateAgentSettings)
 				agentAdmin.POST("/providers", handler.AdminCreateProvider)
+				agentAdmin.POST("/providers/test-connection", handler.AdminTestProviderConnection)
 				agentAdmin.PUT("/providers/:id", handler.AdminUpdateProvider)
 				agentAdmin.DELETE("/providers/:id", handler.AdminDeleteProvider)
 				agentAdmin.POST("/models", handler.AdminCreateModel)

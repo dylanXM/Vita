@@ -385,6 +385,8 @@ export interface AIModelTestResult {
   scenario: AIModelScenario;
   success: boolean;
   error?: string;
+  request?: string;
+  response?: string;
 }
 
 export type AIModelScenario =
@@ -412,9 +414,13 @@ export interface AIModelCreateInput {
 }
 
 export interface AIModelTestInput {
-  provider_id: string;
+  provider_id?: string;
   model_name: string;
   scenarios: AIModelScenario[];
+  /** Inline config for testing an unsaved service. */
+  kind?: string;
+  base_url?: string;
+  api_key?: string;
   transcription_file?: File | null;
 }
 
@@ -427,6 +433,8 @@ export interface AIModelInput {
   model_name: string;
   display_name: string;
   capabilities: Array<"text" | "image" | "audio" | "video">;
+  /** When present (including an empty array), refreshes configured scenarios. */
+  scenarios?: AIModelScenario[];
   subscription_plan_ids: string[];
   enabled: boolean;
 }
@@ -605,3 +613,4 @@ export interface StoryBackground {
 }
 
 export type StoryBackgroundInput = Omit<StoryBackground, "id">;
+

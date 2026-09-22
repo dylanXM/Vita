@@ -56,6 +56,8 @@ type modelTestResult struct {
 	Scenario string `json:"scenario"`
 	Success  bool   `json:"success"`
 	Error    string `json:"error,omitempty"`
+	Request  string `json:"request,omitempty"`
+	Response string `json:"response,omitempty"`
 }
 
 type agentSettingsResponse struct {
@@ -106,7 +108,7 @@ func AdminAgentConfig(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load portraits"})
 		return
 	}
-	plans, err := loadModelSubscriptionPlans()
+	plans, err := loadModelSubscriptionPlans(strings.TrimSpace(c.Query("environment")))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load subscription plans"})
 		return
@@ -185,6 +187,59 @@ func upsertProvider(c *gin.Context, id string) {
 	c.JSON(http.StatusNotFound, gin.H{"error": "provider not found"})
 }
 
+type providerConnectionInput struct {
+	Kind       string `json:"kind"`
+	BaseURL    string `json:"base_url"`
+	APIKey     string `json:"api_key"`
+	ProviderID string `json:"provider_id"`
+}
+
+// AdminTestProviderConnection verifies the provider endpoint itself with a
+// lightweight models listing call. It validates the service connection rather
+// than end-to-end model behavior. When the request carries no key but a
+// provider_id, the stored key is reused so an existing service can be retested.
+func AdminTestProviderConnection(c *gin.Context) {
+	if companionAgent == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "agent service is unavailable"})
+		return
+	}
+	var input providerConnectionInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	kind := strings.ToLower(strings.TrimSpace(input.Kind))
+	if kind != "openai" && kind != "anthropic" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "kind must be openai or anthropic"})
+		return
+	}
+	apiKey := strings.TrimSpace(input.APIKey)
+	if apiKey == "" && strings.TrimSpace(input.ProviderID) != "" {
+		var encrypted string
+		if err := db.Get().QueryRow(`SELECT api_key_ciphertext FROM ai_providers WHERE id=$1`, strings.TrimSpace(input.ProviderID)).Scan(&encrypted); err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "provider not found"})
+			return
+		}
+		decrypted, err := companionAgent.DecryptSecret(encrypted)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read provider key"})
+			return
+		}
+		apiKey = decrypted
+	}
+	if apiKey == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "API key is required"})
+		return
+	}
+	model := agent.Model{Kind: kind, BaseURL: strings.TrimSpace(input.BaseURL), APIKey: apiKey}
+	client := agent.NewClient()
+	if err := client.TestConnection(c.Request.Context(), model); err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "connected"})
+}
+
 func AdminDeleteProvider(c *gin.Context) {
 	var usedByMediaRoute bool
 	if err := db.Get().QueryRow(`SELECT EXISTS(
@@ -216,6 +271,7 @@ type modelInput struct {
 	ModelName           string   `json:"model_name" binding:"required"`
 	DisplayName         string   `json:"display_name" binding:"required"`
 	Capabilities        []string `json:"capabilities"`
+	Scenarios           []string `json:"scenarios"`
 	SubscriptionPlanIDs []string `json:"subscription_plan_ids"`
 	Enabled             *bool    `json:"enabled"`
 }
@@ -335,8 +391,9 @@ func AdminTestModel(c *gin.Context) {
 	defer c.Request.MultipartForm.RemoveAll()
 	providerID := strings.TrimSpace(c.PostForm("provider_id"))
 	modelName := strings.TrimSpace(c.PostForm("model_name"))
-	if providerID == "" || modelName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "provider and model ID are required"})
+	inlineKey := strings.TrimSpace(c.PostForm("api_key"))
+	if modelName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "model ID is required"})
 		return
 	}
 	var requestedScenarios []string
@@ -349,31 +406,52 @@ func AdminTestModel(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	model, loadErr := loadModelForValidation(providerID, modelName)
+	var (
+		model   agent.Model
+		loadErr error
+	)
+	if inlineKey != "" {
+		model = agent.Model{
+			Kind:      strings.ToLower(strings.TrimSpace(c.PostForm("kind"))),
+			BaseURL:   strings.TrimSpace(c.PostForm("base_url")),
+			APIKey:    inlineKey,
+			ModelName: modelName,
+		}
+		if model.Kind != "openai" && model.Kind != "anthropic" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "kind must be openai or anthropic"})
+			return
+		}
+	} else {
+		if providerID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "provider and model ID are required"})
+			return
+		}
+		model, loadErr = loadModelForValidation(providerID, modelName)
+	}
 	var testAudio *agent.ModelTestAudio
 	var audioErr error
 	if slices.Contains(scenarios, "audio_transcription") {
 		testAudio, audioErr = readModelTestAudio(c)
 	}
 	client := agent.NewClient()
-	results := collectModelTestResults(scenarios, func(scenario string) error {
+	results := collectModelTestResults(scenarios, func(scenario string) (agent.ModelScenarioTest, error) {
 		testErr := loadErr
 		if testErr == nil && scenario == "audio_transcription" && audioErr != nil {
 			testErr = audioErr
 		}
-		if testErr == nil {
-			testErr = agent.TestModelScenario(c.Request.Context(), client, model, scenario, testAudio)
+		if testErr != nil {
+			return agent.ModelScenarioTest{}, testErr
 		}
-		return testErr
+		return agent.TestModelScenario(c.Request.Context(), client, model, scenario, testAudio)
 	})
 	c.JSON(http.StatusOK, gin.H{"results": results})
 }
 
-func collectModelTestResults(scenarios []string, test func(string) error) []modelTestResult {
+func collectModelTestResults(scenarios []string, test func(string) (agent.ModelScenarioTest, error)) []modelTestResult {
 	results := make([]modelTestResult, 0, len(scenarios))
 	for _, scenario := range scenarios {
-		err := test(scenario)
-		result := modelTestResult{Scenario: scenario, Success: err == nil}
+		detail, err := test(scenario)
+		result := modelTestResult{Scenario: scenario, Success: err == nil, Request: detail.Request, Response: detail.Response}
 		if err != nil {
 			result.Error = err.Error()
 		}
@@ -394,15 +472,39 @@ func updateModel(c *gin.Context, id string) {
 	if input.Enabled != nil {
 		enabled = *input.Enabled
 	}
-	var storedProviderID, storedModelName, storedCapabilities string
-	if err := db.Get().QueryRow(`SELECT provider_id,model_name,capabilities FROM ai_models WHERE id=$1`, id).Scan(&storedProviderID, &storedModelName, &storedCapabilities); err != nil {
+	var storedProviderID, storedModelName string
+	if err := db.Get().QueryRow(`SELECT provider_id,model_name FROM ai_models WHERE id=$1`, id).Scan(&storedProviderID, &storedModelName); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "model not found"})
 		return
 	}
-	requestedCapabilities, _ := json.Marshal(input.Capabilities)
-	if input.ProviderID != storedProviderID || strings.TrimSpace(input.ModelName) != storedModelName || !jsonEqual([]byte(storedCapabilities), requestedCapabilities) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "provider, model ID, and capabilities cannot be changed; add a new model instead"})
-		return
+	var scenariosJSON, capabilitiesJSON []byte
+	scenariosProvided := input.Scenarios != nil
+	if scenariosProvided {
+		var newScenarios, newCapabilities []string
+		if len(input.Scenarios) == 0 {
+			newScenarios = []string{}
+			newCapabilities = []string{"text"}
+		} else {
+			ns, nc, nerr := normalizeModelScenarios(input.Scenarios)
+			if nerr != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": nerr.Error()})
+				return
+			}
+			newScenarios, newCapabilities = ns, nc
+		}
+		scenariosJSON, _ = json.Marshal(newScenarios)
+		capabilitiesJSON, _ = json.Marshal(newCapabilities)
+	} else {
+		var storedCapabilities string
+		if err := db.Get().QueryRow(`SELECT capabilities FROM ai_models WHERE id=$1`, id).Scan(&storedCapabilities); err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "model not found"})
+			return
+		}
+		requestedCapabilities, _ := json.Marshal(input.Capabilities)
+		if input.ProviderID != storedProviderID || strings.TrimSpace(input.ModelName) != storedModelName || !jsonEqual([]byte(storedCapabilities), requestedCapabilities) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "provider, model ID, and capabilities cannot be changed; add a new model instead"})
+			return
+		}
 	}
 	planIDs, err := normalizeSubscriptionPlanIDs(input.SubscriptionPlanIDs)
 	if err != nil {
@@ -430,8 +532,13 @@ func updateModel(c *gin.Context, id string) {
 			return
 		}
 	}
-	_, err = tx.ExecContext(c.Request.Context(), `UPDATE ai_models SET display_name=$2,enabled=$3,updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
-		id, strings.TrimSpace(input.DisplayName), enabled)
+	if scenariosProvided {
+		_, err = tx.ExecContext(c.Request.Context(), `UPDATE ai_models SET display_name=$2,enabled=$3,capabilities=$4::jsonb,configured_scenarios=$5::jsonb,updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
+			id, strings.TrimSpace(input.DisplayName), enabled, capabilitiesJSON, scenariosJSON)
+	} else {
+		_, err = tx.ExecContext(c.Request.Context(), `UPDATE ai_models SET display_name=$2,enabled=$3,updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
+			id, strings.TrimSpace(input.DisplayName), enabled)
+	}
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save model"})
 		return
@@ -1110,10 +1217,17 @@ func loadAdminModels() ([]adminModel, error) {
 	return items, rows.Err()
 }
 
-func loadModelSubscriptionPlans() ([]adminProduct, error) {
-	rows, err := db.Get().Query(`SELECT id,key,name,environment,platform,coins_granted,price_usd,period,
+func loadModelSubscriptionPlans(environment string) ([]adminProduct, error) {
+	query := `SELECT id,key,name,environment,platform,coins_granted,price_usd,period,
 		product_id,enabled,sort_order,created_at,updated_at
-		FROM subscription_plans ORDER BY environment,platform,sort_order,price_usd,key`)
+		FROM subscription_plans`
+	var args []any
+	if environment != "" {
+		query += ` WHERE environment=$1`
+		args = append(args, environment)
+	}
+	query += ` ORDER BY environment,platform,sort_order,price_usd,key`
+	rows, err := db.Get().Query(query, args...)
 	if err != nil {
 		return nil, err
 	}

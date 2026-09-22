@@ -18,6 +18,7 @@ import { WhatsNewPage } from "@/pages/WhatsNewPage";
 import { SocialLinksPage } from "@/pages/SocialLinksPage";
 import { CreditProductsPage } from "@/pages/CreditProductsPage";
 import { MediaModelsPage } from "@/pages/MediaModelsPage";
+import { ModelServicesPage } from "@/pages/ModelServicesPage";
 import { LegalDocumentsPage } from "@/pages/LegalDocumentsPage";
 import { AIPetsPage } from "@/pages/AIPetsPage";
 import { StoryHubPage } from "@/pages/StoryHubPage";
@@ -64,6 +65,7 @@ const router = createBrowserRouter([
       { path: "companions/:id", element: <CompanionDetailPage /> },
       { path: "agent", element: <AgentPage /> },
       { path: "media-models", element: <MediaModelsPage /> },
+      { path: "model-services", element: <ModelServicesPage /> },
       { path: "storage", element: <StoragePage /> },
       { path: "subscription-plans", element: <SubscriptionPlansPage /> },
       { path: "coin-packs", element: <CoinPacksPage /> },
