@@ -183,7 +183,7 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(title: Text('companion.create.title'.tr)),
+      appBar: AppBar(leading: const VitaBackButton(), title: Text('companion.create.title'.tr)),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),

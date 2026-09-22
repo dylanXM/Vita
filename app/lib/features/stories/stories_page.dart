@@ -90,7 +90,7 @@ class StoriesPage extends StatelessWidget {
         controller ?? Get.put<StoriesController>(StoriesController());
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(title: Text('storyHub.title'.tr)),
+      appBar: AppBar(leading: const VitaBackButton(), title: Text('storyHub.title'.tr)),
       body: Obx(() {
         final backgrounds = _maps(activeController.catalog['backgrounds']);
         final subscribed = activeController.catalog['subscribed'] == true;
@@ -303,7 +303,7 @@ class _CustomStoryBackgroundPageState extends State<CustomStoryBackgroundPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(title: Text('storyHub.createCustom'.tr)),
+      appBar: AppBar(leading: const VitaBackButton(), title: Text('storyHub.createCustom'.tr)),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         _field(title, 'storyHub.name'.tr),
         _field(genre, 'storyHub.genre'.tr),
@@ -596,7 +596,7 @@ class StoryboardPage extends StatelessWidget {
     final imageURL = '${board['image_url'] ?? ''}';
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(title: Text('storyHub.storyboard'.tr)),
+      appBar: AppBar(leading: const VitaBackButton(), title: Text('storyHub.storyboard'.tr)),
       body: ListView(
         padding: const EdgeInsets.only(top: 12, bottom: 30),
         children: [

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../shared/widgets.dart';
 
 import '../../core/legal_documents.dart';
 import '../../core/app_content_controller.dart';
@@ -19,7 +20,7 @@ class LegalDocumentPage extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: vita.pageBg,
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(leading: const VitaBackButton(), title: Text(title)),
       body: SafeArea(
           top: false,
           child: Obx(() {

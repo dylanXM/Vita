@@ -115,6 +115,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     return Scaffold(
       backgroundColor: vita.pageBg,
       appBar: AppBar(
+        leading: const VitaBackButton(),
         title: Text('profile.edit.title'.tr),
         actions: [
           TextButton(

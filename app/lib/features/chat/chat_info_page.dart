@@ -40,6 +40,7 @@ class ChatInfoPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: vita.pageBg,
       appBar: AppBar(
+        leading: const VitaBackButton(),
         title: Text('chatInfo.title'.tr),
         shape: const Border(),
       ),
@@ -408,7 +409,7 @@ class _ChatMediaPageState extends State<ChatMediaPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(title: Text('chatInfo.media'.tr)),
+      appBar: AppBar(leading: const VitaBackButton(), title: Text('chatInfo.media'.tr)),
       body: RefreshIndicator(
         onRefresh: () => _load(refresh: true),
         child: _items.isEmpty && !_loading

@@ -41,7 +41,7 @@ class ChatListPage extends StatelessWidget {
                     duration: const Duration(milliseconds: 300),
                   );
                 },
-                icon: Icon(Icons.add, color: context.vita.text, size: 26),
+                icon: Icon(Icons.add_circle_outline, color: context.vita.text, size: 26),
               ),
             ),
             _ChatSearchBox(),

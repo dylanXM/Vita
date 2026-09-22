@@ -21,7 +21,7 @@ class CompanionCreateMethodPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(title: Text('companion.create.chooseMethod'.tr)),
+      appBar: AppBar(leading: const VitaBackButton(), title: Text('companion.create.chooseMethod'.tr)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(0, 12, 0, 28),
         children: [
@@ -262,6 +262,7 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
     return Scaffold(
       backgroundColor: context.vita.pageBg,
       appBar: AppBar(
+          leading: const VitaBackButton(),
           title: Text((widget.mode == AICompanionCreateMode.meet
                   ? 'companion.create.method.meet'
                   : 'companion.create.method.description')

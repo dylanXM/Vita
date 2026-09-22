@@ -1,3 +1,4 @@
+import '../../shared/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -15,7 +16,7 @@ class SubscriptionPage extends StatelessWidget {
     final ctrl = BillingController.to;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(title: Text('me.plus.title'.tr)),
+      appBar: AppBar(leading: const VitaBackButton(), title: Text('me.plus.title'.tr)),
       body: Obx(() => _body(context, ctrl)),
     );
   }

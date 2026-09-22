@@ -17,7 +17,7 @@ class CreditsPage extends StatelessWidget {
     final ctrl = BillingController.to;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(title: Text('credits.title'.tr)),
+      appBar: AppBar(leading: const VitaBackButton(), title: Text('credits.title'.tr)),
       body: Obx(() => RefreshIndicator(
             onRefresh: ctrl.refreshCredits,
             child: _body(context, ctrl),

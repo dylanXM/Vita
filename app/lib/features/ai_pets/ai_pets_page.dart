@@ -143,7 +143,7 @@ class _AIPetsPageState extends State<AIPetsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(title: Text('aiPets.title'.tr)),
+      appBar: AppBar(leading: const VitaBackButton(), title: Text('aiPets.title'.tr)),
       body: _loading && _breeds.isEmpty
           ? ListView.builder(
               itemCount: 4,
@@ -395,7 +395,7 @@ class _AIPetHomePageState extends State<AIPetHomePage> {
     final state = _state ?? const <String, dynamic>{};
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(title: Text(widget.name)),
+      appBar: AppBar(leading: const VitaBackButton(), title: Text(widget.name)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(

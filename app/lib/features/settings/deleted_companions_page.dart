@@ -76,7 +76,7 @@ class _DeletedCompanionsPageState extends State<DeletedCompanionsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(title: Text('settings.deletedCompanions'.tr)),
+      appBar: AppBar(leading: const VitaBackButton(), title: Text('settings.deletedCompanions'.tr)),
       body: RefreshIndicator(
         onRefresh: _load,
         child: _loading && _items.isEmpty

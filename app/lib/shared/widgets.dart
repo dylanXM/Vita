@@ -537,3 +537,18 @@ String formatDateSeparator(DateTime t) {
 /// True when both timestamps fall on the same calendar day.
 bool isSameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
+
+/// Unified back button matching the chat detail page: thin iOS-style chevron.
+class VitaBackButton extends StatelessWidget {
+  const VitaBackButton({super.key, this.onPressed});
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: Icon(Icons.arrow_back_ios_new,
+          size: 20, color: context.vita.text),
+      onPressed: onPressed ?? () => Get.back(),
+    );
+  }
+}

@@ -87,6 +87,8 @@ class _ChatPageState extends State<ChatPage> {
   late final Worker _messageWorker;
   Timer? _recordingTimer;
   bool _recording = false;
+  String? _panel; // null | 'emoji' | 'more'
+  static const double _panelHeight = 210;
 
   @override
   void initState() {
@@ -235,37 +237,28 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  void _showEmojiPicker() {
-    FocusScope.of(context).unfocus();
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: context.vita.surface,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-          child: GridView.builder(
-            shrinkWrap: true,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 8,
-              mainAxisSpacing: 4,
-              crossAxisSpacing: 4,
-            ),
-            itemCount: _messageEmojis.length,
-            itemBuilder: (_, index) {
-              final emoji = _messageEmojis[index];
-              return InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: () {
-                  _insertEmoji(emoji);
-                  Navigator.of(sheetContext).pop();
-                },
-                child: Center(
-                    child: Text(emoji, style: const TextStyle(fontSize: 26))),
-              );
-            },
-          ),
+  Widget _buildEmojiPanel() {
+    return Container(
+      color: context.vita.pageBg,
+      height: _panelHeight,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: GridView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 8,
+          mainAxisSpacing: 4,
+          crossAxisSpacing: 4,
         ),
+        itemCount: _messageEmojis.length,
+        itemBuilder: (_, index) {
+          final emoji = _messageEmojis[index];
+          return InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => _insertEmoji(emoji),
+            child: Center(
+                child: Text(emoji, style: const TextStyle(fontSize: 26))),
+          );
+        },
       ),
     );
   }
@@ -342,9 +335,17 @@ class _ChatPageState extends State<ChatPage> {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: Obx(() => _buildInputBar(
-                        locked: ctrl.accessError.value != null,
-                      )),
+                  child: SafeArea(
+                    top: false,
+                    child: Obx(() => Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildInputBar(locked: ctrl.accessError.value != null),
+                            if (_panel == 'emoji') _buildEmojiPanel(),
+                            if (_panel == 'more') _buildMorePanel(),
+                          ],
+                        )),
+                  ),
                 ),
               ],
             ),
@@ -354,8 +355,11 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  double _inputBarReservedHeight(BuildContext context) =>
-      72 + MediaQuery.of(context).padding.bottom;
+  double _inputBarReservedHeight(BuildContext context) {
+    var h = 72 + MediaQuery.of(context).padding.bottom;
+    if (_panel != null) h += _panelHeight;
+    return h;
+  }
 
   Widget _buildMessages(ChatController ctrl, {double bottomPadding = 0}) {
     if (ctrl.loading.value && ctrl.messages.isEmpty) {
@@ -510,17 +514,17 @@ class _ChatPageState extends State<ChatPage> {
         border:
             Border(top: BorderSide(color: context.vita.divider, width: 0.5)),
       ),
-      padding: EdgeInsets.fromLTRB(
-          8, 8, 8, 8 + MediaQuery.of(context).padding.bottom),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          _RoundIconButton(
-            icon: _recording ? Icons.keyboard : Icons.graphic_eq,
-            onTap: locked ? null : _toggleRecording,
-            active: _recording,
-          ),
-          const SizedBox(width: 8),
+          // TODO: voice recording button temporarily hidden
+          // _RoundIconButton(
+          //   icon: _recording ? Icons.keyboard : Icons.graphic_eq,
+          //   onTap: locked ? null : _toggleRecording,
+          //   active: _recording,
+          // ),
+          // const SizedBox(width: 8),
           Expanded(
             child: Container(
               clipBehavior: Clip.antiAlias,
@@ -535,6 +539,9 @@ class _ChatPageState extends State<ChatPage> {
                 child: TextField(
                   controller: _input,
                   enabled: !locked,
+                  onTap: () {
+                    if (_panel != null) setState(() => _panel = null);
+                  },
                   minLines: 1,
                   maxLines: 5,
                   textInputAction: TextInputAction.send,
@@ -561,53 +568,68 @@ class _ChatPageState extends State<ChatPage> {
           ),
           const SizedBox(width: 8),
           _RoundIconButton(
-            icon: Icons.sentiment_satisfied_alt_outlined,
-            onTap: locked ? null : _showEmojiPicker,
+            icon: _panel == 'emoji'
+                ? Icons.keyboard
+                : Icons.sentiment_satisfied_alt_outlined,
+            onTap: locked
+                ? null
+                : () => setState(() {
+                      FocusScope.of(context).unfocus();
+                      _panel = _panel == 'emoji' ? null : 'emoji';
+                    }),
             showBorder: false,
             iconSize: 30,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 0),
           _RoundIconButton(
-            icon: Icons.add,
-            onTap: locked ? null : _showMorePanel,
+            icon: Icons.add_circle_outline,
+            onTap: locked
+                ? null
+                : () => setState(() {
+                      FocusScope.of(context).unfocus();
+                      _panel = _panel == 'more' ? null : 'more';
+                    }),
+            showBorder: false,
+            iconSize: 30,
           ),
         ],
       ),
     );
   }
 
-  void _showMorePanel() {
-    FocusScope.of(context).unfocus();
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: context.vita.pageBg,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          child: Row(
-            children: [
-              _MorePanelButton(
-                icon: Icons.swap_horiz_rounded,
-                label: '转账',
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  Get.snackbar('转账', '转账功能即将上线');
-                },
-              ),
-              const SizedBox(width: 20),
-              _MorePanelButton(
-                icon: Icons.card_giftcard_rounded,
-                label: '礼物',
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  showModalBottomSheet<void>(context: context, isScrollControlled: true, backgroundColor: context.vita.surface, showDragHandle: true, builder: (_) => ExperienceSheet(companionId: widget.companionId, onCompleted: ctrl.poll));
-                },
-              ),
-            ],
+  Widget _buildMorePanel() {
+    return Container(
+      color: context.vita.pageBg,
+      height: _panelHeight,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _MorePanelButton(
+            icon: Icons.swap_horiz_rounded,
+            label: '转账',
+            onTap: () {
+              setState(() => _panel = null);
+              Get.snackbar('转账', '转账功能即将上线');
+            },
           ),
-        ),
+          const SizedBox(width: 20),
+          _MorePanelButton(
+            icon: Icons.card_giftcard_rounded,
+            label: '礼物',
+            onTap: () {
+              setState(() => _panel = null);
+              showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: context.vita.surface,
+                  showDragHandle: true,
+                  builder: (_) => ExperienceSheet(
+                      companionId: widget.companionId,
+                      onCompleted: ctrl.poll));
+            },
+          ),
+        ],
       ),
     );
   }

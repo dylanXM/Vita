@@ -335,7 +335,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
     final name = widget.companion['name'] as String? ?? 'memories.title'.tr;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(title: Text(name)),
+      appBar: AppBar(leading: const VitaBackButton(), title: Text(name)),
       body: SafeArea(
         bottom: false,
         child: Obx(() => _buildBody(context)),

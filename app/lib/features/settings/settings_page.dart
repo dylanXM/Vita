@@ -329,7 +329,7 @@ class _OptionListPage extends StatelessWidget {
     final vita = context.vita;
     return Scaffold(
       backgroundColor: vita.pageBg,
-      appBar: AppBar(title: Text(title.tr)),
+      appBar: AppBar(leading: const VitaBackButton(), title: Text(title.tr)),
       body: ListView(
         padding: const EdgeInsets.only(top: 8, bottom: 24),
         children: [
