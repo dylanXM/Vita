@@ -176,22 +176,24 @@ class StoriesPage extends StatelessWidget {
                           fontSize: 17, fontWeight: FontWeight.w600))),
               // Self-as-protagonist entry: no AI companion, the user themselves
               // is the lead character.
-              ListTile(
-                  leading: Obx(() {
-                    final auth = AuthController.to;
-                    final name = auth.nickname.isNotEmpty
-                        ? auth.nickname
-                        : (auth.email.isEmpty ? 'storyHub.self'.tr : auth.email);
-                    return VitaAvatar(
-                        name: name,
-                        imageUrl: auth.avatarUrl,
-                    );
-                  }),
-                  title: Text('storyHub.self'.tr),
-                  onTap: () {
-                    Get.back();
-                    controller.start(background, null);
-                  }),
+              Obx(() {
+                final auth = AuthController.to;
+                final name = auth.nickname.isNotEmpty
+                    ? auth.nickname
+                    : (auth.email.isNotEmpty
+                        ? auth.email
+                        : 'storyHub.self'.tr);
+                return ListTile(
+                    leading: VitaAvatar(
+                      name: name,
+                      imageUrl: auth.avatarUrl,
+                    ),
+                    title: Text(name),
+                    onTap: () {
+                      Get.back();
+                      controller.start(background, null);
+                    });
+              }),
               const Divider(height: 0.5, indent: 72),
               ...controller.companions.map((companion) => ListTile(
                   leading: VitaAvatar(

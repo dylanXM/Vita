@@ -232,6 +232,7 @@ class VitaTranslations extends Translations {
       'storyHub.storyboardGenerating': 'Generating storyboard…',
       'storyHub.storyboardFailed': 'Storyboard generation failed',
       'storyHub.shareExternal': 'Share to another app',
+      'storyHub.self': 'Myself',
       'aiPets.title': 'AI Pets',
       'aiPets.empty': 'No AI pets yet',
       'aiPets.emptySub':
@@ -651,6 +652,7 @@ class VitaTranslations extends Translations {
       'storyHub.storyboardGenerating': '故事板生成中…',
       'storyHub.storyboardFailed': '故事板生成失败',
       'storyHub.shareExternal': '分享到其他应用',
+      'storyHub.self': '我自己',
       'aiPets.title': 'AI 宠物',
       'aiPets.empty': '还没有 AI 宠物',
       'aiPets.emptySub': 'Admin 配置并启用品种后会显示在这里。',
