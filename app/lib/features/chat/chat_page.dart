@@ -516,40 +516,40 @@ class _ChatPageState extends State<ChatPage> {
           const SizedBox(width: 8),
           Expanded(
             child: Container(
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 color: context.vita.surface,
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(4),
               ),
               child: Focus(
                 canRequestFocus: false,
                 skipTraversal: true,
                 onKeyEvent: _onInputKey,
-                child: SizedBox(
-                    height: 40,
-                    child: TextField(
-                controller: _input,
-                enabled: !locked,
-                minLines: 1,
-                maxLines: 5,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _send(),
-                style: TextStyle(
-                    fontSize: 16, color: context.vita.text, height: 1.4),
-                decoration: InputDecoration(
-                  hintText: locked ? 'chat.cannotSend'.tr : 'chat.message'.tr,
-                  hintStyle:
-                      TextStyle(color: context.vita.hint, fontSize: 15),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  errorBorder: InputBorder.none,
-                  disabledBorder: InputBorder.none,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: TextField(
+                  controller: _input,
+                  enabled: !locked,
+                  minLines: 1,
+                  maxLines: 5,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _send(),
+                  style: TextStyle(
+                      fontSize: 16, color: context.vita.text, height: 1.4),
+                  decoration: InputDecoration(
+                    hintText:
+                        locked ? 'chat.cannotSend'.tr : 'chat.message'.tr,
+                    hintStyle: TextStyle(
+                        color: context.vita.hint, fontSize: 16, height: 1.4),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    isCollapsed: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                  ),
                 ),
               ),
-              ),
-            ),
           ),
           ),
           const SizedBox(width: 8),
