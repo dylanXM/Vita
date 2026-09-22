@@ -19,9 +19,13 @@ class LifeDetailPage extends StatelessWidget {
     final vita = context.vita;
     return Scaffold(
       backgroundColor: vita.pageBg,
-      appBar: AppBar(leading: const VitaBackButton(), title: Text('contactDetail.title'.tr)),
+      appBar: AppBar(
+        leading: const VitaBackButton(),
+        title: Text('contactDetail.title'.tr),
+        shape: const Border(),
+      ),
       body: ListView(
-        padding: const EdgeInsets.only(top: 10, bottom: 28),
+        padding: const EdgeInsets.only(bottom: 28),
         children: [
           _ProfileHeader(
             companion: companion,

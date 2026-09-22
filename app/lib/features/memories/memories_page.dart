@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -5,6 +6,7 @@ import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
+import '../life/life_detail_page.dart';
 
 class MemoriesController extends GetxController {
   static MemoriesController get to => Get.find();
@@ -335,7 +337,20 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
     final name = widget.companion['name'] as String? ?? 'memories.title'.tr;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(leading: const VitaBackButton(), title: Text(name)),
+      appBar: AppBar(
+        leading: const VitaBackButton(),
+        title: Text(name),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.more_horiz),
+            color: context.vita.subText,
+            onPressed: () => Get.to(
+              () => LifeDetailPage(companion: widget.companion),
+              transition: Transition.cupertino,
+            ),
+          ),
+        ],
+      ),
       body: SafeArea(
         bottom: false,
         child: Obx(() => _buildBody(context)),
@@ -370,20 +385,52 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
           else
             SliverPadding(
               padding: const EdgeInsets.only(top: 12, bottom: 24),
-              sliver: SliverList.separated(
-                itemCount: controller.memories.length,
-                separatorBuilder: (_, __) => Divider(
-                  height: 0.5,
-                  indent: 60,
-                  color: context.vita.divider,
-                ),
-                itemBuilder: (context, index) => _MemoryTile(
-                  companionId: companionId,
-                  memory: controller.memories[index],
-                ),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate(_buildGroupedTiles(context)),
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  List<Widget> _buildGroupedTiles(BuildContext context) {
+    final tiles = <Widget>[];
+    DateTime? prevDay;
+    for (var i = 0; i < controller.memories.length; i++) {
+      final m = controller.memories[i];
+      final t = DateTime.tryParse(m['event_time'] as String? ??
+              m['created_at'] as String? ??
+              '') ??
+          DateTime.now();
+      final day = DateTime(t.year, t.month, t.day);
+      if (prevDay == null || day != prevDay) {
+        tiles.add(_DateSectionHeader(label: formatDateSeparator(t.toLocal())));
+      }
+      tiles.add(_MemoryTile(
+        companionId: companionId,
+        memory: m,
+      ));
+      prevDay = day;
+    }
+    return tiles;
+  }
+}
+
+class _DateSectionHeader extends StatelessWidget {
+  const _DateSectionHeader({required this.label});
+  final String label;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: context.vita.subText,
+        ),
       ),
     );
   }
@@ -446,9 +493,6 @@ class _MemoryTile extends StatelessWidget {
     final content = memory['content'] as String? ?? '';
     final title = (memory['title'] as String? ?? '').trim();
     final type = (memory['type'] as String? ?? 'memory').trim();
-    final eventTime = DateTime.tryParse(memory['event_time'] as String? ?? '');
-    final createdAt = DateTime.tryParse(memory['created_at'] as String? ?? '');
-    final date = eventTime ?? createdAt;
     final readonly = memory['readonly'] == true;
 
     return Container(
@@ -496,84 +540,90 @@ class _MemoryTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 7),
                 Text(
-                  [
-                    type,
-                    if (date != null) formatDate(date.toLocal()),
-                  ].where((item) => item.isNotEmpty).join(' · '),
+                  type,
                   style: TextStyle(fontSize: 12, color: context.vita.subText),
                 ),
               ],
             ),
           ),
           if (!readonly)
-            PopupMenuButton<String>(
-              onSelected: (action) {
-                if (action == 'edit') {
-                  _editMemory(context);
-                } else if (action == 'delete') {
-                  _deleteMemory(context);
-                }
-              },
-              itemBuilder: (_) => [
-                PopupMenuItem(value: 'edit', child: Text('memories.edit'.tr)),
-                PopupMenuItem(
-                  value: 'delete',
-                  child: Text('memories.delete'.tr),
+            Builder(builder: (btnCtx) {
+              return GestureDetector(
+                onTapDown: (details) {
+                  final box = btnCtx.findRenderObject() as RenderBox;
+                  final center = box.localToGlobal(Offset(box.size.width / 2, box.size.height / 2));
+                  _showWeChatMenu(context, center);
+                },
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Icon(Icons.more_horiz, color: Color(0xFF999999), size: 20),
                 ),
-              ],
-            ),
+              );
+            }),
         ],
       ),
     );
   }
 
-  Future<void> _editMemory(BuildContext context) async {
-    final input =
-        TextEditingController(text: memory['content'] as String? ?? '');
-    final value = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('memories.edit'.tr),
-        content: TextField(
-          controller: input,
-          minLines: 2,
-          maxLines: 5,
-          maxLength: 500,
+  void _showWeChatMenu(BuildContext context, Offset tapPos) {
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (overlayCtx) => Stack(children: [
+        GestureDetector(
+          onTap: () => entry.remove(),
+          child: Container(color: Colors.transparent),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text('common.cancel'.tr),
+        Positioned(
+          right: MediaQuery.of(context).size.width - tapPos.dx - 12,
+          top: tapPos.dy + 12,
+          child: Material(
+            color: Colors.transparent,
+            child: Stack(clipBehavior: Clip.none, alignment: Alignment.topRight, children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4C4C4C),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
+                  ],
+                ),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  _MenuItem(
+                      icon: Icons.delete,
+                      label: 'memories.delete'.tr,
+                      onTap: () { entry.remove(); _deleteMemory(context); },
+                    ),
+                  ]),
+              ),
+              Positioned(
+                top: -7,
+                right: 6,
+                child: CustomPaint(
+                  size: const Size(12, 7),
+                  painter: _MenuArrowPainter(),
+                ),
+              ),
+            ]),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, input.text.trim()),
-            child: Text('common.save'.tr),
-          ),
-        ],
-      ),
+        ),
+      ]),
     );
-    input.dispose();
-    if (value != null && value.isNotEmpty) {
-      await MemoriesController.to.updateMemory(
-        companionId,
-        memory['id'] as String,
-        value,
-      );
-    }
+    Overlay.of(context).insert(entry);
   }
 
   Future<void> _deleteMemory(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showCupertinoDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => CupertinoAlertDialog(
         title: Text('memories.delete'.tr),
         content: Text('memories.deleteConfirm'.tr),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text('common.cancel'.tr),
+            child: Text('common.cancel'.tr, style: const TextStyle(color: CupertinoColors.systemGrey)),
           ),
-          FilledButton(
+          CupertinoDialogAction(
+            isDestructiveAction: true,
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text('memories.delete'.tr),
           ),
@@ -587,4 +637,42 @@ class _MemoryTile extends StatelessWidget {
       );
     }
   }
+}
+
+
+class _MenuItem extends StatelessWidget {
+  const _MenuItem({required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 20, color: Colors.white),
+          const SizedBox(width: 12),
+          Text(label, style: const TextStyle(color: Colors.white, fontSize: 16)),
+        ]),
+      ),
+    );
+  }
+}
+
+class _MenuArrowPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = const Color(0xFF4C4C4C);
+    final path = Path();
+    path.moveTo(0, size.height);
+    path.lineTo(size.width / 2, 0);
+    path.lineTo(size.width, size.height);
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

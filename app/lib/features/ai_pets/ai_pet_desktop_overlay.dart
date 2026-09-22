@@ -125,9 +125,6 @@ class _DraggablePetState extends State<_DraggablePet>
                   decoration: BoxDecoration(
                     color: context.vita.surface.withValues(alpha: .9),
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: context.vita.green.withValues(alpha: .32),
-                    ),
                     boxShadow: const [
                       BoxShadow(
                         color: Color(0x24000000),

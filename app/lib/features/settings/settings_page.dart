@@ -24,7 +24,7 @@ class SettingsPage extends StatelessWidget {
       backgroundColor: vita.pageBg,
       appBar: AppBar(title: Text('settings.title'.tr)),
       body: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 24),
+        padding: const EdgeInsets.only(top: 10, bottom: 24),
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -329,7 +329,11 @@ class _OptionListPage extends StatelessWidget {
     final vita = context.vita;
     return Scaffold(
       backgroundColor: vita.pageBg,
-      appBar: AppBar(leading: const VitaBackButton(), title: Text(title.tr)),
+      appBar: AppBar(
+        leading: const VitaBackButton(),
+        title: Text(title.tr),
+        shape: const Border(),
+      ),
       body: ListView(
         padding: const EdgeInsets.only(top: 8, bottom: 24),
         children: [

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -68,18 +69,19 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     final key = product['key'] as String? ?? '';
     final coins = product['coins'] as int? ?? 0;
     final owned = _owned[key] == true;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showCupertinoDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => CupertinoAlertDialog(
         title: Text((product['name_key'] as String? ?? key).tr),
         content: Text(owned
             ? 'experience.equipConfirm'.tr
             : 'experience.confirm'.trParams({'coins': '$coins'})),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
               onPressed: () => Navigator.pop(dialogContext, false),
-              child: Text('common.cancel'.tr)),
-          FilledButton(
+              
+              child: Text('common.cancel'.tr, style: const TextStyle(color: CupertinoColors.systemGrey))),
+          CupertinoDialogAction(
               onPressed: () => Navigator.pop(dialogContext, true),
               child: Text(owned ? 'experience.equip'.tr : 'experience.use'.tr)),
         ],
@@ -141,22 +143,13 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
           // Header — centered title, matching the app nav-bar style.
           SizedBox(
             height: 52,
-            child: Stack(alignment: Alignment.center, children: [
-              Text('experience.title'.tr,
+            child: Center(
+              child: Text('experience.title'.tr,
                   style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w600,
                       color: context.vita.text)),
-              Positioned(
-                  right: 8,
-                  top: 0,
-                  bottom: 0,
-                  child: Center(
-                      child: IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: Icon(Icons.close,
-                              size: 22, color: context.vita.subText)))),
-            ]),
+            ),
           ),
           Divider(height: 0.5, thickness: 0.5, color: context.vita.divider),
           // Balance strip.

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -33,16 +34,39 @@ class _AIPetsPageState extends State<AIPetsPage> {
     _load();
   }
 
+  bool _autoJumped = false;
+
   Future<void> _load() async {
     if (mounted) setState(() => _loading = true);
     try {
       final data = await ApiClient.instance.get('/v1/ai-pets/breeds');
       final items = data is Map ? data['items'] : null;
       if (mounted && items is List) {
-        setState(() => _breeds = items
+        final breeds = items
             .whereType<Map>()
             .map((item) => Map<String, dynamic>.from(item))
-            .toList());
+            .toList();
+        setState(() => _breeds = breeds);
+        // If already adopted a pet, jump straight to its detail page and
+        // replace this list page so the user cannot adopt another one.
+        if (!_autoJumped) {
+          for (final breed in breeds) {
+            final adoptedId = '${breed['adopted_companion_id'] ?? ''}';
+            if (adoptedId.isNotEmpty) {
+              _autoJumped = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                Get.off(() => AIPetHomePage(
+                      companionId: adoptedId,
+                      name:
+                          '${breed['adopted_companion_name'] ?? breed['name'] ?? ''}',
+                      avatarUrl: '${breed['avatar_url'] ?? ''}',
+                      species: '${breed['species'] ?? ''}',
+                    ));
+              });
+              break;
+            }
+          }
+        }
       }
     } catch (_) {
       // Keep Explore usable when remote pet content is temporarily unavailable.
@@ -71,29 +95,32 @@ class _AIPetsPageState extends State<AIPetsPage> {
     }
     final nameController =
         TextEditingController(text: '${breed['name'] ?? ''}');
-    final confirmed = await Get.dialog<bool>(AlertDialog(
-      title: Text('aiPets.adoptTitle'.tr),
-      content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${breed['description'] ?? ''}'),
-            const SizedBox(height: 16),
-            TextField(
-                controller: nameController,
-                autofocus: true,
-                maxLength: 40,
-                decoration: InputDecoration(labelText: 'aiPets.petName'.tr)),
-          ]),
-      actions: [
-        TextButton(
-            onPressed: () => Get.back(result: false),
-            child: Text('common.cancel'.tr)),
-        FilledButton(
-            onPressed: () => Get.back(result: true),
-            child: Text('aiPets.adopt'.tr)),
-      ],
-    ));
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: Text('aiPets.adoptTitle'.tr),
+        content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${breed['description'] ?? ''}'),
+              const SizedBox(height: 16),
+              TextField(
+                  controller: nameController,
+                  autofocus: true,
+                  maxLength: 40,
+                  decoration: InputDecoration(labelText: 'aiPets.petName'.tr)),
+            ]),
+        actions: [
+          CupertinoDialogAction(
+              onPressed: () => Get.back(result: false),
+              child: Text('common.cancel'.tr, style: const TextStyle(color: CupertinoColors.systemGrey))),
+          CupertinoDialogAction(
+              onPressed: () => Get.back(result: true),
+              child: Text('aiPets.adopt'.tr)),
+        ],
+      ),
+    );
     if (confirmed != true || nameController.text.trim().isEmpty) {
       nameController.dispose();
       return;

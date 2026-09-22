@@ -109,13 +109,13 @@ class _NavItem {
 const List<_NavItem> _kTabs = [
   _NavItem(
     labelKey: 'tab.chat',
-    icon: Icons.chat_bubble_outline_rounded,
-    activeIcon: Icons.chat_bubble_rounded,
+    icon: Icons.forum_outlined,
+    activeIcon: Icons.forum,
   ),
   _NavItem(
     labelKey: 'tab.memories',
-    icon: Icons.auto_stories_outlined,
-    activeIcon: Icons.auto_stories_rounded,
+    icon: Icons.favorite_border,
+    activeIcon: Icons.favorite,
   ),
   _NavItem(
     labelKey: 'tab.explore',
@@ -124,8 +124,8 @@ const List<_NavItem> _kTabs = [
   ),
   _NavItem(
     labelKey: 'tab.me',
-    icon: Icons.person_outline_rounded,
-    activeIcon: Icons.person_rounded,
+    icon: Icons.person_outline,
+    activeIcon: Icons.person,
   ),
 ];
 

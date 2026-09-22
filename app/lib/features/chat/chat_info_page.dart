@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
@@ -165,17 +166,17 @@ class ChatInfoPage extends StatelessWidget {
   }
 
   Future<void> _confirmDelete(BuildContext context) async {
-    final first = await showDialog<bool>(
+    final first = await showCupertinoDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => CupertinoAlertDialog(
         title: Text('chatInfo.deleteConfirmTitle'.tr),
         content: Text('chatInfo.deleteConfirmMessage'.trParams({'name': name})),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text('common.cancel'.tr),
+            child: Text('common.cancel'.tr, style: const TextStyle(color: CupertinoColors.systemGrey)),
           ),
-          FilledButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text('chatInfo.deleteContinue'.tr),
           ),
@@ -183,20 +184,18 @@ class ChatInfoPage extends StatelessWidget {
       ),
     );
     if (first != true || !context.mounted) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showCupertinoDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => CupertinoAlertDialog(
         title: Text('chatInfo.deleteFinalTitle'.tr),
         content: Text('chatInfo.deleteFinalMessage'.tr),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text('common.cancel'.tr),
+            child: Text('common.cancel'.tr, style: const TextStyle(color: CupertinoColors.systemGrey)),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: dialogContext.vita.red,
-            ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text('chatInfo.delete'.tr),
           ),
