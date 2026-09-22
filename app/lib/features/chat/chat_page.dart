@@ -16,6 +16,7 @@ import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
 import '../shell/shell_page.dart';
 import 'chat_controller.dart';
+import '../auth/auth_controller.dart';
 import 'chat_info_page.dart';
 import 'chat_message_content.dart';
 import 'experience_sheet.dart';
@@ -480,8 +481,14 @@ class _ChatPageState extends State<ChatPage> {
               ),
               if (isUser) ...[
                 const SizedBox(width: 8),
-                VitaAvatar(name: '1', radius: 22,
-                    borderRadius: BorderRadius.circular(10)),
+                Obx(() {
+                  final auth = AuthController.to;
+                  return VitaAvatar(
+                      name: auth.nickname.isEmpty ? '?' : auth.nickname,
+                      radius: 22,
+                      imageUrl: auth.avatarUrl,
+                      borderRadius: BorderRadius.circular(10));
+                }),
               ],
             ],
           ),
