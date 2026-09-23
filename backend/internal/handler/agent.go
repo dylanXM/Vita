@@ -56,6 +56,8 @@ type modelTestResult struct {
 	Scenario string `json:"scenario"`
 	Success  bool   `json:"success"`
 	Error    string `json:"error,omitempty"`
+	Method   string `json:"method,omitempty"`
+	URL      string `json:"url,omitempty"`
 	Request  string `json:"request,omitempty"`
 	Response string `json:"response,omitempty"`
 }
@@ -233,11 +235,12 @@ func AdminTestProviderConnection(c *gin.Context) {
 	}
 	model := agent.Model{Kind: kind, BaseURL: strings.TrimSpace(input.BaseURL), APIKey: apiKey}
 	client := agent.NewClient()
-	if err := client.TestConnection(c.Request.Context(), model); err != nil {
-		c.JSON(http.StatusOK, gin.H{"success": false, "message": err.Error()})
+	models, raw, err := client.TestConnection(c.Request.Context(), model)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": err.Error(), "raw": raw})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "connected"})
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "connected", "models": models, "raw": raw})
 }
 
 func AdminDeleteProvider(c *gin.Context) {
@@ -451,7 +454,7 @@ func collectModelTestResults(scenarios []string, test func(string) (agent.ModelS
 	results := make([]modelTestResult, 0, len(scenarios))
 	for _, scenario := range scenarios {
 		detail, err := test(scenario)
-		result := modelTestResult{Scenario: scenario, Success: err == nil, Request: detail.Request, Response: detail.Response}
+		result := modelTestResult{Scenario: scenario, Success: err == nil, Method: detail.Method, URL: detail.URL, Request: detail.Request, Response: detail.Response}
 		if err != nil {
 			result.Error = err.Error()
 		}
@@ -604,7 +607,7 @@ func replaceModelSubscriptionPlans(ctx context.Context, store modelPlanStore, mo
 
 func normalizeModelScenarios(input []string) ([]string, []string, error) {
 	if len(input) == 0 {
-		return nil, nil, errors.New("select at least one testable model scenario")
+		return []string{}, []string{}, nil
 	}
 	seenScenarios := make(map[string]bool, len(input))
 	seenCapabilities := make(map[string]bool)

@@ -242,7 +242,7 @@ export const agentApi = {
     http.put<AIModel>(`/admin/agent/models/${id}`, body),
   removeModel: (id: string) => http.del<{ message: string }>(`/admin/agent/models/${id}`),
   testProviderConnection: (body: { kind: string; base_url: string; api_key?: string; provider_id?: string }) =>
-    http.post<{ success: boolean; message: string }>("/admin/agent/providers/test-connection", body, { timeout: 60_000 }),
+    http.post<{ success: boolean; message: string; models?: string[]; raw?: string }>("/admin/agent/providers/test-connection", body, { timeout: 60_000 }),
   mediaRoutes: (signal?: AbortSignal) =>
     http.get<MediaModelRoutesResponse>("/admin/agent/media-routes", { signal }),
   saveMediaRoutes: (routes: MediaModelRoute[]) =>

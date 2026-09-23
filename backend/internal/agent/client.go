@@ -57,7 +57,7 @@ func (c *Client) TranscribeAudio(ctx context.Context, model Model, filename, mim
 	if err := writer.Close(); err != nil {
 		return "", err
 	}
-	endpoint := strings.TrimRight(defaultBaseURL(model.Kind, model.BaseURL), "/") + "/v1/audio/transcriptions"
+	endpoint := providerEndpoint(defaultBaseURL(model.Kind, model.BaseURL), "/audio/transcriptions")
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, &body)
 	if err != nil {
 		return "", err
@@ -94,7 +94,7 @@ func (c *Client) GenerateSpeech(ctx context.Context, model Model, text, voice st
 		voice = "alloy"
 	}
 	body, _ := json.Marshal(map[string]any{"model": model.ModelName, "voice": voice, "input": text, "response_format": "mp3"})
-	endpoint := strings.TrimRight(defaultBaseURL(model.Kind, model.BaseURL), "/") + "/v1/audio/speech"
+	endpoint := providerEndpoint(defaultBaseURL(model.Kind, model.BaseURL), "/audio/speech")
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, "", err
@@ -156,7 +156,7 @@ func (c *Client) GenerateImage(ctx context.Context, model Model, input GenerateI
 			B64JSON string `json:"b64_json"`
 		} `json:"data"`
 	}
-	endpoint := strings.TrimRight(defaultBaseURL(model.Kind, model.BaseURL), "/") + "/v1/images/generations"
+	endpoint := providerEndpoint(defaultBaseURL(model.Kind, model.BaseURL), "/images/generations")
 	if err := c.doJSONWithLimit(ctx, endpoint, model.APIKey, "", body, &response, maxImageProviderResponseBytes); err != nil {
 		return "", err
 	}
@@ -186,17 +186,59 @@ func (c *Client) openAI(ctx context.Context, model Model, input GenerateRequest)
 	}
 	var response struct {
 		Choices []struct {
-			Message ChatMessage `json:"message"`
+			Message struct {
+				Content          json.RawMessage `json:"content"`
+				ReasoningContent string          `json:"reasoning_content"`
+			} `json:"message"`
 		} `json:"choices"`
 	}
-	endpoint := strings.TrimRight(defaultBaseURL(model.Kind, model.BaseURL), "/") + "/v1/chat/completions"
+	endpoint := providerEndpoint(defaultBaseURL(model.Kind, model.BaseURL), "/chat/completions")
 	if err := c.doJSON(ctx, endpoint, model.APIKey, "", body, &response); err != nil {
 		return "", err
 	}
-	if len(response.Choices) == 0 || strings.TrimSpace(response.Choices[0].Message.Content) == "" {
-		return "", fmt.Errorf("openai-compatible provider returned no text")
+	if len(response.Choices) == 0 {
+		return "", fmt.Errorf("openai-compatible provider returned no choices")
 	}
-	return strings.TrimSpace(response.Choices[0].Message.Content), nil
+	msg := response.Choices[0].Message
+	if text := extractOpenAIText(msg.Content); text != "" {
+		return text, nil
+	}
+	// Reasoning models (e.g. Claude through an OpenAI-compatible gateway) may
+	// put the visible reply in reasoning_content while message.content is empty.
+	if text := strings.TrimSpace(msg.ReasoningContent); text != "" {
+		return text, nil
+	}
+	raw := strings.TrimSpace(string(msg.Content))
+	if len(raw) > 500 {
+		raw = raw[:500] + "…"
+	}
+	return "", fmt.Errorf("openai-compatible provider returned no text (content=%s)", raw)
+}
+
+// extractOpenAIText reads the text out of an OpenAI chat message content
+// field, which may be either a plain string or an array of content blocks.
+func extractOpenAIText(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		return strings.TrimSpace(s)
+	}
+	var blocks []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(raw, &blocks); err == nil {
+		var b strings.Builder
+		for _, blk := range blocks {
+			if blk.Type == "text" {
+				b.WriteString(blk.Text)
+			}
+		}
+		return strings.TrimSpace(b.String())
+	}
+	return ""
 }
 
 func (c *Client) anthropic(ctx context.Context, model Model, input GenerateRequest) (string, error) {
@@ -213,7 +255,7 @@ func (c *Client) anthropic(ctx context.Context, model Model, input GenerateReque
 			Text string `json:"text"`
 		} `json:"content"`
 	}
-	endpoint := strings.TrimRight(defaultBaseURL(model.Kind, model.BaseURL), "/") + "/v1/messages"
+	endpoint := providerEndpoint(defaultBaseURL(model.Kind, model.BaseURL), "/messages")
 	if err := c.doJSON(ctx, endpoint, model.APIKey, "2023-06-01", body, &response); err != nil {
 		return "", err
 	}
@@ -265,11 +307,19 @@ func (c *Client) doJSONWithLimit(ctx context.Context, endpoint, apiKey, anthropi
 // key is accepted. It only calls the lightweight models listing endpoint and
 // does not invoke the configured model, so it validates the service connection
 // itself rather than end-to-end model behavior.
-func (c *Client) TestConnection(ctx context.Context, model Model) error {
-	endpoint := strings.TrimRight(defaultBaseURL(model.Kind, model.BaseURL), "/") + "/v1/models"
+// TestConnection lists the provider's models endpoint and returns the model
+// IDs the API key is allowed to use. It validates the service connection and
+// surfaces the actually available model names so the admin console can tell a
+// mis-typed remote model ID from an upstream outage.
+// TestConnection pings the provider's models endpoint and returns both the
+// parsed model IDs and the raw response body. The raw body is always surfaced
+// (truncated) so the admin console can see exactly which model names the key
+// is allowed to use, even when the upstream uses a non-standard schema.
+func (c *Client) TestConnection(ctx context.Context, model Model) ([]string, string, error) {
+	endpoint := providerEndpoint(defaultBaseURL(model.Kind, model.BaseURL), "/models")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return fmt.Errorf("create provider request: %w", err)
+		return nil, "", fmt.Errorf("create provider request: %w", err)
 	}
 	if model.Kind == "anthropic" {
 		req.Header.Set("x-api-key", model.APIKey)
@@ -279,14 +329,48 @@ func (c *Client) TestConnection(ctx context.Context, model Model) error {
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("provider request: %w", err)
+		return nil, "", fmt.Errorf("provider request: %w", err)
 	}
 	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxProviderResponseBytes))
+	reader := io.LimitReader(resp.Body, maxProviderResponseBytes)
+	raw, _ := io.ReadAll(reader)
+	rawText := strings.TrimSpace(string(raw))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("provider returned %s", resp.Status)
+		return nil, rawText, fmt.Errorf("provider returned %s on GET %s: %s", resp.Status, endpoint, rawText)
 	}
-	return nil
+	var listing struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	models := []string{}
+	if err := json.Unmarshal(raw, &listing); err == nil {
+		for _, item := range listing.Data {
+			if item.ID != "" {
+				models = append(models, item.ID)
+			}
+		}
+	}
+	if len(rawText) > 2000 {
+		rawText = rawText[:2000] + "…"
+	}
+	return models, rawText, nil
+}
+
+// providerEndpoint joins a configured base URL with an API path that starts
+// with a slash. It avoids double-prefixing /v1: operators often paste the full
+// OpenAI-compatible base URL (e.g. https://gateway.example.com/v1) into the
+// service address, and naively appending /v1 again produces /v1/v1/... which
+// the upstream rejects on chat calls even when a bare GET /v1/models passes.
+func providerEndpoint(base, path string) string {
+	b := strings.TrimRight(strings.TrimSpace(base), "/")
+	if b == "" {
+		b = "https://api.openai.com"
+	}
+	if strings.HasSuffix(b, "/v1") {
+		return b + path
+	}
+	return b + "/v1" + path
 }
 
 func defaultBaseURL(kind, configured string) string {

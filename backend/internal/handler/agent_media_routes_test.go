@@ -111,7 +111,12 @@ func TestNormalizeModelScenariosDerivesCapabilities(t *testing.T) {
 }
 
 func TestNormalizeModelScenariosRejectsUntestableAndDuplicateScenarios(t *testing.T) {
-	for _, scenarios := range [][]string{{}, {"unknown_scene"}, {"text_chat", "text_chat"}} {
+	// An empty scenario list is now allowed: scenarios are configured later
+	// through the dedicated "configure system scenarios" dialog.
+	if _, _, err := normalizeModelScenarios([]string{}); err != nil {
+		t.Fatalf("empty scenario list should be accepted, got %v", err)
+	}
+	for _, scenarios := range [][]string{{"unknown_scene"}, {"text_chat", "text_chat"}} {
 		if _, _, err := normalizeModelScenarios(scenarios); err == nil {
 			t.Fatalf("expected validation error for %#v", scenarios)
 		}

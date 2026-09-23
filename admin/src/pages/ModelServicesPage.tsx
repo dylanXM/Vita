@@ -352,7 +352,7 @@ function EditorDialog({
   const { t } = useTranslation();
   const open = editor !== null;
   const isEdit = editor?.mode === "edit";
-  const [conn, setConn] = useState<{ success: boolean; message: string } | null>(null);
+  const [conn, setConn] = useState<{ success: boolean; message: string; models?: string[]; raw?: string } | null>(null);
   const test = useMutation({
     mutationFn: () =>
       agentApi.testProviderConnection({
@@ -373,7 +373,7 @@ function EditorDialog({
   );
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { onClose(); setConn(null); } }}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>{isEdit ? t("modelServices.edit") : t("modelServices.create")}</DialogTitle>
           <DialogDescription>{t("modelServices.editorDesc")}</DialogDescription>
@@ -423,11 +423,25 @@ function EditorDialog({
           {t("modelServices.enabled")}
         </label>
         {conn && (
-          <div className="flex items-center gap-2 text-sm">
-            <Badge variant={conn.success ? "success" : "warning"}>
-              {conn.success ? t("modelServices.connectionOk") : t("modelServices.connectionFailed")}
-            </Badge>
-            {conn.message && <span className="text-xs text-muted-foreground">{conn.message}</span>}
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center gap-2">
+              <Badge variant={conn.success ? "success" : "warning"}>
+                {conn.success ? t("modelServices.connectionOk") : t("modelServices.connectionFailed")}
+              </Badge>
+              {conn.message && <span className="text-xs text-muted-foreground">{conn.message}</span>}
+            </div>
+            {conn.success && conn.models && conn.models.length > 0 && (
+              <div>
+                <div className="text-xs text-muted-foreground">{t("modelServices.availableModels")}（{conn.models.length}）</div>
+                <pre className="mt-1 max-h-32 overflow-auto rounded bg-muted p-2 font-mono text-xs whitespace-pre-wrap break-words">{conn.models.join(", ")}</pre>
+              </div>
+            )}
+            {conn.raw && (
+              <div>
+                <div className="text-xs text-muted-foreground">{t("modelServices.rawResponse")}</div>
+                <pre className="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 font-mono text-xs whitespace-pre-wrap break-words">{conn.raw}</pre>
+              </div>
+            )}
           </div>
         )}
         <DialogFooter className="gap-2">
@@ -457,17 +471,23 @@ function ScenarioResults({ results }: { results: AIModelTestResult[] }) {
             <Badge variant={r.success ? "success" : "warning"}>{r.success ? t("modelServices.ok") : t("modelServices.failed")}</Badge>
             <span className="font-medium">{t(`mediaModels.route.${r.scenario}`)}</span>
           </div>
-          {r.error && <p className="mt-1 text-xs text-destructive">{r.error}</p>}
+          {r.method && r.url && (
+            <div className="mt-2">
+              <div className="text-xs text-muted-foreground">{t("modelServices.testEndpoint")}</div>
+              <pre className="mt-0.5 overflow-auto rounded bg-muted p-2 font-mono text-xs whitespace-pre-wrap break-all">{r.method} {r.url}</pre>
+            </div>
+          )}
+          {r.error && <p className="mt-2 whitespace-pre-wrap break-all text-xs text-destructive">{r.error}</p>}
           {r.request && (
             <div className="mt-2">
               <div className="text-xs text-muted-foreground">{t("modelServices.testRequest")}</div>
-              <pre className="mt-0.5 max-h-24 overflow-auto rounded bg-muted p-2 text-xs">{r.request}</pre>
+              <pre className="mt-0.5 max-h-64 overflow-auto rounded bg-muted p-2 font-mono text-xs whitespace-pre-wrap break-words">{r.request}</pre>
             </div>
           )}
           {r.response && (
             <div className="mt-2">
               <div className="text-xs text-muted-foreground">{t("modelServices.testResponse")}</div>
-              <pre className="mt-0.5 max-h-24 overflow-auto rounded bg-muted p-2 text-xs">{r.response}</pre>
+              <pre className="mt-0.5 max-h-64 overflow-auto rounded bg-muted p-2 font-mono text-xs whitespace-pre-wrap break-words">{r.response}</pre>
             </div>
           )}
         </div>
@@ -541,7 +561,7 @@ function ScenariosDialog({
 
   return (
     <Dialog open={row !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle>{t("modelServices.configureScenarios")}</DialogTitle>
           <DialogDescription>{row?.model.display_name}</DialogDescription>

@@ -385,6 +385,8 @@ export interface AIModelTestResult {
   scenario: AIModelScenario;
   success: boolean;
   error?: string;
+  method?: string;
+  url?: string;
   request?: string;
   response?: string;
 }
