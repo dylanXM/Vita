@@ -609,6 +609,10 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS subscription_paused_at TIMESTAMP`,
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP`,
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS purge_after TIMESTAMP`,
+		// admin_takeover=true means an administrator has taken over this
+		// companion manually: the Life Engine keeps its daily plan but stops
+		// dispatching proactive messages until the admin exits the takeover.
+		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS admin_takeover BOOLEAN NOT NULL DEFAULT false`,
 		`CREATE INDEX IF NOT EXISTS idx_companions_purge_after ON companions(purge_after) WHERE deleted_at IS NOT NULL`,
 		// Reserved for the upcoming voice-message capability. Keeping the
 		// provider-specific settings in JSON avoids another migration when the

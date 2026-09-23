@@ -285,3 +285,40 @@ export const companionsApi = {
       { params: { page, page_size: 50 }, signal },
     ),
 };
+
+import type {
+  LifeEngineCompanion,
+  LifeEngineEvent,
+  LifeEngineEventInput,
+  LifeEngineOverview,
+} from "./types";
+
+export const lifeEngineApi = {
+  overview: (signal?: AbortSignal) =>
+    http.get<LifeEngineOverview>("/admin/life-engine/overview", { signal }),
+  companions: (signal?: AbortSignal) =>
+    http.get<{ items: LifeEngineCompanion[] }>("/admin/life-engine/companions", { signal }),
+  events: (companionID: string, signal?: AbortSignal) =>
+    http.get<{ items: LifeEngineEvent[] }>(`/admin/life-engine/companions/${companionID}/events`, { signal }),
+  createEvent: (companionID: string, body: LifeEngineEventInput) =>
+    http.post<{ id: string }>(`/admin/life-engine/companions/${companionID}/events`, body),
+  updateEvent: (eventID: string, body: LifeEngineEventInput) =>
+    http.put<{ message: string }>(`/admin/life-engine/events/${eventID}`, body),
+  deleteEvent: (eventID: string) =>
+    http.del<{ message: string }>(`/admin/life-engine/events/${eventID}`),
+  enterTakeover: (companionID: string) =>
+    http.post<{ message: string }>(`/admin/life-engine/companions/${companionID}/takeover`),
+  exitTakeover: (companionID: string) =>
+    http.del<{ message: string }>(`/admin/life-engine/companions/${companionID}/takeover`),
+  triggerPlan: (force = false) =>
+    http.post<{ message: string; scanned: number; newly_completed: number; failed_after: number; diagnostics: Array<{ name: string; active: boolean; life_enabled: boolean; admin_takeover: boolean; active_subscription: boolean; today_status: string; last_error: string }> }>(
+      "/admin/life-engine/trigger-plan", undefined, { params: force ? { force: "true" } : undefined, timeout: 120_000 }),
+  triggerProactive: () =>
+    http.post<{ message: string; due_before: number; dispatched: number; shared_after: number }>(
+      "/admin/life-engine/trigger-proactive", undefined, { timeout: 120_000 }),
+  resendOutbox: (companionID: string) =>
+    http.post<{ message: string; reset: number }>(`/admin/life-engine/companions/${companionID}/resend-outbox`),
+  broadcast: (companionID: string, body: { content: string; conversation_id?: string }) =>
+    http.post<{ message: string; message_id: string; conversation_id: string }>(
+      `/admin/life-engine/companions/${companionID}/broadcast`, body),
+};

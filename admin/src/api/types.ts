@@ -616,3 +616,98 @@ export interface StoryBackground {
 
 export type StoryBackgroundInput = Omit<StoryBackground, "id">;
 
+
+export interface LifeEngineSettings {
+  daily_event_min: number;
+  daily_event_max: number;
+  daily_proactive_limit: number;
+  daily_life_photo_limit: number;
+  quiet_hours_start: number;
+  quiet_hours_end: number;
+}
+
+export interface LifeEngineCounters {
+  active_companions: number;
+  takeover_companions: number;
+  events_today: number;
+  events_shared_today: number;
+  proactive_messages_today: number;
+  outbox_ready: number;
+  outbox_retrying: number;
+  outbox_failed: number;
+  runs_failed_today: number;
+}
+
+export interface LifeEngineRunBucket {
+  kind: string;
+  status: string;
+  count: number;
+}
+
+export interface LifeEngineOverview {
+  settings: LifeEngineSettings;
+  counters: LifeEngineCounters;
+  last_run_at: string | null;
+  run_breakdown: LifeEngineRunBucket[];
+}
+
+export interface LifeEngineCompanion {
+  id: string;
+  name: string;
+  user_id: string;
+  user_email: string;
+  environment: Environment;
+  city: string;
+  active: boolean;
+  life_enabled: boolean;
+  proactive_enabled: boolean;
+  admin_takeover: boolean;
+  today_events: number;
+  today_shared: number;
+  due_unshared: number;
+  today_proactive: number;
+  mood: number;
+  energy: number;
+  stress: number;
+  social_energy: number;
+  intimacy: number;
+  trust: number;
+  familiarity: number;
+  enthusiasm: number;
+  last_run_at: string | null;
+  last_run_status: string;
+  last_error: string;
+  last_model_output: string;
+  updated_at: string;
+}
+
+export interface LifeEngineEvent {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  location: string;
+  start_time: string;
+  end_time: string;
+  emotion: string;
+  importance: number;
+  user_relevance: number;
+  shareability: boolean;
+  status: string;
+  shared_at: string | null;
+  generation_source: string;
+  payload: Record<string, unknown>;
+}
+
+export interface LifeEngineEventInput {
+  title: string;
+  description?: string;
+  location?: string;
+  start_time: string;
+  end_time: string;
+  emotion?: string;
+  importance?: number;
+  user_relevance?: number;
+  shareability?: boolean;
+  event_type?: string;
+}

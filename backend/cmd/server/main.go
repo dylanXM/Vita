@@ -327,6 +327,22 @@ func main() {
 				agentAdmin.PUT("/portraits/:id", handler.AdminUpdatePortrait)
 				agentAdmin.GET("/companions", handler.AdminListCompanions)
 				agentAdmin.POST("/companions", handler.AdminCreateCompanion)
+
+			lifeEngine := admin.Group("/life-engine")
+			{
+				lifeEngine.GET("/overview", handler.AdminLifeEngineOverview)
+				lifeEngine.GET("/companions", handler.AdminLifeEngineCompanions)
+				lifeEngine.GET("/companions/:id/events", handler.AdminLifeEngineCompanionEvents)
+				lifeEngine.POST("/companions/:id/events", handler.AdminLifeEngineCreateEvent)
+				lifeEngine.PUT("/events/:eventId", handler.AdminLifeEngineUpdateEvent)
+				lifeEngine.DELETE("/events/:eventId", handler.AdminLifeEngineDeleteEvent)
+				lifeEngine.POST("/companions/:id/takeover", handler.AdminLifeEngineEnterTakeover)
+				lifeEngine.DELETE("/companions/:id/takeover", handler.AdminLifeEngineExitTakeover)
+				lifeEngine.POST("/trigger-plan", handler.AdminLifeEngineTriggerPlan)
+				lifeEngine.POST("/trigger-proactive", handler.AdminLifeEngineTriggerProactive)
+				lifeEngine.POST("/companions/:id/resend-outbox", handler.AdminLifeEngineResendOutbox)
+				lifeEngine.POST("/companions/:id/broadcast", handler.AdminLifeEngineBroadcast)
+			}
 				agentAdmin.PUT("/companions/:id", handler.AdminUpdateCompanion)
 			}
 		}

@@ -22,6 +22,7 @@ import { ModelServicesPage } from "@/pages/ModelServicesPage";
 import { LegalDocumentsPage } from "@/pages/LegalDocumentsPage";
 import { AIPetsPage } from "@/pages/AIPetsPage";
 import { StoryHubPage } from "@/pages/StoryHubPage";
+import { LifeEnginePage } from "@/pages/LifeEnginePage";
 import { StoragePage } from "@/pages/StoragePage";
 import { Button } from "@/components/ui/button";
 
@@ -78,6 +79,7 @@ const router = createBrowserRouter([
       { path: "legal-documents", element: <LegalDocumentsPage /> },
       { path: "ai-pets", element: <AIPetsPage /> },
       { path: "story-hub", element: <StoryHubPage /> },
+      { path: "life-engine", element: <LifeEnginePage /> },
     ],
   },
   { path: "*", element: <NotFoundPage /> },

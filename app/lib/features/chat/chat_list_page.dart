@@ -75,14 +75,17 @@ class ChatListPage extends StatelessWidget {
         subtitle: 'contacts.noResultsSub'.tr,
       );
     }
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 90),
-      itemCount: list.length,
-      separatorBuilder: (context, _) => Divider(
-        height: 0.5,
-        indent: 82,
-        color: context.vita.divider,
-      ),
+    return RefreshIndicator(
+      onRefresh: () => ctrl.load(),
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(0, 8, 0, 90),
+        itemCount: list.length,
+        separatorBuilder: (context, _) => Divider(
+          height: 0.5,
+          indent: 82,
+          color: context.vita.divider,
+        ),
       itemBuilder: (context, i) {
         final c = list[i];
         final id = c['id'] as String? ?? '';
@@ -183,6 +186,7 @@ class ChatListPage extends StatelessWidget {
           ),
         );
       },
+      ),
     );
   }
 }

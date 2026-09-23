@@ -692,7 +692,7 @@ func (s *Service) EnsureDailyPlans(ctx context.Context) error {
 		       COALESCE(u.timezone, 'UTC')
 		FROM companions c JOIN users u ON u.id = c.user_id
 		LEFT JOIN relationship_states r ON r.companion_id=c.id
-		WHERE (c.active = true OR c.deleted_at IS NOT NULL) AND c.life_enabled=true AND c.is_default=false
+		WHERE (c.active = true OR c.deleted_at IS NOT NULL) AND c.life_enabled=true AND c.is_default=false AND COALESCE(c.admin_takeover,false)=false
 		AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active'
 		  AND (s.current_period_end IS NULL OR s.current_period_end > CURRENT_TIMESTAMP))`)
 	if err != nil {
@@ -822,6 +822,9 @@ func (s *Service) generatePlan(ctx context.Context, profile companionContext, lo
 				s.recordRun(ctx, profile.ID, "life_plan", model.ID, "succeeded", "")
 				return events, model.ID, nil
 			}
+			lastErr = generateErr
+			s.recordRunWithInput(ctx, profile.ID, "life_plan", model.ID, "failed", generateErr.Error(), text)
+			continue
 		}
 		lastErr = generateErr
 		s.recordRun(ctx, profile.ID, "life_plan", model.ID, "failed", generateErr.Error())
@@ -963,7 +966,7 @@ func (s *Service) ensureCompanionConnections(ctx context.Context) error {
 	rows, err := s.db.QueryContext(ctx, `
 		WITH eligible AS (
 			SELECT c.id,COALESCE(c.city,'') city FROM companions c
-			WHERE (c.active=true OR c.deleted_at IS NOT NULL) AND c.life_enabled=true AND c.is_default=false
+			WHERE (c.active=true OR c.deleted_at IS NOT NULL) AND c.life_enabled=true AND c.is_default=false AND COALESCE(c.admin_takeover,false)=false
 			  AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP))
 		)
 		SELECT a.id,b.id FROM eligible a JOIN eligible b ON a.id < b.id
@@ -1165,7 +1168,7 @@ func (s *Service) generateSocialEvent(ctx context.Context, a, b companionContext
 // PublishDueMoments turns selected life records into social posts. media_urls
 // makes text, image-only and image-plus-text posts share one stable contract.
 func (s *Service) PublishDueMoments(ctx context.Context) error {
-	rows, err := s.db.QueryContext(ctx, `SELECT e.id,e.companion_id,e.social_event_id,COALESCE(e.title,''),COALESCE(e.description,''),e.start_time,e.payload::text FROM life_events e JOIN companions c ON c.id=e.companion_id WHERE e.status='active' AND e.start_time<=CURRENT_TIMESTAMP AND COALESCE((e.payload->>'moment_candidate')::boolean,false)=true AND (c.active=true OR c.deleted_at IS NOT NULL) AND c.life_enabled=true AND c.is_default=false AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP)) AND NOT EXISTS(SELECT 1 FROM moment_posts p WHERE p.life_event_id=e.id) ORDER BY e.start_time LIMIT 50`)
+	rows, err := s.db.QueryContext(ctx, `SELECT e.id,e.companion_id,e.social_event_id,COALESCE(e.title,''),COALESCE(e.description,''),e.start_time,e.payload::text FROM life_events e JOIN companions c ON c.id=e.companion_id WHERE e.status='active' AND e.start_time<=CURRENT_TIMESTAMP AND COALESCE((e.payload->>'moment_candidate')::boolean,false)=true AND (c.active=true OR c.deleted_at IS NOT NULL) AND c.life_enabled=true AND c.is_default=false AND COALESCE(c.admin_takeover,false)=false AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP)) AND NOT EXISTS(SELECT 1 FROM moment_posts p WHERE p.life_event_id=e.id) ORDER BY e.start_time LIMIT 50`)
 	if err != nil {
 		return err
 	}
@@ -1248,7 +1251,7 @@ func (s *Service) DispatchDueProactive(ctx context.Context) error {
 		LEFT JOIN relationship_states r ON r.companion_id=c.id
 		WHERE e.shareability = true AND e.shared_at IS NULL AND e.status = 'active'
 		  AND e.start_time <= CURRENT_TIMESTAMP AND c.active = true AND c.proactive_enabled = true
-		  AND c.life_enabled=true AND c.is_default=false
+		  AND c.life_enabled=true AND c.is_default=false AND COALESCE(c.admin_takeover,false)=false
 		  AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active'
 		    AND (s.current_period_end IS NULL OR s.current_period_end > CURRENT_TIMESTAMP))
 		  AND c.created_at <= CURRENT_TIMESTAMP - INTERVAL '1 hour'
@@ -1895,13 +1898,20 @@ func (s *Service) getOrCreateConversation(ctx context.Context, userID, companion
 }
 
 func (s *Service) recordRun(ctx context.Context, companionID, kind, modelID, status, runError string) {
+	s.recordRunWithInput(ctx, companionID, kind, modelID, status, runError, "")
+}
+
+// recordRunWithInput attaches a short snippet of the model's raw output so
+// admins can see what the model actually returned when a structured-output
+// parse fails.
+func (s *Service) recordRunWithInput(ctx context.Context, companionID, kind, modelID, status, runError, inputSummary string) {
 	if s.db == nil {
 		return
 	}
 	_, _ = s.db.ExecContext(ctx, `
-		INSERT INTO agent_runs (id, companion_id, kind, model_id, status, error, finished_at)
-		VALUES ($1,NULLIF($2,''),$3,NULLIF($4,''),$5,$6,CURRENT_TIMESTAMP)`,
-		uuid.New().String(), companionID, kind, modelID, status, truncate(runError, 2000))
+		INSERT INTO agent_runs (id, companion_id, kind, model_id, status, error, input_summary, finished_at)
+		VALUES ($1,NULLIF($2,''),$3,NULLIF($4,''),$5,$6,NULLIF($7,''),CURRENT_TIMESTAMP)`,
+		uuid.New().String(), companionID, kind, modelID, status, truncate(runError, 2000), truncate(inputSummary, 500))
 }
 
 func (s *Service) updateRelationshipAndMemory(ctx context.Context, companionID, userID, userText string) {
@@ -1988,17 +1998,52 @@ func parseLifePlan(raw string) ([]lifePlanEvent, error) {
 	clean = strings.TrimPrefix(clean, "```")
 	clean = strings.TrimSuffix(clean, "```")
 	clean = strings.TrimSpace(clean)
-	start, end := strings.Index(clean, "["), strings.LastIndex(clean, "]")
-	if start < 0 || end < start {
+	// Find the first top-level JSON array by bracket matching, so markdown
+	// image syntax like ![alt](url) in preamble doesn't fool the splitter.
+	start := strings.Index(clean, "[")
+	if start < 0 {
 		return nil, fmt.Errorf("life plan did not contain a JSON array")
+	}
+	depth := 0
+	inStr := false
+	esc := false
+	end := -1
+	for i := start; i < len(clean); i++ {
+		ch := clean[i]
+		if inStr {
+			if esc {
+				esc = false
+			} else if ch == '\\' {
+				esc = true
+			} else if ch == '"' {
+				inStr = false
+			}
+			continue
+		}
+		switch ch {
+		case '"':
+			inStr = true
+		case '[':
+			depth++
+		case ']':
+			depth--
+			if depth == 0 {
+				end = i
+			}
+		}
+		if end >= 0 {
+			break
+		}
+	}
+	if end < 0 {
+		return nil, fmt.Errorf("life plan array was not closed")
 	}
 	var events []lifePlanEvent
 	if err := json.Unmarshal([]byte(clean[start:end+1]), &events); err != nil {
 		return nil, fmt.Errorf("decode life plan: %w", err)
 	}
-	if len(events) == 0 {
-		return nil, fmt.Errorf("life plan was empty")
-	}
+	// An empty array is not a hard error: normalizePlan fills in mock events
+	// when the model returns [] or returns too few parseable items.
 	return events, nil
 }
 
