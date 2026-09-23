@@ -6,7 +6,7 @@ import 'package:get/get.dart';
 import '../../core/theme.dart';
 import 'ai_pet_avatar.dart';
 import 'ai_pet_desktop_controller.dart';
-import 'ai_pets_page.dart';
+import 'ai_pet_home_page.dart';
 
 class AIPetDesktopOverlay extends StatelessWidget {
   const AIPetDesktopOverlay({super.key, required this.child});

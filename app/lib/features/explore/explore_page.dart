@@ -63,9 +63,9 @@ class ExplorePage extends StatelessWidget {
               radius: 0,
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: VitaListTile(
-                customIcon: const VitaMenuIcon(
+                customIcon: VitaMenuIcon(
                   icon: Icons.camera_alt_outlined,
-                  color: Color(0xFF07C160),
+                  color: vita.green,
                 ),
                 title: 'explore.moments'.tr,
                 borderRadius: BorderRadius.zero,

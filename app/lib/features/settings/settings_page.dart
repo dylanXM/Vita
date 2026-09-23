@@ -73,6 +73,23 @@ class SettingsPage extends StatelessWidget {
                 const Divider(indent: 52, height: 0.5),
                 Obx(
                   () => VitaListTile(
+                    customIcon: VitaMenuIcon(
+                      icon: Icons.palette_outlined,
+                      color: vita.green,
+                    ),
+                    title: 'palette.title'.tr,
+                    subtitle: _paletteLabel(context, settings.currentPalette),
+                    borderRadius: BorderRadius.zero,
+                    onTap: () => Get.to(
+                      () => const PalettePage(),
+                      transition: Transition.cupertino,
+                      duration: const Duration(milliseconds: 300),
+                    ),
+                  ),
+                ),
+                const Divider(indent: 52, height: 0.5),
+                Obx(
+                  () => VitaListTile(
                     customIcon: const VitaMenuIcon(
                       icon: Icons.pets_outlined,
                       color: Color(0xFFE88952),
@@ -169,9 +186,9 @@ class SettingsPage extends StatelessWidget {
                 }),
                 const Divider(indent: 52, height: 0.5),
                 VitaListTile(
-                  customIcon: const VitaMenuIcon(
+                  customIcon: VitaMenuIcon(
                     icon: Icons.restore_from_trash_outlined,
-                    color: Color(0xFF07C160),
+                    color: vita.green,
                   ),
                   title: 'settings.deletedCompanions'.tr,
                   subtitle: 'settings.deletedCompanions.subtitle'.tr,
@@ -470,6 +487,119 @@ class ThemePage extends StatelessWidget {
           },
         ),
       ],
+    );
+  }
+}
+
+/// Current palette display name.
+String _paletteLabel(BuildContext context, VitaPalette palette) {
+  switch (palette) {
+    case VitaPalette.violet:
+      return 'palette.violet'.tr;
+    case VitaPalette.coral:
+      return 'palette.coral'.tr;
+    case VitaPalette.rose:
+      return 'palette.rose'.tr;
+    case VitaPalette.teal:
+      return 'palette.teal'.tr;
+  }
+}
+
+/// Brand color scheme picker — four palettes with live swatch previews.
+class PalettePage extends StatelessWidget {
+  const PalettePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final vita = context.vita;
+    return Scaffold(
+      backgroundColor: vita.pageBg,
+      appBar: AppBar(
+        leading: const VitaBackButton(),
+        title: Text('palette.title'.tr),
+        shape: const Border(),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 24),
+        children: [
+          VitaCard(
+            radius: 0,
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              children: [
+                for (var i = 0; i < VitaPalette.values.length; i++) ...[
+                  if (i > 0) const Divider(indent: 20, height: 0.5),
+                  _PaletteRow(palette: VitaPalette.values[i]),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PaletteRow extends StatelessWidget {
+  const _PaletteRow({required this.palette});
+
+  final VitaPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = VitaSettingsController.to;
+    final vita = context.vita;
+    final light = VitaThemeData.lightFor(palette);
+    final selected = settings.currentPalette == palette;
+    return InkWell(
+      onTap: () {
+        settings.setPalette(palette);
+        Get.back();
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            // Swatch preview: accent + outgoing bubble.
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: light.green,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Align(
+                alignment: Alignment.bottomRight,
+                child: Container(
+                  width: 18,
+                  height: 18,
+                  margin: const EdgeInsets.only(right: 4, bottom: 4),
+                  decoration: BoxDecoration(
+                    color: light.bubbleGreen,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                _paletteLabel(context, palette),
+                style: TextStyle(
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w500,
+                  color: vita.text,
+                ),
+              ),
+            ),
+            if (selected)
+              Icon(Icons.check_rounded, size: 20, color: vita.green)
+            else
+              const SizedBox(width: 20),
+          ],
+        ),
+      ),
     );
   }
 }

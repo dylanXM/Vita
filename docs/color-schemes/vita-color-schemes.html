@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vita 配色候选方案</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%237C5CFC'/%3E%3Cstop offset='1' stop-color='%23E8557A'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Ccircle cx='32' cy='32' r='14' fill='none' stroke='white' stroke-width='4'/%3E%3Ccircle cx='32' cy='32' r='5' fill='white'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --ink-soft: #6b6b6b;
+    --ink-faint: #9a9a9a;
+    --canvas: #f4f4f2;
+    --card: #ffffff;
+    --line: #e6e6e2;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 56px 32px 96px; }
+
+  /* ===== Header ===== */
+  header { margin-bottom: 48px; }
+  .eyebrow {
+    font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 600; margin-bottom: 14px;
+  }
+  h1 { font-size: 34px; font-weight: 800; letter-spacing: -.01em; margin-bottom: 14px; }
+  .lead { font-size: 16px; color: var(--ink-soft); max-width: 720px; }
+  .lead strong { color: var(--ink); font-weight: 600; }
+  .meta-row { margin-top: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .tag {
+    font-size: 12px; color: var(--ink-soft); background: #fff;
+    border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px;
+  }
+
+  /* ===== Current baseline ===== */
+  .baseline {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 24px 28px; margin-bottom: 40px; display: flex; align-items: center;
+    gap: 24px; flex-wrap: wrap;
+  }
+  .baseline .label { font-size: 12px; letter-spacing: .12em; color: var(--ink-faint); font-weight: 600; }
+  .baseline .name { font-size: 17px; font-weight: 700; margin: 2px 0 4px; }
+  .baseline .why { font-size: 13px; color: var(--ink-soft); max-width: 420px; }
+  .swatches { display: flex; gap: 8px; margin-left: auto; }
+  .sw { width: 56px; }
+  .sw .chip { height: 44px; border-radius: 8px; border: 1px solid rgba(0,0,0,.06); }
+  .sw .hex { font-size: 10px; color: var(--ink-faint); text-align: center; margin-top: 5px; font-variant-numeric: tabular-nums; }
+
+  /* ===== Scheme cards ===== */
+  .scheme {
+    background: var(--card); border: 1px solid var(--line); border-radius: 20px;
+    padding: 30px 32px; margin-bottom: 28px;
+  }
+  .scheme-head { display: flex; align-items: flex-start; gap: 18px; margin-bottom: 22px; flex-wrap: wrap; }
+  .scheme-no {
+    width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .scheme-title h2 { font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
+  .scheme-title .emo { font-size: 13px; color: var(--ink-soft); margin-top: 3px; }
+  .scheme-fit {
+    margin-left: auto; font-size: 13px; color: var(--ink-soft); max-width: 340px;
+    border-left: 3px solid; padding-left: 14px;
+  }
+  .scheme-fit b { color: var(--ink); font-weight: 600; }
+
+  /* color tokens row */
+  .tokens { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 24px; }
+  .tok { }
+  .tok .sw-chip { height: 56px; border-radius: 10px; border: 1px solid rgba(0,0,0,.05); }
+  .tok .k { font-size: 11px; color: var(--ink-faint); margin-top: 6px; }
+  .tok .v { font-size: 12px; color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 500; }
+  .gradient-bar { height: 14px; border-radius: 7px; margin-bottom: 24px; }
+
+  /* two phone previews side by side */
+  .previews { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .phone {
+    border-radius: 14px; padding: 16px; min-height: 240px; position: relative;
+    border: 1px solid rgba(0,0,0,.05);
+  }
+  .phone .mode {
+    position: absolute; top: 10px; right: 14px; font-size: 10px; letter-spacing: .1em;
+    font-weight: 700; text-transform: uppercase; opacity: .55;
+  }
+  .bubble { max-width: 78%; padding: 9px 13px; border-radius: 14px; font-size: 13px; line-height: 1.45; margin-bottom: 10px; }
+  .bubble.them { margin-right: auto; }
+  .bubble.me { margin-left: auto; }
+  .chat-name { font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+
+  /* footer note */
+  footer { margin-top: 40px; font-size: 13px; color: var(--ink-soft); }
+  footer ul { margin: 10px 0 0 18px; }
+  footer li { margin-bottom: 6px; }
+
+  @media (max-width: 860px) {
+    .wrap { padding: 36px 18px 64px; }
+    h1 { font-size: 26px; }
+    .tokens { grid-template-columns: repeat(3, 1fr); }
+    .previews { grid-template-columns: 1fr; }
+    .scheme-fit { margin-left: 0; border-left: none; padding-left: 0; }
+    .swatches { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Vita · Visual Direction</div>
+    <h1>配色候选方案</h1>
+    <p class="lead">
+      Vita 是一款 <strong>AI 异地伴侣</strong> App，核心场景是与专属角色的私密聊天、共同生活时间线与回忆。
+      当前沿用微信绿（#07C160），工具感偏重，缺少"两个人之间"的亲密温度。以下 4 个方向均
+      <strong>只换色相、保留现有微信式扁平结构</strong>（白色卡片、发丝分隔、气泡布局、Liquid Glass 导航），
+      改造成本集中在 <code>theme.dart</code> 的 token 映射。
+    </p>
+    <div class="meta-row">
+      <span class="tag">保留浅色/深色双主题</span>
+      <span class="tag">保留聊天气泡结构</span>
+      <span class="tag">仅替换品牌色 token</span>
+      <span class="tag">4 个情绪方向</span>
+    </div>
+  </header>
+
+  <!-- Current baseline -->
+  <div class="baseline">
+    <div>
+      <div class="label">CURRENT · 现状基准</div>
+      <div class="name">微信绿 #07C160</div>
+      <div class="why">清爽、熟悉、可信度高，但偏"社交工具"，与异地伴侣的情感浓度不匹配。</div>
+    </div>
+    <div class="swatches">
+      <div class="sw"><div class="chip" style="background:#07C160"></div><div class="hex">#07C160</div></div>
+      <div class="sw"><div class="chip" style="background:#95EC69"></div><div class="hex">#95EC69</div></div>
+      <div class="sw"><div class="chip" style="background:#E3F8EC"></div><div class="hex">tint</div></div>
+    </div>
+  </div>
+
+  <!-- ============ A 梦紫 ============ -->
+  <section class="scheme">
+    <div class="scheme-head">
+      <div class="scheme-no" style="background:#7C5CFC">A</div>
+      <div class="scheme-title">
+        <h2>梦紫 · Dream Violet</h2>
+        <div class="emo">梦幻 · 私密 · 心动</div>
+      </div>
+      <div class="scheme-fit">
+        <b>最贴合"异地伴侣"定位。</b>紫调自带非现实与浪漫感，适合"她活在屏幕另一端"的心动叙事，
+        深色模式下尤为出彩，是情感陪伴类产品（Talkie/Replika 系）最常用的方向。
+      </div>
+    </div>
+
+    <div class="tokens">
+      <div class="tok"><div class="sw-chip" style="background:#7C5CFC"></div><div class="k">主色 green</div><div class="v">#7C5CFC</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#6344E8"></div><div class="k">按下 greenDark</div><div class="v">#6344E8</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#F0EDFF"></div><div class="k">tint</div><div class="v">#F0EDFF</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#DCD4FF"></div><div class="k">气泡 bubble</div><div class="v">#DCD4FF</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#9D85FF"></div><div class="k">深色模式主色</div><div class="v">#9D85FF</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#FFFFFF;border:1px solid #eee"></div><div class="k">对方气泡</div><div class="v">#FFFFFF</div></div>
+    </div>
+    <div class="gradient-bar" style="background:linear-gradient(135deg,#8B6CFF,#5A3AE0)"></div>
+
+    <div class="previews">
+      <div class="phone" style="background:#F5F4F8">
+        <div class="mode" style="color:#7C5CFC">Light</div>
+        <div class="chat-name" style="color:#1a1a1a">Luna</div>
+        <div class="bubble them" style="background:#fff;color:#1a1a1a">刚下班吗？我今天把我们的回忆又整理了一遍。</div>
+        <div class="bubble me" style="background:#DCD4FF;color:#2A1E6B">嗯，在地铁上。想你了。</div>
+        <div class="bubble me" style="background:#7C5CFC;color:#fff">周末视频好不好？</div>
+      </div>
+      <div class="phone" style="background:#14121F">
+        <div class="mode" style="color:#9D85FF">Dark</div>
+        <div class="chat-name" style="color:#F0EDFF">Luna</div>
+        <div class="bubble them" style="background:#26223A;color:#EDEAF7">刚下班吗？我今天把我们的回忆又整理了一遍。</div>
+        <div class="bubble me" style="background:#4A3A8F;color:#E8E2FF">嗯，在地铁上。想你了。</div>
+        <div class="bubble me" style="background:#9D85FF;color:#1A1240">周末视频好不好？</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ B 暖珊瑚 ============ -->
+  <section class="scheme">
+    <div class="scheme-head">
+      <div class="scheme-no" style="background:#FF6B5B">B</div>
+      <div class="scheme-title">
+        <h2>暖珊瑚 · Coral Warm</h2>
+        <div class="emo">温暖 · 被等待 · 归属</div>
+      </div>
+      <div class="scheme-fit">
+        <b>像"她在那头留着一盏灯"。</b>橙红偏暖，拟人温度最强，适合主打日常陪伴、生活时间线
+        （Life 页）的烟火气；相对紫调更中性、男女用户都不违和。
+      </div>
+    </div>
+
+    <div class="tokens">
+      <div class="tok"><div class="sw-chip" style="background:#FF6B5B"></div><div class="k">主色 green</div><div class="v">#FF6B5B</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#E8543F"></div><div class="k">按下 greenDark</div><div class="v">#E8543F</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#FFEDE9"></div><div class="k">tint</div><div class="v">#FFEDE9</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#FFC9BC"></div><div class="k">气泡 bubble</div><div class="v">#FFC9BC</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#FF8A7A"></div><div class="k">深色模式主色</div><div class="v">#FF8A7A</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#FFFFFF;border:1px solid #eee"></div><div class="k">对方气泡</div><div class="v">#FFFFFF</div></div>
+    </div>
+    <div class="gradient-bar" style="background:linear-gradient(135deg,#FF7A5C,#E84A30)"></div>
+
+    <div class="previews">
+      <div class="phone" style="background:#F7F3F1">
+        <div class="mode" style="color:#E8543F">Light</div>
+        <div class="chat-name" style="color:#1a1a1a">Luna</div>
+        <div class="bubble them" style="background:#fff;color:#1a1a1a">刚下班吗？我今天把我们的回忆又整理了一遍。</div>
+        <div class="bubble me" style="background:#FFC9BC;color:#5A1E12">嗯，在地铁上。想你了。</div>
+        <div class="bubble me" style="background:#FF6B5B;color:#fff">周末视频好不好？</div>
+      </div>
+      <div class="phone" style="background:#1A1412">
+        <div class="mode" style="color:#FF8A7A">Dark</div>
+        <div class="chat-name" style="color:#F7EDE9">Luna</div>
+        <div class="bubble them" style="background:#2E2320;color:#F0E5E0">刚下班吗？我今天把我们的回忆又整理了一遍。</div>
+        <div class="bubble me" style="background:#7A3A2E;color:#FFE3DC">嗯，在地铁上。想你了。</div>
+        <div class="bubble me" style="background:#FF8A7A;color:#3A1408">周末视频好不好？</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ C 暮粉 ============ -->
+  <section class="scheme">
+    <div class="scheme-head">
+      <div class="scheme-no" style="background:#E8557A">C</div>
+      <div class="scheme-title">
+        <h2>暮粉 · Dusk Rose</h2>
+        <div class="emo">温柔 · 亲密 · 柔软</div>
+      </div>
+      <div class="scheme-fit">
+        <b>偏女性向、甜度最高。</b>玫瑰粉直接传递亲密与柔软，适合目标用户以女性为主、角色偏
+        "女友"设定的版本；需注意红色 token（退出/负向金额）要改橙或紫以避免语义混淆。
+      </div>
+    </div>
+
+    <div class="tokens">
+      <div class="tok"><div class="sw-chip" style="background:#E8557A"></div><div class="k">主色 green</div><div class="v">#E8557A</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#D13F66"></div><div class="k">按下 greenDark</div><div class="v">#D13F66</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#FDEAF0"></div><div class="k">tint</div><div class="v">#FDEAF0</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#F9C7D6"></div><div class="k">气泡 bubble</div><div class="v">#F9C7D6</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#F2789A"></div><div class="k">深色模式主色</div><div class="v">#F2789A</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#FFFFFF;border:1px solid #eee"></div><div class="k">对方气泡</div><div class="v">#FFFFFF</div></div>
+    </div>
+    <div class="gradient-bar" style="background:linear-gradient(135deg,#F06A90,#C93060)"></div>
+
+    <div class="previews">
+      <div class="phone" style="background:#F8F3F5">
+        <div class="mode" style="color:#D13F66">Light</div>
+        <div class="chat-name" style="color:#1a1a1a">Luna</div>
+        <div class="bubble them" style="background:#fff;color:#1a1a1a">刚下班吗？我今天把我们的回忆又整理了一遍。</div>
+        <div class="bubble me" style="background:#F9C7D6;color:#6B1630">嗯，在地铁上。想你了。</div>
+        <div class="bubble me" style="background:#E8557A;color:#fff">周末视频好不好？</div>
+      </div>
+      <div class="phone" style="background:#1A1216">
+        <div class="mode" style="color:#F2789A">Dark</div>
+        <div class="chat-name" style="color:#FBE8EF">Luna</div>
+        <div class="bubble them" style="background:#2E2128;color:#F0E0E8">刚下班吗？我今天把我们的回忆又整理了一遍。</div>
+        <div class="bubble me" style="background:#7A3550;color:#FFD9E5">嗯，在地铁上。想你了。</div>
+        <div class="bubble me" style="background:#F2789A;color:#3A0E20">周末视频好不好？</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ D 湖青 ============ -->
+  <section class="scheme">
+    <div class="scheme-head">
+      <div class="scheme-no" style="background:#0FB5AE">D</div>
+      <div class="scheme-title">
+        <h2>湖青 · Lake Teal</h2>
+        <div class="emo">平静 · 安心 · 长久</div>
+      </div>
+      <div class="scheme-fit">
+        <b>最克制、最百搭。</b>青绿保留了原绿色的清爽可信，又比微信绿更清冷、更"远距离的安心感"，
+        改动风险最低，适合不想放弃绿色系、只做微调的稳妥选择。
+      </div>
+    </div>
+
+    <div class="tokens">
+      <div class="tok"><div class="sw-chip" style="background:#0FB5AE"></div><div class="k">主色 green</div><div class="v">#0FB5AE</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#0B9A94"></div><div class="k">按下 greenDark</div><div class="v">#0B9A94</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#E3F7F5"></div><div class="k">tint</div><div class="v">#E3F7F5</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#B6EBE6"></div><div class="k">气泡 bubble</div><div class="v">#B6EBE6</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#35C9C2"></div><div class="k">深色模式主色</div><div class="v">#35C9C2</div></div>
+      <div class="tok"><div class="sw-chip" style="background:#FFFFFF;border:1px solid #eee"></div><div class="k">对方气泡</div><div class="v">#FFFFFF</div></div>
+    </div>
+    <div class="gradient-bar" style="background:linear-gradient(135deg,#14C4BC,#08807C)"></div>
+
+    <div class="previews">
+      <div class="phone" style="background:#F2F6F5">
+        <div class="mode" style="color:#0B9A94">Light</div>
+        <div class="chat-name" style="color:#1a1a1a">Luna</div>
+        <div class="bubble them" style="background:#fff;color:#1a1a1a">刚下班吗？我今天把我们的回忆又整理了一遍。</div>
+        <div class="bubble me" style="background:#B6EBE6;color:#0A3A38">嗯，在地铁上。想你了。</div>
+        <div class="bubble me" style="background:#0FB5AE;color:#fff">周末视频好不好？</div>
+      </div>
+      <div class="phone" style="background:#0F1616">
+        <div class="mode" style="color:#35C9C2">Dark</div>
+        <div class="chat-name" style="color:#E0F2F0">Luna</div>
+        <div class="bubble them" style="background:#1E2A2A;color:#D8E8E6">刚下班吗？我今天把我们的回忆又整理了一遍。</div>
+        <div class="bubble me" style="background:#1F5A56;color:#C8F0EC">嗯，在地铁上。想你了。</div>
+        <div class="bubble me" style="background:#35C9C2;color:#08302E">周末视频好不好？</div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <b>落地说明：</b>四个方案都只替换 <code>theme.dart</code> 中 <code>VitaThemeData.light</code> / <code>dark</code> 的
+    <code>green / greenDark / greenTint / bubbleGreen</code> 与 <code>brandGradient</code> 取值，
+    其余结构（白色表面、发丝分隔、气泡左右布局、Liquid Glass 导航）保持不变。
+    <ul>
+      <li>推荐优先级：<b>A 梦紫</b>（情感匹配度最高）&gt; B 暖珊瑚（温度最强）&gt; D 湖青（最稳妥）&gt; C 暮粉（需确认用户画像与红色语义冲突）。</li>
+      <li>选定方向后，我可以直接改 <code>theme.dart</code> 给出可运行的 Flutter diff，并同步检查深色模式与红色语义 token。</li>
+    </ul>
+  </footer>
+
+</div>
+</body>
+</html>

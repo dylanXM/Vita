@@ -52,10 +52,11 @@ class _VitaAppState extends State<VitaApp> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = _settings.currentPalette;
     return GetMaterialApp(
       title: 'Vita',
-      theme: VitaTheme.light,
-      darkTheme: VitaTheme.dark,
+      theme: VitaTheme.lightFor(palette),
+      darkTheme: VitaTheme.darkFor(palette),
       themeMode: _settings.appliedThemeMode,
       locale: Get.locale,
       fallbackLocale: const Locale('en'),

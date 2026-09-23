@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_client.dart';
 import 'supported_locales.dart';
+import 'theme.dart';
 
 /// App-wide user preferences: language and theme.
 ///
@@ -19,6 +20,7 @@ class VitaSettingsController extends GetxController {
   static const _themeKey = 'vita_theme_mode';
   static const _localeKey = 'vita_locale';
   static const _petDesktopKey = 'vita_pet_desktop_enabled';
+  static const _paletteKey = 'vita_palette';
 
   /// Languages the app ships.
   static const List<Locale> supportedLocales = vitaSupportedLocales;
@@ -31,6 +33,9 @@ class VitaSettingsController extends GetxController {
 
   /// Whether the adopted AI pet floats above every app route.
   final petDesktopEnabled = false.obs;
+
+  /// User-selected brand color scheme. null → default (violet).
+  final Rxn<VitaPalette> palette = Rxn<VitaPalette>();
 
   /// Completes once the persisted preferences have been loaded.
   final Completer<void> ready = Completer<void>();
@@ -57,6 +62,11 @@ class VitaSettingsController extends GetxController {
       locale.value = vitaLocaleFromTag(lang);
     }
     petDesktopEnabled.value = prefs.getBool(_petDesktopKey) ?? false;
+    final savedPalette = prefs.getString(_paletteKey);
+    if (savedPalette != null) {
+      palette.value = VitaPalette.values
+          .firstWhereOrNull((p) => p.storageKey == savedPalette);
+    }
     // GetX resolves .tr through the static Get.locale, so even in
     // "follow system" mode we pin it to a concrete supported locale.
     Get.locale = effectiveLocale;
@@ -73,11 +83,22 @@ class VitaSettingsController extends GetxController {
   /// The theme mode applied to the app: explicit choice or [ThemeMode.system].
   ThemeMode get appliedThemeMode => themeMode.value ?? ThemeMode.system;
 
+  /// The brand color scheme applied to the app: explicit choice or violet.
+  VitaPalette get currentPalette => palette.value ?? VitaPalette.violet;
+
   void setThemeMode(ThemeMode? mode) {
     themeMode.value = mode;
     _persist(_themeKey, mode?.name);
     // The app root rebuilds GetMaterialApp with the new themeMode; every
     // `context.vita` (Theme.of) then resolves against the new brightness.
+    _changed();
+  }
+
+  void setPalette(VitaPalette value) {
+    palette.value = value;
+    _persist(_paletteKey, value.storageKey);
+    // Rebuild GetMaterialApp with the new palette; every `context.vita`
+    // resolves the new brand colors through the ThemeExtension token.
     _changed();
   }
 

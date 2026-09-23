@@ -1,13 +1,148 @@
 import 'package:flutter/material.dart';
 
-/// Vita design system — a WeChat-inspired modern visual language with
-/// light and dark palettes.
+/// Vita design system — a warm, chat-forward visual language with light and
+/// dark palettes, plus four switchable brand color schemes (palettes).
 ///
-/// White (or near-black) grouped surfaces on a soft canvas, the brand green
-/// accent, hairline separators and compact spacing. Every page resolves its
+/// White (or near-black) grouped surfaces on a soft canvas, a brand accent
+/// color, hairline separators and compact spacing. Every page resolves its
 /// colors through `context.vita`, which returns the [VitaThemeData] matching
-/// the current theme brightness — so light/dark/system modes and live system
-/// brightness changes re-render the whole app automatically.
+/// the current theme brightness **and the user-selected [VitaPalette]** — so
+/// light/dark/system mode changes and live palette switches re-render the
+/// whole app automatically.
+///
+/// The palette is carried on the [ThemeData] as a [VitaPaletteToken]
+/// extension, so widget tests that only provide `VitaTheme.light` (violet)
+/// keep working without registering a settings controller.
+
+/// Switchable brand color schemes. [VitaPalette.violet] is the default.
+enum VitaPalette {
+  /// Dream Violet — romantic, private (default).
+  violet,
+
+  /// Warm Coral — warm, waiting.
+  coral,
+
+  /// Dusk Rose — tender, intimate.
+  rose,
+
+  /// Lake Teal — calm, dependable.
+  teal;
+
+  /// Stable storage key value (persisted in SharedPreferences).
+  String get storageKey => name;
+}
+
+/// Brand accent colors for one palette at one brightness.
+@immutable
+class Brand {
+  const Brand({
+    required this.green,
+    required this.greenDark,
+    required this.greenTint,
+    required this.bubbleGreen,
+    required this.gradient,
+  });
+
+  final Color green;
+  final Color greenDark;
+  final Color greenTint;
+  final Color bubbleGreen;
+  final List<Color> gradient;
+}
+
+/// Resolved brand colors for a [VitaPalette].
+class VitaBrandColors {
+  const VitaBrandColors._(this.light, this.dark);
+
+  final Brand light;
+  final Brand dark;
+
+  static const Map<VitaPalette, VitaBrandColors> _table = {
+    VitaPalette.violet: VitaBrandColors._(
+      Brand(
+        green: Color(0xFF7C5CFC),
+        greenDark: Color(0xFF6344E8),
+        greenTint: Color(0xFFF0EDFF),
+        bubbleGreen: Color(0xFFDCD4FF),
+        gradient: [Color(0xFF8B6CFF), Color(0xFF5A3AE0)],
+      ),
+      Brand(
+        green: Color(0xFF9D85FF),
+        greenDark: Color(0xFF7C5CFC),
+        greenTint: Color(0x339D85FF),
+        bubbleGreen: Color(0xFF4A3A8F),
+        gradient: [Color(0xFFA78BFA), Color(0xFF6344E8)],
+      ),
+    ),
+    VitaPalette.coral: VitaBrandColors._(
+      Brand(
+        green: Color(0xFFFF6B5B),
+        greenDark: Color(0xFFE8543F),
+        greenTint: Color(0xFFFFEDE9),
+        bubbleGreen: Color(0xFFFFC9BC),
+        gradient: [Color(0xFFFF7A5C), Color(0xFFE84A30)],
+      ),
+      Brand(
+        green: Color(0xFFFF8A7A),
+        greenDark: Color(0xFFFF6B5B),
+        greenTint: Color(0x33FF8A7A),
+        bubbleGreen: Color(0xFF7A3A2E),
+        gradient: [Color(0xFFFF8A7A), Color(0xFFE8543F)],
+      ),
+    ),
+    VitaPalette.rose: VitaBrandColors._(
+      Brand(
+        green: Color(0xFFE8557A),
+        greenDark: Color(0xFFD13F66),
+        greenTint: Color(0xFFFDEAF0),
+        bubbleGreen: Color(0xFFF9C7D6),
+        gradient: [Color(0xFFF06A90), Color(0xFFC93060)],
+      ),
+      Brand(
+        green: Color(0xFFF2789A),
+        greenDark: Color(0xFFE8557A),
+        greenTint: Color(0x33F2789A),
+        bubbleGreen: Color(0xFF7A3550),
+        gradient: [Color(0xFFF2789A), Color(0xFFD13F66)],
+      ),
+    ),
+    VitaPalette.teal: VitaBrandColors._(
+      Brand(
+        green: Color(0xFF0FB5AE),
+        greenDark: Color(0xFF0B9A94),
+        greenTint: Color(0xFFE3F7F5),
+        bubbleGreen: Color(0xFFB6EBE6),
+        gradient: [Color(0xFF14C4BC), Color(0xFF08807C)],
+      ),
+      Brand(
+        green: Color(0xFF35C9C2),
+        greenDark: Color(0xFF0FB5AE),
+        greenTint: Color(0x3335C9C2),
+        bubbleGreen: Color(0xFF1F5A56),
+        gradient: [Color(0xFF35C9C2), Color(0xFF0B9A94)],
+      ),
+    ),
+  };
+
+  static VitaBrandColors of(VitaPalette p) => _table[p] ?? _table[VitaPalette.violet]!;
+}
+
+/// Carries the active [VitaPalette] on [ThemeData] so `context.vita` can
+/// resolve brand colors without reaching for the settings controller.
+@immutable
+class VitaPaletteToken extends ThemeExtension<VitaPaletteToken> {
+  const VitaPaletteToken(this.palette);
+
+  final VitaPalette palette;
+
+  @override
+  VitaPaletteToken copyWith({VitaPalette? palette}) =>
+      VitaPaletteToken(palette ?? this.palette);
+
+  @override
+  VitaPaletteToken lerp(ThemeExtension<VitaPaletteToken>? other, double t) =>
+      this;
+}
 
 class VitaThemeData {
   const VitaThemeData({
@@ -31,15 +166,17 @@ class VitaThemeData {
     required this.selectionPill,
     required this.shimmerA,
     required this.shimmerB,
+    required this.brandGradient,
   });
 
-  /// Light palette (default).
+  /// Light palette for the default (violet) scheme. Kept as a const for
+  /// backward compatibility with existing tests and the app boot path.
   static const VitaThemeData light = VitaThemeData(
     brightness: Brightness.light,
-    green: Color(0xFF07C160),
-    greenDark: Color(0xFF06AD56),
-    greenTint: Color(0xFFE3F8EC),
-    bubbleGreen: Color(0xFF95EC69),
+    green: Color(0xFF7C5CFC),
+    greenDark: Color(0xFF6344E8),
+    greenTint: Color(0xFFF0EDFF),
+    bubbleGreen: Color(0xFFDCD4FF),
     red: Color(0xFFFA5151),
     pageBg: Color(0xFFF5F6F7),
     surface: Colors.white,
@@ -55,15 +192,20 @@ class VitaThemeData {
     selectionPill: Color(0xCCE2E2E2),
     shimmerA: Color(0xFFF2F3F5),
     shimmerB: Color(0xFFE4E6E9),
+    brandGradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFF8B6CFF), Color(0xFF5A3AE0)],
+    ),
   );
 
-  /// Dark palette.
+  /// Dark palette for the default (violet) scheme.
   static const VitaThemeData dark = VitaThemeData(
     brightness: Brightness.dark,
-    green: Color(0xFF0ACB72),
-    greenDark: Color(0xFF08A85E),
-    greenTint: Color(0x330ACB72),
-    bubbleGreen: Color(0xFF3E9B4F),
+    green: Color(0xFF9D85FF),
+    greenDark: Color(0xFF7C5CFC),
+    greenTint: Color(0x339D85FF),
+    bubbleGreen: Color(0xFF4A3A8F),
     red: Color(0xFFFF6B6B),
     pageBg: Color(0xFF0F0F11),
     surface: Color(0xFF1C1C1E),
@@ -79,20 +221,69 @@ class VitaThemeData {
     selectionPill: Color(0xCC3A3A3C),
     shimmerA: Color(0xFF2A2A2C),
     shimmerB: Color(0xFF3A3A3C),
+    brandGradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFFA78BFA), Color(0xFF6344E8)],
+    ),
   );
+
+  /// Build a light palette for any [palette].
+  factory VitaThemeData.lightFor(VitaPalette palette) =>
+      VitaThemeData._build(palette, Brightness.light);
+
+  /// Build a dark palette for any [palette].
+  factory VitaThemeData.darkFor(VitaPalette palette) =>
+      VitaThemeData._build(palette, Brightness.dark);
+
+  factory VitaThemeData._build(VitaPalette palette, Brightness brightness) {
+    if (palette == VitaPalette.violet) {
+      return brightness == Brightness.light ? light : dark;
+    }
+    final brand = VitaBrandColors.of(palette);
+    final b = brightness == Brightness.light ? brand.light : brand.dark;
+    final base = brightness == Brightness.light ? light : dark;
+    return VitaThemeData(
+      brightness: brightness,
+      green: b.green,
+      greenDark: b.greenDark,
+      greenTint: b.greenTint,
+      bubbleGreen: b.bubbleGreen,
+      red: base.red,
+      pageBg: base.pageBg,
+      surface: base.surface,
+      divider: base.divider,
+      chevron: base.chevron,
+      text: base.text,
+      subText: base.subText,
+      hint: base.hint,
+      tabInactive: base.tabInactive,
+      glass: base.glass,
+      glassRing: base.glassRing,
+      glassShadow: base.glassShadow,
+      selectionPill: base.selectionPill,
+      shimmerA: base.shimmerA,
+      shimmerB: base.shimmerB,
+      brandGradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: b.gradient,
+      ),
+    );
+  }
 
   final Brightness brightness;
 
-  /// Brand / accent green (WeChat green).
+  /// Brand / accent color.
   final Color green;
 
-  /// Pressed / darker green.
+  /// Pressed / darker brand color.
   final Color greenDark;
 
-  /// Light green tint for selected chips and icon backgrounds.
+  /// Tint for selected chips and icon backgrounds.
   final Color greenTint;
 
-  /// User message bubble green.
+  /// Outgoing (user) message bubble color.
   final Color bubbleGreen;
 
   /// Destructive red (sign out, negative amounts).
@@ -119,7 +310,7 @@ class VitaThemeData {
   /// Hint text.
   final Color hint;
 
-  /// Unselected tab icon/label (iOS 27: near-opaque black, darkened by glass).
+  /// Unselected tab icon/label.
   final Color tabInactive;
 
   /// Liquid Glass capsule fill (translucent).
@@ -138,24 +329,26 @@ class VitaThemeData {
   final Color shimmerA;
   final Color shimmerB;
 
-  /// Tokens matching the current theme brightness of [context].
-  static VitaThemeData of(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark ? dark : light;
+  /// Brand gradient for hero surfaces.
+  final LinearGradient brandGradient;
 
-  /// Brand gradient for hero surfaces (profile header, balance card, mark).
-  LinearGradient get brandGradient => const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFF12C56C), Color(0xFF059457)],
-      );
+  /// Tokens matching the current theme brightness and palette of [context].
+  static VitaThemeData of(BuildContext context) {
+    final ext = Theme.of(context).extension<VitaPaletteToken>();
+    final palette = ext?.palette ?? VitaPalette.violet;
+    final brightness = Theme.of(context).brightness;
+    return brightness == Brightness.dark
+        ? VitaThemeData.darkFor(palette)
+        : VitaThemeData.lightFor(palette);
+  }
 }
 
 extension VitaTokens on BuildContext {
-  /// Resolved Vita design tokens for the current theme brightness.
+  /// Resolved Vita design tokens for the current theme brightness and palette.
   ///
   /// Use this instead of hard-coded colors: `context.vita.text`,
   /// `context.vita.surface`, ... It re-renders automatically when the
-  /// app or system switches between light and dark.
+  /// app switches light/dark or changes palette.
   VitaThemeData get vita => VitaThemeData.of(this);
 }
 
@@ -171,7 +364,7 @@ class VitaRadius {
 class VitaShadow {
   VitaShadow._();
 
-  /// Subtle card elevation (WeChat 8.0 style).
+  /// Subtle card elevation.
   static const List<BoxShadow> card = [
     BoxShadow(color: Color(0x0A000000), blurRadius: 12, offset: Offset(0, 2)),
   ];
@@ -183,8 +376,6 @@ class VitaShadow {
 }
 
 /// Standard Vita text styles, resolved for the current brightness.
-///
-/// Access through the tokens: `context.vita.pageTitle`, `context.vita.sub`, ...
 extension VitaTextStyle on VitaThemeData {
   TextStyle get display => TextStyle(
         fontSize: 32,
@@ -233,10 +424,19 @@ extension VitaTextStyle on VitaThemeData {
 class VitaTheme {
   VitaTheme._();
 
-  static ThemeData get light => _base(VitaThemeData.light);
-  static ThemeData get dark => _base(VitaThemeData.dark);
+  /// Default (violet) light theme — kept for the app boot path and tests.
+  static ThemeData get light => lightFor(VitaPalette.violet);
+  static ThemeData get dark => darkFor(VitaPalette.violet);
 
-  static ThemeData _base(VitaThemeData t) {
+  /// Light [ThemeData] for an explicit [palette].
+  static ThemeData lightFor(VitaPalette palette) =>
+      _base(VitaThemeData.lightFor(palette), palette);
+
+  /// Dark [ThemeData] for an explicit [palette].
+  static ThemeData darkFor(VitaPalette palette) =>
+      _base(VitaThemeData.darkFor(palette), palette);
+
+  static ThemeData _base(VitaThemeData t, VitaPalette palette) {
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
@@ -246,6 +446,7 @@ class VitaTheme {
         surface: t.surface,
       ),
       scaffoldBackgroundColor: t.pageBg,
+      extensions: [VitaPaletteToken(palette)],
     );
     return base.copyWith(
       appBarTheme: AppBarTheme(
