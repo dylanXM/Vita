@@ -345,7 +345,7 @@ export interface LegalDocument {
 export type LegalDocumentInput = Pick<LegalDocument,
   "environment" | "document_type" | "version" | "title" | "summary" | "content">;
 
-export type AIProviderKind = "openai" | "anthropic";
+export type AIProviderKind = "openai" | "anthropic" | "kie";
 
 export interface AIProvider {
   id: string;

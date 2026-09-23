@@ -102,3 +102,112 @@ func TestOpenAICompatibleAudioClient(t *testing.T) {
 		t.Fatalf("audio = %q, mime = %q, err = %v", audio, mimeType, err)
 	}
 }
+
+func TestKieImageClient(t *testing.T) {
+	var createBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/jobs/createTask":
+			_ = json.NewDecoder(r.Body).Decode(&createBody)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"code": 200, "msg": "success",
+				"data": map[string]any{"taskId": "task_abc"},
+			})
+		case "/api/v1/jobs/recordInfo":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"code": 200, "msg": "success",
+				"data": map[string]any{
+					"state":      "success",
+					"resultJson": `{"resultUrls":["https://cdn.example/kie-life.png"]}`,
+				},
+			})
+		default:
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	url, err := NewClient().GenerateImage(context.Background(), Model{
+		Kind: "kie", BaseURL: server.URL, APIKey: "key", ModelName: "grok-imagine/text-to-image",
+	}, GenerateImageRequest{Prompt: "ordinary cafe"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if url != "https://cdn.example/kie-life.png" {
+		t.Fatalf("url = %q", url)
+	}
+	if createBody["model"] != "grok-imagine/text-to-image" {
+		t.Fatalf("model in body = %v", createBody["model"])
+	}
+}
+
+func TestKieSpeechClient(t *testing.T) {
+	var resultJSON string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/jobs/createTask":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"code": 200, "msg": "success",
+				"data": map[string]any{"taskId": "task_voice"},
+			})
+		case "/api/v1/jobs/recordInfo":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"code": 200, "msg": "success",
+				"data": map[string]any{
+					"state":      "success",
+					"resultJson": resultJSON,
+				},
+			})
+		case "/kie-voice.mp3":
+			w.Header().Set("Content-Type", "audio/mpeg")
+			_, _ = w.Write([]byte("kie-mp3"))
+		default:
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	resultJSON = `{"resultUrls":["` + server.URL + `/kie-voice.mp3"]}`
+
+	audio, mimeType, err := NewClient().GenerateSpeech(context.Background(), Model{
+		Kind: "kie", BaseURL: server.URL, APIKey: "key", ModelName: "elevenlabs/tts",
+	}, "hello", "alloy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(audio) != "kie-mp3" || mimeType != "audio/mpeg" {
+		t.Fatalf("audio = %q, mime = %q", string(audio), mimeType)
+	}
+}
+
+func TestKieTestConnection(t *testing.T) {
+	// Valid key: recordInfo probe returns 404 (task not found) but HTTP 200-ish.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/jobs/recordInfo" {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": 404, "msg": "task not found"})
+	}))
+	defer server.Close()
+	_, raw, err := NewClient().TestConnection(context.Background(), Model{
+		Kind: "kie", BaseURL: server.URL, APIKey: "key", ModelName: "x",
+	})
+	if err != nil {
+		t.Fatalf("expected valid key, got %v (raw=%s)", err, raw)
+	}
+
+	// Invalid key: 401.
+	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("unauthorized"))
+	}))
+	defer authServer.Close()
+	_, _, err = NewClient().TestConnection(context.Background(), Model{
+		Kind: "kie", BaseURL: authServer.URL, APIKey: "bad", ModelName: "x",
+	})
+	if err == nil {
+		t.Fatal("expected auth error for bad key")
+	}
+}

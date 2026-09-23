@@ -87,6 +87,9 @@ func (c *Client) TranscribeAudio(ctx context.Context, model Model, filename, mim
 }
 
 func (c *Client) GenerateSpeech(ctx context.Context, model Model, text, voice string) ([]byte, string, error) {
+	if model.Kind == "kie" {
+		return c.kieGenerateSpeech(ctx, model, text, voice)
+	}
 	if model.Kind != "openai" {
 		return nil, "", fmt.Errorf("speech generation is unsupported for provider kind %q", model.Kind)
 	}
@@ -142,6 +145,9 @@ func (c *Client) GenerateText(ctx context.Context, model Model, input GenerateRe
 }
 
 func (c *Client) GenerateImage(ctx context.Context, model Model, input GenerateImageRequest) (string, error) {
+	if model.Kind == "kie" {
+		return c.kieGenerateImage(ctx, model, input)
+	}
 	if model.Kind != "openai" {
 		return "", fmt.Errorf("image generation is unsupported for provider kind %q", model.Kind)
 	}
@@ -316,6 +322,9 @@ func (c *Client) doJSONWithLimit(ctx context.Context, endpoint, apiKey, anthropi
 // (truncated) so the admin console can see exactly which model names the key
 // is allowed to use, even when the upstream uses a non-standard schema.
 func (c *Client) TestConnection(ctx context.Context, model Model) ([]string, string, error) {
+	if model.Kind == "kie" {
+		return c.kieTestConnection(ctx, model)
+	}
 	endpoint := providerEndpoint(defaultBaseURL(model.Kind, model.BaseURL), "/models")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
@@ -381,4 +390,194 @@ func defaultBaseURL(kind, configured string) string {
 		return "https://api.anthropic.com"
 	}
 	return "https://api.openai.com"
+}
+
+// ===== KIE (kie.ai) async task provider =====
+//
+// KIE exposes image/video/audio models through a two-step async flow:
+//   1. POST /api/v1/jobs/createTask  -> returns taskId
+//   2. GET  /api/v1/jobs/recordInfo?taskId=... -> poll until state=success/fail
+// Success returns resultJson, a JSON string like {"resultUrls":["https://..."]}.
+// This does not follow the OpenAI sync protocol; it is wired into GenerateImage
+// and GenerateSpeech so existing image/TTS routes and admin scenario tests work.
+
+func kieBase(model Model) string {
+	b := strings.TrimRight(strings.TrimSpace(model.BaseURL), "/")
+	if b == "" {
+		return "https://api.kie.ai"
+	}
+	return b
+}
+
+// kieCreateTask submits a generation task and returns its taskId.
+func (c *Client) kieCreateTask(ctx context.Context, model Model, input map[string]any) (string, error) {
+	body, _ := json.Marshal(map[string]any{
+		"model": model.ModelName,
+		"input": input,
+	})
+	endpoint := kieBase(model) + "/api/v1/jobs/createTask"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("kie createTask request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+model.APIKey)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("kie createTask: %w", err)
+	}
+	defer resp.Body.Close()
+	reader := io.LimitReader(resp.Body, maxProviderResponseBytes)
+	var out struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+		Data struct {
+			TaskID string `json:"taskId"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(reader).Decode(&out); err != nil {
+		raw, _ := io.ReadAll(reader)
+		return "", fmt.Errorf("kie createTask decode: %s", strings.TrimSpace(string(raw)))
+	}
+	if out.Code != 200 || out.Data.TaskID == "" {
+		return "", fmt.Errorf("kie createTask failed: code=%d msg=%s", out.Code, out.Msg)
+	}
+	return out.Data.TaskID, nil
+}
+
+// kiePollResult waits for a task to reach success/fail and returns its resultJson.
+func (c *Client) kiePollResult(ctx context.Context, model Model, taskID string) (string, error) {
+	endpoint := kieBase(model) + "/api/v1/jobs/recordInfo?taskId=" + taskID
+	deadline := time.Now().Add(90 * time.Second)
+	for {
+		if time.Now().After(deadline) {
+			return "", fmt.Errorf("kie task %s timed out", taskID)
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+		if err != nil {
+			return "", fmt.Errorf("kie recordInfo request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+model.APIKey)
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return "", fmt.Errorf("kie recordInfo: %w", err)
+		}
+		reader := io.LimitReader(resp.Body, maxProviderResponseBytes)
+		var out struct {
+			Code int    `json:"code"`
+			Msg  string `json:"msg"`
+			Data struct {
+				State      string `json:"state"`
+				ResultJSON string `json:"resultJson"`
+				FailMsg    string `json:"failMsg"`
+			} `json:"data"`
+		}
+		decodeErr := json.NewDecoder(reader).Decode(&out)
+		resp.Body.Close()
+		if decodeErr != nil {
+			return "", fmt.Errorf("kie recordInfo decode: %w", decodeErr)
+		}
+		switch out.Data.State {
+		case "success":
+			if strings.TrimSpace(out.Data.ResultJSON) == "" {
+				return "", fmt.Errorf("kie task %s returned an empty result", taskID)
+			}
+			return out.Data.ResultJSON, nil
+		case "fail":
+			return "", fmt.Errorf("kie task %s failed: %s", taskID, strings.TrimSpace(out.Data.FailMsg))
+		}
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
+// kieResultURL extracts the first result URL from a KIE resultJson payload.
+func kieResultURL(resultJSON string) (string, error) {
+	var out struct {
+		ResultUrls []string `json:"resultUrls"`
+	}
+	if err := json.Unmarshal([]byte(resultJSON), &out); err != nil {
+		return "", fmt.Errorf("decode kie result: %w", err)
+	}
+	if len(out.ResultUrls) == 0 || strings.TrimSpace(out.ResultUrls[0]) == "" {
+		return "", fmt.Errorf("kie returned no result URL")
+	}
+	return out.ResultUrls[0], nil
+}
+
+// kieGenerateImage runs the async KIE flow for text-to-image and returns the image URL.
+func (c *Client) kieGenerateImage(ctx context.Context, model Model, input GenerateImageRequest) (string, error) {
+	taskID, err := c.kieCreateTask(ctx, model, map[string]any{"prompt": input.Prompt})
+	if err != nil {
+		return "", err
+	}
+	resultJSON, err := c.kiePollResult(ctx, model, taskID)
+	if err != nil {
+		return "", err
+	}
+	return kieResultURL(resultJSON)
+}
+
+// kieGenerateSpeech runs the async KIE flow for text-to-speech and returns the audio bytes.
+func (c *Client) kieGenerateSpeech(ctx context.Context, model Model, text, voice string) ([]byte, string, error) {
+	input := map[string]any{"text": text}
+	if strings.TrimSpace(voice) != "" {
+		input["voice"] = voice
+	}
+	taskID, err := c.kieCreateTask(ctx, model, input)
+	if err != nil {
+		return nil, "", err
+	}
+	resultJSON, err := c.kiePollResult(ctx, model, taskID)
+	if err != nil {
+		return nil, "", err
+	}
+	url, err := kieResultURL(resultJSON)
+	if err != nil {
+		return nil, "", err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("kie audio download: %w", err)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("kie audio download: %w", err)
+	}
+	defer resp.Body.Close()
+	audio, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
+	if err != nil || len(audio) == 0 {
+		return nil, "", fmt.Errorf("kie audio download returned empty content")
+	}
+	mimeType := resp.Header.Get("Content-Type")
+	if mimeType == "" {
+		mimeType = "audio/mpeg"
+	}
+	return audio, mimeType, nil
+}
+
+// kieTestConnection validates the API key against the unified recordInfo probe.
+// Any non-401/403 response means the key was accepted (the probe taskId does not
+// need to exist; a 404/501 is expected but proves authentication succeeded).
+func (c *Client) kieTestConnection(ctx context.Context, model Model) ([]string, string, error) {
+	endpoint := kieBase(model) + "/api/v1/jobs/recordInfo?taskId=kie-connectivity-probe"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("kie test connection request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+model.APIKey)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("kie test connection: %w", err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, maxProviderResponseBytes))
+	rawText := strings.TrimSpace(string(raw))
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return nil, rawText, fmt.Errorf("kie rejected the API key (HTTP %d)", resp.StatusCode)
+	}
+	return nil, rawText, nil
 }

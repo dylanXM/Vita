@@ -388,6 +388,7 @@ function EditorDialog({
               <SelectContent>
                 <SelectItem value="openai">OpenAI-compatible</SelectItem>
                 <SelectItem value="anthropic">Anthropic</SelectItem>
+                <SelectItem value="kie">KIE (async tasks)</SelectItem>
               </SelectContent>
             </Select>
           </Field>
