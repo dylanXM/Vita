@@ -811,25 +811,49 @@ func (s *Service) generatePlan(ctx context.Context, profile companionContext, lo
 	recentLife := s.recentLifeContext(ctx, profile.ID, localDate)
 	prompt := lifePlanPrompt(profile, localDate, timezone, recentLife,
 		settings.DailyEventMin, settings.DailyEventMax, proactiveLimit)
-	request := GenerateRequest{System: "You plan a believable daily timeline for a fictional AI companion. Output strict JSON only.", Messages: []ChatMessage{{Role: "user", Content: prompt}}, Temperature: 0.85, MaxTokens: 2200}
+	systemPrompt := `You plan a believable daily timeline for a fictional AI companion.
+RESPONSE FORMAT: output ONLY a single JSON array. No prose, no explanation, no markdown fences.
+The very first character of your reply MUST be '[' and the very last character MUST be ']'. Do not write anything before or after the array.`
+	request := GenerateRequest{System: systemPrompt, Messages: []ChatMessage{{Role: "user", Content: prompt}}, Temperature: 0.6, MaxTokens: 2200}
 	var lastErr error
 	for _, model := range models {
-		text, generateErr := s.client.GenerateText(ctx, model, request)
-		if generateErr == nil {
-			var events []lifePlanEvent
-			events, generateErr = parseLifePlan(text)
-			if generateErr == nil {
+		messages := append([]ChatMessage{}, request.Messages...)
+		for attempt := 0; attempt < 2; attempt++ {
+			tryReq := request
+			tryReq.Messages = messages
+			text, generateErr := s.client.GenerateText(ctx, model, tryReq)
+			if generateErr != nil {
+				lastErr = generateErr
+				s.recordRun(ctx, profile.ID, "life_plan", model.ID, "failed", generateErr.Error())
+				break
+			}
+			events, parseErr := parseLifePlan(text)
+			if parseErr == nil {
 				s.recordRun(ctx, profile.ID, "life_plan", model.ID, "succeeded", "")
 				return events, model.ID, nil
 			}
-			lastErr = generateErr
-			s.recordRunWithInput(ctx, profile.ID, "life_plan", model.ID, "failed", generateErr.Error(), text)
-			continue
+			lastErr = parseErr
+			s.recordRunWithInput(ctx, profile.ID, "life_plan", model.ID, "failed", parseErr.Error(), text)
+			if attempt == 0 && !strings.HasPrefix(strings.TrimSpace(text), "[") {
+				messages = append(messages,
+					ChatMessage{Role: "assistant", Content: truncate(text, 400)},
+					ChatMessage{Role: "user", Content: "That reply was not a JSON array. Reply with ONLY the JSON array now — first character '[', last character ']', no commentary."},
+				)
+				continue
+			}
+			break
 		}
-		lastErr = generateErr
-		s.recordRun(ctx, profile.ID, "life_plan", model.ID, "failed", generateErr.Error())
 	}
-	return nil, "", lastErr
+	// All configured models failed to produce a parseable plan. Rather than
+	// leave the day stuck in 'failed' forever (which also blocks proactive
+	// dispatch and the app list), fall back to a believable mock plan and mark
+	// the run as failed-but-recovered. The admin page still shows the model
+	// output so the operator can switch text_life_plan to a stronger model.
+	mock := mockPlan(profile)
+	s.recordRunWithInput(ctx, profile.ID, "life_plan", "", "failed",
+		"all models failed; fell back to mock plan: "+lastErr.Error(),
+		lastErr.Error())
+	return mock, "fallback-mock", nil
 }
 
 func lifePlanPrompt(profile companionContext, localDate, timezone, recentLife string, minEvents, maxEvents, proactiveLimit int) string {
