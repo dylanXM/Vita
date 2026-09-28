@@ -101,11 +101,13 @@ class _AIPetsPageState extends State<AIPetsPage> {
             children: [
               Text('${breed['description'] ?? ''}'),
               const SizedBox(height: 16),
-              TextField(
+              CupertinoTextField(
                   controller: nameController,
                   autofocus: true,
                   maxLength: 40,
-                  decoration: InputDecoration(labelText: 'aiPets.petName'.tr)),
+                  placeholder: 'aiPets.petName'.tr,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10)),
             ]),
         actions: [
           CupertinoDialogAction(

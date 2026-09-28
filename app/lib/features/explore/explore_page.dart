@@ -127,7 +127,7 @@ class MomentsPage extends StatelessWidget {
     final controller = ExploreController.to;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(title: Text('explore.moments'.tr)),
+      appBar: AppBar(leading: const VitaBackButton(), title: Text('explore.moments'.tr)),
       body: SafeArea(
         bottom: false,
         child: _MomentsFeed(controller: controller),

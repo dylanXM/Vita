@@ -98,9 +98,9 @@ func AdminGetManagedCompanion(c *gin.Context) {
 	}
 	err := db.Get().QueryRow(`SELECT c.id,c.user_id,u.email,u.environment,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),
 		COALESCE(c.city,''),COALESCE(c.occupation,''),COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),
-		c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.model_id,c.portrait_id,
+		c.personality_tags,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.model_id,c.portrait_id,
 		c.creation_source,c.proactive_enabled,c.active,c.life_enabled,c.friendship_active,c.subscription_paused_at,c.voice_enabled,
-		c.voice_config::text,COALESCE(NULLIF(c.avatar_url,''),p.image_url,''),COALESCE(am.display_name,''),c.created_at,c.updated_at,
+		c.voice_config,COALESCE(NULLIF(c.avatar_url,''),p.image_url,''),COALESCE(am.display_name,''),c.created_at,c.updated_at,
 		(SELECT COUNT(*) FROM conversations WHERE companion_id=c.id),
 		(SELECT COUNT(*) FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE companion_id=c.id)),
 		(SELECT COUNT(*) FROM memories WHERE companion_id=c.id),(SELECT COUNT(*) FROM life_events WHERE companion_id=c.id),

@@ -186,7 +186,9 @@ class StoriesPage extends StatelessWidget {
                 return ListTile(
                     leading: VitaAvatar(
                       name: name,
+                      radius: 22,
                       imageUrl: auth.avatarUrl,
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     title: Text(name),
                     onTap: () {
@@ -198,7 +200,9 @@ class StoriesPage extends StatelessWidget {
               ...controller.companions.map((companion) => ListTile(
                   leading: VitaAvatar(
                       name: '${companion['name'] ?? ''}',
-                      imageUrl: '${companion['avatar_url'] ?? ''}'),
+                      radius: 22,
+                      imageUrl: '${companion['portrait_url'] ?? ''}',
+                      borderRadius: BorderRadius.circular(8)),
                   title: Text('${companion['name'] ?? ''}'),
                   onTap: () {
                     Get.back();

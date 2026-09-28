@@ -1063,8 +1063,8 @@ type adminCompanionInput struct {
 func AdminListCompanions(c *gin.Context) {
 	rows, err := db.Get().Query(`
 		SELECT c.id,c.user_id,u.email,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.city,''),COALESCE(c.occupation,''),
-		COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,
-		c.life_habits,c.life_goal,c.backstory,c.model_id,c.portrait_id,c.proactive_enabled,c.active,c.voice_enabled,c.voice_config::text,c.created_at,c.updated_at
+		COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags,c.speaking_style,c.likes,c.dislikes,
+		c.life_habits,c.life_goal,c.backstory,c.model_id,c.portrait_id,c.proactive_enabled,c.active,c.voice_enabled,c.voice_config,c.created_at,c.updated_at
 		FROM companions c JOIN users u ON u.id=c.user_id ORDER BY c.created_at DESC`)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list companions"})
