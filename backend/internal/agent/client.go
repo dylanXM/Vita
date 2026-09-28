@@ -254,23 +254,58 @@ func (c *Client) anthropic(ctx context.Context, model Model, input GenerateReque
 		"messages":    input.Messages,
 		"temperature": input.Temperature,
 		"max_tokens":  input.MaxTokens,
+		// claude-sonnet-5 is a reasoning model: without an explicit
+		// "thinking: disabled" some proxies let thinking consume the whole
+		// max_tokens budget and return a content array with no text block
+		// (surfaced as "anthropic provider returned no text").
+		"thinking": map[string]any{"type": "disabled"},
 	}
-	var response struct {
+	endpoint := providerEndpoint(defaultBaseURL(model.Kind, model.BaseURL), "/messages")
+	var raw json.RawMessage
+	if err := c.doJSON(ctx, endpoint, model.APIKey, "2023-06-01", body, &raw); err != nil {
+		return "", err
+	}
+	// Anthropic format: content blocks, text inside type=="text" blocks.
+	var anthro struct {
 		Content []struct {
 			Type string `json:"type"`
 			Text string `json:"text"`
 		} `json:"content"`
 	}
-	endpoint := providerEndpoint(defaultBaseURL(model.Kind, model.BaseURL), "/messages")
-	if err := c.doJSON(ctx, endpoint, model.APIKey, "2023-06-01", body, &response); err != nil {
-		return "", err
-	}
-	for _, block := range response.Content {
+	_ = json.Unmarshal(raw, &anthro)
+	for _, block := range anthro.Content {
 		if block.Type == "text" && strings.TrimSpace(block.Text) != "" {
 			return strings.TrimSpace(block.Text), nil
 		}
 	}
-	return "", fmt.Errorf("anthropic provider returned no text")
+	// OpenAI-compatible format: choices[].message.content. Some "anthropic"
+	// proxies (e.g. api.sweetai.work) answer /messages with this shape even
+	// though the request was anthropic-flavoured.
+	var oai struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	_ = json.Unmarshal(raw, &oai)
+	for _, choice := range oai.Choices {
+		if strings.TrimSpace(choice.Message.Content) != "" {
+			return strings.TrimSpace(choice.Message.Content), nil
+		}
+	}
+	types := make([]string, 0, len(anthro.Content))
+	for _, blk := range anthro.Content {
+		types = append(types, blk.Type)
+	}
+	if len(types) == 0 {
+		types = append(types, "(empty content)")
+	}
+	snippet := strings.TrimSpace(string(raw))
+	if len(snippet) > 400 {
+		snippet = snippet[:400]
+	}
+	return "", fmt.Errorf("anthropic provider returned no text (content blocks: %s; raw: %s)", strings.Join(types, ", "), snippet)
 }
 
 func (c *Client) doJSON(ctx context.Context, endpoint, apiKey, anthropicVersion string, body any, output any) error {

@@ -814,7 +814,7 @@ func (s *Service) generatePlan(ctx context.Context, profile companionContext, lo
 	systemPrompt := `You plan a believable daily timeline for a fictional AI companion.
 RESPONSE FORMAT: output ONLY a single JSON array. No prose, no explanation, no markdown fences.
 The very first character of your reply MUST be '[' and the very last character MUST be ']'. Do not write anything before or after the array.`
-	request := GenerateRequest{System: systemPrompt, Messages: []ChatMessage{{Role: "user", Content: prompt}}, Temperature: 0.6, MaxTokens: 2200}
+	request := GenerateRequest{System: systemPrompt, Messages: []ChatMessage{{Role: "user", Content: prompt}}, Temperature: 0.6, MaxTokens: 4096}
 	var lastErr error
 	for _, model := range models {
 		messages := append([]ChatMessage{}, request.Messages...)
@@ -834,10 +834,17 @@ The very first character of your reply MUST be '[' and the very last character M
 			}
 			lastErr = parseErr
 			s.recordRunWithInput(ctx, profile.ID, "life_plan", model.ID, "failed", parseErr.Error(), text)
-			if attempt == 0 && !strings.HasPrefix(strings.TrimSpace(text), "[") {
+			if attempt == 0 {
+				// Retry on ANY parse failure, not just a missing leading '['.
+				// A truncated array (starts with '[' but the closing ']' was cut
+				// off by the token limit) previously never got a second chance.
+				guidance := "That reply was not a JSON array. Reply with ONLY the JSON array now — first character '[', last character ']', no commentary."
+				if strings.HasPrefix(strings.TrimSpace(text), "[") {
+					guidance = "The JSON array in your previous reply was incomplete or malformed (it was likely cut off). Reply again with ONLY a single, complete, valid JSON array — first character '[', last character ']' — and keep each event description concise so the whole array fits within the token limit."
+				}
 				messages = append(messages,
 					ChatMessage{Role: "assistant", Content: truncate(text, 400)},
-					ChatMessage{Role: "user", Content: "That reply was not a JSON array. Reply with ONLY the JSON array now — first character '[', last character ']', no commentary."},
+					ChatMessage{Role: "user", Content: guidance},
 				)
 				continue
 			}

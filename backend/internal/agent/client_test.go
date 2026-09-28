@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -209,5 +210,56 @@ func TestKieTestConnection(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected auth error for bad key")
+	}
+}
+
+// TestAnthropicKindOpenAIResponse guards against proxies that answer an
+// anthropic-shaped /messages request with an OpenAI-compatible body
+// (choices[].message.content). anthropic() must extract text from both shapes.
+func TestAnthropicKindOpenAIResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/messages" || r.Header.Get("x-api-key") != "key" {
+			t.Fatal("unexpected anthropic request")
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []any{map[string]any{"message": map[string]any{"role": "assistant", "content": `[{"type":"meal","title":"Lunch","description":"Ramen at the corner shop.","location":"cafe","start":"12:00","end":"12:40","emotion":"happy","importance":30,"user_relevance":20,"share":false,"moment":false,"moment_text":"","media_urls":[]}]`}}},
+		})
+	}))
+	defer server.Close()
+
+	client := NewClient()
+	text, err := client.GenerateText(context.Background(), Model{
+		Kind: "anthropic", BaseURL: server.URL, APIKey: "key", ModelName: "model",
+	}, GenerateRequest{Messages: []ChatMessage{{Role: "user", Content: "hi"}}, MaxTokens: 4096})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(strings.TrimSpace(text), "[") {
+		t.Fatalf("expected JSON array text, got %q", text)
+	}
+}
+
+// TestAnthropicNoTextDiagnostics verifies the failure path now reports the
+// actual content blocks and a raw response snippet instead of a bare message.
+func TestAnthropicNoTextDiagnostics(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"content": []any{map[string]any{"type": "thinking", "thinking": "let me think"}},
+		})
+	}))
+	defer server.Close()
+
+	client := NewClient()
+	_, err := client.GenerateText(context.Background(), Model{
+		Kind: "anthropic", BaseURL: server.URL, APIKey: "key", ModelName: "model",
+	}, GenerateRequest{Messages: []ChatMessage{{Role: "user", Content: "hi"}}, MaxTokens: 4096})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "content blocks: thinking") {
+		t.Fatalf("expected block diagnostics, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "raw:") {
+		t.Fatalf("expected raw snippet, got %v", err)
 	}
 }
