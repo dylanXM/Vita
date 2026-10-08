@@ -41,8 +41,7 @@ class ExploreController extends GetxController {
   }
 }
 
-/// Explore tab — a grouped menu (same pattern as the Me page): each tile
-/// pushes a full second page instead of switching content in place.
+/// Places in the companion world, each opening an existing feature.
 class ExplorePage extends StatelessWidget {
   const ExplorePage({super.key});
 
@@ -57,64 +56,109 @@ class ExplorePage extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 90),
           children: [
-            VitaTabHeader(title: 'explore.title'.tr, showDivider: false),
-            const SizedBox(height: 10),
-            VitaCard(
-              radius: 0,
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: VitaListTile(
-                customIcon: VitaMenuIcon(
-                  icon: Icons.camera_alt_outlined,
-                  color: vita.green,
-                ),
+            VitaTabHeader(title: 'tab.discover'.tr, showDivider: false),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Text('discover.subtitle'.tr,
+                  style: TextStyle(color: vita.subText, fontSize: 13)),
+            ),
+            _PlaceCard(
+              icon: Icons.auto_stories_outlined,
+              title: 'storyHub.title'.tr,
+              subtitle: 'discover.stories'.tr,
+              colors: const [Color(0xFF6654A4), Color(0xFFA487BE)],
+              onTap: () => Get.to(() => const StoriesPage(),
+                  transition: Transition.cupertino),
+            ),
+            _PlaceCard(
+              icon: Icons.pets_outlined,
+              title: 'aiPets.title'.tr,
+              subtitle: 'discover.pets'.tr,
+              colors: const [Color(0xFFB26C55), Color(0xFFE8AF85)],
+              onTap: () => Get.to(() => const AIPetsPage(),
+                  transition: Transition.cupertino),
+            ),
+            Obx(() {
+              final posts = ExploreController.to.posts;
+              final content =
+                  posts.isEmpty ? '' : '${posts.first['content'] ?? ''}'.trim();
+              return _PlaceCard(
+                icon: Icons.camera_alt_outlined,
                 title: 'explore.moments'.tr,
-                borderRadius: BorderRadius.zero,
-                onTap: () => Get.to(
-                  () => const MomentsPage(),
-                  transition: Transition.cupertino,
-                  duration: const Duration(milliseconds: 300),
-                ),
-              ),
-            ),
-            VitaCard(
-              radius: 0,
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: VitaListTile(
-                customIcon: const VitaMenuIcon(
-                  icon: Icons.auto_stories_outlined,
-                  color: Color(0xFF576B95),
-                ),
-                title: 'storyHub.title'.tr,
-                borderRadius: BorderRadius.zero,
-                onTap: () => Get.to(
-                  () => const StoriesPage(),
-                  transition: Transition.cupertino,
-                  duration: const Duration(milliseconds: 300),
-                ),
-              ),
-            ),
-            VitaCard(
-              radius: 0,
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: VitaListTile(
-                customIcon: const VitaMenuIcon(
-                  icon: Icons.pets_outlined,
-                  color: Color(0xFFF29C38),
-                ),
-                title: 'aiPets.title'.tr,
-                borderRadius: BorderRadius.zero,
-                onTap: () => Get.to(
-                  () => const AIPetsPage(),
-                  transition: Transition.cupertino,
-                  duration: const Duration(milliseconds: 300),
-                ),
-              ),
-            ),
+                subtitle: content.isEmpty ? 'discover.moments'.tr : content,
+                colors: const [Color(0xFF4D8293), Color(0xFF8CB9B6)],
+                onTap: () => Get.to(() => const MomentsPage(),
+                    transition: Transition.cupertino),
+              );
+            }),
           ],
         ),
       ),
     );
   }
+}
+
+class _PlaceCard extends StatelessWidget {
+  const _PlaceCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.colors,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final List<Color> colors;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+        child: Material(
+          borderRadius: BorderRadius.circular(24),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Ink(
+              height: 168,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: colors),
+              ),
+              child: Stack(children: [
+                Positioned(
+                  right: -16,
+                  top: -28,
+                  child: Icon(icon,
+                      size: 188, color: Colors.white.withValues(alpha: 0.16)),
+                ),
+                Positioned(
+                  left: 22,
+                  right: 22,
+                  bottom: 22,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 23,
+                              fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 6),
+                      Text(subtitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Color(0xFFF3EEF6), fontSize: 13)),
+                    ],
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      );
 }
 
 /// Moments second page — companions' public posts, pushed from the Explore
@@ -127,7 +171,8 @@ class MomentsPage extends StatelessWidget {
     final controller = ExploreController.to;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(leading: const VitaBackButton(), title: Text('explore.moments'.tr)),
+      appBar: AppBar(
+          leading: const VitaBackButton(), title: Text('explore.moments'.tr)),
       body: SafeArea(
         bottom: false,
         child: _MomentsFeed(controller: controller),

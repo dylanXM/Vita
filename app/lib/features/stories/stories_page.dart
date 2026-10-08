@@ -12,6 +12,7 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
+import '../../shared/world_scene_banner.dart';
 import '../auth/auth_controller.dart';
 
 String _requestKey() =>
@@ -90,7 +91,8 @@ class StoriesPage extends StatelessWidget {
         controller ?? Get.put<StoriesController>(StoriesController());
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(leading: const VitaBackButton(), title: Text('storyHub.title'.tr)),
+      appBar: AppBar(
+          leading: const VitaBackButton(), title: Text('storyHub.title'.tr)),
       body: Obx(() {
         final backgrounds = _maps(activeController.catalog['backgrounds']);
         final subscribed = activeController.catalog['subscribed'] == true;
@@ -108,6 +110,11 @@ class StoriesPage extends StatelessWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.only(top: 12, bottom: 32),
             children: [
+              WorldSceneBanner(
+                title: 'storyHub.title'.tr,
+                subtitle: 'discover.stories'.tr,
+                icon: Icons.auto_stories_outlined,
+              ),
               _SectionHeader(
                   title: 'storyHub.backgrounds'.tr,
                   action: subscribed
@@ -140,7 +147,8 @@ class StoriesPage extends StatelessWidget {
                         title: 'storyHub.empty'.tr,
                         subtitle: 'storyHub.emptySub'.tr)),
               ...activeController.stories.map((story) => VitaCard(
-                  radius: 0,
+                  radius: 20,
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                   padding: EdgeInsets.zero,
                   child: Material(
                     color: Colors.transparent,
@@ -180,9 +188,7 @@ class StoriesPage extends StatelessWidget {
                 final auth = AuthController.to;
                 final name = auth.nickname.isNotEmpty
                     ? auth.nickname
-                    : (auth.email.isNotEmpty
-                        ? auth.email
-                        : 'storyHub.self'.tr);
+                    : (auth.email.isNotEmpty ? auth.email : 'storyHub.self'.tr);
                 return ListTile(
                     leading: VitaAvatar(
                       name: name,
@@ -236,7 +242,8 @@ class _BackgroundTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final cover = '${background['cover_url'] ?? ''}';
     return VitaCard(
-        radius: 0,
+        radius: 20,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
         padding: EdgeInsets.zero,
         child: Material(
           color: Colors.transparent,
@@ -245,8 +252,8 @@ class _BackgroundTile extends StatelessWidget {
               leading: ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: SizedBox(
-                      width: 58,
-                      height: 58,
+                      width: 72,
+                      height: 92,
                       child: cover.isEmpty
                           ? Container(
                               color: context.vita.pageBg,
@@ -307,7 +314,9 @@ class _CustomStoryBackgroundPageState extends State<CustomStoryBackgroundPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(leading: const VitaBackButton(), title: Text('storyHub.createCustom'.tr)),
+      appBar: AppBar(
+          leading: const VitaBackButton(),
+          title: Text('storyHub.createCustom'.tr)),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         _field(title, 'storyHub.name'.tr),
         _field(genre, 'storyHub.genre'.tr),
@@ -600,7 +609,9 @@ class StoryboardPage extends StatelessWidget {
     final imageURL = '${board['image_url'] ?? ''}';
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(leading: const VitaBackButton(), title: Text('storyHub.storyboard'.tr)),
+      appBar: AppBar(
+          leading: const VitaBackButton(),
+          title: Text('storyHub.storyboard'.tr)),
       body: ListView(
         padding: const EdgeInsets.only(top: 12, bottom: 30),
         children: [

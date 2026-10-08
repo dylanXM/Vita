@@ -6,6 +6,7 @@ import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
+import '../../shared/world_scene_banner.dart';
 import 'ai_pet_avatar.dart';
 import 'ai_pet_desktop_controller.dart';
 import 'ai_pet_home_page.dart';
@@ -104,13 +105,14 @@ class _AIPetsPageState extends State<AIPetsPage> {
                   autofocus: true,
                   maxLength: 40,
                   placeholder: 'aiPets.petName'.tr,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
             ]),
         actions: [
           CupertinoDialogAction(
               onPressed: () => Get.back(result: false),
-              child: Text('common.cancel'.tr, style: const TextStyle(color: CupertinoColors.systemGrey))),
+              child: Text('common.cancel'.tr,
+                  style: const TextStyle(color: CupertinoColors.systemGrey))),
           CupertinoDialogAction(
               onPressed: () => Get.back(result: true),
               child: Text('aiPets.adopt'.tr)),
@@ -164,7 +166,8 @@ class _AIPetsPageState extends State<AIPetsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(leading: const VitaBackButton(), title: Text('aiPets.title'.tr)),
+      appBar: AppBar(
+          leading: const VitaBackButton(), title: Text('aiPets.title'.tr)),
       body: _loading && _breeds.isEmpty
           ? ListView.builder(
               itemCount: 4,
@@ -180,13 +183,23 @@ class _AIPetsPageState extends State<AIPetsPage> {
                               title: 'aiPets.empty'.tr,
                               subtitle: 'aiPets.emptySub'.tr))
                     ])
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-                      itemCount: _breeds.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) => _BreedCard(
-                          breed: _breeds[index],
-                          onTap: () => _openBreed(_breeds[index])),
+                  : ListView(
+                      padding: const EdgeInsets.only(bottom: 28),
+                      children: [
+                        WorldSceneBanner(
+                          title: 'aiPets.title'.tr,
+                          subtitle: 'discover.pets'.tr,
+                          icon: Icons.pets_outlined,
+                        ),
+                        for (final breed in _breeds)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                            child: _BreedCard(
+                              breed: breed,
+                              onTap: () => _openBreed(breed),
+                            ),
+                          ),
+                      ],
                     ),
             ),
     );
@@ -203,10 +216,12 @@ class _BreedCard extends StatelessWidget {
     final adopted = '${breed['adopted_companion_id'] ?? ''}'.isNotEmpty;
     final allowed = breed['can_adopt'] == true;
     return VitaCard(
+      radius: 24,
+      margin: EdgeInsets.zero,
       padding: EdgeInsets.zero,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(24),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(children: [

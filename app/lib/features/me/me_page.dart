@@ -66,11 +66,14 @@ class MePage extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 90),
             children: [
               const VitaTabHeader(title: 'Vita', showDivider: false),
-              // Account summary follows the same tap-target and surface rhythm
-              // as the grouped menu rows below.
+              // A traveler profile anchors the account in the world language.
               Container(
-                color: vita.surface,
-                padding: const EdgeInsets.fromLTRB(20, 24, 16, 24),
+                margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                decoration: BoxDecoration(
+                  gradient: vita.brandGradient,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                padding: const EdgeInsets.fromLTRB(20, 28, 16, 28),
                 child: Row(
                   children: [
                     ClipOval(
@@ -103,7 +106,7 @@ class MePage extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
-                              color: vita.text,
+                              color: Colors.white,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -111,7 +114,7 @@ class MePage extends StatelessWidget {
                             plan,
                             style: TextStyle(
                               fontSize: 13,
-                              color: vita.subText,
+                              color: const Color(0xFFEDE7FF),
                             ),
                           ),
                         ],
@@ -120,11 +123,12 @@ class MePage extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 4),
 
               // Subscription group.
               VitaCard(
-                radius: 0,
+                radius: 20,
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Column(
                   children: [
@@ -172,20 +176,15 @@ class MePage extends StatelessWidget {
                 ),
               ),
 
-              // Settings.
-              VitaCard(
-                radius: 0,
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Column(
-                  children: [
-                    VitaListTile(
-                      customIcon: const VitaMenuIcon(
-                        icon: Icons.card_giftcard_outlined,
-                        color: Color(0xFFE86C8D),
-                      ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Column(children: [
+                  Row(children: [
+                    Expanded(
+                        child: _MePortal(
+                      icon: Icons.card_giftcard_outlined,
                       title: 'me.inviteCode'.tr,
                       subtitle: inviteCode.isEmpty ? '—' : inviteCode,
-                      borderRadius: BorderRadius.zero,
                       onTap: inviteCode.isEmpty
                           ? null
                           : () async {
@@ -197,36 +196,29 @@ class MePage extends StatelessWidget {
                               Get.snackbar(
                                   'me.inviteCode'.tr, 'me.inviteCopied'.tr);
                             },
-                    ),
-                    const Divider(indent: 52, height: 0.5),
-                    VitaListTile(
-                      customIcon: const VitaMenuIcon(
-                        icon: Icons.star_outline_rounded,
-                        color: Color(0xFFE9A820),
-                      ),
+                    )),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: _MePortal(
+                      icon: Icons.star_outline_rounded,
                       title: 'me.rate'.tr,
-                      borderRadius: BorderRadius.zero,
                       onTap: _rateApp,
-                    ),
-                    const Divider(indent: 52, height: 0.5),
-                    VitaListTile(
-                      customIcon: const VitaMenuIcon(
-                        icon: Icons.mail_outline_rounded,
-                        color: Color(0xFF4A90E2),
-                      ),
+                    )),
+                  ]),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(
+                        child: _MePortal(
+                      icon: Icons.mail_outline_rounded,
                       title: 'me.contact'.tr,
                       subtitle: supportEmail,
-                      borderRadius: BorderRadius.zero,
                       onTap: _contactUs,
-                    ),
-                    const Divider(indent: 52, height: 0.5),
-                    VitaListTile(
-                      customIcon: const VitaMenuIcon(
-                        icon: Icons.settings_outlined,
-                        color: Color(0xFF7C8796),
-                      ),
+                    )),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: _MePortal(
+                      icon: Icons.settings_outlined,
                       title: 'me.settings'.tr,
-                      borderRadius: BorderRadius.zero,
                       onTap: () {
                         AnalyticsService.to.track('profile_settings_opened',
                             category: 'profile');
@@ -234,9 +226,9 @@ class MePage extends StatelessWidget {
                             transition: Transition.cupertino,
                             duration: const Duration(milliseconds: 300));
                       },
-                    ),
-                  ],
-                ),
+                    )),
+                  ]),
+                ]),
               ),
 
               Obx(() {
@@ -258,6 +250,54 @@ class MePage extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MePortal extends StatelessWidget {
+  const _MePortal(
+      {required this.icon,
+      required this.title,
+      required this.onTap,
+      this.subtitle});
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: context.vita.surface,
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(22),
+          child: SizedBox(
+            height: 124,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, color: context.vita.green, size: 28),
+                  const Spacer(),
+                  Text(title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: context.vita.text,
+                          fontWeight: FontWeight.w700)),
+                  if (subtitle != null)
+                    Text(subtitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: context.vita.subText, fontSize: 11)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 class _SocialMediaCard extends StatelessWidget {
@@ -284,7 +324,8 @@ class _SocialMediaCard extends StatelessWidget {
     ].where((item) => item.url.isNotEmpty).toList();
 
     return VitaCard(
-      radius: 0,
+      radius: 20,
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

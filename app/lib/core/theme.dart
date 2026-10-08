@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// Vita design system — a warm, chat-forward visual language with light and
+/// Vita design system — a character-world visual language with light and
 /// dark palettes, plus four switchable brand color schemes (palettes).
 ///
-/// White (or near-black) grouped surfaces on a soft canvas, a brand accent
-/// color, hairline separators and compact spacing. Every page resolves its
+/// Soft surfaces and expressive accents anchor the world. Every page resolves its
 /// colors through `context.vita`, which returns the [VitaThemeData] matching
 /// the current theme brightness **and the user-selected [VitaPalette]** — so
 /// light/dark/system mode changes and live palette switches re-render the
@@ -124,7 +123,8 @@ class VitaBrandColors {
     ),
   };
 
-  static VitaBrandColors of(VitaPalette p) => _table[p] ?? _table[VitaPalette.violet]!;
+  static VitaBrandColors of(VitaPalette p) =>
+      _table[p] ?? _table[VitaPalette.violet]!;
 }
 
 /// Carries the active [VitaPalette] on [ThemeData] so `context.vita` can
@@ -453,13 +453,12 @@ class VitaTheme {
         backgroundColor: t.pageBg,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        shape: Border(bottom: BorderSide(color: t.divider, width: 0.5)),
-        centerTitle: true,
+        centerTitle: false,
         foregroundColor: t.text,
         titleTextStyle: TextStyle(
           color: t.text,
-          fontSize: 17,
-          fontWeight: FontWeight.w600,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -469,7 +468,8 @@ class VitaTheme {
           disabledBackgroundColor: t.green.withValues(alpha: 0.4),
           minimumSize: const Size.fromHeight(50),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
@@ -478,7 +478,8 @@ class VitaTheme {
           foregroundColor: t.text,
           side: BorderSide(color: t.divider),
           minimumSize: const Size.fromHeight(50),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
         ),
       ),
@@ -494,23 +495,23 @@ class VitaTheme {
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: t.divider),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: t.divider),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: t.green, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: t.red),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: t.red, width: 1.5),
         ),
         hintStyle: TextStyle(color: t.hint, fontSize: 15),
@@ -519,7 +520,7 @@ class VitaTheme {
         backgroundColor: t.pageBg,
         selectedColor: t.greenTint,
         checkmarkColor: t.green,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         side: BorderSide(color: t.divider),
         labelStyle: TextStyle(fontSize: 14, color: t.text),
       ),
@@ -533,11 +534,11 @@ class VitaTheme {
         backgroundColor: Color(0xFF3B3B3B),
         contentTextStyle: TextStyle(color: Colors.white, fontSize: 14),
         shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(4))),
+            borderRadius: BorderRadius.all(Radius.circular(16))),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: t.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         titleTextStyle:
             TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: t.text),
       ),

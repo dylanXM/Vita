@@ -14,6 +14,7 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
+import '../../shared/world_scene_banner.dart';
 import '../shell/shell_page.dart';
 import 'chat_controller.dart';
 import '../auth/auth_controller.dart';
@@ -21,8 +22,7 @@ import 'chat_info_page.dart';
 import 'chat_message_content.dart';
 import 'experience_sheet.dart';
 
-/// Chat detail page — message bubbles (user right / companion left),
-/// date separators and a WeChat-style input bar.
+/// Conversation within a companion's world.
 class ChatPage extends StatefulWidget {
   const ChatPage(
       {super.key,
@@ -301,6 +301,15 @@ class _ChatPageState extends State<ChatPage> {
       ),
       body: Column(
         children: [
+          WorldSceneBanner(
+            title: widget.name,
+            subtitle: widget.companion?['friendship_active'] == false
+                ? 'chat.notFriends'.tr
+                : 'world.ready'.tr,
+            icon: Icons.auto_awesome,
+            imageUrl: widget.companion?['portrait_url'] as String?,
+            height: 172,
+          ),
           Obx(() => ctrl.accessError.value == null
               ? const SizedBox.shrink()
               : Container(
@@ -430,7 +439,7 @@ class _ChatPageState extends State<ChatPage> {
                           ? null
                           : BoxDecoration(
                               color: bubbleColor,
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(20),
                             ),
                       child: _ChatMessageBody(
                         message: m,
@@ -438,23 +447,10 @@ class _ChatPageState extends State<ChatPage> {
                         onPlayVoice: _playVoice,
                       ),
                     ),
-                    if (!isGift)
-                      Positioned(
-                        right: isUser ? -6 : null,
-                        left: isUser ? null : -6,
-                        top: 22,
-                        child: CustomPaint(
-                          size: const Size(6, 8),
-                          painter: _BubbleTailPainter(
-                            color: bubbleColor,
-                            pointRight: isUser,
-                          ),
-                        ),
-                      ),
                     if (isUser && deliveryStatus != 'delivered')
                       Positioned(
-                        right: -(8 +
-                            (deliveryStatus == 'sending' ? 14.0 : 17.0)),
+                        right:
+                            -(8 + (deliveryStatus == 'sending' ? 14.0 : 17.0)),
                         bottom: 0,
                         child: deliveryStatus == 'sending'
                             ? SizedBox.square(
@@ -498,8 +494,7 @@ class _ChatPageState extends State<ChatPage> {
     return Container(
       decoration: BoxDecoration(
         color: context.vita.pageBg,
-        border:
-            Border(top: BorderSide(color: context.vita.divider, width: 0.5)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       child: Row(
@@ -517,7 +512,7 @@ class _ChatPageState extends State<ChatPage> {
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 color: context.vita.surface,
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(20),
               ),
               child: Focus(
                 canRequestFocus: false,
@@ -536,8 +531,7 @@ class _ChatPageState extends State<ChatPage> {
                   style: TextStyle(
                       fontSize: 16, color: context.vita.text, height: 1.4),
                   decoration: InputDecoration(
-                    hintText:
-                        locked ? 'chat.cannotSend'.tr : 'chat.message'.tr,
+                    hintText: locked ? 'chat.cannotSend'.tr : 'chat.message'.tr,
                     hintStyle: TextStyle(
                         color: context.vita.hint, fontSize: 16, height: 1.4),
                     border: InputBorder.none,
@@ -546,12 +540,12 @@ class _ChatPageState extends State<ChatPage> {
                     errorBorder: InputBorder.none,
                     disabledBorder: InputBorder.none,
                     isCollapsed: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                 ),
               ),
-          ),
+            ),
           ),
           const SizedBox(width: 8),
           _RoundIconButton(
@@ -561,9 +555,9 @@ class _ChatPageState extends State<ChatPage> {
             onTap: locked
                 ? null
                 : () {
-                      FocusScope.of(context).unfocus();
-                      _panel.value = panel == 'emoji' ? null : 'emoji';
-                    },
+                    FocusScope.of(context).unfocus();
+                    _panel.value = panel == 'emoji' ? null : 'emoji';
+                  },
             showBorder: false,
             iconSize: 30,
           ),
@@ -573,9 +567,9 @@ class _ChatPageState extends State<ChatPage> {
             onTap: locked
                 ? null
                 : () {
-                      FocusScope.of(context).unfocus();
-                      _panel.value = panel == 'more' ? null : 'more';
-                    },
+                    FocusScope.of(context).unfocus();
+                    _panel.value = panel == 'more' ? null : 'more';
+                  },
             showBorder: false,
             iconSize: 30,
           ),
@@ -612,8 +606,7 @@ class _ChatPageState extends State<ChatPage> {
                   backgroundColor: context.vita.surface,
                   showDragHandle: true,
                   builder: (_) => ExperienceSheet(
-                      companionId: widget.companionId,
-                      onCompleted: ctrl.poll));
+                      companionId: widget.companionId, onCompleted: ctrl.poll));
             },
           ),
         ],
@@ -952,38 +945,4 @@ class _MorePanelButton extends StatelessWidget {
   }
 }
 
-/// Clip path that adds a small WeChat-style tail to a chat bubble.
-/// [isUser] = true draws the tail on the right (green bubble); false on the
-/// left (white bubble).
-class _BubbleTailPainter extends CustomPainter {
-  _BubbleTailPainter({required this.color, required this.pointRight});
-
-  final Color color;
-  final bool pointRight;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    final path = Path();
-    if (pointRight) {
-      path
-        ..moveTo(0, 0)
-        ..lineTo(size.width, size.height / 2)
-        ..lineTo(0, size.height)
-        ..close();
-    } else {
-      path
-        ..moveTo(size.width, 0)
-        ..lineTo(0, size.height / 2)
-        ..lineTo(size.width, size.height)
-        ..close();
-    }
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(_BubbleTailPainter old) =>
-      old.color != color || old.pointRight != pointRight;
-}
-
-/// Chat avatar: mint-green circle with green initial (WeChat-style).
+/// Chat avatar fallback when a character has no portrait.

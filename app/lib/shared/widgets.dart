@@ -78,7 +78,7 @@ class VitaCard extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(16),
     this.margin = const EdgeInsets.only(bottom: 12),
-    this.radius = 0,
+    this.radius = 20,
     this.shadow = const [],
   });
 
@@ -102,8 +102,7 @@ class VitaCard extends StatelessWidget {
   }
 }
 
-/// Compact, centered top-level header. Subtitles are intentionally omitted so
-/// the hierarchy matches the rest of the app's navigation bars.
+/// Spacious top-level world header.
 class VitaTabHeader extends StatelessWidget {
   const VitaTabHeader({
     super.key,
@@ -129,7 +128,7 @@ class VitaTabHeader extends StatelessWidget {
       // the trailing `Positioned(right: 8)` action hug the centered title
       // instead of the screen's right edge.
       width: double.infinity,
-      height: 52,
+      height: 64,
       decoration: BoxDecoration(
         color: context.vita.pageBg,
         border: showDivider
@@ -138,16 +137,19 @@ class VitaTabHeader extends StatelessWidget {
             : null,
       ),
       child: Stack(
-        alignment: Alignment.center,
+        alignment: Alignment.centerLeft,
         children: [
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-                color: context.vita.text),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 64, 0),
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  color: context.vita.text),
+            ),
           ),
           if (actions != null)
             Positioned(
@@ -546,8 +548,7 @@ class VitaBackButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      icon: Icon(Icons.arrow_back_ios_new,
-          size: 20, color: context.vita.text),
+      icon: Icon(Icons.arrow_back_ios_new, size: 20, color: context.vita.text),
       onPressed: onPressed ?? () => Get.back(),
     );
   }

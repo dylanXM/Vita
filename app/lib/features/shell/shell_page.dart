@@ -7,22 +7,22 @@ import '../../core/push_notification_service.dart';
 import '../../core/app_content_controller.dart';
 import '../../core/analytics_service.dart';
 import '../../core/theme.dart';
-import '../chat/chat_list_page.dart';
+import '../world/world_page.dart';
 import '../me/me_page.dart';
 import '../memories/memories_page.dart';
 import '../explore/explore_page.dart';
 import '../whats_new/whats_new_sheet.dart';
 
-/// Main shell — content scrolls edge to edge behind a floating glass dock
-/// (Chat | Memories | Explore | Me), matching the reference app chrome.
+/// Main shell for the world, journey, discover and account destinations.
 class ShellController extends GetxController {
   static ShellController get to => Get.find();
 
   final index = 0.obs;
+  final selectedCompanionId = RxnString();
 
   void switchTo(int i) {
     if (i == index.value) return;
-    const tabs = ['chat', 'memories', 'explore', 'me'];
+    const tabs = ['world', 'journey', 'discover', 'me'];
     AnalyticsService.to.track('tab_selected',
         category: 'navigation',
         properties: {'from': tabs[index.value], 'to': tabs[i]});
@@ -65,8 +65,8 @@ class _ShellPageState extends State<ShellPage> {
           final mq = MediaQuery.of(context);
           final safeBottom = mq.padding.bottom;
           return MediaQuery(
-            // Match the reference app: tab pages receive an extra bottom inset
-            // for the floating dock while the background still extends behind it.
+            // Tab pages receive an extra bottom inset for the floating dock
+            // while their backgrounds continue behind it.
             data: mq.copyWith(
               padding: mq.padding.copyWith(
                 bottom: safeBottom + VitaTabBar.reservedHeight,
@@ -75,11 +75,14 @@ class _ShellPageState extends State<ShellPage> {
             child: Obx(
               () => IndexedStack(
                 index: ctrl.index.value,
-                children: const [
-                  ChatListPage(),
-                  MemoriesPage(),
-                  ExplorePage(),
-                  MePage(),
+                children: [
+                  TickerMode(
+                    enabled: ctrl.index.value == 0,
+                    child: const WorldPage(),
+                  ),
+                  const MemoriesPage(),
+                  const ExplorePage(),
+                  const MePage(),
                 ],
               ),
             ),
@@ -108,17 +111,17 @@ class _NavItem {
 
 const List<_NavItem> _kTabs = [
   _NavItem(
-    labelKey: 'tab.chat',
-    icon: Icons.forum_outlined,
-    activeIcon: Icons.forum,
+    labelKey: 'tab.world',
+    icon: Icons.auto_awesome_outlined,
+    activeIcon: Icons.auto_awesome,
   ),
   _NavItem(
-    labelKey: 'tab.memories',
-    icon: Icons.favorite_border,
-    activeIcon: Icons.favorite,
+    labelKey: 'tab.journey',
+    icon: Icons.route_outlined,
+    activeIcon: Icons.route,
   ),
   _NavItem(
-    labelKey: 'tab.explore',
+    labelKey: 'tab.discover',
     icon: Icons.explore_outlined,
     activeIcon: Icons.explore,
   ),
@@ -311,9 +314,7 @@ class _LiquidGlassPill extends StatelessWidget {
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: dark
-                ? const Color(0x3DFFFFFF)
-                : const Color(0x80FFFFFF),
+            color: dark ? const Color(0x3DFFFFFF) : const Color(0x80FFFFFF),
             borderRadius: BorderRadius.circular(VitaRadius.pill),
           ),
         ),

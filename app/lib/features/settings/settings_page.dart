@@ -33,7 +33,8 @@ class SettingsPage extends StatelessWidget {
           const SizedBox(height: 12),
           // General group: language + theme.
           VitaCard(
-            radius: 0,
+            radius: 20,
+            margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Column(
               children: [
@@ -128,7 +129,8 @@ class SettingsPage extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           VitaCard(
-            radius: 0,
+            radius: 20,
+            margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Column(
               children: [
@@ -162,7 +164,8 @@ class SettingsPage extends StatelessWidget {
           const SizedBox(height: 12),
           // Account group: profile, deleted companions, sign out.
           VitaCard(
-            radius: 0,
+            radius: 20,
+            margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Column(
               children: [
@@ -355,7 +358,8 @@ class _OptionListPage extends StatelessWidget {
         padding: const EdgeInsets.only(top: 8, bottom: 24),
         children: [
           VitaCard(
-            radius: 0,
+            radius: 20,
+            margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Column(
               children: [
@@ -523,7 +527,8 @@ class PalettePage extends StatelessWidget {
         padding: const EdgeInsets.only(top: 8, bottom: 24),
         children: [
           VitaCard(
-            radius: 0,
+            radius: 20,
+            margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Column(
               children: [

@@ -7,6 +7,7 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../life/life_detail_page.dart';
+import '../shell/shell_page.dart';
 
 class MemoriesController extends GetxController {
   static MemoriesController get to => Get.find();
@@ -16,20 +17,6 @@ class MemoriesController extends GetxController {
   final companions = <Map<String, dynamic>>[].obs;
   final memories = <Map<String, dynamic>>[].obs;
   final activeCompanionId = RxnString();
-  final searchQuery = ''.obs;
-
-  /// Companions filtered by name / city / occupation for the search box.
-  List<Map<String, dynamic>> get filteredCompanions {
-    final q = searchQuery.value.trim().toLowerCase();
-    if (q.isEmpty) return List.of(companions);
-    return companions.where((companion) {
-      final name = (companion['name'] as String? ?? '').toLowerCase();
-      final city = (companion['city'] as String? ?? '').toLowerCase();
-      final occupation =
-          (companion['occupation'] as String? ?? '').toLowerCase();
-      return name.contains(q) || city.contains(q) || occupation.contains(q);
-    }).toList();
-  }
 
   @override
   void onInit() {
@@ -105,40 +92,43 @@ class MemoriesController extends GetxController {
   }
 }
 
-/// First level: a contact-style list. Memories from different companions are
-/// deliberately kept separate instead of sharing an in-page selector.
-///
-/// It is a root dock tab, so it carries the same borderless top header as the
-/// other tabs and its list scrolls behind the floating glass tab bar.
-class MemoriesPage extends StatelessWidget {
+/// A shared journey with a companion selector and a dated timeline.
+class MemoriesPage extends StatefulWidget {
   const MemoriesPage({super.key});
 
   @override
+  State<MemoriesPage> createState() => _MemoriesPageState();
+}
+
+class _MemoriesPageState extends State<MemoriesPage> {
+  String? _selectedId;
+
+  void _select(Map<String, dynamic> companion) {
+    final id = companion['id'] as String? ?? '';
+    if (id.isEmpty || id == _selectedId) return;
+    setState(() => _selectedId = id);
+    ShellController.to.selectedCompanionId.value = id;
+    MemoriesController.to.loadMemories(id);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final controller = MemoriesController.to;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      // Bottom is open so the list scrolls behind the glass tab bar.
       body: SafeArea(
         bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            VitaTabHeader(title: 'memories.title'.tr, showDivider: false),
-            const _MemorySearchBox(),
-            Expanded(child: Obx(() => _buildBody(context, controller))),
-          ],
-        ),
+        child: Obx(() => _buildBody(context, MemoriesController.to)),
       ),
     );
   }
 
   Widget _buildBody(BuildContext context, MemoriesController controller) {
     if (controller.companionsLoading.value && controller.companions.isEmpty) {
-      return ListView.builder(
-        padding: const EdgeInsets.only(bottom: 90),
-        itemCount: 6,
-        itemBuilder: (_, __) => const VitaSkeletonCard(withAvatar: true),
+      return ListView(
+        children: [
+          VitaTabHeader(title: 'tab.journey'.tr, showDivider: false),
+          const VitaSkeletonCard(withAvatar: true),
+        ],
       );
     }
     if (controller.companions.isEmpty) {
@@ -147,6 +137,7 @@ class MemoriesPage extends StatelessWidget {
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
+            VitaTabHeader(title: 'tab.journey'.tr, showDivider: false),
             SizedBox(
               height: MediaQuery.sizeOf(context).height * 0.62,
               child: VitaEmpty(
@@ -160,156 +151,94 @@ class MemoriesPage extends StatelessWidget {
       );
     }
 
-    final list = controller.filteredCompanions;
-    if (list.isEmpty) {
-      return VitaEmpty(
-        icon: Icons.search,
-        title: 'memories.noResults'.tr,
-        subtitle: 'memories.noResultsSub'.tr,
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: controller.loadCompanions,
-      child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(top: 8, bottom: 90),
-        itemCount: list.length,
-        separatorBuilder: (_, __) => Divider(
-          height: 0.5,
-          indent: 72,
-          color: context.vita.divider,
-        ),
-        itemBuilder: (context, index) => _MemoryContactTile(
-          companion: list[index],
-        ),
-      ),
+    final companions = controller.companions;
+    final activeId =
+        ShellController.to.selectedCompanionId.value ?? _selectedId;
+    final selected = companions.firstWhere(
+      (item) => item['id'] == activeId,
+      orElse: () => companions.first,
     );
-  }
-}
-
-/// WeChat-style rounded search field filtering the companion list.
-class _MemorySearchBox extends StatelessWidget {
-  const _MemorySearchBox();
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = MemoriesController.to;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
-      child: TextField(
-        onChanged: (v) => controller.searchQuery.value = v,
-        textInputAction: TextInputAction.search,
-        decoration: InputDecoration(
-          hintText: 'memories.search'.tr,
-          hintStyle: TextStyle(color: context.vita.hint, fontSize: 14),
-          prefixIcon: const SizedBox(
-            height: 40,
-            width: 38,
-            child: Center(
-              child: Icon(Icons.search, size: 18, color: Color(0xFFBBBBBB)),
+    final selectedId = selected['id'] as String? ?? '';
+    if (_selectedId != selectedId && selectedId.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _select(selected);
+      });
+    }
+    return RefreshIndicator(
+      onRefresh: () async {
+        await controller.loadCompanions();
+        if (selectedId.isNotEmpty) await controller.loadMemories(selectedId);
+      },
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 110),
+        children: [
+          VitaTabHeader(title: 'tab.journey'.tr, showDivider: false),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 18),
+            child: Text('journey.subtitle'.tr,
+                style: TextStyle(color: context.vita.subText, fontSize: 13)),
+          ),
+          SizedBox(
+            height: 48,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              scrollDirection: Axis.horizontal,
+              itemCount: companions.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) => ChoiceChip(
+                label: Text('${companions[i]['name'] ?? 'chat.companion'.tr}'),
+                selected: companions[i]['id'] == selectedId,
+                onSelected: (_) => _select(companions[i]),
+              ),
             ),
           ),
-          filled: true,
-          fillColor: context.vita.surface,
-          contentPadding: const EdgeInsets.symmetric(vertical: 8),
-          isDense: true,
-          prefixIconConstraints:
-              const BoxConstraints(minWidth: 38, minHeight: 40),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.zero,
-            borderSide: BorderSide.none,
+          const SizedBox(height: 14),
+          _CompanionMemoryHeader(companion: selected),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+            child: OutlinedButton.icon(
+              onPressed: () =>
+                  Get.to(() => LifeDetailPage(companion: selected)),
+              icon: const Icon(Icons.auto_awesome_outlined),
+              label: Text('journey.life'.tr),
+            ),
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.zero,
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.zero,
-            borderSide: BorderSide.none,
-          ),
-        ),
+          if (controller.memoriesLoading.value && controller.memories.isEmpty)
+            const VitaSkeletonCard(withAvatar: false)
+          else if (controller.memories.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 44),
+              child: VitaEmpty(
+                icon: Icons.star_border,
+                title: 'memories.empty'.tr,
+                subtitle: 'memories.emptySub'.tr,
+              ),
+            )
+          else
+            ..._timeline(controller.memories, selectedId),
+        ],
       ),
     );
   }
-}
 
-class _MemoryContactTile extends StatelessWidget {
-  const _MemoryContactTile({required this.companion});
-
-  final Map<String, dynamic> companion;
-
-  @override
-  Widget build(BuildContext context) {
-    final id = companion['id'] as String? ?? '';
-    final name = companion['name'] as String? ?? 'chat.companion'.tr;
-    final city = (companion['city'] as String? ?? '').trim();
-    final occupation = (companion['occupation'] as String? ?? '').trim();
-    final profile =
-        [city, occupation].where((item) => item.isNotEmpty).join(' · ');
-
-    return Material(
-      color: context.vita.surface,
-      child: InkWell(
-        onTap: id.isEmpty
-            ? null
-            : () {
-                AnalyticsService.to.track(
-                  'memory_companion_opened',
-                  category: 'navigation',
-                  properties: {'companion_id': id},
-                );
-                Get.to(
-                  () => MemoryDetailPage(companion: companion),
-                  transition: Transition.cupertino,
-                  duration: const Duration(milliseconds: 300),
-                );
-              },
-        child: SizedBox(
-          height: 72,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                VitaAvatar(
-                  name: name,
-                  radius: 22,
-                  imageUrl: companion['portrait_url'] as String?,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: context.vita.text,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      profile.isEmpty ? 'memories.subtitle'.tr : profile,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: context.vita.subText,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, size: 20, color: context.vita.chevron),
-            ],
-          ),
-        ),
-        ),
-      ),
-    );
+  List<Widget> _timeline(List<Map<String, dynamic>> memories, String id) {
+    final result = <Widget>[];
+    DateTime? previous;
+    for (final memory in memories) {
+      final date = (DateTime.tryParse(memory['event_time'] as String? ??
+                  memory['created_at'] as String? ??
+                  '') ??
+              DateTime.now())
+          .toLocal();
+      final day = DateTime(date.year, date.month, date.day);
+      if (previous != day) {
+        result.add(_DateSectionHeader(label: formatDateSeparator(date)));
+      }
+      result.add(_MemoryTile(companionId: id, memory: memory));
+      previous = day;
+    }
+    return result;
   }
 }
 
@@ -400,9 +329,8 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
     DateTime? prevDay;
     for (var i = 0; i < controller.memories.length; i++) {
       final m = controller.memories[i];
-      final t = DateTime.tryParse(m['event_time'] as String? ??
-              m['created_at'] as String? ??
-              '') ??
+      final t = DateTime.tryParse(
+              m['event_time'] as String? ?? m['created_at'] as String? ?? '') ??
           DateTime.now();
       final day = DateTime(t.year, t.month, t.day);
       if (prevDay == null || day != prevDay) {
@@ -552,12 +480,14 @@ class _MemoryTile extends StatelessWidget {
               return GestureDetector(
                 onTapDown: (details) {
                   final box = btnCtx.findRenderObject() as RenderBox;
-                  final center = box.localToGlobal(Offset(box.size.width / 2, box.size.height / 2));
+                  final center = box.localToGlobal(
+                      Offset(box.size.width / 2, box.size.height / 2));
                   _showWeChatMenu(context, center);
                 },
                 child: const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Icon(Icons.more_horiz, color: Color(0xFF999999), size: 20),
+                  child: Icon(Icons.more_horiz,
+                      color: Color(0xFF999999), size: 20),
                 ),
               );
             }),
@@ -579,32 +509,41 @@ class _MemoryTile extends StatelessWidget {
           top: tapPos.dy + 12,
           child: Material(
             color: Colors.transparent,
-            child: Stack(clipBehavior: Clip.none, alignment: Alignment.topRight, children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF4C4C4C),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: const [
-                    BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
-                  ],
-                ),
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  _MenuItem(
-                      icon: Icons.delete,
-                      label: 'memories.delete'.tr,
-                      onTap: () { entry.remove(); _deleteMemory(context); },
+            child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.topRight,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4C4C4C),
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: const [
+                        BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 8,
+                            offset: Offset(0, 2)),
+                      ],
                     ),
-                  ]),
-              ),
-              Positioned(
-                top: -7,
-                right: 6,
-                child: CustomPaint(
-                  size: const Size(12, 7),
-                  painter: _MenuArrowPainter(),
-                ),
-              ),
-            ]),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      _MenuItem(
+                        icon: Icons.delete,
+                        label: 'memories.delete'.tr,
+                        onTap: () {
+                          entry.remove();
+                          _deleteMemory(context);
+                        },
+                      ),
+                    ]),
+                  ),
+                  Positioned(
+                    top: -7,
+                    right: 6,
+                    child: CustomPaint(
+                      size: const Size(12, 7),
+                      painter: _MenuArrowPainter(),
+                    ),
+                  ),
+                ]),
           ),
         ),
       ]),
@@ -621,7 +560,8 @@ class _MemoryTile extends StatelessWidget {
         actions: [
           CupertinoDialogAction(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text('common.cancel'.tr, style: const TextStyle(color: CupertinoColors.systemGrey)),
+            child: Text('common.cancel'.tr,
+                style: const TextStyle(color: CupertinoColors.systemGrey)),
           ),
           CupertinoDialogAction(
             isDestructiveAction: true,
@@ -640,9 +580,9 @@ class _MemoryTile extends StatelessWidget {
   }
 }
 
-
 class _MenuItem extends StatelessWidget {
-  const _MenuItem({required this.icon, required this.label, required this.onTap});
+  const _MenuItem(
+      {required this.icon, required this.label, required this.onTap});
   final IconData icon;
   final String label;
   final VoidCallback onTap;
@@ -656,7 +596,8 @@ class _MenuItem extends StatelessWidget {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(icon, size: 20, color: Colors.white),
           const SizedBox(width: 12),
-          Text(label, style: const TextStyle(color: Colors.white, fontSize: 16)),
+          Text(label,
+              style: const TextStyle(color: Colors.white, fontSize: 16)),
         ]),
       ),
     );
@@ -674,6 +615,7 @@ class _MenuArrowPainter extends CustomPainter {
     path.close();
     canvas.drawPath(path, paint);
   }
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
