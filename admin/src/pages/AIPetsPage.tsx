@@ -5,27 +5,23 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { aiPetBreedsApi, envApi, subscriptionPlansApi } from "@/api/admin";
+import { errorMessage } from "@/api/client";
 import type { AIPetBreed, AIPetBreedInput, Environment } from "@/api/types";
 import { ENVIRONMENTS } from "@/api/types";
-import { errorMessage } from "@/api/client";
+import { ConfigurationButton } from "@/components/configuration-button";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const emptyForm = (environment: Environment): AIPetBreedInput => ({
-  environment,
-  name: "",
-  species: "",
-  personality: "",
-  description: "",
-  avatar_url: "",
-  sort_order: 0,
-  enabled: true,
-  subscription_plan_ids: [],
+  environment, name: "", species: "", personality: "", description: "", avatar_url: "",
+  sort_order: 0, enabled: true, subscription_plan_ids: [],
 });
 
 function Field({ label, children, wide = false }: { label: string; children: React.ReactNode; wide?: boolean }) {
@@ -38,15 +34,13 @@ export function AIPetsPage() {
   const envQuery = useQuery({ queryKey: ["admin-environment"], queryFn: ({ signal }) => envApi.get(signal) });
   const [environment, setEnvironment] = useState<Environment | null>(null);
   const activeEnv = environment ?? envQuery.data?.environment;
+  const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState<AIPetBreedInput>(emptyForm("dev"));
 
   useEffect(() => {
     if (!environment && envQuery.data?.environment) setEnvironment(envQuery.data.environment);
   }, [environment, envQuery.data]);
-  useEffect(() => {
-    if (activeEnv && !editing) setForm(emptyForm(activeEnv));
-  }, [activeEnv, editing]);
 
   const breeds = useQuery({
     queryKey: ["ai-pet-breeds", activeEnv],
@@ -58,70 +52,93 @@ export function AIPetsPage() {
     queryFn: ({ signal }) => subscriptionPlansApi.list({ environment: activeEnv! }, signal),
     enabled: Boolean(activeEnv),
   });
-  const reset = () => {
-    setEditing(null);
-    if (activeEnv) setForm(emptyForm(activeEnv));
-  };
+  const close = () => { setOpen(false); setEditing(null); };
   const save = useMutation({
     mutationFn: () => editing ? aiPetBreedsApi.update(editing, form) : aiPetBreedsApi.create(form),
     onSuccess: () => {
       toast.success(t("aiPets.saved"));
-      reset();
-      void queryClient.invalidateQueries({ queryKey: ["ai-pet-breeds"] });
+      close();
+      void queryClient.invalidateQueries({ queryKey: ["ai-pet-breeds", activeEnv] });
     },
     onError: (error) => toast.error(errorMessage(error, t("common.failedToLoad"))),
   });
+  const create = () => {
+    if (!activeEnv) return;
+    setEditing(null);
+    setForm(emptyForm(activeEnv));
+    setOpen(true);
+  };
   const edit = (breed: AIPetBreed) => {
     setEditing(breed.id);
     setForm({
-      environment: breed.environment,
-      name: breed.name,
-      species: breed.species,
-      personality: breed.personality,
-      description: breed.description,
-      avatar_url: breed.avatar_url,
-      sort_order: breed.sort_order,
-      enabled: breed.enabled,
-      subscription_plan_ids: breed.subscription_plan_ids ?? [],
+      environment: breed.environment, name: breed.name, species: breed.species,
+      personality: breed.personality, description: breed.description,
+      avatar_url: breed.avatar_url, sort_order: breed.sort_order,
+      enabled: breed.enabled, subscription_plan_ids: [...(breed.subscription_plan_ids ?? [])],
     });
+    setOpen(true);
   };
 
   return <div className="space-y-6">
-    <PageHeader title={t("aiPets.title")} description={t("aiPets.desc")} actions={
-      <Select value={activeEnv ?? ""} onValueChange={(value) => { setEnvironment(value as Environment); setEditing(null); }}>
+    <PageHeader title={t("aiPets.title")} description={t("aiPets.desc")} actions={<>
+      <Select value={activeEnv ?? ""} onValueChange={(value) => { setEnvironment(value as Environment); close(); }}>
         <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
         <SelectContent>{ENVIRONMENTS.map((env) => <SelectItem key={env} value={env}>{t(`billing.env.${env}`)}</SelectItem>)}</SelectContent>
       </Select>
-    } />
-    <Card>
-      <CardHeader><CardTitle>{editing ? t("aiPets.edit") : t("aiPets.create")}</CardTitle><CardDescription>{t("aiPets.formDesc")}</CardDescription></CardHeader>
-      <CardContent className="space-y-5">
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label={t("aiPets.name")}><Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
-          <Field label={t("aiPets.species")}><Input value={form.species} onChange={(event) => setForm({ ...form, species: event.target.value })} /></Field>
-          <Field label={t("aiPets.personality")}><Input value={form.personality} onChange={(event) => setForm({ ...form, personality: event.target.value })} placeholder={t("aiPets.personalityHint")} /></Field>
-          <Field label={t("aiPets.avatarUrl")}><Input value={form.avatar_url} onChange={(event) => setForm({ ...form, avatar_url: event.target.value })} placeholder="https://…" /></Field>
-          <Field wide label={t("aiPets.description")}><textarea className="min-h-24 w-full rounded-md border bg-background p-3 text-sm" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field>
-          <Field label={t("aiPets.sortOrder")}><Input type="number" value={form.sort_order} onChange={(event) => setForm({ ...form, sort_order: Number(event.target.value) || 0 })} /></Field>
-          <div className="flex items-end"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(event) => setForm({ ...form, enabled: event.target.checked })} />{t("content.enabled")}</label></div>
-        </div>
-        <div className="rounded-md border p-4">
-          <div className="font-medium">{t("aiPets.subscriptionAccess")}</div>
-          <p className="mt-1 text-xs text-muted-foreground">{t("aiPets.subscriptionAccessDesc")}</p>
-          <div className="mt-3 grid max-h-52 gap-2 overflow-y-auto md:grid-cols-2">
-            {(plans.data?.items ?? []).map((plan) => <label key={plan.id} className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={form.subscription_plan_ids.includes(plan.id)} onChange={(event) => setForm({ ...form, subscription_plan_ids: event.target.checked ? [...form.subscription_plan_ids, plan.id] : form.subscription_plan_ids.filter((id) => id !== plan.id) })} /><span>{plan.name}<span className="block text-xs text-muted-foreground">{t(`billing.platform.${plan.platform}`)} · {plan.product_id}</span></span></label>)}
+      <ConfigurationButton label={t("aiPets.create")} icon={<Plus />} onClick={create} disabled={!activeEnv}
+        details={breeds.data ? [`${t("aiPets.configuredCount")}: ${breeds.data.items.length}`, ...breeds.data.items.map((breed) => breed.name)] : [t(breeds.isError ? "common.failedToLoad" : "common.loading")]} />
+    </>} />
+    <Card><CardContent className="p-4">
+      {breeds.isError ? <p className="py-8 text-center text-sm text-destructive">{t("common.failedToLoad")}</p>
+        : breeds.isLoading ? <p className="py-8 text-center text-sm text-muted-foreground">{t("common.loading")}</p>
+        : !breeds.data?.items.length ? <p className="py-8 text-center text-sm text-muted-foreground">{t("aiPets.empty")}</p>
+        : <Table><TableHeader><TableRow>
+          <TableHead>{t("aiPets.name")}</TableHead><TableHead>{t("aiPets.species")}</TableHead>
+          <TableHead>{t("aiPets.subscriptionAccess")}</TableHead><TableHead>{t("content.enabled")}</TableHead>
+          <TableHead className="text-end">{t("users.actions")}</TableHead>
+        </TableRow></TableHeader><TableBody>{breeds.data.items.map((breed) => <TableRow key={breed.id}>
+          <TableCell><div className="flex items-center gap-3">
+            <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted">
+              {breed.avatar_url && !breed.avatar_url.startsWith("asset://") ? <img src={breed.avatar_url} alt="" className="size-full object-cover" /> : <PawPrint className="size-5 text-muted-foreground" />}
+            </div><div><div className="font-medium">{breed.name}</div><div className="line-clamp-1 max-w-72 text-xs text-muted-foreground">{breed.description}</div></div>
+          </div></TableCell>
+          <TableCell>{breed.species}</TableCell>
+          <TableCell>{breed.subscription_plan_ids.length ? t("aiPets.selectedPlans", { count: breed.subscription_plan_ids.length }) : t("aiPets.allPlans")}</TableCell>
+          <TableCell><Badge variant={breed.enabled ? "success" : "outline"}>{t(breed.enabled ? "content.enabled" : "content.disabled")}</Badge></TableCell>
+          <TableCell className="text-end"><ConfigurationButton label={t("users.edit")} icon={<Pencil />} onClick={() => edit(breed)}
+            details={[
+              `${t("aiPets.name")}: ${breed.name}`,
+              `${t("aiPets.species")}: ${breed.species}`,
+              `${t("aiPets.personality")}: ${breed.personality || "—"}`,
+              `${t("aiPets.description")}: ${breed.description || "—"}`,
+              `${t("aiPets.avatarUrl")}: ${breed.avatar_url || "—"}`,
+              `${t("aiPets.subscriptionAccess")}: ${breed.subscription_plan_ids.length ? breed.subscription_plan_ids.map((id) => plans.data?.items.find((plan) => plan.id === id)?.name ?? id).join(", ") : t("aiPets.allPlans")}`,
+              `${t("aiPets.sortOrder")}: ${breed.sort_order}`,
+              `${t("content.enabled")}: ${t(breed.enabled ? "content.enabled" : "content.disabled")}`,
+            ]} /></TableCell>
+        </TableRow>)}</TableBody></Table>}
+    </CardContent></Card>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) close(); }}>
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        <DialogHeader><DialogTitle>{editing ? t("aiPets.edit") : t("aiPets.create")}</DialogTitle><DialogDescription>{t("aiPets.formDesc")}</DialogDescription></DialogHeader>
+        <div className="space-y-5">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label={t("aiPets.name")}><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+            <Field label={t("aiPets.species")}><Input value={form.species} onChange={(e) => setForm({ ...form, species: e.target.value })} /></Field>
+            <Field label={t("aiPets.personality")}><Input value={form.personality} onChange={(e) => setForm({ ...form, personality: e.target.value })} placeholder={t("aiPets.personalityHint")} /></Field>
+            <Field label={t("aiPets.avatarUrl")}><Input value={form.avatar_url} onChange={(e) => setForm({ ...form, avatar_url: e.target.value })} placeholder="https://…" /></Field>
+            <Field wide label={t("aiPets.description")}><textarea className="min-h-24 w-full rounded-md border bg-background p-3 text-sm" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
+            <Field label={t("aiPets.sortOrder")}><Input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) || 0 })} /></Field>
+            <div className="flex items-end"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />{t("content.enabled")}</label></div>
+          </div>
+          <div className="rounded-md border p-4"><div className="font-medium">{t("aiPets.subscriptionAccess")}</div><p className="mt-1 text-xs text-muted-foreground">{t("aiPets.subscriptionAccessDesc")}</p>
+            <div className="mt-3 grid max-h-52 gap-2 overflow-y-auto md:grid-cols-2">
+              {(plans.data?.items ?? []).map((plan) => <label key={plan.id} className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={form.subscription_plan_ids.includes(plan.id)} onChange={(event) => setForm({ ...form, subscription_plan_ids: event.target.checked ? [...form.subscription_plan_ids, plan.id] : form.subscription_plan_ids.filter((id) => id !== plan.id) })} /><span>{plan.name}<span className="block text-xs text-muted-foreground">{t(`billing.platform.${plan.platform}`)} · {plan.product_id}</span></span></label>)}
+            </div>
           </div>
         </div>
-        <div className="flex gap-2"><Button disabled={!activeEnv || !form.name.trim() || !form.species.trim() || save.isPending} onClick={() => save.mutate()}>{editing ? <Save /> : <Plus />}{editing ? t("aiPets.update") : t("aiPets.add")}</Button>{editing && <Button variant="outline" onClick={reset}>{t("users.cancel")}</Button>}</div>
-      </CardContent>
-    </Card>
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {(breeds.data?.items ?? []).map((breed) => <Card key={breed.id}>
-        <CardContent className="flex gap-4 p-4">
-          <div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-xl bg-muted">{breed.avatar_url && !breed.avatar_url.startsWith("asset://") ? <img src={breed.avatar_url} alt="" className="size-full object-cover" /> : <PawPrint className="size-8 text-muted-foreground" />}</div>
-          <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><div className="font-semibold">{breed.name}</div><Badge variant={breed.enabled ? "success" : "outline"}>{breed.enabled ? t("content.enabled") : t("content.disabled")}</Badge></div><div className="text-sm text-muted-foreground">{breed.species}</div><p className="mt-2 line-clamp-2 text-sm">{breed.description}</p><div className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><span>{breed.subscription_plan_ids.length ? t("aiPets.selectedPlans", { count: breed.subscription_plan_ids.length }) : t("aiPets.allPlans")}</span><Button size="sm" variant="outline" onClick={() => edit(breed)}><Pencil />{t("users.edit")}</Button></div></div>
-        </CardContent>
-      </Card>)}
-    </div>
+        <DialogFooter><Button variant="outline" onClick={close}>{t("users.cancel")}</Button><Button disabled={!activeEnv || !form.name.trim() || !form.species.trim() || save.isPending} onClick={() => save.mutate()}>{editing ? <Save /> : <Plus />}{editing ? t("aiPets.update") : t("aiPets.add")}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>;
 }

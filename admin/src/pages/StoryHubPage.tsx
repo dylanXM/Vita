@@ -1,43 +1,140 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { BookOpen, Pencil, Plus, Save, Settings2, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { envApi, storiesApi } from "@/api/admin";
+import { errorMessage } from "@/api/client";
 import type { Environment, StoryBackground, StoryBackgroundInput, StoryConfig } from "@/api/types";
 import { ENVIRONMENTS } from "@/api/types";
-import { errorMessage } from "@/api/client";
+import { ConfigurationButton } from "@/components/configuration-button";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-const blank = (environment: Environment): StoryBackgroundInput => ({ environment, title: "", cover_url: "", synopsis: "", world_setting: "", opening: "", genre: "", character_constraints: "", story_goal: "", sort_order: 0, enabled: true });
-function Field({ label, children, wide = false }: { label: string; children: React.ReactNode; wide?: boolean }) { return <div className={`space-y-1.5 ${wide ? "md:col-span-2" : ""}`}><Label>{label}</Label>{children}</div>; }
+const blank = (environment: Environment): StoryBackgroundInput => ({
+  environment, title: "", cover_url: "", synopsis: "", world_setting: "", opening: "",
+  genre: "", character_constraints: "", story_goal: "", sort_order: 0, enabled: true,
+});
 const area = "min-h-24 w-full rounded-md border bg-background p-3 text-sm";
+const ruleKeys = ["free_chapter_limit", "custom_background_limit", "storyboard_unlock_chapters", "chapter_coins", "storyboard_coins"] as const;
+const ruleLabels = { free_chapter_limit: "freeLimit", custom_background_limit: "customLimit", storyboard_unlock_chapters: "unlock", chapter_coins: "chapterCoins", storyboard_coins: "storyboardCoins" } as const;
+
+function Field({ label, children, wide = false }: { label: string; children: React.ReactNode; wide?: boolean }) {
+  return <div className={`space-y-1.5 ${wide ? "md:col-span-2" : ""}`}><Label>{label}</Label>{children}</div>;
+}
 
 export function StoryHubPage() {
-  const { t } = useTranslation(); const queryClient = useQueryClient();
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const env = useQuery({ queryKey: ["admin-environment"], queryFn: ({ signal }) => envApi.get(signal) });
-  const [environment, setEnvironment] = useState<Environment | null>(null); const active = environment ?? env.data?.environment;
+  const [environment, setEnvironment] = useState<Environment | null>(null);
+  const active = environment ?? env.data?.environment;
   const config = useQuery({ queryKey: ["story-config", active], queryFn: ({ signal }) => storiesApi.config(active!, signal), enabled: Boolean(active) });
   const backgrounds = useQuery({ queryKey: ["story-backgrounds", active], queryFn: ({ signal }) => storiesApi.backgrounds(active!, signal), enabled: Boolean(active) });
-  const [rules, setRules] = useState<StoryConfig | null>(null); const [editing, setEditing] = useState<string | null>(null); const [form, setForm] = useState<StoryBackgroundInput>(blank("dev"));
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [backgroundOpen, setBackgroundOpen] = useState(false);
+  const [rules, setRules] = useState<StoryConfig | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [form, setForm] = useState<StoryBackgroundInput>(blank("dev"));
+
   useEffect(() => { if (!environment && env.data?.environment) setEnvironment(env.data.environment); }, [environment, env.data]);
-  useEffect(() => { if (config.data) setRules(config.data); }, [config.data]);
-  useEffect(() => { if (active && !editing) setForm(blank(active)); }, [active, editing]);
-  const refresh = () => { void queryClient.invalidateQueries({ queryKey: ["story-backgrounds"] }); };
-  const saveRules = useMutation({ mutationFn: () => storiesApi.saveConfig(rules!), onSuccess: (value) => { setRules(value); toast.success(t("storyHub.saved")); }, onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))) });
-  const save = useMutation({ mutationFn: () => editing ? storiesApi.updateBackground(editing, form) : storiesApi.createBackground(form), onSuccess: () => { toast.success(t("storyHub.saved")); setEditing(null); if (active) setForm(blank(active)); refresh(); }, onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))) });
+  useEffect(() => { if (!rulesOpen && config.data) setRules(config.data); }, [config.data, rulesOpen]);
+  const refresh = () => { void queryClient.invalidateQueries({ queryKey: ["story-backgrounds", active] }); };
+  const closeBackground = () => { setBackgroundOpen(false); setEditing(null); };
+  const saveRules = useMutation({
+    mutationFn: () => storiesApi.saveConfig(rules!),
+    onSuccess: (value) => {
+      setRules(value);
+      setRulesOpen(false);
+      queryClient.setQueryData(["story-config", active], value);
+      toast.success(t("storyHub.saved"));
+    },
+    onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))),
+  });
+  const save = useMutation({
+    mutationFn: () => editing ? storiesApi.updateBackground(editing, form) : storiesApi.createBackground(form),
+    onSuccess: () => { toast.success(t("storyHub.saved")); closeBackground(); refresh(); },
+    onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))),
+  });
   const remove = useMutation({ mutationFn: storiesApi.removeBackground, onSuccess: () => { toast.success(t("storyHub.deleted")); refresh(); }, onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))) });
-  const edit = (x: StoryBackground) => { setEditing(x.id); const { id: _, ...input } = x; setForm(input); };
-  return <div className="space-y-6"><PageHeader title={t("storyHub.title")} description={t("storyHub.desc")} actions={<Select value={active ?? ""} onValueChange={(v) => { setEnvironment(v as Environment); setEditing(null); }}><SelectTrigger className="w-40"><SelectValue /></SelectTrigger><SelectContent>{ENVIRONMENTS.map((x) => <SelectItem key={x} value={x}>{t(`billing.env.${x}`)}</SelectItem>)}</SelectContent></Select>} />
-    <Card><CardHeader><CardTitle>{t("storyHub.rules")}</CardTitle><CardDescription>{t("storyHub.customLimitHint")}</CardDescription></CardHeader><CardContent>{rules && <div className="grid gap-4 md:grid-cols-3">{(["free_chapter_limit","custom_background_limit","storyboard_unlock_chapters","chapter_coins","storyboard_coins"] as const).map((key) => <Field key={key} label={t(`storyHub.${({free_chapter_limit:"freeLimit",custom_background_limit:"customLimit",storyboard_unlock_chapters:"unlock",chapter_coins:"chapterCoins",storyboard_coins:"storyboardCoins"} as const)[key]}`)}><Input type="number" min={key === "free_chapter_limit" || key === "custom_background_limit" ? 0 : 1} value={rules[key]} onChange={(e) => setRules({...rules,[key]:Number(e.target.value)})}/></Field>)}<div className="flex items-end"><Button disabled={saveRules.isPending} onClick={() => saveRules.mutate()}><Save />{t("storyHub.saveRules")}</Button></div></div>}</CardContent></Card>
-    <Card><CardHeader><CardTitle>{editing ? t("storyHub.edit") : t("storyHub.create")}</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid gap-4 md:grid-cols-2"><Field label={t("storyHub.name")}><Input value={form.title} onChange={(e)=>setForm({...form,title:e.target.value})}/></Field><Field label={t("storyHub.cover")}><Input value={form.cover_url} onChange={(e)=>setForm({...form,cover_url:e.target.value})}/></Field><Field label={t("storyHub.genre")}><Input value={form.genre} onChange={(e)=>setForm({...form,genre:e.target.value})}/></Field><Field label={t("storyHub.sort")}><Input type="number" value={form.sort_order} onChange={(e)=>setForm({...form,sort_order:Number(e.target.value)})}/></Field><Field wide label={t("storyHub.synopsis")}><textarea className={area} value={form.synopsis} onChange={(e)=>setForm({...form,synopsis:e.target.value})}/></Field><Field wide label={t("storyHub.world")}><textarea className={area} value={form.world_setting} onChange={(e)=>setForm({...form,world_setting:e.target.value})}/></Field><Field wide label={t("storyHub.opening")}><textarea className={area} value={form.opening} onChange={(e)=>setForm({...form,opening:e.target.value})}/></Field><Field label={t("storyHub.constraints")}><textarea className={area} value={form.character_constraints} onChange={(e)=>setForm({...form,character_constraints:e.target.value})}/></Field><Field label={t("storyHub.goal")}><textarea className={area} value={form.story_goal} onChange={(e)=>setForm({...form,story_goal:e.target.value})}/></Field></div><label className="flex gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(e)=>setForm({...form,enabled:e.target.checked})}/>{t("storyHub.enabled")}</label><div className="flex gap-2"><Button disabled={!form.title.trim()||!form.world_setting.trim()||!form.opening.trim()||save.isPending} onClick={()=>save.mutate()}>{editing?<Save/>:<Plus/>}{t("storyHub.saveBackground")}</Button>{editing&&<Button variant="outline" onClick={()=>{setEditing(null);if(active)setForm(blank(active));}}>{t("users.cancel")}</Button>}</div></CardContent></Card>
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{(backgrounds.data?.items??[]).map((x)=><Card key={x.id}><CardContent className="p-4"><div className="flex items-start gap-3">{x.cover_url?<img src={x.cover_url} className="size-20 rounded-xl object-cover"/>:<div className="grid size-20 place-items-center rounded-xl bg-muted"><BookOpen/></div>}<div className="min-w-0 flex-1"><div className="flex gap-2 font-semibold">{x.title}<Badge variant={x.enabled?"success":"outline"}>{x.enabled?t("content.enabled"):t("content.disabled")}</Badge></div><p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{x.synopsis||x.world_setting}</p></div></div><div className="mt-4 flex justify-end gap-2"><Button size="sm" variant="outline" onClick={()=>edit(x)}><Pencil/></Button><Button size="sm" variant="destructive" onClick={()=>{if(confirm(t("storyHub.deleteConfirm")))remove.mutate(x.id)}}><Trash2/></Button></div></CardContent></Card>)}</div>
+  const create = () => { if (!active) return; setEditing(null); setForm(blank(active)); setBackgroundOpen(true); };
+  const edit = (item: StoryBackground) => { const { id: _, ...input } = item; setEditing(item.id); setForm(input); setBackgroundOpen(true); };
+  const savedRules = config.data;
+  const ruleSummary = savedRules
+    ? ruleKeys.map((key) => `${t(`storyHub.${ruleLabels[key]}`)}: ${savedRules[key]}`)
+    : [t(config.isError ? "common.failedToLoad" : "common.loading")];
+
+  return <div className="space-y-6">
+    <PageHeader title={t("storyHub.title")} description={t("storyHub.desc")} actions={<>
+      <Select value={active ?? ""} onValueChange={(value) => { setEnvironment(value as Environment); setRulesOpen(false); closeBackground(); }}>
+        <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+        <SelectContent>{ENVIRONMENTS.map((item) => <SelectItem key={item} value={item}>{t(`billing.env.${item}`)}</SelectItem>)}</SelectContent>
+      </Select>
+      <ConfigurationButton label={t("storyHub.rules")} icon={<Settings2 />} onClick={() => { setRules(savedRules ? { ...savedRules } : null); setRulesOpen(true); }} disabled={!savedRules} details={ruleSummary} />
+      <ConfigurationButton label={t("storyHub.create")} icon={<Plus />} onClick={create} disabled={!active}
+        details={backgrounds.data ? [`${t("storyHub.configuredCount")}: ${backgrounds.data.items.length}`, ...backgrounds.data.items.map((item) => item.title)] : [t(backgrounds.isError ? "common.failedToLoad" : "common.loading")]} />
+    </>} />
+    <Card><CardContent className="p-4">
+      {backgrounds.isError ? <p className="py-8 text-center text-sm text-destructive">{t("common.failedToLoad")}</p>
+        : backgrounds.isLoading ? <p className="py-8 text-center text-sm text-muted-foreground">{t("common.loading")}</p>
+        : !backgrounds.data?.items.length ? <p className="py-8 text-center text-sm text-muted-foreground">{t("storyHub.empty")}</p>
+        : <Table><TableHeader><TableRow>
+          <TableHead>{t("storyHub.name")}</TableHead><TableHead>{t("storyHub.genre")}</TableHead>
+          <TableHead>{t("storyHub.sort")}</TableHead><TableHead>{t("storyHub.enabled")}</TableHead>
+          <TableHead className="text-end">{t("users.actions")}</TableHead>
+        </TableRow></TableHeader><TableBody>{backgrounds.data.items.map((item) => <TableRow key={item.id}>
+          <TableCell><div className="flex items-center gap-3">
+            {item.cover_url ? <img src={item.cover_url} alt="" className="size-12 shrink-0 rounded-lg object-cover" /> : <span className="grid size-12 shrink-0 place-items-center rounded-lg bg-muted"><BookOpen className="size-5" /></span>}
+            <div><div className="font-medium">{item.title}</div><div className="line-clamp-1 max-w-72 text-xs text-muted-foreground">{item.synopsis || item.world_setting}</div></div>
+          </div></TableCell>
+          <TableCell>{item.genre || "—"}</TableCell><TableCell>{item.sort_order}</TableCell>
+          <TableCell><Badge variant={item.enabled ? "success" : "outline"}>{t(item.enabled ? "content.enabled" : "content.disabled")}</Badge></TableCell>
+          <TableCell className="text-end"><div className="inline-flex items-center gap-2">
+            <ConfigurationButton label={t("users.edit")} icon={<Pencil />} onClick={() => edit(item)} details={[
+              `${t("storyHub.name")}: ${item.title}`, `${t("storyHub.genre")}: ${item.genre || "—"}`,
+              `${t("storyHub.sort")}: ${item.sort_order}`, `${t("storyHub.enabled")}: ${t(item.enabled ? "content.enabled" : "content.disabled")}`,
+              `${t("storyHub.cover")}: ${item.cover_url || "—"}`, `${t("storyHub.synopsis")}: ${item.synopsis || "—"}`,
+              `${t("storyHub.world")}: ${item.world_setting}`, `${t("storyHub.opening")}: ${item.opening}`,
+              `${t("storyHub.constraints")}: ${item.character_constraints || "—"}`, `${t("storyHub.goal")}: ${item.story_goal || "—"}`,
+            ]} />
+            <Button size="sm" variant="destructive" disabled={remove.isPending} onClick={() => { if (confirm(t("storyHub.deleteConfirm"))) remove.mutate(item.id); }}><Trash2 />{t("storyHub.delete")}</Button>
+          </div></TableCell>
+        </TableRow>)}</TableBody></Table>}
+    </CardContent></Card>
+    <Dialog open={rulesOpen} onOpenChange={(next) => { if (!next) { setRulesOpen(false); setRules(savedRules ?? null); } }}>
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        <DialogHeader><DialogTitle>{t("storyHub.rules")}</DialogTitle><DialogDescription>{t("storyHub.customLimitHint")}</DialogDescription></DialogHeader>
+        {rules && <div className="grid gap-4 md:grid-cols-2">{ruleKeys.map((key) => <Field key={key} label={t(`storyHub.${ruleLabels[key]}`)}>
+          <Input type="number" min={key === "free_chapter_limit" || key === "custom_background_limit" ? 0 : 1} value={rules[key]} onChange={(e) => setRules({ ...rules, [key]: Number(e.target.value) })} />
+        </Field>)}</div>}
+        <DialogFooter><Button variant="outline" onClick={() => { setRulesOpen(false); setRules(savedRules ?? null); }}>{t("users.cancel")}</Button><Button disabled={!rules || saveRules.isPending} onClick={() => saveRules.mutate()}><Save />{t("storyHub.saveRules")}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+    <Dialog open={backgroundOpen} onOpenChange={(next) => { if (!next) closeBackground(); }}>
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        <DialogHeader><DialogTitle>{editing ? t("storyHub.edit") : t("storyHub.create")}</DialogTitle><DialogDescription>{t("storyHub.backgrounds")}</DialogDescription></DialogHeader>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label={t("storyHub.name")}><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
+          <Field label={t("storyHub.cover")}><Input value={form.cover_url} onChange={(e) => setForm({ ...form, cover_url: e.target.value })} /></Field>
+          <Field label={t("storyHub.genre")}><Input value={form.genre} onChange={(e) => setForm({ ...form, genre: e.target.value })} /></Field>
+          <Field label={t("storyHub.sort")}><Input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} /></Field>
+          <Field wide label={t("storyHub.synopsis")}><textarea className={area} value={form.synopsis} onChange={(e) => setForm({ ...form, synopsis: e.target.value })} /></Field>
+          <Field wide label={t("storyHub.world")}><textarea className={area} value={form.world_setting} onChange={(e) => setForm({ ...form, world_setting: e.target.value })} /></Field>
+          <Field wide label={t("storyHub.opening")}><textarea className={area} value={form.opening} onChange={(e) => setForm({ ...form, opening: e.target.value })} /></Field>
+          <Field label={t("storyHub.constraints")}><textarea className={area} value={form.character_constraints} onChange={(e) => setForm({ ...form, character_constraints: e.target.value })} /></Field>
+          <Field label={t("storyHub.goal")}><textarea className={area} value={form.story_goal} onChange={(e) => setForm({ ...form, story_goal: e.target.value })} /></Field>
+        </div>
+        <label className="flex gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />{t("storyHub.enabled")}</label>
+        <DialogFooter><Button variant="outline" onClick={closeBackground}>{t("users.cancel")}</Button><Button disabled={!form.title.trim() || !form.world_setting.trim() || !form.opening.trim() || save.isPending} onClick={() => save.mutate()}>{editing ? <Save /> : <Plus />}{t("storyHub.saveBackground")}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>;
 }
