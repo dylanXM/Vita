@@ -47,6 +47,18 @@ class PetFxLayer extends StatelessWidget {
           left: 52,
           child: Text('💭', style: TextStyle(fontSize: 28)),
         ),
+      if (fx.contains(PetFx.tired))
+        const Positioned(
+          top: 64,
+          right: 60,
+          child: Text('😪', style: TextStyle(fontSize: 26)),
+        ),
+      if (fx.contains(PetFx.hungry))
+        const Positioned(
+          top: 64,
+          right: 60,
+          child: Text('🦴', style: TextStyle(fontSize: 24)),
+        ),
       if (fx.contains(PetFx.bowl))
         const Positioned(
           bottom: 15,

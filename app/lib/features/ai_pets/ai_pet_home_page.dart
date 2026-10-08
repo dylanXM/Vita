@@ -7,15 +7,15 @@ import 'package:get/get.dart';
 import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
-import '../../shared/widgets.dart';
 import '../chat/chat_page.dart';
 import '../life/life_detail_page.dart';
 import '../memories/memories_page.dart';
 import 'animation/brain/pet_brain.dart';
 import 'animation/pet/pet_motion_spec.dart';
 import 'animation/pet/pet_state_machine.dart';
-import 'animation/scene/pet_scene.dart';
+import 'animation/scene/pet_stage.dart';
 import 'animation/scene/weather_particles.dart';
+import 'animation/ui/pet_action_menu.dart';
 import 'animation/world_clock.dart';
 
 class AIPetHomePage extends StatefulWidget {
@@ -46,6 +46,7 @@ class _AIPetHomePageState extends State<AIPetHomePage>
   final LocalPetBrain _brain = LocalPetBrain();
   Weather _weather = Weather.none;
   Timer? _weatherTimer;
+  Timer? _vitalsTimer;
   final math.Random _random = math.Random();
   bool _reduceMotion = false;
 
@@ -66,6 +67,11 @@ class _AIPetHomePageState extends State<AIPetHomePage>
     _machine = PetStateMachine(vsync: this);
     _load();
     _scheduleWeather();
+    // 周期性静默同步服务器数值，让宠物自主切换困/饿/睡等生活状态。
+    _vitalsTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+      _refreshState();
+    });
   }
 
   @override
@@ -86,6 +92,7 @@ class _AIPetHomePageState extends State<AIPetHomePage>
   @override
   void dispose() {
     _weatherTimer?.cancel();
+    _vitalsTimer?.cancel();
     _worldClock.dispose();
     _machine.dispose();
     super.dispose();
@@ -103,24 +110,49 @@ class _AIPetHomePageState extends State<AIPetHomePage>
     });
   }
 
+  void _applyIntent(Map<String, dynamic> nextState, {bool silent = false}) {
+    final intent = _brain.intentFromState(nextState);
+    _machine.updateVitals(
+      energy: (nextState['energy'] as num?)?.toInt() ?? 100,
+      hunger: (nextState['hunger'] as num?)?.toInt() ?? 100,
+      happiness: (nextState['happiness'] as num?)?.toInt() ?? 100,
+    );
+    // 进食中不打断动画。
+    if (_machine.state != PetState.feeding) {
+      _machine.transition(intent.state);
+      _machine.scheduleAmbient();
+    }
+    if (!silent && mounted) setState(() => _state = nextState);
+  }
+
   Future<void> _load() async {
     try {
       final data = await ApiClient.instance
           .get('/v1/ai-pets/${widget.companionId}/state');
       if (mounted && data is Map) {
         final nextState = Map<String, dynamic>.from(data);
-        final intent = _brain.intentFromState(nextState);
-        setState(() {
-          _state = nextState;
-          _machine.needsSleep = intent.state == PetState.sleeping;
-          _machine.transition(intent.state);
-        });
-        _machine.scheduleAmbient();
+        setState(() => _state = nextState);
+        _applyIntent(nextState);
       }
     } on ApiException catch (error) {
       if (mounted) Get.snackbar('aiPets.error'.tr, error.message);
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// 静默刷新数值：不展示加载态，只同步状态与生活动画。
+  Future<void> _refreshState() async {
+    try {
+      final data = await ApiClient.instance
+          .get('/v1/ai-pets/${widget.companionId}/state');
+      if (mounted && data is Map) {
+        final nextState = Map<String, dynamic>.from(data);
+        setState(() => _state = nextState);
+        _applyIntent(nextState, silent: true);
+      }
+    } on ApiException {
+      // 静默失败，下次轮询重试。
     }
   }
 
@@ -149,6 +181,11 @@ class _AIPetHomePageState extends State<AIPetHomePage>
         final nextLevel =
             (nextState['level'] as num?)?.toInt() ?? previousLevel;
         setState(() => _state = nextState);
+        _machine.updateVitals(
+          energy: (nextState['energy'] as num?)?.toInt() ?? 100,
+          hunger: (nextState['hunger'] as num?)?.toInt() ?? 100,
+          happiness: (nextState['happiness'] as num?)?.toInt() ?? 100,
+        );
         _machine.showAction(
             nextLevel > previousLevel ? PetState.levelUp : PetState.happy,
             duration: const Duration(milliseconds: 1800));
@@ -156,7 +193,8 @@ class _AIPetHomePageState extends State<AIPetHomePage>
       Get.snackbar('aiPets.fed'.tr, 'aiPets.fedSub'.tr);
     } on ApiException catch (error) {
       _machine.transition(
-          _machine.needsSleep ? PetState.sleeping : PetState.idle);
+          _machine.needsSleep ? PetState.sleeping : PetState.standing);
+      _machine.scheduleAmbient();
       if (error.code == 'insufficient_credits') {
         Get.snackbar('aiPets.notEnoughCoins'.tr, 'aiPets.notEnoughCoinsSub'.tr);
         Get.toNamed('/credits');
@@ -166,7 +204,10 @@ class _AIPetHomePageState extends State<AIPetHomePage>
     } finally {
       if (mounted) {
         setState(() => _feeding = false);
-        if (_machine.state == PetState.idle) _machine.scheduleAmbient();
+        if (_machine.state == PetState.standing ||
+            _machine.state == PetState.idle) {
+          _machine.scheduleAmbient();
+        }
       }
     }
   }
@@ -179,137 +220,63 @@ class _AIPetHomePageState extends State<AIPetHomePage>
   @override
   Widget build(BuildContext context) {
     final state = _state ?? const <String, dynamic>{};
+    final level = (state['level'] as num?)?.toInt() ?? 1;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(leading: const VitaBackButton(), title: Text(widget.name)),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
-                children: [
-                  PetScene(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          PetStage(
+            name: widget.name,
+            species: widget.species,
+            level: level,
+            imageUrl: widget.avatarUrl,
+            machine: _machine,
+            clock: _worldClock,
+            weather: _weather,
+            onTap: _petTap,
+            onBack: () => Get.back(),
+          ),
+          // 右下角悬浮操作按钮（喂食/聊天/生活/回忆/刷新 + 状态面板）。
+          SafeArea(
+            child: Align(
+              alignment: const Alignment(.92, .98),
+              child: PetActionMenu(
+                level: level,
+                coins: (state['coins'] as num?)?.toInt() ?? 0,
+                experience: (state['experience'] as num?)?.toInt() ?? 0,
+                state: state,
+                feeding: _feeding,
+                feedCost: (state['feed_coin_cost'] as num?)?.toInt() ?? 5,
+                onFeed: _feed,
+                onChat: () => Get.to(() => ChatPage(
+                    companionId: widget.companionId,
                     name: widget.name,
-                    imageUrl: widget.avatarUrl,
-                    machine: _machine,
-                    worldClock: _worldClock,
-                    weather: _weather,
-                    onTap: _petTap,
-                  ),
-                  const SizedBox(height: 12),
-                  VitaCard(
-                      child: Column(children: [
-                    Text(widget.name,
-                        style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            color: context.vita.text)),
-                    Text(
-                        '${widget.species} · ${'aiPets.level'.trParams({
-                              'level': '${state['level'] ?? 1}'
-                            })}',
-                        style: TextStyle(color: context.vita.subText)),
-                    const SizedBox(height: 16),
-                    _StatusBar(
-                        label: 'aiPets.hunger'.tr,
-                        value: (state['hunger'] as num?)?.toInt() ?? 0,
-                        color: Colors.orange),
-                    _StatusBar(
-                        label: 'aiPets.happiness'.tr,
-                        value: (state['happiness'] as num?)?.toInt() ?? 0,
-                        color: Colors.pink),
-                    _StatusBar(
-                        label: 'aiPets.energy'.tr,
-                        value: (state['energy'] as num?)?.toInt() ?? 0,
-                        color: Colors.blue),
-                    _StatusBar(
-                        label: 'aiPets.health'.tr,
-                        value: (state['health'] as num?)?.toInt() ?? 0,
-                        color: context.vita.green),
-                    const SizedBox(height: 8),
-                    Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                              'aiPets.experience'.trParams(
-                                  {'value': '${state['experience'] ?? 0}'}),
-                              style: TextStyle(color: context.vita.subText)),
-                          Text(
-                              'aiPets.coins'.trParams(
-                                  {'value': '${state['coins'] ?? 0}'}),
-                              style: TextStyle(color: context.vita.subText))
-                        ]),
-                    const SizedBox(height: 14),
-                    SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                            onPressed: _feeding ? null : _feed,
-                            icon: const Icon(Icons.restaurant),
-                            label: Text(_feeding
-                                ? 'aiPets.feeding'.tr
-                                : 'aiPets.feed'.trParams({
-                                    'coins': '${state['feed_coin_cost'] ?? 5}'
-                                  })))),
-                  ])),
-                  const SizedBox(height: 12),
-                  VitaCard(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Column(children: [
-                        VitaListTile(
-                            icon: Icons.chat_bubble_outline,
-                            title: 'aiPets.chat'.tr,
-                            onTap: () => Get.to(() => ChatPage(
-                                companionId: widget.companionId,
-                                name: widget.name,
-                                companion: _companion))),
-                        VitaListTile(
-                            icon: Icons.auto_stories_outlined,
-                            title: 'aiPets.life'.tr,
-                            onTap: () => Get.to(
-                                () => LifeDetailPage(companion: _companion))),
-                        VitaListTile(
-                            icon: Icons.star_border,
-                            title: 'aiPets.memories'.tr,
-                            onTap: () => Get.to(() =>
-                                MemoryDetailPage(companion: _companion))),
-                      ])),
-                ],
+                    companion: _companion)),
+                onLife: () =>
+                    Get.to(() => LifeDetailPage(companion: _companion)),
+                onMemories: () =>
+                    Get.to(() => MemoryDetailPage(companion: _companion)),
+                onRefresh: _refreshState,
               ),
             ),
+          ),
+          if (_loading)
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: context.vita.glass,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: context.vita.glassRing, width: .8),
+                ),
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.5, color: context.vita.green),
+              ),
+            ),
+        ],
+      ),
     );
   }
-}
-
-class _StatusBar extends StatelessWidget {
-  const _StatusBar(
-      {required this.label, required this.value, required this.color});
-  final String label;
-  final int value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Row(children: [
-          SizedBox(
-              width: 70,
-              child: Text(label,
-                  style: TextStyle(fontSize: 13, color: context.vita.subText))),
-          Expanded(
-              child: ClipRRect(
-                  borderRadius: BorderRadius.circular(5),
-                  child: LinearProgressIndicator(
-                      value: value.clamp(0, 100) / 100,
-                      minHeight: 9,
-                      backgroundColor: context.vita.pageBg,
-                      valueColor: AlwaysStoppedAnimation(color)))),
-          const SizedBox(width: 10),
-          SizedBox(
-              width: 28,
-              child: Text('$value',
-                  textAlign: TextAlign.right,
-                  style: TextStyle(fontSize: 12, color: context.vita.subText))),
-        ]),
-      );
 }
