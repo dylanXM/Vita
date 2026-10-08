@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 
 import 'pet_motion_spec.dart';
 
-/// 宠物状态机：管理状态迁移、环境定时与动作动画。
+/// 宠物状态机：根据真实数值和用户互动管理状态迁移与动作动画。
 /// 只消费 PetIntent/服务器数值，不感知 AI 来源。
 ///
 /// 周期姿态由 WorldClock 驱动；600ms 过渡从当前混合姿态出发，可连续打断。
@@ -26,10 +25,9 @@ class PetStateMachine extends ChangeNotifier {
   bool needsSleep = false;
   bool needsFood = false;
   bool needsRest = false;
+  bool needsCare = false;
   bool _reducedMotion = false;
-  Timer? _ambientTimer;
   Timer? _actionTimer;
-  final math.Random _random = math.Random();
 
   PetState get state => _state;
   bool get isActionActive => _actionTimer?.isActive == true;
@@ -62,9 +60,15 @@ class PetStateMachine extends ChangeNotifier {
 
   double weightFor(PetState state) => stateWeights[state] ?? 0;
 
-  bool get _locked => isActionActive || _state == PetState.feeding;
-
-  PetState get _fallback => needsSleep ? PetState.sleeping : PetState.standing;
+  PetState get _fallback => needsSleep
+      ? PetState.sleeping
+      : needsFood
+          ? PetState.hungry
+          : needsCare
+              ? PetState.sick
+              : needsRest
+                  ? PetState.tired
+                  : PetState.standing;
 
   /// 依据服务器数值得出建议状态：
   /// energy<20 → sleeping；hunger<30 → hungry；happiness<30 → sick；
@@ -88,13 +92,13 @@ class PetStateMachine extends ChangeNotifier {
     needsSleep = energy < 20;
     needsFood = hunger < 30;
     needsRest = energy < 50;
+    needsCare = happiness < 30;
   }
 
-  /// 直接迁移到 [next]：记录前序状态并启动平滑过渡，取消所有定时。
+  /// 直接迁移到 [next]：记录前序状态并启动平滑过渡。
   void transition(PetState next) {
     if (next == _state) return;
     _actionTimer?.cancel();
-    _ambientTimer?.cancel();
     _fromWeights = stateWeights;
     _state = next;
     if (reducedMotion) {
@@ -105,10 +109,9 @@ class PetStateMachine extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 执行某个动作；[duration] 后平滑回落站立/睡觉并重新安排生活动画。
+  /// 执行某个动作；[duration] 后平滑回落到生命数值对应的稳定状态。
   void showAction(PetState action, {Duration? duration}) {
     _actionTimer?.cancel();
-    _ambientTimer?.cancel();
     _fromWeights = stateWeights;
     _state = action;
     if (reducedMotion) {
@@ -128,77 +131,12 @@ class PetStateMachine extends ChangeNotifier {
           _blend.forward(from: 0);
         }
         notifyListeners();
-        scheduleAmbient();
       });
     }
   }
 
-  /// 生活状态调度：宠物在「站起 → 坐下 → 散步 → …」间自然地生活，
-  /// 并根据数值穿插困 / 饿 / 睡。
-  void scheduleAmbient() {
-    _ambientTimer?.cancel();
-    if (_locked) return;
-    _ambientTimer = Timer(_nextLifeDelay(), () {
-      if (_locked || !hasListeners) return;
-      if (needsSleep) {
-        // Low server energy must not freeze the character indefinitely.
-        // It rests most of the time, with brief wakeful moments.
-        final action =
-            _random.nextBool() ? PetState.sitting : PetState.drinking;
-        showAction(action, duration: const Duration(milliseconds: 2600));
-        return;
-      }
-      final next = _nextLifeState();
-      if (next == PetState.feeding || next == PetState.drinking) {
-        showAction(next, duration: const Duration(milliseconds: 2600));
-        return;
-      }
-      if (next == PetState.sleeping) {
-        showAction(next, duration: const Duration(milliseconds: 5200));
-        return;
-      }
-      transition(next);
-      scheduleAmbient();
-    });
-  }
-
-  Duration _nextLifeDelay() {
-    final seconds = switch (_state) {
-      PetState.walking => 5 + _random.nextInt(4),
-      PetState.sitting => 3 + _random.nextInt(5),
-      PetState.tired => 3 + _random.nextInt(3),
-      PetState.hungry => 3 + _random.nextInt(3),
-      PetState.drinking => 4 + _random.nextInt(3),
-      _ => 4 + _random.nextInt(5),
-    };
-    return Duration(seconds: seconds);
-  }
-
-  PetState _nextLifeState() {
-    // 数值越差，困 / 饿越容易被触发。
-    if (needsFood && _random.nextDouble() < .55) return PetState.feeding;
-    if (needsFood && _random.nextDouble() < .6) return PetState.hungry;
-    if (needsRest && _random.nextDouble() < .8) return PetState.tired;
-    final roll = _random.nextDouble();
-    if (roll < .08) return PetState.sleeping;
-    if (roll < .22) return PetState.drinking;
-    return switch (_state) {
-      PetState.walking => roll < .5 ? PetState.standing : PetState.sitting,
-      PetState.sitting => roll < .6 ? PetState.standing : PetState.walking,
-      PetState.tired ||
-      PetState.hungry =>
-        roll < .5 ? PetState.standing : PetState.sitting,
-      _ => roll < .45
-          ? PetState.sitting
-          : roll < .78
-              ? PetState.walking
-              : PetState.standing,
-    };
-  }
-
   @override
   void dispose() {
-    _ambientTimer?.cancel();
     _actionTimer?.cancel();
     _blend.dispose();
     super.dispose();

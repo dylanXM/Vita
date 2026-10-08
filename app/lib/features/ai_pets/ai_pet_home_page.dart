@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -16,6 +15,7 @@ import 'animation/scene/weather_particles.dart';
 import 'animation/ui/pet_action_menu.dart';
 import 'animation/world_clock.dart';
 import 'ai_pet_desktop_controller.dart';
+import 'ai_pet_avatar.dart';
 
 class AIPetHomePage extends StatefulWidget {
   const AIPetHomePage({
@@ -43,10 +43,8 @@ class _AIPetHomePageState extends State<AIPetHomePage>
   late final WorldClock _worldClock;
   late final PetStateMachine _machine;
   final LocalPetBrain _brain = LocalPetBrain();
-  Weather _weather = Weather.none;
-  Timer? _weatherTimer;
+  final Weather _weather = Weather.none;
   Timer? _vitalsTimer;
-  final math.Random _random = math.Random();
   bool _reduceMotion = false;
 
   Map<String, dynamic> get _companion => {
@@ -63,6 +61,18 @@ class _AIPetHomePageState extends State<AIPetHomePage>
     return saved is String && saved.isNotEmpty ? saved : widget.avatarUrl;
   }
 
+  String get _currentSpriteSheetUrl {
+    final saved = _state?['sprite_sheet_url'];
+    if (saved is String && saved.isNotEmpty) return saved;
+    return aiPetPoseSheetAssetPath(_currentAvatarUrl) ?? '';
+  }
+
+  String get _currentActionSheetUrl {
+    final saved = _state?['action_sheet_url'];
+    if (saved is String && saved.isNotEmpty) return saved;
+    return aiPetActionSheetAssetPath(_currentAvatarUrl) ?? '';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -73,8 +83,7 @@ class _AIPetHomePageState extends State<AIPetHomePage>
     _worldClock = WorldClock(vsync: this);
     _machine = PetStateMachine(vsync: this);
     _load();
-    _scheduleWeather();
-    // 周期性静默同步服务器数值，让宠物自主切换困/饿/睡等生活状态。
+    // 只同步真实生命数值；不再随机安排吃喝或姿势。
     _vitalsTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (!mounted) return;
       _refreshState();
@@ -101,23 +110,10 @@ class _AIPetHomePageState extends State<AIPetHomePage>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AIPetDesktopController.to.petHomeVisible.value = false;
     });
-    _weatherTimer?.cancel();
     _vitalsTimer?.cancel();
     _worldClock.dispose();
     _machine.dispose();
     super.dispose();
-  }
-
-  void _scheduleWeather() {
-    _weatherTimer?.cancel();
-    _weatherTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (!mounted) return;
-      setState(() {
-        _weather = _reduceMotion
-            ? Weather.none
-            : Weather.values[_random.nextInt(Weather.values.length)];
-      });
-    });
   }
 
   void _applyIntent(Map<String, dynamic> nextState, {bool silent = false}) {
@@ -130,7 +126,6 @@ class _AIPetHomePageState extends State<AIPetHomePage>
     // 数值轮询只更新需要，不打断当前的短动作或手动喂食。
     if (!_feeding && !_machine.isActionActive) {
       _machine.transition(intent.state);
-      _machine.scheduleAmbient();
     }
     if (!silent && mounted) setState(() => _state = nextState);
   }
@@ -204,7 +199,6 @@ class _AIPetHomePageState extends State<AIPetHomePage>
     } on ApiException catch (error) {
       _machine.transition(
           _machine.needsSleep ? PetState.sleeping : PetState.standing);
-      _machine.scheduleAmbient();
       if (error.code == 'insufficient_credits') {
         Get.snackbar('aiPets.notEnoughCoins'.tr, 'aiPets.notEnoughCoinsSub'.tr);
         Get.toNamed('/credits');
@@ -214,10 +208,6 @@ class _AIPetHomePageState extends State<AIPetHomePage>
     } finally {
       if (mounted) {
         setState(() => _feeding = false);
-        if (_machine.state == PetState.standing ||
-            _machine.state == PetState.idle) {
-          _machine.scheduleAmbient();
-        }
       }
     }
   }
@@ -266,6 +256,8 @@ class _AIPetHomePageState extends State<AIPetHomePage>
             species: widget.species,
             level: level,
             imageUrl: _currentAvatarUrl,
+            spriteSheetUrl: _currentSpriteSheetUrl,
+            actionSheetUrl: _currentActionSheetUrl,
             machine: _machine,
             clock: _worldClock,
             weather: _weather,

@@ -1,22 +1,18 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../../ai_pet_avatar.dart';
-import 'mesh_bone_pet.dart';
-import 'pet_motion_spec.dart';
+import 'pet_pose_sheet.dart';
 import 'pet_state_machine.dart';
 
-/// 宠物本体渲染：由状态机 + 世界时钟驱动「网格形变骨骼动画」。
-///
-/// 任意宠物图（网络 / 本地 / 上传文件）都会被铺成网格并按骨骼分区绑定，
-/// 状态切换时姿态逐参数插值，宠物像真的在生活（低头、弓背、收腿、摆尾），
-/// 形象始终 1:1 来自原图。纯表现层，不感知 AI 来源。
+/// Full-body authored poses replace the generic whole-image mesh deformation.
+/// A legacy pet without a sheet keeps its original portrait intact.
 class PetRenderer extends StatelessWidget {
   const PetRenderer({
     super.key,
     required this.name,
     required this.imageUrl,
+    this.spriteSheetUrl = '',
+    this.actionSheetUrl = '',
     required this.machine,
     required this.worldTime,
     this.size = 260,
@@ -24,59 +20,25 @@ class PetRenderer extends StatelessWidget {
 
   final String name;
   final String imageUrl;
+  final String spriteSheetUrl;
+  final String actionSheetUrl;
   final PetStateMachine machine;
   final double worldTime;
   final double size;
 
-  ImageProvider _provider(String url) {
-    if (url.startsWith('asset://')) {
-      return AssetImage(url.substring('asset://'.length));
-    }
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return NetworkImage(url);
-    }
-    throw ArgumentError.value(url, 'url', 'Unsupported pet image URL');
-  }
-
   @override
-  Widget build(BuildContext context) {
-    if (!imageUrl.startsWith('asset://') &&
-        !imageUrl.startsWith('http://') &&
-        !imageUrl.startsWith('https://')) {
-      return SizedBox(
+  Widget build(BuildContext context) => SizedBox(
         width: size,
         height: size,
-        child: const Icon(Icons.pets_rounded, size: 120),
+        child: spriteSheetUrl.isEmpty
+            ? AIPetAvatar(name: name, imageUrl: imageUrl)
+            : PetPoseSheet(
+                name: name,
+                avatarUrl: imageUrl,
+                sheetUrl: spriteSheetUrl,
+                actionSheetUrl: actionSheetUrl,
+                machine: machine,
+                worldTime: worldTime,
+              ),
       );
-    }
-    final blinkPath = aiPetClosedEyeAssetPath(imageUrl);
-    final walkingWeight = machine.weightFor(PetState.walking);
-    final walkingDistance = PetMotionSpec.table[PetState.walking]!.driftX;
-    final walkPhase = worldTime * math.pi * 2 * 10;
-    final walkX = walkingWeight * walkingDistance * .5 * math.sin(walkPhase);
-    var scale = 0.0;
-    for (final entry in machine.stateWeights.entries) {
-      scale += PetMotionSpec.table[entry.key]!.scale * entry.value;
-    }
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Transform.translate(
-        offset: Offset(walkX, 0),
-        child: Transform.scale(
-          alignment: Alignment.bottomCenter,
-          scale: scale,
-          child: RepaintBoundary(
-            child: MeshBonePet(
-              imageProvider: _provider(imageUrl),
-              closedEyeProvider:
-                  blinkPath == null ? null : AssetImage(blinkPath),
-              machine: machine,
-              worldTime: worldTime,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

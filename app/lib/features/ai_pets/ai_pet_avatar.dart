@@ -74,3 +74,18 @@ String? aiPetClosedEyeAssetPath(String imageUrl) {
   if (!supportedAssets.contains(assetPath)) return null;
   return assetPath.replaceFirst('.png', '_blink.png');
 }
+
+String? aiPetPoseSheetAssetPath(String imageUrl) {
+  if (imageUrl.startsWith('asset://assets/ai_pets/') &&
+      aiPetClosedEyeAssetPath(imageUrl) != null) {
+    return imageUrl.replaceFirst('.png', '_poses.png');
+  }
+  return null;
+}
+
+String? aiPetActionSheetAssetPath(String imageUrl) {
+  if (aiPetPoseSheetAssetPath(imageUrl) != null) {
+    return imageUrl.replaceFirst('.png', '_actions.png');
+  }
+  return null;
+}

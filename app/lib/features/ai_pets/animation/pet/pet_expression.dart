@@ -11,11 +11,13 @@ class PetFxLayer extends StatelessWidget {
     super.key,
     required this.machine,
     required this.worldTime,
+    this.poseSheet = false,
     this.speech,
   });
 
   final PetStateMachine machine;
   final double worldTime;
+  final bool poseSheet;
   final String? speech;
 
   @override
@@ -110,7 +112,7 @@ class PetFxLayer extends StatelessWidget {
           right: 60,
           child: Text('🦴', style: TextStyle(fontSize: 24)),
         ),
-      if (fx.contains(PetFx.bowl))
+      if (!poseSheet && fx.contains(PetFx.bowl))
         const Positioned(
           bottom: 15,
           left: 0,
@@ -126,7 +128,7 @@ class PetFxLayer extends StatelessWidget {
                         borderRadius: BorderRadius.all(Radius.circular(100))))),
           ]),
         ),
-      if (fx.contains(PetFx.water))
+      if (!poseSheet && fx.contains(PetFx.water))
         Positioned(
           bottom: 15,
           left: 0,

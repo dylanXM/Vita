@@ -22,6 +22,8 @@ class PetStage extends StatelessWidget {
     required this.species,
     required this.level,
     required this.imageUrl,
+    required this.spriteSheetUrl,
+    required this.actionSheetUrl,
     required this.machine,
     required this.clock,
     required this.weather,
@@ -34,6 +36,8 @@ class PetStage extends StatelessWidget {
   final String species;
   final int level;
   final String imageUrl;
+  final String spriteSheetUrl;
+  final String actionSheetUrl;
   final PetStateMachine machine;
   final WorldClock clock;
   final Weather weather;
@@ -104,6 +108,8 @@ class PetStage extends StatelessWidget {
                             child: PetRenderer(
                               name: name,
                               imageUrl: imageUrl,
+                              spriteSheetUrl: spriteSheetUrl,
+                              actionSheetUrl: actionSheetUrl,
                               machine: machine,
                               worldTime: worldTime,
                               size: size,
@@ -116,6 +122,7 @@ class PetStage extends StatelessWidget {
                       child: PetFxLayer(
                         machine: machine,
                         worldTime: worldTime,
+                        poseSheet: spriteSheetUrl.isNotEmpty,
                         speech: speech,
                       ),
                     ),

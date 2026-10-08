@@ -24,6 +24,8 @@ type aiPetBreedInput struct {
 	Personality         string   `json:"personality"`
 	Description         string   `json:"description"`
 	AvatarURL           string   `json:"avatar_url"`
+	SpriteSheetURL      string   `json:"sprite_sheet_url"`
+	ActionSheetURL      string   `json:"action_sheet_url"`
 	SortOrder           int      `json:"sort_order"`
 	Enabled             bool     `json:"enabled"`
 	SubscriptionPlanIDs []string `json:"subscription_plan_ids"`
@@ -37,6 +39,8 @@ type aiPetBreed struct {
 	Personality          string   `json:"personality"`
 	Description          string   `json:"description"`
 	AvatarURL            string   `json:"avatar_url"`
+	SpriteSheetURL       string   `json:"sprite_sheet_url"`
+	ActionSheetURL       string   `json:"action_sheet_url"`
 	SortOrder            int      `json:"sort_order"`
 	Enabled              bool     `json:"enabled"`
 	SubscriptionPlanIDs  []string `json:"subscription_plan_ids"`
@@ -47,7 +51,7 @@ type aiPetBreed struct {
 
 func AdminListAIPetBreeds(c *gin.Context) {
 	environment := currentEnvironment()
-	rows, err := db.Get().Query(`SELECT b.id,b.environment,b.name,b.species,b.personality,b.description,b.avatar_url,b.sort_order,b.enabled,
+	rows, err := db.Get().Query(`SELECT b.id,b.environment,b.name,b.species,b.personality,b.description,b.avatar_url,b.sprite_sheet_url,b.action_sheet_url,b.sort_order,b.enabled,
 		COALESCE(jsonb_agg(link.subscription_plan_id ORDER BY link.subscription_plan_id) FILTER (WHERE link.subscription_plan_id IS NOT NULL),'[]'::jsonb)::text
 		FROM ai_pet_breeds b LEFT JOIN ai_pet_breed_subscription_plans link ON link.breed_id=b.id
 		WHERE b.environment=$1 GROUP BY b.id ORDER BY b.sort_order,b.name`, environment)
@@ -60,7 +64,7 @@ func AdminListAIPetBreeds(c *gin.Context) {
 	for rows.Next() {
 		var item aiPetBreed
 		var plans string
-		if err := rows.Scan(&item.ID, &item.Environment, &item.Name, &item.Species, &item.Personality, &item.Description, &item.AvatarURL, &item.SortOrder, &item.Enabled, &plans); err != nil {
+		if err := rows.Scan(&item.ID, &item.Environment, &item.Name, &item.Species, &item.Personality, &item.Description, &item.AvatarURL, &item.SpriteSheetURL, &item.ActionSheetURL, &item.SortOrder, &item.Enabled, &plans); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read AI pet breeds"})
 			return
 		}
@@ -94,6 +98,8 @@ func saveAIPetBreed(c *gin.Context, id string, create bool) {
 	input.Personality = strings.TrimSpace(input.Personality)
 	input.Description = strings.TrimSpace(input.Description)
 	input.AvatarURL = strings.TrimSpace(input.AvatarURL)
+	input.SpriteSheetURL = strings.TrimSpace(input.SpriteSheetURL)
+	input.ActionSheetURL = strings.TrimSpace(input.ActionSheetURL)
 	input.SubscriptionPlanIDs = uniqueStrings(input.SubscriptionPlanIDs)
 	if input.Name == "" || input.Species == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name and species are required"})
@@ -101,6 +107,14 @@ func saveAIPetBreed(c *gin.Context, id string, create bool) {
 	}
 	if !validArtworkURL(input.AvatarURL) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "pet avatar must be an HTTP(S) image URL or bundled asset"})
+		return
+	}
+	if !validArtworkURL(input.SpriteSheetURL) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "pet sprite sheet must be an HTTP(S) image URL or bundled asset"})
+		return
+	}
+	if !validArtworkURL(input.ActionSheetURL) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "pet action sheet must be an HTTP(S) image URL or bundled asset"})
 		return
 	}
 	tx, err := db.Get().BeginTx(c.Request.Context(), nil)
@@ -117,11 +131,11 @@ func saveAIPetBreed(c *gin.Context, id string, create bool) {
 		}
 	}
 	if create {
-		_, err = tx.Exec(`INSERT INTO ai_pet_breeds(id,environment,name,species,personality,description,avatar_url,sort_order,enabled)
-			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, id, input.Environment, input.Name, input.Species, input.Personality, input.Description, input.AvatarURL, input.SortOrder, input.Enabled)
+		_, err = tx.Exec(`INSERT INTO ai_pet_breeds(id,environment,name,species,personality,description,avatar_url,sprite_sheet_url,action_sheet_url,sort_order,enabled)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, id, input.Environment, input.Name, input.Species, input.Personality, input.Description, input.AvatarURL, input.SpriteSheetURL, input.ActionSheetURL, input.SortOrder, input.Enabled)
 	} else {
 		var result sql.Result
-		result, err = tx.Exec(`UPDATE ai_pet_breeds SET environment=$2,name=$3,species=$4,personality=$5,description=$6,avatar_url=$7,sort_order=$8,enabled=$9,updated_at=CURRENT_TIMESTAMP WHERE id=$1`, id, input.Environment, input.Name, input.Species, input.Personality, input.Description, input.AvatarURL, input.SortOrder, input.Enabled)
+		result, err = tx.Exec(`UPDATE ai_pet_breeds SET environment=$2,name=$3,species=$4,personality=$5,description=$6,avatar_url=$7,sprite_sheet_url=$8,action_sheet_url=$9,sort_order=$10,enabled=$11,updated_at=CURRENT_TIMESTAMP WHERE id=$1`, id, input.Environment, input.Name, input.Species, input.Personality, input.Description, input.AvatarURL, input.SpriteSheetURL, input.ActionSheetURL, input.SortOrder, input.Enabled)
 		if err == nil {
 			if count, _ := result.RowsAffected(); count == 0 {
 				c.JSON(http.StatusNotFound, gin.H{"error": "AI pet breed not found"})
@@ -148,12 +162,12 @@ func saveAIPetBreed(c *gin.Context, id string, create bool) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save AI pet breed"})
 		return
 	}
-	c.JSON(map[bool]int{true: http.StatusCreated, false: http.StatusOK}[create], aiPetBreed{ID: id, Environment: input.Environment, Name: input.Name, Species: input.Species, Personality: input.Personality, Description: input.Description, AvatarURL: input.AvatarURL, SortOrder: input.SortOrder, Enabled: input.Enabled, SubscriptionPlanIDs: input.SubscriptionPlanIDs})
+	c.JSON(map[bool]int{true: http.StatusCreated, false: http.StatusOK}[create], aiPetBreed{ID: id, Environment: input.Environment, Name: input.Name, Species: input.Species, Personality: input.Personality, Description: input.Description, AvatarURL: input.AvatarURL, SpriteSheetURL: input.SpriteSheetURL, ActionSheetURL: input.ActionSheetURL, SortOrder: input.SortOrder, Enabled: input.Enabled, SubscriptionPlanIDs: input.SubscriptionPlanIDs})
 }
 
 func ListAIPetBreeds(c *gin.Context) {
 	userID := c.GetString("user_id")
-	rows, err := db.Get().Query(`SELECT b.id,b.environment,b.name,b.species,b.personality,b.description,b.avatar_url,b.sort_order,b.enabled,
+	rows, err := db.Get().Query(`SELECT b.id,b.environment,b.name,b.species,b.personality,b.description,b.avatar_url,b.sprite_sheet_url,b.action_sheet_url,b.sort_order,b.enabled,
 		COALESCE((SELECT c.id FROM companions c WHERE c.user_id=$1 AND c.pet_breed_id=b.id AND c.deleted_at IS NULL LIMIT 1),''),
 		COALESCE((SELECT c.name FROM companions c WHERE c.user_id=$1 AND c.pet_breed_id=b.id AND c.deleted_at IS NULL LIMIT 1),''),
 		(EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=$1 AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP)) AND
@@ -170,7 +184,7 @@ func ListAIPetBreeds(c *gin.Context) {
 	items := []aiPetBreed{}
 	for rows.Next() {
 		var item aiPetBreed
-		if err := rows.Scan(&item.ID, &item.Environment, &item.Name, &item.Species, &item.Personality, &item.Description, &item.AvatarURL, &item.SortOrder, &item.Enabled, &item.AdoptedCompanionID, &item.AdoptedCompanionName, &item.CanAdopt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Environment, &item.Name, &item.Species, &item.Personality, &item.Description, &item.AvatarURL, &item.SpriteSheetURL, &item.ActionSheetURL, &item.SortOrder, &item.Enabled, &item.AdoptedCompanionID, &item.AdoptedCompanionName, &item.CanAdopt); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read AI pets"})
 			return
 		}
@@ -200,14 +214,14 @@ func AdoptAIPet(c *gin.Context) {
 	userID := c.GetString("user_id")
 	var breed aiPetBreed
 	var canAdopt bool
-	err := db.Get().QueryRow(`SELECT b.id,b.name,b.species,b.personality,b.description,b.avatar_url,
+	err := db.Get().QueryRow(`SELECT b.id,b.name,b.species,b.personality,b.description,b.avatar_url,b.sprite_sheet_url,b.action_sheet_url,
 		(EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=$1 AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP)) AND
 		 (NOT EXISTS(SELECT 1 FROM ai_pet_breed_subscription_plans link WHERE link.breed_id=b.id) OR EXISTS(
 			SELECT 1 FROM ai_pet_breed_subscription_plans link JOIN subscription_plans p ON p.id=link.subscription_plan_id
 			JOIN subscriptions s ON s.user_id=$1 AND s.environment=p.environment AND s.platform=p.platform AND s.product_id=p.product_id
 			WHERE link.breed_id=b.id AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP))))
 		FROM ai_pet_breeds b WHERE b.id=$2 AND b.environment=$3 AND b.enabled=true`, userID, input.BreedID, currentEnvironment()).Scan(
-		&breed.ID, &breed.Name, &breed.Species, &breed.Personality, &breed.Description, &breed.AvatarURL, &canAdopt)
+		&breed.ID, &breed.Name, &breed.Species, &breed.Personality, &breed.Description, &breed.AvatarURL, &breed.SpriteSheetURL, &breed.ActionSheetURL, &canAdopt)
 	if errors.Is(err, sql.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "AI pet breed not found"})
 		return
@@ -263,20 +277,22 @@ func AdoptAIPet(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "this pet has already been adopted or could not be created"})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"companion_id": companionID, "name": input.Name, "breed": breed, "state": petStateResponse{Hunger: 80, Happiness: 70, Energy: 80, Health: 100, Experience: 0, Level: 1}})
+	c.JSON(http.StatusCreated, gin.H{"companion_id": companionID, "name": input.Name, "breed": breed, "state": petStateResponse{AvatarURL: breed.AvatarURL, SpriteSheetURL: breed.SpriteSheetURL, ActionSheetURL: breed.ActionSheetURL, Hunger: 80, Happiness: 70, Energy: 80, Health: 100, Experience: 0, Level: 1}})
 }
 
 type petStateResponse struct {
-	AvatarURL  string     `json:"avatar_url"`
-	Hunger     int        `json:"hunger"`
-	Happiness  int        `json:"happiness"`
-	Energy     int        `json:"energy"`
-	Health     int        `json:"health"`
-	Experience int        `json:"experience"`
-	Level      int        `json:"level"`
-	LastFedAt  *time.Time `json:"last_fed_at"`
-	Coins      int        `json:"coins"`
-	FeedCoins  int        `json:"feed_coin_cost"`
+	AvatarURL      string     `json:"avatar_url"`
+	SpriteSheetURL string     `json:"sprite_sheet_url"`
+	ActionSheetURL string     `json:"action_sheet_url"`
+	Hunger         int        `json:"hunger"`
+	Happiness      int        `json:"happiness"`
+	Energy         int        `json:"energy"`
+	Health         int        `json:"health"`
+	Experience     int        `json:"experience"`
+	Level          int        `json:"level"`
+	LastFedAt      *time.Time `json:"last_fed_at"`
+	Coins          int        `json:"coins"`
+	FeedCoins      int        `json:"feed_coin_cost"`
 }
 
 func GetAIPetState(c *gin.Context) {
@@ -302,7 +318,8 @@ func FeedAIPet(c *gin.Context) {
 	}
 	ctx := c.Request.Context()
 	userID, companionID := c.GetString("user_id"), c.Param("id")
-	if _, err := loadAndDecayPetState(ctx, userID, companionID); err != nil {
+	initialState, err := loadAndDecayPetState(ctx, userID, companionID)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "AI pet not found"})
 		} else {
@@ -370,6 +387,9 @@ func FeedAIPet(c *gin.Context) {
 		return
 	}
 	state.LastFedAt = &lastFed
+	state.AvatarURL = initialState.AvatarURL
+	state.SpriteSheetURL = initialState.SpriteSheetURL
+	state.ActionSheetURL = initialState.ActionSheetURL
 	state.Coins = reservation.Balance
 	state.FeedCoins = reservation.Product.Coins
 	result, _ := json.Marshal(state)
@@ -388,11 +408,11 @@ func loadAndDecayPetState(ctx context.Context, userID, companionID string) (petS
 	var state petStateResponse
 	var lastDecay time.Time
 	var lastFed sql.NullTime
-	err := db.Get().QueryRowContext(ctx, `SELECT c.avatar_url,s.hunger,s.happiness,s.energy,s.health,s.experience,s.level,s.last_fed_at,s.last_decay_at,u.credits_balance,
+	err := db.Get().QueryRowContext(ctx, `SELECT c.avatar_url,COALESCE(b.sprite_sheet_url,''),COALESCE(b.action_sheet_url,''),s.hunger,s.happiness,s.energy,s.health,s.experience,s.level,s.last_fed_at,s.last_decay_at,u.credits_balance,
 		COALESCE((SELECT p.coins FROM credit_products p WHERE p.environment=u.environment AND p.product_key='ai_pet_feed' AND p.enabled=true),5)
-		FROM ai_pet_states s JOIN companions c ON c.id=s.companion_id JOIN users u ON u.id=c.user_id
+		FROM ai_pet_states s JOIN companions c ON c.id=s.companion_id LEFT JOIN ai_pet_breeds b ON b.id=c.pet_breed_id JOIN users u ON u.id=c.user_id
 		WHERE c.id=$1 AND c.user_id=$2 AND c.active=true AND c.creation_source='ai_pet'`, companionID, userID).Scan(
-		&state.AvatarURL, &state.Hunger, &state.Happiness, &state.Energy, &state.Health, &state.Experience, &state.Level, &lastFed, &lastDecay, &state.Coins, &state.FeedCoins)
+		&state.AvatarURL, &state.SpriteSheetURL, &state.ActionSheetURL, &state.Hunger, &state.Happiness, &state.Energy, &state.Health, &state.Experience, &state.Level, &lastFed, &lastDecay, &state.Coins, &state.FeedCoins)
 	if err != nil {
 		return state, err
 	}

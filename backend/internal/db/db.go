@@ -655,6 +655,8 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_ai_pet_breeds_scope ON ai_pet_breeds(environment,enabled,sort_order,name)`,
+		`ALTER TABLE ai_pet_breeds ADD COLUMN IF NOT EXISTS sprite_sheet_url TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE ai_pet_breeds ADD COLUMN IF NOT EXISTS action_sheet_url TEXT NOT NULL DEFAULT ''`,
 		`INSERT INTO ai_pet_breeds(id,environment,name,species,personality,description,avatar_url,sort_order,enabled)
 		 SELECT 'system-ai-pet-' || env || '-' || slug,env,name,species,personality,description,avatar_url,sort_order,true
 		 FROM (VALUES('prod')) AS environments(env)
@@ -667,6 +669,16 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			('golden-retriever','Sunny','Dog','Friendly and caring','A warm golden retriever who loves playtime, encouragement, and making new memories.','asset://assets/ai_pets/dog_retriever.png',60)
 		 ) AS defaults(slug,name,species,personality,description,avatar_url,sort_order)
 		 ON CONFLICT(id) DO NOTHING`,
+		`UPDATE ai_pet_breeds SET sprite_sheet_url=replace(avatar_url,'.png','_poses.png')
+		 WHERE sprite_sheet_url='' AND avatar_url IN (
+		 'asset://assets/ai_pets/cat_orange.png','asset://assets/ai_pets/cat_tuxedo.png',
+		 'asset://assets/ai_pets/cat_ragdoll.png','asset://assets/ai_pets/dog_corgi.png',
+		 'asset://assets/ai_pets/dog_shiba.png','asset://assets/ai_pets/dog_retriever.png')`,
+		`UPDATE ai_pet_breeds SET action_sheet_url=replace(avatar_url,'.png','_actions.png')
+		 WHERE action_sheet_url='' AND avatar_url IN (
+		 'asset://assets/ai_pets/cat_orange.png','asset://assets/ai_pets/cat_tuxedo.png',
+		 'asset://assets/ai_pets/cat_ragdoll.png','asset://assets/ai_pets/dog_corgi.png',
+		 'asset://assets/ai_pets/dog_shiba.png','asset://assets/ai_pets/dog_retriever.png')`,
 		`CREATE TABLE IF NOT EXISTS ai_pet_breed_subscription_plans (
 			breed_id TEXT NOT NULL REFERENCES ai_pet_breeds(id) ON DELETE CASCADE,
 			subscription_plan_id TEXT NOT NULL REFERENCES subscription_plans(id) ON DELETE CASCADE,

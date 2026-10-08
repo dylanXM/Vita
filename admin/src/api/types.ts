@@ -210,6 +210,8 @@ export interface AIPetBreed {
   personality: string;
   description: string;
   avatar_url: string;
+  sprite_sheet_url: string;
+  action_sheet_url: string;
   sort_order: number;
   enabled: boolean;
   subscription_plan_ids: string[];
