@@ -167,51 +167,44 @@ class _PoseSheetPainter extends CustomPainter {
       edge,
       edge,
     );
-    final cellWeights = List<double>.filled(6, 0);
+    // A pose sheet contains complete silhouettes, not layers of one rig.
+    // Blending two cells draws both bodies and makes a visible double image.
+    // Select one authored silhouette per frame; the state machine still blends
+    // position, effects and other scene motion independently.
+    var state = PetState.standing;
+    var strongest = -1.0;
     for (final entry in weights.entries) {
-      if (actions != null &&
-          (entry.key == PetState.walking ||
-              entry.key == PetState.feeding ||
-              entry.key == PetState.drinking)) {
-        continue;
+      if (entry.value > strongest) {
+        strongest = entry.value;
+        state = entry.key;
       }
-      cellWeights[_cellFor(entry.key)] += entry.value;
     }
-    for (var index = 0; index < 6; index++) {
-      final opacity = cellWeights[index].clamp(0.0, 1.0).toDouble();
-      if (opacity <= .001) continue;
-      final breath = index == 5 ? .007 : .004;
-      final rise = breath * edge * math.sin(worldTime * math.pi * 2 * 12);
-      _drawCell(canvas, image, index, dest.shift(Offset(0, rise)), opacity);
-    }
+
     final actionImage = actions;
-    if (actionImage == null) return;
-    final walking = weights[PetState.walking] ?? 0;
-    if (walking > .001) {
-      final frame = (worldTime * 120) % 1 * 3;
-      final first = frame.floor();
-      final blend = Curves.easeInOutSine
-          .transform(((frame - first - .72) / .28).clamp(0.0, 1.0).toDouble());
-      _drawCell(canvas, actionImage, first, dest, walking * (1 - blend));
-      _drawCell(canvas, actionImage, (first + 1) % 3, dest, walking * blend);
+    if (actionImage != null) {
+      if (state == PetState.walking) {
+        final frame = ((worldTime * 360).floor()) % 3;
+        _drawCell(canvas, actionImage, frame, dest);
+        return;
+      }
+      if (state == PetState.feeding) {
+        final frame = ((worldTime * 80).floor()) % 2;
+        _drawCell(canvas, actionImage, 3 + frame, dest);
+        return;
+      }
+      if (state == PetState.drinking) {
+        final frame = ((worldTime * 100).floor()) % 2;
+        _drawCell(
+            canvas, frame == 0 ? image : actionImage, frame == 0 ? 4 : 5, dest);
+        return;
+      }
     }
-    final feeding = weights[PetState.feeding] ?? 0;
-    if (feeding > .001) {
-      final blend = .5 - .5 * math.cos(worldTime * math.pi * 2 * 40);
-      _drawCell(canvas, actionImage, 3, dest, feeding * (1 - blend));
-      _drawCell(canvas, actionImage, 4, dest, feeding * blend);
-    }
-    final drinking = weights[PetState.drinking] ?? 0;
-    if (drinking > .001) {
-      final blend = .5 - .5 * math.cos(worldTime * math.pi * 2 * 50);
-      _drawCell(canvas, image, 4, dest, drinking * (1 - blend));
-      _drawCell(canvas, actionImage, 5, dest, drinking * blend);
-    }
+    final breath = state == PetState.sleeping ? .007 : .004;
+    final rise = breath * edge * math.sin(worldTime * math.pi * 2 * 12);
+    _drawCell(canvas, image, _cellFor(state), dest.shift(Offset(0, rise)));
   }
 
-  void _drawCell(
-      Canvas canvas, ui.Image sheet, int index, Rect dest, double opacity) {
-    if (opacity <= .001) return;
+  void _drawCell(Canvas canvas, ui.Image sheet, int index, Rect dest) {
     final cellWidth = sheet.width / 3.0;
     final cellHeight = sheet.height / 2.0;
     canvas.drawImageRect(
@@ -223,9 +216,7 @@ class _PoseSheetPainter extends CustomPainter {
         cellHeight,
       ),
       dest,
-      Paint()
-        ..color =
-            Colors.white.withValues(alpha: opacity.clamp(0.0, 1.0).toDouble()),
+      Paint()..filterQuality = FilterQuality.low,
     );
   }
 
