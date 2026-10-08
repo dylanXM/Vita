@@ -328,29 +328,38 @@ func main() {
 				agentAdmin.GET("/companions", handler.AdminListCompanions)
 				agentAdmin.POST("/companions", handler.AdminCreateCompanion)
 
-			lifeEngine := admin.Group("/life-engine")
-			{
-				lifeEngine.GET("/overview", handler.AdminLifeEngineOverview)
-				lifeEngine.GET("/companions", handler.AdminLifeEngineCompanions)
-				lifeEngine.GET("/companions/:id/events", handler.AdminLifeEngineCompanionEvents)
-				lifeEngine.POST("/companions/:id/events", handler.AdminLifeEngineCreateEvent)
-				lifeEngine.PUT("/events/:eventId", handler.AdminLifeEngineUpdateEvent)
-				lifeEngine.DELETE("/events/:eventId", handler.AdminLifeEngineDeleteEvent)
-				lifeEngine.POST("/companions/:id/takeover", handler.AdminLifeEngineEnterTakeover)
-				lifeEngine.DELETE("/companions/:id/takeover", handler.AdminLifeEngineExitTakeover)
-				lifeEngine.POST("/trigger-plan", handler.AdminLifeEngineTriggerPlan)
-				lifeEngine.POST("/trigger-proactive", handler.AdminLifeEngineTriggerProactive)
-				lifeEngine.POST("/companions/:id/resend-outbox", handler.AdminLifeEngineResendOutbox)
-				lifeEngine.POST("/companions/:id/broadcast", handler.AdminLifeEngineBroadcast)
-			}
+				lifeEngine := admin.Group("/life-engine")
+				{
+					lifeEngine.GET("/overview", handler.AdminLifeEngineOverview)
+					lifeEngine.GET("/companions", handler.AdminLifeEngineCompanions)
+					lifeEngine.GET("/companions/:id/events", handler.AdminLifeEngineCompanionEvents)
+					lifeEngine.POST("/companions/:id/events", handler.AdminLifeEngineCreateEvent)
+					lifeEngine.PUT("/events/:eventId", handler.AdminLifeEngineUpdateEvent)
+					lifeEngine.DELETE("/events/:eventId", handler.AdminLifeEngineDeleteEvent)
+					lifeEngine.POST("/companions/:id/takeover", handler.AdminLifeEngineEnterTakeover)
+					lifeEngine.DELETE("/companions/:id/takeover", handler.AdminLifeEngineExitTakeover)
+					lifeEngine.POST("/trigger-plan", handler.AdminLifeEngineTriggerPlan)
+					lifeEngine.POST("/trigger-proactive", handler.AdminLifeEngineTriggerProactive)
+					lifeEngine.POST("/companions/:id/resend-outbox", handler.AdminLifeEngineResendOutbox)
+					lifeEngine.POST("/companions/:id/broadcast", handler.AdminLifeEngineBroadcast)
+				}
 				agentAdmin.PUT("/companions/:id", handler.AdminUpdateCompanion)
 			}
 		}
 	}
 
 	srv := &http.Server{
-		Addr:         cfg.HTTPAddr,
-		Handler:      engine,
+		Addr: cfg.HTTPAddr,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost && (r.URL.Path == "/v1/admin/life-engine/trigger-plan" || r.URL.Path == "/v1/admin/life-engine/trigger-proactive") {
+				// These passes have a 120s work budget. Allow cleanup and the JSON
+				// response to finish without changing other endpoints' deadlines.
+				if err := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(140 * time.Second)); err != nil {
+					log.Printf("set life engine response deadline: %v", err)
+				}
+			}
+			engine.ServeHTTP(w, r)
+		}),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 60 * time.Second,
 	}

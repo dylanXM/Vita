@@ -53,7 +53,7 @@ export function LifeEnginePage() {
       }
       refresh();
     },
-    onError: (e) => toast.error(errorMessage(e, t("lifeEngine.runFailed"))),
+    onError: (e) => { toast.error(errorMessage(e, t("lifeEngine.runFailed"))); refresh(); },
   });
   const runProactive = useMutation({
     mutationFn: () => lifeEngineApi.triggerProactive(),
@@ -62,7 +62,7 @@ export function LifeEnginePage() {
       toast.success(t("lifeEngine.proactiveDoneStats", { due: r.due_before, sent: r.dispatched }));
       refresh();
     },
-    onError: (e) => toast.error(errorMessage(e, t("lifeEngine.runFailed"))),
+    onError: (e) => { toast.error(errorMessage(e, t("lifeEngine.runFailed"))); refresh(); },
   });
 
   const [eventsFor, setEventsFor] = useState<LifeEngineCompanion | null>(null);

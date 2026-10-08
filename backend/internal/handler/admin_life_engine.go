@@ -80,9 +80,9 @@ func AdminLifeEngineOverview(c *gin.Context) {
 		return
 	}
 	type runBucket struct {
-		Kind string `json:"kind"`
+		Kind   string `json:"kind"`
 		Status string `json:"status"`
-		Count int    `json:"count"`
+		Count  int    `json:"count"`
 	}
 	var buckets []runBucket
 	for rows.Next() {
@@ -93,9 +93,9 @@ func AdminLifeEngineOverview(c *gin.Context) {
 	rows.Close()
 
 	c.JSON(http.StatusOK, gin.H{
-		"settings":   settings,
-		"counters":  agg,
-		"last_run_at": nullTime(lastRunAt),
+		"settings":      settings,
+		"counters":      agg,
+		"last_run_at":   nullTime(lastRunAt),
 		"run_breakdown": buckets,
 	})
 }
@@ -146,9 +146,9 @@ func AdminLifeEngineCompanions(c *gin.Context) {
 		       COALESCE(cs.mood,50), COALESCE(cs.energy,50), COALESCE(cs.stress,50), COALESCE(cs.social_energy,50),
 		       COALESCE(rs.intimacy,0), COALESCE(rs.trust,0), COALESCE(rs.familiarity,0), COALESCE(rs.enthusiasm,0),
 		       (SELECT finished_at FROM agent_runs WHERE companion_id=c.id ORDER BY finished_at DESC NULLS LAST LIMIT 1),
-		       (SELECT status FROM agent_runs WHERE companion_id=c.id ORDER BY finished_at DESC NULLS LAST LIMIT 1),
-		       (SELECT COALESCE(error,'') FROM agent_runs WHERE companion_id=c.id AND status='failed' ORDER BY finished_at DESC LIMIT 1),
-			(SELECT COALESCE(input_summary,'') FROM agent_runs WHERE companion_id=c.id AND status='failed' ORDER BY finished_at DESC LIMIT 1),
+		       COALESCE((SELECT status FROM agent_runs WHERE companion_id=c.id ORDER BY finished_at DESC NULLS LAST LIMIT 1),''),
+		       COALESCE((SELECT error FROM agent_runs WHERE companion_id=c.id AND status='failed' ORDER BY finished_at DESC LIMIT 1),''),
+			COALESCE((SELECT input_summary FROM agent_runs WHERE companion_id=c.id AND status='failed' ORDER BY finished_at DESC LIMIT 1),''),
 		       c.updated_at
 		FROM companions c JOIN users u ON u.id=c.user_id
 		LEFT JOIN companion_states cs ON cs.companion_id=c.id
@@ -379,80 +379,120 @@ func AdminLifeEngineExitTakeover(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "takeover ended", "companion_id": companionID})
 }
 
-// AdminLifeEngineTriggerPlan forces an immediate EnsureDailyPlans pass. The
-// worker is idempotent: a day that is already completed is left alone unless
-// ?force=true is supplied, in which case today's companion_days rows are reset
-// to failed so the plan is regenerated (and today's life_events are rebuilt).
+// AdminLifeEngineTriggerPlan runs eligible companions' plans. Force is applied
+// under the worker's per-day lock, using each companion's local date.
 func AdminLifeEngineTriggerPlan(c *gin.Context) {
-	force := c.Query("force") == "true"
-	if force {
-		if _, err := db.Get().Exec(`
-			UPDATE companion_days SET status='failed', last_error='', generated_at=NULL, event_count=0
-			WHERE local_date=CURRENT_DATE AND status='completed'`); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reset today's plans"})
-			return
-		}
+	if companionAgent == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "agent service is not initialized"})
+		return
 	}
-	var beforeCompleted, beforeFailed, scanned int
-	_ = db.Get().QueryRow(`SELECT COUNT(*) FROM companion_days WHERE local_date=CURRENT_DATE AND status='completed'`).Scan(&beforeCompleted)
-	_ = db.Get().QueryRow(`SELECT COUNT(*) FROM companion_days WHERE local_date=CURRENT_DATE AND status='failed'`).Scan(&beforeFailed)
-	_ = db.Get().QueryRow(`SELECT COUNT(*) FROM companions WHERE is_default=false AND deleted_at IS NULL`).Scan(&scanned)
+	force := c.Query("force") == "true"
+	var beforeCompleted, scanned int
+	if err := db.Get().QueryRow(`SELECT COUNT(*) FROM companion_days WHERE local_date=(CURRENT_TIMESTAMP AT TIME ZONE timezone)::date AND status='completed'`).Scan(&beforeCompleted); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read life engine counters: " + err.Error()})
+		return
+	}
+	if err := db.Get().QueryRow(`SELECT COUNT(*) FROM companions WHERE is_default=false AND deleted_at IS NULL`).Scan(&scanned); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read life engine counters: " + err.Error()})
+		return
+	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
 	defer cancel()
-	if err := companionAgent.EnsureDailyPlans(ctx); err != nil {
+	if err := companionAgent.EnsureDailyPlansWithForce(ctx, force); err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
 	var afterCompleted, afterFailed int
-	_ = db.Get().QueryRow(`SELECT COUNT(*) FROM companion_days WHERE local_date=CURRENT_DATE AND status='completed'`).Scan(&afterCompleted)
-	_ = db.Get().QueryRow(`SELECT COUNT(*) FROM companion_days WHERE local_date=CURRENT_DATE AND status='failed'`).Scan(&afterFailed)
+	if err := db.Get().QueryRow(`SELECT COUNT(*) FROM companion_days WHERE local_date=(CURRENT_TIMESTAMP AT TIME ZONE timezone)::date AND status='completed'`).Scan(&afterCompleted); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read life engine counters: " + err.Error()})
+		return
+	}
+	if err := db.Get().QueryRow(`SELECT COUNT(*) FROM companion_days WHERE local_date=(CURRENT_TIMESTAMP AT TIME ZONE timezone)::date AND status='failed'`).Scan(&afterFailed); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read life engine counters: " + err.Error()})
+		return
+	}
 	// Diagnostics: for every non-default companion, show which gate kept it out.
 	type diagRow struct {
-		Name       string `json:"name"`
-		Active     bool   `json:"active"`
-		LifeEnabled bool  `json:"life_enabled"`
-		Takeover   bool   `json:"admin_takeover"`
-		Subscribed bool   `json:"active_subscription"`
-		DayStatus  string `json:"today_status"`
-		LastError  string `json:"last_error"`
+		Name        string `json:"name"`
+		Active      bool   `json:"active"`
+		LifeEnabled bool   `json:"life_enabled"`
+		Takeover    bool   `json:"admin_takeover"`
+		Subscribed  bool   `json:"active_subscription"`
+		DayStatus   string `json:"today_status"`
+		LastError   string `json:"last_error"`
 	}
-	diagRows, _ := db.Get().Query(`
+	diagRows, err := db.Get().Query(`
 		SELECT c.name, c.active, c.life_enabled, COALESCE(c.admin_takeover,false),
 		  EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active'
 		    AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP)),
-		  COALESCE((SELECT status FROM companion_days d WHERE d.companion_id=c.id AND d.local_date=CURRENT_DATE),'none'),
-		  COALESCE((SELECT last_error FROM companion_days d WHERE d.companion_id=c.id AND d.local_date=CURRENT_DATE),'')
+		  COALESCE((SELECT status FROM companion_days d WHERE d.companion_id=c.id AND d.local_date=(CURRENT_TIMESTAMP AT TIME ZONE timezone)::date),'none'),
+		  COALESCE((SELECT last_error FROM companion_days d WHERE d.companion_id=c.id AND d.local_date=(CURRENT_TIMESTAMP AT TIME ZONE timezone)::date),'')
 		FROM companions c WHERE c.is_default=false AND c.deleted_at IS NULL ORDER BY c.created_at`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load plan diagnostics: " + err.Error()})
+		return
+	}
+	defer diagRows.Close()
 	diags := make([]diagRow, 0)
 	for diagRows.Next() {
 		var d diagRow
-		_ = diagRows.Scan(&d.Name, &d.Active, &d.LifeEnabled, &d.Takeover, &d.Subscribed, &d.DayStatus, &d.LastError)
+		if err := diagRows.Scan(&d.Name, &d.Active, &d.LifeEnabled, &d.Takeover, &d.Subscribed, &d.DayStatus, &d.LastError); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read plan diagnostics: " + err.Error()})
+			return
+		}
 		diags = append(diags, d)
 	}
-	diagRows.Close()
+	if err := diagRows.Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read plan diagnostics: " + err.Error()})
+		return
+	}
 
+	newlyCompleted := afterCompleted - beforeCompleted
+	if force {
+		// Only count eligible completed days; unselected companions were not rerun.
+		if err := db.Get().QueryRow(`SELECT COUNT(*) FROM companion_days d
+			JOIN companions c ON c.id=d.companion_id
+			WHERE d.local_date=(CURRENT_TIMESTAMP AT TIME ZONE d.timezone)::date AND d.status='completed'
+			AND (c.active=true OR c.deleted_at IS NOT NULL) AND c.life_enabled=true AND c.is_default=false
+			AND COALESCE(c.admin_takeover,false)=false
+			AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active'
+			AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP))`).Scan(&newlyCompleted); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to count completed plans"})
+			return
+		}
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"message":         "plan pass completed",
-		"force":           force,
-		"scanned":         scanned,
+		"message":          "plan pass completed",
+		"force":            force,
+		"scanned":          scanned,
 		"completed_before": beforeCompleted,
 		"completed_after":  afterCompleted,
-		"newly_completed":  afterCompleted - beforeCompleted,
+		"newly_completed":  newlyCompleted,
 		"failed_after":     afterFailed,
-		"diagnostics":     diags,
+		"diagnostics":      diags,
 	})
 }
 
 // AdminLifeEngineTriggerProactive forces an immediate proactive dispatch pass.
 // It reports how many due unshared events it actually walked through.
 func AdminLifeEngineTriggerProactive(c *gin.Context) {
+	if companionAgent == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "agent service is not initialized"})
+		return
+	}
 	var dueBefore, sharedBefore, sharedAfter int
-	_ = db.Get().QueryRow(`
+	if err := db.Get().QueryRow(`
 		SELECT COUNT(*) FROM life_events e JOIN companions c ON c.id=e.companion_id
 		WHERE e.shareability=true AND e.shared_at IS NULL AND e.status='active'
-		  AND e.start_time<=CURRENT_TIMESTAMP AND c.is_default=false`).Scan(&dueBefore)
-	_ = db.Get().QueryRow(`SELECT COUNT(*) FROM life_events WHERE shared_at IS NOT NULL AND local_date=CURRENT_DATE`).Scan(&sharedBefore)
+		  AND e.start_time<=CURRENT_TIMESTAMP AND c.is_default=false`).Scan(&dueBefore); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read life engine counters: " + err.Error()})
+		return
+	}
+	if err := db.Get().QueryRow(`SELECT COUNT(*) FROM life_events WHERE shared_at IS NOT NULL AND local_date=CURRENT_DATE`).Scan(&sharedBefore); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read life engine counters: " + err.Error()})
+		return
+	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
 	defer cancel()
@@ -460,10 +500,13 @@ func AdminLifeEngineTriggerProactive(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
-	_ = db.Get().QueryRow(`SELECT COUNT(*) FROM life_events WHERE shared_at IS NOT NULL AND local_date=CURRENT_DATE`).Scan(&sharedAfter)
+	if err := db.Get().QueryRow(`SELECT COUNT(*) FROM life_events WHERE shared_at IS NOT NULL AND local_date=CURRENT_DATE`).Scan(&sharedAfter); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read life engine counters: " + err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"message":      "proactive dispatch completed",
-		"due_before":   dueBefore,
+		"message":       "proactive dispatch completed",
+		"due_before":    dueBefore,
 		"shared_before": sharedBefore,
 		"shared_after":  sharedAfter,
 		"dispatched":    sharedAfter - sharedBefore,

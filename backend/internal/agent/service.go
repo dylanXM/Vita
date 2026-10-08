@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -673,6 +674,12 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 }
 
 func (s *Service) EnsureDailyPlans(ctx context.Context) error {
+	return s.EnsureDailyPlansWithForce(ctx, false)
+}
+
+// EnsureDailyPlansWithForce rebuilds eligible companions' local days when forced.
+// The per-day lock also protects manual runs from the background worker.
+func (s *Service) EnsureDailyPlansWithForce(ctx context.Context, force bool) error {
 	if !s.mock {
 		enabled, err := s.modelRouteEnabled(ctx, "text_life_plan")
 		if err != nil || !enabled {
@@ -718,15 +725,25 @@ func (s *Service) EnsureDailyPlans(ctx context.Context) error {
 		}
 		items = append(items, current)
 	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	var failures []error
 	for _, current := range items {
-		if err := s.ensurePlan(ctx, current.profile, current.tz, settings); err != nil {
-			log.Printf("life plan companion=%s: %v", current.profile.ID, err)
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(failures, err)...)
+		}
+		if err := s.ensurePlan(ctx, current.profile, current.tz, settings, force); err != nil {
+			failures = append(failures, fmt.Errorf("life plan companion=%s: %w", current.profile.ID, err))
 		}
 	}
-	return rows.Err()
+	return errors.Join(failures...)
 }
 
-func (s *Service) ensurePlan(ctx context.Context, profile companionContext, timezone string, settings lifeSettings) error {
+func (s *Service) ensurePlan(ctx context.Context, profile companionContext, timezone string, settings lifeSettings, force bool) (runErr error) {
 	location, err := time.LoadLocation(timezone)
 	if err != nil {
 		location = time.UTC
@@ -734,35 +751,69 @@ func (s *Service) ensurePlan(ctx context.Context, profile companionContext, time
 	}
 	localNow := time.Now().In(location)
 	localDate := localNow.Format("2006-01-02")
-	_, err = s.db.ExecContext(ctx, `
+	// A session lock survives request cancellation until failure state is saved,
+	// and PostgreSQL releases it if the process/connection dies. This allows
+	// abandoned generating rows to recover without stealing a live worker's day.
+	conn, err := s.db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	lockKey := "life-plan:" + profile.ID + ":" + localDate
+	var locked bool
+	if err := conn.QueryRowContext(ctx, `SELECT pg_try_advisory_lock(hashtextextended($1, 0))`, lockKey).Scan(&locked); err != nil {
+		// The server may have acquired the lock before cancellation reached us.
+		_ = conn.Raw(func(any) error { return driver.ErrBadConn })
+		return err
+	}
+	if !locked {
+		return fmt.Errorf("life plan is already running for %s", localDate)
+	}
+	defer func() {
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if _, err := conn.ExecContext(cleanupCtx, `SELECT pg_advisory_unlock(hashtextextended($1, 0))`, lockKey); err != nil {
+			// Never return a session holding a lock to the connection pool.
+			_ = conn.Raw(func(any) error { return driver.ErrBadConn })
+		}
+	}()
+	_, err = conn.ExecContext(ctx, `
 		INSERT INTO companion_days (companion_id, local_date, timezone, status)
 		VALUES ($1, $2, $3, 'pending') ON CONFLICT DO NOTHING`, profile.ID, localDate, timezone)
 	if err != nil {
 		return err
 	}
 	var status string
-	if err := s.db.QueryRowContext(ctx, `SELECT status FROM companion_days WHERE companion_id = $1 AND local_date = $2`, profile.ID, localDate).Scan(&status); err != nil {
+	if err := conn.QueryRowContext(ctx, `SELECT status FROM companion_days WHERE companion_id = $1 AND local_date = $2`, profile.ID, localDate).Scan(&status); err != nil {
 		return err
 	}
-	if status == "completed" || status == "generating" {
+	if status == "completed" && !force {
 		return nil
 	}
-	result, err := s.db.ExecContext(ctx, `UPDATE companion_days SET status = 'generating', last_error = '' WHERE companion_id = $1 AND local_date = $2 AND status IN ('pending', 'failed')`, profile.ID, localDate)
-	if err != nil {
+	// All failures, including cancellation and persistence failures, must clear
+	// generating. Use a fresh context while we still own the per-day lock.
+	defer func() {
+		if runErr == nil {
+			return
+		}
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if _, err := conn.ExecContext(cleanupCtx, `UPDATE companion_days SET status='failed', last_error=$3 WHERE companion_id=$1 AND local_date=$2`, profile.ID, localDate, truncate(runErr.Error(), 1000)); err != nil {
+			runErr = errors.Join(runErr, fmt.Errorf("save failed plan state: %w", err))
+		}
+		s.recordRun(cleanupCtx, profile.ID, "life_plan", "", "failed", runErr.Error())
+	}()
+	if _, err := conn.ExecContext(ctx, `UPDATE companion_days SET status='generating', last_error='' WHERE companion_id=$1 AND local_date=$2`, profile.ID, localDate); err != nil {
 		return err
-	}
-	if count, _ := result.RowsAffected(); count == 0 {
-		return nil
 	}
 
 	effectiveProactiveLimit := min(8, settings.DailyProactiveLimit+profile.Enthusiasm/25)
 	events, modelID, err := s.generatePlan(ctx, profile, localDate, timezone, settings, effectiveProactiveLimit)
 	if err != nil {
-		_, _ = s.db.ExecContext(ctx, `UPDATE companion_days SET status = 'failed', last_error = $3 WHERE companion_id = $1 AND local_date = $2`, profile.ID, localDate, truncate(err.Error(), 1000))
 		return err
 	}
 	events = normalizePlan(events, settings.DailyEventMin, settings.DailyEventMax, effectiveProactiveLimit, profile)
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -850,6 +901,12 @@ The very first character of your reply MUST be '[' and the very last character M
 			}
 			break
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no life planning model is available")
 	}
 	// All configured models failed to produce a parseable plan. Rather than
 	// leave the day stuck in 'failed' forever (which also blocks proactive
@@ -1267,11 +1324,6 @@ func (s *Service) DispatchDueProactive(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if !s.mock {
-		if _, err := s.loadTextRouteModels(ctx, "text_proactive", "", ""); err != nil {
-			return err
-		}
-	}
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT e.id, e.companion_id, c.user_id, c.name, COALESCE(c.city, ''),
 		       COALESCE(e.title, ''), COALESCE(e.description, ''), COALESCE(e.location, ''),
@@ -1303,12 +1355,25 @@ func (s *Service) DispatchDueProactive(ctx context.Context) error {
 		}
 		due = append(due, event)
 	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	var failures []error
 	for _, event := range due {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(failures, err)...)
+		}
 		if err := s.dispatchEvent(ctx, event, settings); err != nil {
-			log.Printf("proactive event=%s: %v", event.id, err)
+			failures = append(failures, fmt.Errorf("proactive event=%s: %w", event.id, err))
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			s.recordRun(cleanupCtx, event.companionID, "proactive", "", "failed", err.Error())
+			cancel()
 		}
 	}
-	return rows.Err()
+	return errors.Join(failures...)
 }
 
 func (s *Service) dispatchEvent(ctx context.Context, event struct {
