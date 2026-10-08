@@ -2,6 +2,7 @@
   "VITA_ENV": "dev",
   "VITA_ENABLE_LOG": "true",
   "VITA_SUPPORT_EMAIL": "dylan_xm@163.com",
+  "VITA_REVENUECAT_KEY": "test_NdhyOAXOcFCUOtiXjfqYFDliLPO",
   "VITA_APP_STORE_URL": "",
   "VITA_PLAY_STORE_URL": "",
   "VITA_FIREBASE_PROJECT_ID": "",
