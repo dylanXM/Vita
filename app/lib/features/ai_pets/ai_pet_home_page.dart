@@ -15,6 +15,7 @@ import 'animation/scene/pet_stage.dart';
 import 'animation/scene/weather_particles.dart';
 import 'animation/ui/pet_action_menu.dart';
 import 'animation/world_clock.dart';
+import 'ai_pet_desktop_controller.dart';
 
 class AIPetHomePage extends StatefulWidget {
   const AIPetHomePage({
@@ -65,6 +66,9 @@ class _AIPetHomePageState extends State<AIPetHomePage>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) AIPetDesktopController.to.petHomeVisible.value = true;
+    });
     AnalyticsService.to.track('ai_pet_home_viewed', category: 'companion');
     _worldClock = WorldClock(vsync: this);
     _machine = PetStateMachine(vsync: this);
@@ -94,6 +98,9 @@ class _AIPetHomePageState extends State<AIPetHomePage>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AIPetDesktopController.to.petHomeVisible.value = false;
+    });
     _weatherTimer?.cancel();
     _vitalsTimer?.cancel();
     _worldClock.dispose();

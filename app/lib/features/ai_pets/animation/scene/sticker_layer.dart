@@ -54,10 +54,10 @@ class _StickerPainter extends CustomPainter {
   final double opacity;
   final List<_Sticker> _stickers;
 
-  static final math.Random _rng = math.Random(20261008);
   static const int _count = 16;
 
   static List<_Sticker> _buildStickers() {
+    final rng = math.Random(20261008);
     const kinds = [
       _StickerKind.heart,
       _StickerKind.star,
@@ -70,11 +70,11 @@ class _StickerPainter extends CustomPainter {
       final kind = kinds[i % kinds.length];
       return _Sticker(
         kind,
-        .02 + _rng.nextDouble() * .96,
-        .04 + _rng.nextDouble() * .88,
-        14 + _rng.nextDouble() * 22,
-        _rng.nextDouble() * math.pi * 2,
-        .5 + _rng.nextDouble() * .9,
+        .02 + rng.nextDouble() * .96,
+        .04 + rng.nextDouble() * .88,
+        14 + rng.nextDouble() * 22,
+        rng.nextDouble() * math.pi * 2,
+        .5 + rng.nextDouble() * .9,
       );
     });
   }

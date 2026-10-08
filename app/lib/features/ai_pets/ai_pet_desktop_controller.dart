@@ -10,6 +10,7 @@ class AIPetDesktopController extends GetxController {
   static AIPetDesktopController get to => Get.find();
 
   final pet = Rxn<Map<String, dynamic>>();
+  final petHomeVisible = false.obs;
   Worker? _settingsWorker;
   Worker? _profileWorker;
   Timer? _refreshTimer;

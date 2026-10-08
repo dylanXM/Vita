@@ -19,6 +19,13 @@ class VitaMediaImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (url.startsWith('asset://')) {
+      return Image.asset(
+        url.substring('asset://'.length),
+        fit: fit,
+        errorBuilder: errorBuilder,
+      );
+    }
     if (url.startsWith('data:image/') && url.contains(',')) {
       return Image.memory(
         base64Decode(url.substring(url.indexOf(',') + 1)),

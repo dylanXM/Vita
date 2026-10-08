@@ -37,7 +37,7 @@ class PetActionMenu extends StatefulWidget {
 }
 
 class _PetActionMenuState extends State<PetActionMenu>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _controller;
   late final AnimationController _pulseController;
   late final Animation<double> _panelScale;

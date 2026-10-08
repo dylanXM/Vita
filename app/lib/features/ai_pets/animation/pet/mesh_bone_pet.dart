@@ -123,13 +123,13 @@ const Map<PetState, MeshPose> kMeshPoseTable = {
   ),
   // 开心：仰头挺胸，弹跳由相位驱动。
   PetState.happy: MeshPose(headDy: -.03, headRot: -.08, tailSwing: .08),
-  // 睡觉：整体压向地面、头垂入身、腿完全收拢。
+  // 睡觉：轻微蜷缩，保留整只宠物的轮廓与四肢。
   PetState.sleeping: MeshPose(
-    headDy: .26,
-    bodyLean: .06,
-    bodyDy: .14,
-    legSquash: .68,
-    squashAll: .3,
+    headDy: .035,
+    bodyLean: .015,
+    bodyDy: .025,
+    legSquash: .08,
+    squashAll: .04,
     tailSwing: .02,
   ),
   PetState.levelUp: MeshPose(headDy: -.04, headRot: -.06, tailSwing: .1),
@@ -332,6 +332,7 @@ class _MeshBonePetState extends State<MeshBonePet> {
             image: image,
             closedEye: _closedEye,
             blink: blink,
+            sleepWeight: sleepWeight,
             pose: pose,
             phase: phase,
             width: cw,
@@ -398,6 +399,7 @@ class _MeshPainter extends CustomPainter {
     required this.image,
     required this.closedEye,
     required this.blink,
+    required this.sleepWeight,
     required this.pose,
     required this.phase,
     required this.width,
@@ -407,6 +409,7 @@ class _MeshPainter extends CustomPainter {
   final ui.Image image;
   final ui.Image? closedEye;
   final double blink;
+  final double sleepWeight;
   final MeshPose pose;
   final double phase;
   final double width;
@@ -422,6 +425,29 @@ class _MeshPainter extends CustomPainter {
     final scale = math.min(width / iw, height / ih);
     final ox = (width - iw * scale) / 2;
     final oy = (height - ih * scale) / 2;
+
+    // 睡眠时始终铺出完整轮廓；过渡期间与网格姿态交叉淡化。
+    // 原图和闭眼图尺寸相同，使用完整图避免四肢在蜷缩网格中消失。
+    if (sleepWeight > 0) {
+      final fullImage = closedEye ?? image;
+      final fullPaint = Paint()
+        ..color = const Color(0xFFFFFFFF)
+            .withValues(alpha: sleepWeight.clamp(0.0, 1.0));
+      final breath = 1 - .015 * (1 + math.sin(phase)) / 2;
+      canvas.save();
+      canvas.translate(0, oy + ih * scale);
+      canvas.scale(1, breath);
+      canvas.translate(0, -(oy + ih * scale));
+      canvas.drawImageRect(
+        fullImage,
+        Rect.fromLTWH(0, 0, iw, ih),
+        Rect.fromLTWH(ox, oy, iw * scale, ih * scale),
+        fullPaint,
+      );
+      canvas.restore();
+    }
+    final meshOpacity = (1 - sleepWeight).clamp(0.0, 1.0);
+    if (meshOpacity == 0) return;
 
     // 源网格顶点（图像像素坐标）与目标网格顶点（画布坐标）。
     final src = List.generate(
@@ -451,8 +477,10 @@ class _MeshPainter extends CustomPainter {
         final i1 = i0 + 1;
         final i2 = (r + 1) * kMeshCols + c;
         final i3 = i2 + 1;
-        _drawTri(canvas, src[i0], src[i1], src[i2], dst[i0], dst[i1], dst[i2]);
-        _drawTri(canvas, src[i1], src[i3], src[i2], dst[i1], dst[i3], dst[i2]);
+        _drawTri(canvas, src[i0], src[i1], src[i2], dst[i0], dst[i1], dst[i2],
+            meshOpacity);
+        _drawTri(canvas, src[i1], src[i3], src[i2], dst[i1], dst[i3], dst[i2],
+            meshOpacity);
       }
     }
   }
@@ -465,6 +493,7 @@ class _MeshPainter extends CustomPainter {
     Offset d0,
     Offset d1,
     Offset d2,
+    double opacity,
   ) {
     // 闭合三角形路径（向外扩张 0.5px，消除相邻三角形间的细缝）。
     final centroid =
@@ -490,12 +519,12 @@ class _MeshPainter extends CustomPainter {
     canvas.save();
     canvas.clipPath(path);
     canvas.transform(m);
+    _paint.color = const Color(0xFFFFFFFF).withValues(alpha: opacity);
     canvas.drawImage(image, Offset.zero, _paint);
     if (closedEye != null && blink > 0) {
       _paint.color = const Color.fromARGB(255, 255, 255, 255)
-          .withValues(alpha: blink.clamp(0.0, 1.0));
+          .withValues(alpha: (blink * opacity).clamp(0.0, 1.0));
       canvas.drawImage(closedEye!, Offset.zero, _paint);
-      _paint.color = const Color.fromRGBO(255, 255, 255, 1);
     }
     canvas.restore();
   }
@@ -517,8 +546,8 @@ class _MeshPainter extends CustomPainter {
     final d = (vqy * ux - uqy * vx) / det;
     final tx = q0.dx - a * p0.dx - b * p0.dy;
     final ty = q0.dy - c * p0.dx - d * p0.dy;
-    // Matrix4 参数为行主序：[[a,b,0,tx],[c,d,0,ty],[0,0,1,0],[0,0,0,1]]
-    return Matrix4(a, b, 0, tx, c, d, 0, ty, 0, 0, 1, 0, 0, 0, 0, 1).storage;
+    // Matrix4 构造参数为列主序，平移量位于最后一列。
+    return Matrix4(a, c, 0, 0, b, d, 0, 0, 0, 0, 1, 0, tx, ty, 0, 1).storage;
   }
 
   @override

@@ -15,13 +15,15 @@ class AIPetDesktopOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Obx(() {
-        final pet = AIPetDesktopController.to.pet.value;
+        final desktop = AIPetDesktopController.to;
+        final pet = desktop.pet.value;
+        final petHomeVisible = desktop.petHomeVisible.value;
         return LayoutBuilder(
           builder: (context, constraints) => Stack(
             fit: StackFit.expand,
             children: [
               child,
-              if (pet != null)
+              if (pet != null && !petHomeVisible)
                 _DraggablePet(
                   pet: pet,
                   availableSize: constraints.biggest,

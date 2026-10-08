@@ -8,7 +8,7 @@
 	deploy-up deploy-down deploy-logs deploy-build deploy-check deploy-clean deploy-beta deploy-prod \
 	admin-dev admin-build admin-check \
 	webapp-dev webapp-build webapp-check \
-	app-prepare-dirs app-run app-run-beta app-run-prod app-dev app-build-apk-beta app-build-apk app-build-ios-beta app-build-ios app-check app-gen \
+	app-prepare-dirs app-run app-run-android app-run-beta app-run-prod app-dev app-build-apk-beta app-build-apk app-build-ios-beta app-build-ios app-check app-gen \
 	website-dev website-build website-check \
 	build check clean clean-all
 
@@ -42,6 +42,7 @@ help:
 	@echo ""
 	@echo "app (Flutter):"
 	@echo "  make app-run             运行 dev 环境"
+	@echo "  make app-run-android     在 Android 模拟器运行 dev 环境"
 	@echo "  make app-run-beta        运行 beta 环境"
 	@echo "  make app-run-prod        运行 prod 环境"
 	@echo "  make app-dev             运行应用（= app-run）"
@@ -282,12 +283,11 @@ FLUTTER_CMD = flutter
 endif
 
 # App API base URL, injected at build time via --dart-define (dev only).
-# iOS and Android currently share the same dev endpoint; if the Android
-# emulator cannot reach the host backend, change APP_API_URL_ANDROID to
-# http://10.0.2.2:8260 (host loopback as seen from the emulator).
+# iOS Simulator reaches the host through 127.0.0.1; Android Emulator uses
+# 10.0.2.2. Override APP_API_URL for a physical device or another host.
 APP_API_URL_IOS     = http://127.0.0.1:8260
 APP_API_URL_ANDROID = http://10.0.2.2:8260
-APP_API_URL         = $(APP_API_URL_ANDROID)
+APP_API_URL         ?= $(APP_API_URL_IOS)
 # China mirrors for pub packages and Flutter engine artifacts so that
 # `flutter pub get` / `flutter precache` are reachable from mainland China.
 # Override by exporting PUB_HOSTED_URL / FLUTTER_STORAGE_BASE_URL before make.
@@ -304,6 +304,9 @@ app-prepare-dirs:
 app-run: app-prepare-dirs
 	@cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; }
 	cd app && $(FLUTTER_ENV) PUB_CACHE="$${PUB_CACHE:-$$HOME/.pub-cache}" HOME="$$(pwd)/.home" CP_HOME_DIR="$$(pwd)/.cocoapods-local" $(FLUTTER_CMD) run --dart-define-from-file=config/dev.json --dart-define=VITA_API_BASE_URL=$(APP_API_URL)
+
+app-run-android: APP_API_URL = $(APP_API_URL_ANDROID)
+app-run-android: app-run
 
 app-run-beta: app-prepare-dirs
 	@cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; }
