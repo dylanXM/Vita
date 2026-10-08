@@ -1377,10 +1377,41 @@ func SendMessage(c *gin.Context) {
 		req.Content = transcript
 		mediaURL = "/v1/media/" + strings.TrimSpace(req.MediaID)
 	}
-	query := `INSERT INTO messages (id,conversation_id,sender_type,message_type,content,media_url,payload,source,delivery_status,created_at) VALUES ($1,$2,'user',$3,$4,NULLIF($5,''),'{}'::jsonb,'user','delivered',$6)`
-	_, err := db.Get().Exec(query, msgID, conversationID, req.MessageType, req.Content, mediaURL, createdAt)
+	query := `INSERT INTO messages (id,conversation_id,sender_type,message_type,content,media_url,payload,source,delivery_status,created_at,life_event_id) VALUES ($1,$2,'user',$3,$4,NULLIF($5,''),'{}'::jsonb,'user','delivered',$6,NULLIF($7,''))`
+	tx, err := db.Get().BeginTx(c.Request.Context(), nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to begin message"})
+		return
+	}
+	defer tx.Rollback()
+	var activeLifeID sql.NullString
+	if !isDefault {
+		lookupErr := tx.QueryRowContext(c.Request.Context(), `SELECT id FROM life_events WHERE companion_id=$1 AND status='active' AND start_time<=CURRENT_TIMESTAMP AND end_time>CURRENT_TIMESTAMP ORDER BY start_time DESC,id DESC LIMIT 1`, companionID).Scan(&activeLifeID)
+		if lookupErr != nil && !errors.Is(lookupErr, sql.ErrNoRows) {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load current world event"})
+			return
+		}
+	}
+	_, err = tx.ExecContext(c.Request.Context(), query, msgID, conversationID, req.MessageType, req.Content, mediaURL, createdAt, activeLifeID.String)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send message"})
+		return
+	}
+	if !isDefault {
+		_, _, localNow, worldErr := worldUserSettings(userID)
+		if worldErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load world clock"})
+			return
+		}
+		_, err = tx.ExecContext(c.Request.Context(), `INSERT INTO world_interactions(id,user_id,companion_id,life_event_id,kind,request_key,local_date,payload)
+			VALUES($1,$2,$3,$4,'chat',$5,$6,$7)`, uuid.New().String(), userID, companionID, activeLifeID, "chat:"+msgID, localNow.Format("2006-01-02"), `{"source":"message"}`)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record world conversation"})
+			return
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save message"})
 		return
 	}
 	userMessage := &agent.SavedMessage{ID: msgID, ConversationID: conversationID, SenderType: "user", MessageType: req.MessageType, Content: req.Content, MediaURL: mediaURL, Payload: map[string]any{}, Source: "user", DeliveryStatus: "delivered", CreatedAt: createdAt}

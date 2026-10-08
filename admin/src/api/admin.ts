@@ -330,3 +330,37 @@ export const lifeEngineApi = {
     http.post<{ message: string; message_id: string; conversation_id: string }>(
       `/admin/life-engine/companions/${companionID}/broadcast`, body),
 };
+
+export interface WorldPlace {
+  scene_kind: string;
+  title: string;
+  description: string;
+  enabled: boolean;
+  updated_at: string;
+}
+
+export interface WorldCampaign {
+  id: string;
+  region_code: string;
+  title: string;
+  description: string;
+  scene_kind: string;
+  ambience: "clear" | "rain" | "snow";
+  starts_on: string;
+  ends_on: string;
+  priority: number;
+  enabled: boolean;
+  updated_at: string;
+}
+
+export type WorldCampaignInput = Omit<WorldCampaign, "id" | "updated_at">;
+
+export const worldEngineApi = {
+  places: (signal?: AbortSignal) => http.get<{ items: WorldPlace[] }>("/admin/life-engine/places", { signal }),
+  savePlace: (kind: string, body: Pick<WorldPlace, "title" | "description" | "enabled">) =>
+    http.put<{ message: string }>(`/admin/life-engine/places/${kind}`, body),
+  campaigns: (signal?: AbortSignal) => http.get<{ items: WorldCampaign[] }>("/admin/life-engine/campaigns", { signal }),
+  createCampaign: (body: WorldCampaignInput) => http.post<{ id: string }>("/admin/life-engine/campaigns", body),
+  updateCampaign: (id: string, body: WorldCampaignInput) => http.put<{ id: string }>(`/admin/life-engine/campaigns/${id}`, body),
+  deleteCampaign: (id: string) => http.del<{ message: string }>(`/admin/life-engine/campaigns/${id}`),
+};

@@ -320,7 +320,24 @@ func FeedAIPet(c *gin.Context) {
 	}
 	var state petStateResponse
 	var lastFed time.Time
-	err = db.Get().QueryRowContext(ctx, `UPDATE ai_pet_states s SET hunger=LEAST(100,hunger+25),happiness=LEAST(100,happiness+8),energy=LEAST(100,energy+4),
+	_, _, localNow, worldErr := worldUserSettings(userID)
+	if worldErr != nil {
+		settlementCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = credits.Refund(settlementCtx, db.Get(), reservation.ID, worldErr.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load world clock"})
+		return
+	}
+	tx, err := db.Get().BeginTx(ctx, nil)
+	if err != nil {
+		settlementCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = credits.Refund(settlementCtx, db.Get(), reservation.ID, err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to begin pet feeding"})
+		return
+	}
+	defer tx.Rollback()
+	err = tx.QueryRowContext(ctx, `UPDATE ai_pet_states s SET hunger=LEAST(100,hunger+25),happiness=LEAST(100,happiness+8),energy=LEAST(100,energy+4),
 		experience=experience+20,level=1+((experience+20)/100),last_fed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
 		FROM companions c WHERE s.companion_id=c.id AND c.id=$1 AND c.user_id=$2 AND c.creation_source='ai_pet'
 		RETURNING s.hunger,s.happiness,s.energy,s.health,s.experience,s.level,s.last_fed_at`, companionID, userID).Scan(
@@ -330,6 +347,25 @@ func FeedAIPet(c *gin.Context) {
 		defer cancel()
 		_ = credits.Refund(settlementCtx, db.Get(), reservation.ID, err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to feed AI pet", "refunded": true})
+		return
+	}
+	var activeLifeID sql.NullString
+	lookupErr := tx.QueryRowContext(ctx, `SELECT id FROM life_events WHERE companion_id=$1 AND status='active' AND start_time<=CURRENT_TIMESTAMP AND end_time>CURRENT_TIMESTAMP ORDER BY start_time DESC,id DESC LIMIT 1`, companionID).Scan(&activeLifeID)
+	if lookupErr != nil && !errors.Is(lookupErr, sql.ErrNoRows) {
+		err = lookupErr
+	} else {
+		_, err = tx.ExecContext(ctx, `INSERT INTO world_interactions(id,user_id,companion_id,life_event_id,kind,request_key,local_date,payload)
+			VALUES($1,$2,$3,$4,'pet_feed',$5,$6,$7)`, uuid.New().String(), userID, companionID, activeLifeID,
+			"pet_feed:"+reservation.ID, localNow.Format("2006-01-02"), `{"source":"pet_feed"}`)
+	}
+	if err == nil {
+		err = tx.Commit()
+	}
+	if err != nil {
+		settlementCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = credits.Refund(settlementCtx, db.Get(), reservation.ID, err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record pet interaction", "refunded": true})
 		return
 	}
 	state.LastFedAt = &lastFed

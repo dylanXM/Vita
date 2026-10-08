@@ -11,6 +11,7 @@ import '../auth/auth_controller.dart';
 import 'deleted_companions_page.dart';
 import 'legal_document_page.dart';
 import 'profile_edit_page.dart';
+import 'world_preferences_page.dart';
 
 /// Settings — language, theme and sign out. Reached from the Me page.
 class SettingsPage extends StatelessWidget {
@@ -118,6 +119,16 @@ class SettingsPage extends StatelessWidget {
                   subtitle: 'settings.notifications.subtitle'.tr,
                   borderRadius: BorderRadius.zero,
                   onTap: openAppSettings,
+                ),
+                const Divider(indent: 52, height: 0.5),
+                VitaListTile(
+                  customIcon:
+                      VitaMenuIcon(icon: Icons.public, color: vita.green),
+                  title: 'world.preferences'.tr,
+                  subtitle: 'world.preferencesHint'.tr,
+                  borderRadius: BorderRadius.zero,
+                  onTap: () => Get.to(() => const WorldPreferencesPage(),
+                      transition: Transition.cupertino),
                 ),
               ],
             ),

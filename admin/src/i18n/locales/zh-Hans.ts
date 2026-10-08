@@ -13,6 +13,7 @@ const zhHans = {
     backToDashboard: "返回仪表盘",
     refresh: "刷新",
     failedToLoad: "加载失败。",
+    edit: "编辑", save: "保存", cancel: "取消", delete: "删除",
   },
 
   nav: {
@@ -22,7 +23,7 @@ const zhHans = {
     users: "用户",
     companions: "角色管理",
     agent: "AI 伴侣",
-    lifeEngine: "Life Engine",
+    lifeEngine: "World Engine",
     modelServices: "模型管理",
     mediaModels: "模型路由",
     storage: "媒体存储",
@@ -268,9 +269,18 @@ const zhHans = {
   storage: { title: "媒体存储", desc: "按环境配置 Cloudflare R2 或腾讯云 COS，用于保存新上传的媒体。", activeProvider: "当前使用", postgresFallback: "PostgreSQL 兜底", fallbackHint: "只有 R2 和 COS 都未启用时，系统才会自动使用 PostgreSQL。", enabled: "启用", endpoint: "Endpoint", bucket: "存储桶", region: "地域", accessKey: "AccessKey ID", secretKey: "SecretAccessKey", keepSecret: "留空会保留已保存的密钥。", configured: "已配置", notConfigured: "未配置", save: "保存配置", saved: "存储配置已保存", test: "测试连接", tested: "连接测试成功", saveBeforeTest: "请先保存凭据再测试。", r2Desc: "填写 Cloudflare R2 存储桶的 S3 API Endpoint。", cosDesc: "填写 COS 地域的 S3 API Endpoint，例如 https://cos.ap-guangzhou.myqcloud.com。", externalFailure: "启用外部存储后，上传失败会明确报错，不会静默写回 PostgreSQL。" },
   legal: { title: "协议管理", desc: "按环境管理英文隐私政策和用户协议。", privacy: "隐私政策", terms: "用户协议", create: "新建版本", edit: "编辑草稿", delete: "删除", activate: "设为生效", version: "版本", summary: "摘要", content: "英文正文", updatedAt: "更新时间", effective: "生效中", historical: "历史版本", draft: "草稿", empty: "当前范围暂无版本。", immutableHint: "发布过的版本永久只读且不可删除；任何改动都必须创建新版本。", englishOnly: "App 仅展示最新生效的英文版本。", activated: "已更新生效版本", deleted: "草稿已删除", saved: "草稿已保存", deleteConfirm: "确定删除该草稿？" },
   whatsNew: { title: "近期更新", desc: "按环境、平台、版本和时间投放更新活动。", create: "新建活动", edit: "编辑活动", version: "最低 App 版本", action: "按钮动作", actionValue: "页面路由或网址", actionLabel: "按钮文案", deleteConfirm: "确定删除该活动？", empty: "当前范围暂无活动。" },
+  worldEngine: {
+    config: "世界配置", configHint: "按环境配置场景地点，以及按用户地区和当地日期生效的限时活动。",
+    places: "场景地点", campaigns: "季节与限时活动", title: "标题", description: "描述",
+    enabled: "启用", disabled: "停用", saved: "世界配置已保存", deleted: "活动已删除",
+    newCampaign: "新建活动", editCampaign: "编辑活动", deleteConfirm: "确定删除这个世界活动？",
+    region: "地区（global 或两位国家代码）", place: "场景地点", startsOn: "开始日期", endsOn: "结束日期", priority: "优先级",
+    ambience: "场景天气", weather: { clear: "晴朗", rain: "下雨", snow: "下雪" },
+    kind: { home: "家", work: "工作室", cafe: "咖啡馆", outdoors: "户外", story: "故事馆" },
+  },
   lifeEngine: {
-    title: "Life Engine",
-    desc: "查看后台引擎运转，并可手动接管某个角色：每日计划、主动消息派发、推送 outbox 与 agent 运行记录。",
+    title: "World Engine",
+    desc: "查看角色生活、世界场景与主动派发；可在世界配置中管理地点和季节活动。",
     runPlan: "跑一次计划",
     runProactive: "跑一次主动派发",
     runningPlan: "正在生成每日计划…",

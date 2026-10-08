@@ -460,7 +460,7 @@ class _MemoryTile extends StatelessWidget {
                   const SizedBox(height: 4),
                 ],
                 Text(
-                  content.tr,
+                  type == 'world_visit' ? 'world.visitMemory'.tr : content.tr,
                   style: TextStyle(
                     fontSize: 15,
                     color: context.vita.text,

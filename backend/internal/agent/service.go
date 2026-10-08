@@ -682,8 +682,11 @@ func (s *Service) EnsureDailyPlans(ctx context.Context) error {
 func (s *Service) EnsureDailyPlansWithForce(ctx context.Context, force bool) error {
 	if !s.mock {
 		enabled, err := s.modelRouteEnabled(ctx, "text_life_plan")
-		if err != nil || !enabled {
+		if err != nil {
 			return err
+		}
+		if !enabled {
+			return fmt.Errorf("text_life_plan model route is disabled")
 		}
 	}
 	settings, err := s.loadLifeSettings(ctx)
@@ -859,7 +862,10 @@ func (s *Service) generatePlan(ctx context.Context, profile companionContext, lo
 	if err != nil {
 		return nil, "", err
 	}
-	recentLife := s.recentLifeContext(ctx, profile.ID, localDate)
+	recentLife := s.recentLifeContext(ctx, profile.ID, localDate) + "\n" + s.recentWorldContext(ctx, profile.ID, localDate)
+	if campaign := s.activeWorldCampaignContext(ctx, profile.UserID, localDate); campaign != "" {
+		recentLife += "\nActive world theme (reflect naturally in at most one ordinary event): " + campaign
+	}
 	prompt := lifePlanPrompt(profile, localDate, timezone, recentLife,
 		settings.DailyEventMin, settings.DailyEventMax, proactiveLimit)
 	systemPrompt := `You plan a believable daily timeline for a fictional AI companion.
@@ -908,16 +914,7 @@ The very first character of your reply MUST be '[' and the very last character M
 	if lastErr == nil {
 		lastErr = fmt.Errorf("no life planning model is available")
 	}
-	// All configured models failed to produce a parseable plan. Rather than
-	// leave the day stuck in 'failed' forever (which also blocks proactive
-	// dispatch and the app list), fall back to a believable mock plan and mark
-	// the run as failed-but-recovered. The admin page still shows the model
-	// output so the operator can switch text_life_plan to a stronger model.
-	mock := mockPlan(profile)
-	s.recordRunWithInput(ctx, profile.ID, "life_plan", "", "failed",
-		"all models failed; fell back to mock plan: "+lastErr.Error(),
-		lastErr.Error())
-	return mock, "fallback-mock", nil
+	return nil, "", fmt.Errorf("all life planning models failed: %w", lastErr)
 }
 
 func lifePlanPrompt(profile companionContext, localDate, timezone, recentLife string, minEvents, maxEvents, proactiveLimit int) string {
@@ -985,6 +982,41 @@ func (s *Service) recentLifeContext(ctx context.Context, companionID, beforeDate
 		return "none"
 	}
 	return strings.Join(items, " | ")
+}
+
+func (s *Service) recentWorldContext(ctx context.Context, companionID, beforeDate string) string {
+	rows, err := s.db.QueryContext(ctx, `SELECT local_date,kind,COUNT(*) FROM world_interactions
+		WHERE companion_id=$1 AND local_date<$2 AND local_date>=($2::date-INTERVAL '7 days')
+		GROUP BY local_date,kind ORDER BY local_date DESC,kind LIMIT 15`, companionID, beforeDate)
+	if err != nil {
+		return "Recent user interactions: none"
+	}
+	defer rows.Close()
+	items := make([]string, 0, 15)
+	for rows.Next() {
+		var day time.Time
+		var kind string
+		var count int
+		if rows.Scan(&day, &kind, &count) == nil {
+			items = append(items, fmt.Sprintf("%s %s x%d", day.Format("2006-01-02"), kind, count))
+		}
+	}
+	if len(items) == 0 {
+		return "Recent user interactions: none"
+	}
+	return "Recent user interactions (do not invent details): " + strings.Join(items, " | ")
+}
+
+func (s *Service) activeWorldCampaignContext(ctx context.Context, userID, localDate string) string {
+	var title, description string
+	err := s.db.QueryRowContext(ctx, `SELECT c.title,c.description FROM world_campaigns c JOIN users u ON u.id=$1
+		WHERE c.environment=u.environment AND c.enabled=true AND c.region_code IN ('global',u.world_region)
+		AND c.starts_on<=$2::date AND c.ends_on>=$2::date
+		ORDER BY CASE WHEN c.region_code=u.world_region THEN 1 ELSE 0 END DESC,c.priority DESC,c.starts_on DESC,c.id DESC LIMIT 1`, userID, localDate).Scan(&title, &description)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(title + ": " + description)
 }
 
 // EnsureCompanionSocialWorld lets subscribed, active companions form a small
@@ -1316,8 +1348,11 @@ func momentPostType(content string, media []string) string {
 func (s *Service) DispatchDueProactive(ctx context.Context) error {
 	if !s.mock {
 		enabled, err := s.modelRouteEnabled(ctx, "text_proactive")
-		if err != nil || !enabled {
+		if err != nil {
 			return err
+		}
+		if !enabled {
+			return fmt.Errorf("text_proactive model route is disabled")
 		}
 	}
 	settings, err := s.loadLifeSettings(ctx)
@@ -1386,6 +1421,16 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 	}
 	localNow := time.Now().In(location)
 	if inQuietHours(localNow.Hour(), settings.QuietStart, settings.QuietEnd) {
+		return nil
+	}
+	// A user who is already visiting or talking to this character does not need
+	// an unsolicited message. Keep the event due and reconsider it next tick.
+	var userPresent bool
+	if err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM world_interactions
+		WHERE companion_id=$1 AND kind IN ('visit','chat') AND created_at>CURRENT_TIMESTAMP-INTERVAL '20 minutes')`, event.companionID).Scan(&userPresent); err != nil {
+		return err
+	}
+	if userPresent {
 		return nil
 	}
 	dayStart := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 0, 0, 0, 0, location).UTC()

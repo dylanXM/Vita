@@ -974,6 +974,61 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		`UPDATE ai_models SET configured_scenarios=configured_scenarios||'["text_story_chapter"]'::jsonb WHERE capabilities ? 'text' AND NOT configured_scenarios ? 'text_story_chapter'`,
 		`UPDATE ai_models SET configured_scenarios=configured_scenarios||'["text_storyboard"]'::jsonb WHERE capabilities ? 'text' AND NOT configured_scenarios ? 'text_storyboard'`,
 		`UPDATE ai_models SET configured_scenarios=configured_scenarios||'["image_storyboard_sheet"]'::jsonb WHERE capabilities ? 'image' AND NOT configured_scenarios ? 'image_storyboard_sheet'`,
+		// World Engine is additive so the API/admin can deploy before the App.
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS world_region TEXT NOT NULL DEFAULT 'global'`,
+		`CREATE TABLE IF NOT EXISTS world_places (
+			id TEXT PRIMARY KEY,
+			environment TEXT NOT NULL CHECK (environment IN ('dev','beta','prod')),
+			scene_kind TEXT NOT NULL,
+			title TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			enabled BOOLEAN NOT NULL DEFAULT true,
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(environment,scene_kind)
+		)`,
+		`INSERT INTO world_places(id,environment,scene_kind,title,description)
+			SELECT 'world-'||env||'-'||kind,env,kind,title,description
+			FROM (VALUES('dev'),('beta'),('prod')) AS environments(env)
+			CROSS JOIN (VALUES
+				('home','world.place.home','world.place.homeHint'),
+				('work','world.place.work','world.place.workHint'),
+				('cafe','world.place.cafe','world.place.cafeHint'),
+				('outdoors','world.place.outdoors','world.place.outdoorsHint'),
+				('story','world.place.story','world.place.storyHint')
+			) AS defaults(kind,title,description)
+			ON CONFLICT(environment,scene_kind) DO NOTHING`,
+		`CREATE TABLE IF NOT EXISTS world_campaigns (
+			id TEXT PRIMARY KEY,
+			environment TEXT NOT NULL CHECK (environment IN ('dev','beta','prod')),
+			region_code TEXT NOT NULL DEFAULT 'global',
+			title TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			scene_kind TEXT NOT NULL DEFAULT 'home',
+			ambience TEXT NOT NULL DEFAULT 'clear' CHECK (ambience IN ('clear','rain','snow')),
+			starts_on DATE NOT NULL,
+			ends_on DATE NOT NULL,
+			priority INTEGER NOT NULL DEFAULT 0,
+			enabled BOOLEAN NOT NULL DEFAULT false,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			CHECK (ends_on >= starts_on)
+		)`,
+		`ALTER TABLE world_campaigns ADD COLUMN IF NOT EXISTS ambience TEXT NOT NULL DEFAULT 'clear'`,
+		`CREATE INDEX IF NOT EXISTS idx_world_campaigns_active ON world_campaigns(environment,enabled,region_code,starts_on,ends_on)`,
+		`CREATE TABLE IF NOT EXISTS world_interactions (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			companion_id TEXT NOT NULL REFERENCES companions(id) ON DELETE CASCADE,
+			life_event_id TEXT REFERENCES life_events(id) ON DELETE SET NULL,
+			kind TEXT NOT NULL CHECK (kind IN ('visit','chat','pet_feed')),
+			request_key TEXT NOT NULL,
+			local_date DATE NOT NULL,
+			payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(user_id,request_key)
+		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_world_one_visit_per_day ON world_interactions(companion_id,local_date) WHERE kind='visit'`,
+		`CREATE INDEX IF NOT EXISTS idx_world_interactions_companion ON world_interactions(companion_id,created_at DESC)`,
 		`INSERT INTO roles (id, name, description) VALUES ('user', 'user', 'Regular user') ON CONFLICT (id) DO NOTHING`,
 		`INSERT INTO roles (id, name, description) VALUES ('admin', 'admin', 'Administrator') ON CONFLICT (id) DO NOTHING`,
 	}

@@ -195,6 +195,11 @@ func main() {
 			life.GET("/today", handler.GetTodayLife)
 			life.GET("/events", handler.GetLifeEvents)
 		}
+		world := api.Group("/companions/:id/world", middleware.RequireAuth())
+		{
+			world.GET("/scene", handler.GetWorldScene)
+			world.POST("/visit", handler.VisitWorld)
+		}
 
 		memories := api.Group("/companions/:id/memories")
 		{
@@ -240,6 +245,8 @@ func main() {
 		api.GET("/me", middleware.RequireAuth(), handler.Me)
 		api.PUT("/me/locale", middleware.RequireAuth(), handler.UpdateMyLocale)
 		api.PUT("/me/profile", middleware.RequireAuth(), handler.UpdateMyProfile)
+		api.GET("/me/world-preferences", middleware.RequireAuth(), handler.GetWorldPreferences)
+		api.PUT("/me/world-preferences", middleware.RequireAuth(), handler.UpdateWorldPreferences)
 		api.DELETE("/me", middleware.RequireAuth(), handler.DeleteMe)
 
 		admin := api.Group("/admin", middleware.RequireAdmin())
@@ -345,6 +352,12 @@ func main() {
 					lifeEngine.POST("/trigger-proactive", handler.AdminLifeEngineTriggerProactive)
 					lifeEngine.POST("/companions/:id/resend-outbox", handler.AdminLifeEngineResendOutbox)
 					lifeEngine.POST("/companions/:id/broadcast", handler.AdminLifeEngineBroadcast)
+					lifeEngine.GET("/places", handler.AdminWorldPlaces)
+					lifeEngine.PUT("/places/:kind", handler.AdminUpdateWorldPlace)
+					lifeEngine.GET("/campaigns", handler.AdminWorldCampaigns)
+					lifeEngine.POST("/campaigns", handler.AdminSaveWorldCampaign)
+					lifeEngine.PUT("/campaigns/:id", handler.AdminSaveWorldCampaign)
+					lifeEngine.DELETE("/campaigns/:id", handler.AdminDeleteWorldCampaign)
 				}
 				agentAdmin.PUT("/companions/:id", handler.AdminUpdateCompanion)
 			}

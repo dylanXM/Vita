@@ -13,6 +13,7 @@ const en = {
     backToDashboard: "Back to dashboard",
     refresh: "Refresh",
     failedToLoad: "Failed to load.",
+    edit: "Edit", save: "Save", cancel: "Cancel", delete: "Delete",
   },
 
   nav: {
@@ -22,7 +23,7 @@ const en = {
     users: "Users",
     companions: "Characters",
     agent: "AI companion",
-    lifeEngine: "Life Engine",
+    lifeEngine: "World Engine",
     modelServices: "Model services",
     mediaModels: "Model routing",
     storage: "Media storage",
@@ -268,9 +269,18 @@ const en = {
   storage: { title: "Media storage", desc: "Store new media in Cloudflare R2 or Tencent Cloud COS for each environment.", activeProvider: "Active provider", postgresFallback: "PostgreSQL fallback", fallbackHint: "PostgreSQL is selected automatically only when both external providers are disabled.", enabled: "Enabled", endpoint: "Endpoint", bucket: "Bucket", region: "Region", accessKey: "Access key ID", secretKey: "Secret access key", keepSecret: "Leave blank to keep the saved credential.", configured: "Configured", notConfigured: "Not configured", save: "Save configuration", saved: "Storage configuration saved", test: "Test connection", tested: "Connection test succeeded", saveBeforeTest: "Save credentials before testing.", r2Desc: "Use the S3 API endpoint from your Cloudflare R2 bucket.", cosDesc: "Use the regional COS S3-compatible endpoint, for example https://cos.ap-guangzhou.myqcloud.com.", externalFailure: "When an external provider is active, upload failures are returned as errors and are not silently written to PostgreSQL." },
   legal: { title: "Legal documents", desc: "Manage the English Privacy Policy and Terms of Service by environment.", privacy: "Privacy Policy", terms: "Terms of Service", create: "New version", edit: "Edit draft", delete: "Delete", activate: "Set effective", version: "Version", summary: "Summary", content: "English content", updatedAt: "Updated", effective: "Effective", historical: "Historical", draft: "Draft", empty: "No versions in this scope.", immutableHint: "Published versions are permanent and read-only. Create a new version for every change.", englishOnly: "Only the latest effective English version is delivered to the app.", activated: "Effective version updated", deleted: "Draft deleted", saved: "Draft saved", deleteConfirm: "Delete this draft?" },
   whatsNew: { title: "What's new", desc: "Create scheduled, version-targeted update campaigns for each environment and platform.", create: "New campaign", edit: "Edit campaign", version: "Minimum app version", action: "CTA action", actionValue: "Route or URL", actionLabel: "CTA label", deleteConfirm: "Delete this campaign?", empty: "No campaigns in this scope." },
+  worldEngine: {
+    config: "World configuration", configHint: "Configure scene places and local-date campaigns for each environment.",
+    places: "Places", campaigns: "Seasonal events", title: "Title", description: "Description",
+    enabled: "Enabled", disabled: "Disabled", saved: "World configuration saved", deleted: "Event deleted",
+    newCampaign: "New event", editCampaign: "Edit event", deleteConfirm: "Delete this world event?",
+    region: "Region (global or 2-letter country code)", place: "Scene place", startsOn: "Start date", endsOn: "End date", priority: "Priority",
+    ambience: "Scene weather", weather: { clear: "Clear", rain: "Rain", snow: "Snow" },
+    kind: { home: "Home", work: "Studio", cafe: "Café", outdoors: "Outdoors", story: "Story house" },
+  },
   lifeEngine: {
-    title: "Life Engine",
-    desc: "Observe the background worker and take over a companion manually: daily plans, proactive dispatch, push outbox, and agent runs.",
+    title: "World Engine",
+    desc: "Observe character life, world scenes and proactive dispatch; manage places and seasonal events in World configuration.",
     runPlan: "Run plan pass",
     runProactive: "Run proactive dispatch",
     runningPlan: "Generating daily plans…",

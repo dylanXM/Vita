@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Bot, Brain, CircleDot, CloudUpload, HeartPulse, Moon, Pause, Play,
-  Radio, RefreshCw, Send, Trash2, Users,
+  Radio, RefreshCw, Send, Settings2, Trash2, Users,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate } from "@/lib/format";
 import { EnvBadge } from "./UsersPage";
+import { WorldEngineConfigDialog } from "./WorldEngineConfigDialog";
 
 export function LifeEnginePage() {
   const { t } = useTranslation();
@@ -67,6 +68,7 @@ export function LifeEnginePage() {
 
   const [eventsFor, setEventsFor] = useState<LifeEngineCompanion | null>(null);
   const [broadcastFor, setBroadcastFor] = useState<LifeEngineCompanion | null>(null);
+  const [configOpen, setConfigOpen] = useState(false);
 
   const counters = overview.data?.counters;
 
@@ -77,6 +79,9 @@ export function LifeEnginePage() {
         description={t("lifeEngine.desc")}
         actions={
           <>
+            <Button variant="outline" size="sm" onClick={() => setConfigOpen(true)}>
+              <Settings2 />{t("worldEngine.config")}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => runPlan.mutate(false)} disabled={runPlan.isPending}>
               <Play />{t("lifeEngine.runPlan")}
             </Button>
@@ -148,6 +153,7 @@ export function LifeEnginePage() {
       {broadcastFor && (
         <BroadcastDialog companion={broadcastFor} onClose={() => setBroadcastFor(null)} onChanged={() => { void overview.refetch(); void list.refetch(); }} />
       )}
+      <WorldEngineConfigDialog open={configOpen} onOpenChange={setConfigOpen} />
     </div>
   );
 }
