@@ -7,9 +7,7 @@ import 'package:get/get.dart';
 import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
-import '../chat/chat_page.dart';
 import '../life/life_detail_page.dart';
-import '../memories/memories_page.dart';
 import 'animation/brain/pet_brain.dart';
 import 'animation/pet/pet_motion_spec.dart';
 import 'animation/pet/pet_state_machine.dart';
@@ -237,7 +235,7 @@ class _AIPetHomePageState extends State<AIPetHomePage>
             onTap: _petTap,
             onBack: () => Get.back(),
           ),
-          // 右下角悬浮操作按钮（喂食/聊天/生活/回忆/刷新 + 状态面板）。
+          // 右下角悬浮操作按钮（喂食/生活/刷新 + 状态面板）。
           SafeArea(
             child: Align(
               alignment: const Alignment(.92, .98),
@@ -249,14 +247,8 @@ class _AIPetHomePageState extends State<AIPetHomePage>
                 feeding: _feeding,
                 feedCost: (state['feed_coin_cost'] as num?)?.toInt() ?? 5,
                 onFeed: _feed,
-                onChat: () => Get.to(() => ChatPage(
-                    companionId: widget.companionId,
-                    name: widget.name,
-                    companion: _companion)),
                 onLife: () =>
                     Get.to(() => LifeDetailPage(companion: _companion)),
-                onMemories: () =>
-                    Get.to(() => MemoryDetailPage(companion: _companion)),
                 onRefresh: _refreshState,
               ),
             ),

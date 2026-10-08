@@ -6,8 +6,6 @@ import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
-import '../chat/chat_list_controller.dart';
-import '../memories/memories_page.dart';
 import 'ai_pet_avatar.dart';
 import 'ai_pet_desktop_controller.dart';
 import 'ai_pet_home_page.dart';
@@ -137,8 +135,6 @@ class _AIPetsPageState extends State<AIPetsPage> {
             'companion_id': companionId
           });
       await Future.wait([
-        ChatListController.to.load(),
-        MemoriesController.to.loadCompanions(),
         if (Get.isRegistered<AIPetDesktopController>())
           AIPetDesktopController.to.refreshPet(),
       ]);

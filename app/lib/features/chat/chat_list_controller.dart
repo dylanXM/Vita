@@ -52,7 +52,9 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
       final data = await ApiClient.instance.get('/v1/companions');
       if (data is List) {
         companions.assignAll(
-          data.whereType<Map<String, dynamic>>().map((e) => Map<String, dynamic>.from(e)),
+          data.whereType<Map<String, dynamic>>()
+              .where((e) => e['creation_source'] != 'ai_pet')
+              .map((e) => Map<String, dynamic>.from(e)),
         );
       }
     } catch (_) {

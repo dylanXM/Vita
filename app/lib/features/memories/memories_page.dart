@@ -45,6 +45,7 @@ class MemoriesController extends GetxController {
         companions.assignAll(
           data
               .whereType<Map<String, dynamic>>()
+              .where((item) => item['creation_source'] != 'ai_pet')
               .map((item) => Map<String, dynamic>.from(item)),
         );
       }

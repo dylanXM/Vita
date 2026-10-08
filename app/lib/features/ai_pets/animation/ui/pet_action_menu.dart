@@ -7,7 +7,7 @@ import '../../../../core/theme.dart';
 
 /// 右下角悬浮操作按钮：点击展开操作面板。
 /// 面板包含状态条（饱腹/开心/精力/健康）、经验/金币，以及
-/// 喂食 / 聊天 / 生活 / 回忆 / 刷新 全部操作。
+/// 喂食 / 生活 / 刷新 操作。
 class PetActionMenu extends StatefulWidget {
   const PetActionMenu({
     super.key,
@@ -18,9 +18,7 @@ class PetActionMenu extends StatefulWidget {
     required this.feeding,
     required this.feedCost,
     required this.onFeed,
-    required this.onChat,
     required this.onLife,
-    required this.onMemories,
     required this.onRefresh,
   });
 
@@ -31,9 +29,7 @@ class PetActionMenu extends StatefulWidget {
   final bool feeding;
   final int feedCost;
   final VoidCallback onFeed;
-  final VoidCallback onChat;
   final VoidCallback onLife;
-  final VoidCallback onMemories;
   final VoidCallback onRefresh;
 
   @override
@@ -206,22 +202,10 @@ class _PetActionMenuState extends State<PetActionMenu>
             onTap: widget.feeding ? null : () => _run(widget.onFeed),
           ),
           _ActionTile(
-            icon: Icons.chat_bubble_outline,
-            iconColor: vita.green,
-            label: 'aiPets.chat'.tr,
-            onTap: () => _run(widget.onChat),
-          ),
-          _ActionTile(
             icon: Icons.auto_stories_outlined,
             iconColor: const Color(0xFF4A90E2),
             label: 'aiPets.life'.tr,
             onTap: () => _run(widget.onLife),
-          ),
-          _ActionTile(
-            icon: Icons.star_border,
-            iconColor: const Color(0xFFFFB930),
-            label: 'aiPets.memories'.tr,
-            onTap: () => _run(widget.onMemories),
           ),
         ],
       ),
