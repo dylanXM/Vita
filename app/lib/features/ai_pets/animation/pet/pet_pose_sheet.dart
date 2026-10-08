@@ -130,6 +130,13 @@ class _PetPoseSheetState extends State<PetPoseSheet> {
         actions: _actions,
         weights: widget.machine.stateWeights,
         worldTime: widget.worldTime,
+        actionSeconds: math.max(
+          0.0,
+          widget.machine.stateElapsed.inMilliseconds / 1000 -
+              (widget.machine.reducedMotion
+                  ? 0.0
+                  : PetStateMachine.transitionDuration.inMilliseconds / 2000),
+        ),
       ),
       child: const SizedBox.expand(),
     );
@@ -142,12 +149,14 @@ class _PoseSheetPainter extends CustomPainter {
     required this.actions,
     required this.weights,
     required this.worldTime,
+    required this.actionSeconds,
   });
 
   final ui.Image image;
   final ui.Image? actions;
   final Map<PetState, double> weights;
   final double worldTime;
+  final double actionSeconds;
 
   int _cellFor(PetState state) => switch (state) {
         PetState.sitting => 1,
@@ -180,28 +189,47 @@ class _PoseSheetPainter extends CustomPainter {
       }
     }
 
+    // The authored sheets have no in-between drawings. Briefly soften the
+    // single silhouette around the hand-off instead of superimposing two
+    // complete animals for the whole transition.
+    final handoff = ((.62 - strongest) / .12).clamp(0.0, 1.0).toDouble();
+    if (handoff > 0) {
+      canvas.saveLayer(
+        dest.inflate(8),
+        Paint()
+          ..imageFilter = ui.ImageFilter.blur(
+            sigmaX: 2.0 * handoff,
+            sigmaY: 2.0 * handoff,
+          ),
+      );
+    }
+
     final actionImage = actions;
     if (actionImage != null) {
       if (state == PetState.walking) {
-        final frame = ((worldTime * 360).floor()) % 3;
+        final frame = (actionSeconds * 6).floor() % 3;
         _drawCell(canvas, actionImage, frame, dest);
+        if (handoff > 0) canvas.restore();
         return;
       }
       if (state == PetState.feeding) {
-        final frame = ((worldTime * 80).floor()) % 2;
+        final frame = (actionSeconds * 3).floor() % 2;
         _drawCell(canvas, actionImage, 3 + frame, dest);
+        if (handoff > 0) canvas.restore();
         return;
       }
       if (state == PetState.drinking) {
-        final frame = ((worldTime * 100).floor()) % 2;
+        final frame = (actionSeconds * 3).floor() % 2;
         _drawCell(
             canvas, frame == 0 ? image : actionImage, frame == 0 ? 4 : 5, dest);
+        if (handoff > 0) canvas.restore();
         return;
       }
     }
     final breath = state == PetState.sleeping ? .007 : .004;
     final rise = breath * edge * math.sin(worldTime * math.pi * 2 * 12);
     _drawCell(canvas, image, _cellFor(state), dest.shift(Offset(0, rise)));
+    if (handoff > 0) canvas.restore();
   }
 
   void _drawCell(Canvas canvas, ui.Image sheet, int index, Rect dest) {
@@ -225,6 +253,7 @@ class _PoseSheetPainter extends CustomPainter {
       oldDelegate.image != image ||
       oldDelegate.actions != actions ||
       oldDelegate.worldTime != worldTime ||
+      oldDelegate.actionSeconds != actionSeconds ||
       !_sameWeights(oldDelegate.weights, weights);
 
   bool _sameWeights(Map<PetState, double> a, Map<PetState, double> b) {

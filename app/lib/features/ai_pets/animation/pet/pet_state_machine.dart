@@ -7,12 +7,14 @@ import 'pet_motion_spec.dart';
 /// 宠物状态机：根据真实数值和用户互动管理状态迁移与动作动画。
 /// 只消费 PetIntent/服务器数值，不感知 AI 来源。
 ///
-/// 周期姿态由 WorldClock 驱动；600ms 过渡从当前混合姿态出发，可连续打断。
+/// 周期姿态由 WorldClock 驱动；420ms 过渡从当前混合姿态出发，可连续打断。
 class PetStateMachine extends ChangeNotifier {
+  static const transitionDuration = Duration(milliseconds: 420);
+
   PetStateMachine({required TickerProvider vsync})
       : _blend = AnimationController(
           vsync: vsync,
-          duration: const Duration(milliseconds: 600),
+          duration: transitionDuration,
         ) {
     _blend.addListener(notifyListeners);
   }
@@ -21,6 +23,7 @@ class PetStateMachine extends ChangeNotifier {
   final AnimationController _blend;
 
   PetState _state = PetState.standing;
+  DateTime _stateChangedAt = DateTime.now();
   Map<PetState, double> _fromWeights = {PetState.standing: 1};
   bool needsSleep = false;
   bool needsFood = false;
@@ -30,6 +33,7 @@ class PetStateMachine extends ChangeNotifier {
   Timer? _actionTimer;
 
   PetState get state => _state;
+  Duration get stateElapsed => DateTime.now().difference(_stateChangedAt);
   bool get isActionActive => _actionTimer?.isActive == true;
 
   bool get reducedMotion => _reducedMotion;
@@ -101,6 +105,7 @@ class PetStateMachine extends ChangeNotifier {
     _actionTimer?.cancel();
     _fromWeights = stateWeights;
     _state = next;
+    _stateChangedAt = DateTime.now();
     if (reducedMotion) {
       _blend.value = 1;
     } else {
@@ -114,6 +119,7 @@ class PetStateMachine extends ChangeNotifier {
     _actionTimer?.cancel();
     _fromWeights = stateWeights;
     _state = action;
+    _stateChangedAt = DateTime.now();
     if (reducedMotion) {
       _blend.value = 1;
     } else {
@@ -125,6 +131,7 @@ class PetStateMachine extends ChangeNotifier {
         if (_state != action) return;
         _fromWeights = stateWeights;
         _state = _fallback;
+        _stateChangedAt = DateTime.now();
         if (reducedMotion) {
           _blend.value = 1;
         } else {

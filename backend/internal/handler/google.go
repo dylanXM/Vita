@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -99,11 +100,17 @@ func GoogleLogin(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "google email not verified"})
 		return
 	}
+	avatarURL := strings.TrimSpace(claims.Picture)
+	parsedAvatar, avatarErr := url.Parse(avatarURL)
+	if avatarErr != nil || parsedAvatar.Scheme != "https" || parsedAvatar.Host == "" || len(avatarURL) > 512 {
+		avatarURL = ""
+	}
 
 	var userID, role string
 	err = db.Get().QueryRow(
 		`SELECT id, COALESCE(role_id, 'user') FROM users WHERE email = $1`, claims.Email).
 		Scan(&userID, &role)
+	existingUser := err == nil
 	if errors.Is(err, sql.ErrNoRows) {
 		acceptedAt, consentErr := legalAcceptance(req.AcceptedLegal, req.PrivacyPolicyVersion, req.TermsVersion)
 		if consentErr != nil {
@@ -113,10 +120,10 @@ func GoogleLogin(c *gin.Context) {
 		userID = uuid.New().String()
 		role = "user"
 		if _, err := db.Get().Exec(
-			`INSERT INTO users (id,email,role_id,environment,legal_accepted_at,privacy_policy_version,terms_version)
-			 VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+			`INSERT INTO users (id,email,role_id,environment,legal_accepted_at,privacy_policy_version,terms_version,avatar_url)
+			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
 			userID, claims.Email, role, currentEnvironment(), acceptedAt,
-			strings.TrimSpace(req.PrivacyPolicyVersion), strings.TrimSpace(req.TermsVersion)); err != nil {
+			strings.TrimSpace(req.PrivacyPolicyVersion), strings.TrimSpace(req.TermsVersion), avatarURL); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 			return
 		}
@@ -128,6 +135,14 @@ func GoogleLogin(c *gin.Context) {
 	if banned, err := userBanned(userID); err == nil && banned {
 		c.JSON(http.StatusForbidden, gin.H{"error": "account is banned"})
 		return
+	}
+	if existingUser && avatarURL != "" {
+		// A user-selected avatar takes priority over the Google profile photo.
+		if _, err := db.Get().Exec(`UPDATE users SET avatar_url=$1,updated_at=CURRENT_TIMESTAMP
+			WHERE id=$2 AND avatar_url=''`, avatarURL, userID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update Google avatar"})
+			return
+		}
 	}
 
 	tokens, err := issueTokens(userID, role)

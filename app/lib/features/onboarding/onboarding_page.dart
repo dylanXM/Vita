@@ -70,8 +70,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
               child: Row(
                 children: [
                   const SizedBox(width: 20),
-                  Icon(Icons.all_inclusive,
-                      color: context.vita.green, size: 30),
+                  Image.asset('assets/branding/vita_brand_mark.png',
+                      width: 30, height: 30),
                   const Spacer(),
                   TextButton(
                       onPressed: () => _finish('skipped'),

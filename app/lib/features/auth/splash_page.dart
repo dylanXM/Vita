@@ -76,7 +76,7 @@ class _SplashPageState extends State<SplashPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Image.asset(
-                'assets/branding/vita_app_icon_1024.png',
+                'assets/branding/vita_brand_mark.png',
                 width: 128,
                 height: 128,
                 fit: BoxFit.contain,

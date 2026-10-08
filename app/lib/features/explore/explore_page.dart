@@ -175,7 +175,7 @@ class MomentsPage extends StatelessWidget {
           leading: const VitaBackButton(), title: Text('explore.moments'.tr)),
       body: SafeArea(
         bottom: false,
-        child: Obx(() => _MomentsFeed(controller: controller)),
+        child: _MomentsFeed(controller: controller),
       ),
     );
   }
@@ -187,7 +187,9 @@ class _MomentsFeed extends StatelessWidget {
   final ExploreController controller;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Obx(() => _buildFeed(context));
+
+  Widget _buildFeed(BuildContext context) {
     if (controller.loading.value && controller.posts.isEmpty) {
       return ListView.builder(
         padding: const EdgeInsets.only(top: 8, bottom: 90),

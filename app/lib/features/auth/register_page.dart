@@ -196,6 +196,11 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               if (_step == 1) ...[
                 const SizedBox(height: 20),
+                Center(
+                  child: Image.asset('assets/branding/vita_brand_mark.png',
+                      width: 60, height: 60),
+                ),
+                const SizedBox(height: 18),
                 Text(
                   'auth.createAccount'.tr,
                   textAlign: TextAlign.center,

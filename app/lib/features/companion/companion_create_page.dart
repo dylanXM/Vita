@@ -131,25 +131,39 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
 
   Widget _field(
       {required TextEditingController controller, required String hint}) {
-    return TextField(
-      controller: controller,
-      style: TextStyle(fontSize: 15, color: context.vita.text),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: context.vita.hint, fontSize: 14.5),
-        contentPadding: const EdgeInsets.symmetric(vertical: 14),
-        border: InputBorder.none,
-        enabledBorder: InputBorder.none,
-        focusedBorder: UnderlineInputBorder(
-            borderSide: BorderSide(color: context.vita.green, width: 1)),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: controller,
+        style: TextStyle(fontSize: 15, color: context.vita.text),
+        decoration: InputDecoration(
+          labelText: hint,
+          labelStyle: TextStyle(color: context.vita.subText),
+          filled: true,
+          fillColor: context.vita.surface,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: context.vita.divider)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: context.vita.divider)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: context.vita.green, width: 1.5)),
+        ),
       ),
     );
   }
 
   Widget _sectionTitle(String key) => Padding(
-        padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
+        padding: const EdgeInsets.fromLTRB(0, 22, 0, 12),
         child: Text(key.tr,
-            style: TextStyle(fontSize: 13, color: context.vita.subText)),
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: context.vita.text)),
       );
 
   Widget _chipRow(
@@ -183,39 +197,27 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(leading: const VitaBackButton(), title: Text('companion.create.title'.tr)),
+      appBar: AppBar(
+          leading: const VitaBackButton(),
+          title: Text('companion.create.title'.tr)),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('companion.create.heading'.tr,
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: context.vita.text)),
-              const SizedBox(height: 6),
-              Text('companion.create.sub'.tr,
-                  style: TextStyle(fontSize: 13, color: context.vita.subText)),
-              const SizedBox(height: 20),
               _sectionTitle('companion.create.basics'),
-              VitaCard(
-                child: Column(
-                  children: [
-                    _field(controller: _name, hint: 'companion.create.name'.tr),
-                    Divider(height: 0.5, color: context.vita.divider),
-                    _field(controller: _city, hint: 'companion.create.city'.tr),
-                    Divider(height: 0.5, color: context.vita.divider),
-                    _field(
-                        controller: _occupation,
-                        hint: 'companion.create.occupation'.tr),
-                    Divider(height: 0.5, color: context.vita.divider),
-                    _field(
-                        controller: _interests,
-                        hint: 'companion.create.interests'.tr),
-                  ],
-                ),
+              Column(
+                children: [
+                  _field(controller: _name, hint: 'companion.create.name'.tr),
+                  _field(controller: _city, hint: 'companion.create.city'.tr),
+                  _field(
+                      controller: _occupation,
+                      hint: 'companion.create.occupation'.tr),
+                  _field(
+                      controller: _interests,
+                      hint: 'companion.create.interests'.tr),
+                ],
               ),
               _sectionTitle('companion.create.personality'),
               VitaCard(
@@ -282,7 +284,10 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
                                   width: 92,
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(4),
+                                    borderRadius: BorderRadius.circular(18),
+                                    color: selected
+                                        ? context.vita.greenTint
+                                        : context.vita.pageBg,
                                     border: Border.all(
                                         color: selected
                                             ? context.vita.green

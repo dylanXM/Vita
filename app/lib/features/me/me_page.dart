@@ -66,14 +66,14 @@ class MePage extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 90),
             children: [
               const VitaTabHeader(title: 'Vita', showDivider: false),
-              // A traveler profile anchors the account in the world language.
               Container(
                 margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 decoration: BoxDecoration(
-                  gradient: vita.brandGradient,
-                  borderRadius: BorderRadius.circular(24),
+                  color: vita.surface,
+                  border: Border.all(color: vita.divider),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                padding: const EdgeInsets.fromLTRB(20, 28, 16, 28),
+                padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
                 child: Row(
                   children: [
                     ClipOval(
@@ -87,7 +87,15 @@ class MePage extends StatelessWidget {
                           : SizedBox(
                               width: 62,
                               height: 62,
-                              child: VitaMediaImage(url: auth.avatarUrl),
+                              child: VitaMediaImage(
+                                url: auth.avatarUrl,
+                                errorBuilder: (_, __, ___) => Image.asset(
+                                  'assets/icons/profile_default.png',
+                                  width: 62,
+                                  height: 62,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
                             ),
                     ),
                     const SizedBox(width: 14),
@@ -106,7 +114,7 @@ class MePage extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                              color: vita.text,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -114,7 +122,7 @@ class MePage extends StatelessWidget {
                             plan,
                             style: TextStyle(
                               fontSize: 13,
-                              color: const Color(0xFFEDE7FF),
+                              color: vita.subText,
                             ),
                           ),
                         ],

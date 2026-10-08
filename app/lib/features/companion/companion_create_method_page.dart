@@ -21,50 +21,43 @@ class CompanionCreateMethodPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(leading: const VitaBackButton(), title: Text('companion.create.chooseMethod'.tr)),
+      appBar: AppBar(
+          leading: const VitaBackButton(),
+          title: Text('companion.create.chooseMethod'.tr)),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(0, 12, 0, 28),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text('companion.create.methodHint'.tr,
-                style: TextStyle(fontSize: 13, color: context.vita.subText)),
-          ),
-          Material(
-            color: context.vita.surface,
-            child: Column(children: [
-              _method(
-                  context,
-                  Icons.dashboard_outlined,
-                  'companion.create.method.template',
-                  'companion.create.method.templateDesc',
-                  () => Get.to(() => const CompanionCreatePage())),
-              Divider(
-                  height: 0.5,
-                  thickness: 0.5,
-                  indent: 72,
-                  color: context.vita.divider),
-              _method(
-                  context,
-                  Icons.edit_note,
-                  'companion.create.method.description',
-                  'companion.create.method.descriptionDesc',
-                  () => Get.to(() => const AICompanionCreatePage(
-                      mode: AICompanionCreateMode.description))),
-              Divider(
-                  height: 0.5,
-                  thickness: 0.5,
-                  indent: 72,
-                  color: context.vita.divider),
-              _method(
-                  context,
-                  Icons.person_search_outlined,
-                  'companion.create.method.meet',
-                  'companion.create.method.meetDesc',
-                  () => Get.to(() => const AICompanionCreatePage(
-                      mode: AICompanionCreateMode.meet))),
-            ]),
-          ),
+          Text('companion.create.heading'.tr,
+              style: TextStyle(
+                  fontSize: 28,
+                  height: 1.2,
+                  fontWeight: FontWeight.w700,
+                  color: context.vita.text)),
+          const SizedBox(height: 10),
+          Text('companion.create.methodHint'.tr,
+              style: TextStyle(
+                  fontSize: 14, height: 1.5, color: context.vita.subText)),
+          const SizedBox(height: 30),
+          _method(
+              context,
+              Icons.auto_awesome_outlined,
+              'companion.create.method.template',
+              'companion.create.method.templateDesc',
+              () => Get.to(() => const CompanionCreatePage())),
+          _method(
+              context,
+              Icons.edit_note_rounded,
+              'companion.create.method.description',
+              'companion.create.method.descriptionDesc',
+              () => Get.to(() => const AICompanionCreatePage(
+                  mode: AICompanionCreateMode.description))),
+          _method(
+              context,
+              Icons.menu_book_outlined,
+              'companion.create.method.meet',
+              'companion.create.method.meetDesc',
+              () => Get.to(() => const AICompanionCreatePage(
+                  mode: AICompanionCreateMode.meet))),
         ],
       ),
     );
@@ -72,25 +65,52 @@ class CompanionCreateMethodPage extends StatelessWidget {
 
   Widget _method(BuildContext context, IconData icon, String title,
       String subtitle, VoidCallback onTap) {
-    return ListTile(
-      minTileHeight: 82,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-            color: context.vita.greenTint,
-            borderRadius: BorderRadius.circular(8)),
-        child: Icon(icon, color: context.vita.green, size: 23),
+    final vita = context.vita;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: vita.surface,
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              border: Border.all(color: vita.divider),
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: Row(children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                    color: vita.greenTint,
+                    borderRadius: BorderRadius.circular(16)),
+                child: Icon(icon, color: vita.green, size: 26),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                  child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title.tr,
+                      style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: vita.text)),
+                  const SizedBox(height: 5),
+                  Text(subtitle.tr,
+                      style: TextStyle(
+                          fontSize: 13, height: 1.4, color: vita.subText)),
+                ],
+              )),
+              const SizedBox(width: 8),
+              Icon(Icons.arrow_forward_rounded, color: vita.chevron, size: 20),
+            ]),
+          ),
+        ),
       ),
-      title: Text(title.tr,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Text(subtitle.tr),
-      ),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: onTap,
     );
   }
 }
@@ -269,7 +289,7 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
               .tr)),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: _hasDraft ? _draftFields(context) : _sourceFields(context),
         ),
       ),
@@ -278,8 +298,9 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
 
   List<Widget> _sourceFields(BuildContext context) => [
         Text('companion.create.aiSourceHelp'.tr,
-            style: TextStyle(color: context.vita.subText)),
-        const SizedBox(height: 16),
+            style: TextStyle(
+                fontSize: 13, height: 1.45, color: context.vita.subText)),
+        const SizedBox(height: 18),
         if (widget.mode == AICompanionCreateMode.description)
           _input(_description, 'companion.create.descriptionHint', maxLines: 8)
         else ...[
@@ -301,7 +322,7 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
         if (_imagePath != null) ...[
           const SizedBox(height: 12),
           ClipRRect(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(18),
               child: Image.file(File(_imagePath!),
                   height: 180, fit: BoxFit.cover)),
         ],
@@ -334,10 +355,14 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
     };
     return [
       Text('companion.create.reviewDraft'.tr,
-          style: TextStyle(color: context.vita.subText)),
+          style: TextStyle(
+              fontSize: 13, height: 1.45, color: context.vita.subText)),
       const SizedBox(height: 16),
       Container(
-        color: context.vita.surface,
+        decoration: BoxDecoration(
+            color: context.vita.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: context.vita.divider)),
         child: Column(children: [
           for (var i = 0; i < labels.length; i++) ...[
             _reviewRow(
@@ -397,10 +422,15 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
         fillColor: context.vita.surface,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        border: const OutlineInputBorder(borderSide: BorderSide.none),
-        enabledBorder: const OutlineInputBorder(borderSide: BorderSide.none),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide(color: context.vita.divider)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide(color: context.vita.divider)),
         focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: context.vita.green, width: 1)),
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide(color: context.vita.green, width: 1.5)),
       ),
     );
   }
@@ -477,6 +507,7 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
 
   Widget _picker(IconData icon, String label, VoidCallback onTap) {
     return VitaCard(
+      radius: 18,
       child: InkWell(
         onTap: _busy ? null : onTap,
         child: Padding(

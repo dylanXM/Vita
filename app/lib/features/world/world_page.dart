@@ -161,54 +161,54 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
             },
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(
-                  20, 18, 20, VitaTabBar.reservedHeight + 34),
+              padding: EdgeInsets.only(bottom: VitaTabBar.reservedHeight + 34),
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text('world.title'.tr,
-                          style: TextStyle(
-                            color: context.vita.text,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w700,
-                          )),
-                    ),
-                    IconButton.filledTonal(
-                      tooltip: 'world.create'.tr,
-                      onPressed: _createCompanion,
-                      icon: const Icon(Icons.add),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                if (current == null)
-                  _EmptyRelationship(onCreate: _createCompanion)
-                else ...[
-                  _CurrentRelationship(
-                    key: ValueKey(currentId),
-                    companion: current,
-                    scene: activeScene,
-                    onChat: () => _openChat(current),
-                    onVisit: () => _visit(currentId),
+                VitaTabHeader(
+                  title: 'tab.world'.tr,
+                  showDivider: false,
+                  actions: IconButton.filledTonal(
+                    tooltip: 'world.create'.tr,
+                    onPressed: _createCompanion,
+                    icon: const Icon(Icons.add),
                   ),
-                  if (others.isNotEmpty) ...[
-                    const SizedBox(height: 28),
-                    Text('world.otherCompanions'.tr,
-                        style: TextStyle(
-                          color: context.vita.text,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        )),
-                    const SizedBox(height: 10),
-                    for (final item in others)
-                      _OtherRelationship(
-                        companion: item,
-                        onTap: () => ShellController.to.selectedCompanionId
-                            .value = item['id'] as String?,
-                      ),
-                  ],
-                ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (current == null)
+                        _EmptyRelationship(onCreate: _createCompanion)
+                      else ...[
+                        _CurrentRelationship(
+                          key: ValueKey(currentId),
+                          companion: current,
+                          scene: activeScene,
+                          onChat: () => _openChat(current),
+                          onVisit: () => _visit(currentId),
+                        ),
+                        if (others.isNotEmpty) ...[
+                          const SizedBox(height: 28),
+                          Text('world.otherCompanions'.tr,
+                              style: TextStyle(
+                                color: context.vita.text,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              )),
+                          const SizedBox(height: 10),
+                          for (final item in others)
+                            _OtherRelationship(
+                              companion: item,
+                              onTap: () => ShellController
+                                  .to
+                                  .selectedCompanionId
+                                  .value = item['id'] as String?,
+                            ),
+                        ],
+                      ],
+                    ],
+                  ),
+                ),
               ],
             ),
           );

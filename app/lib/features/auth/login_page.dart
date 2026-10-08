@@ -77,18 +77,9 @@ class _LoginPageState extends State<LoginPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 16),
-              // A quiet brand mark keeps the authentication screen familiar.
               Center(
-                child: Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(
-                    color: context.vita.green,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child:
-                      const Icon(Icons.favorite, color: Colors.white, size: 42),
-                ),
+                child: Image.asset('assets/branding/vita_brand_mark.png',
+                    width: 88, height: 88),
               ),
               const SizedBox(height: 20),
               Text(
