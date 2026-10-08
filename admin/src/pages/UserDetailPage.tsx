@@ -39,7 +39,7 @@ import { subscriptionPlansApi, usersApi } from "@/api/admin";
 import { errorMessage } from "@/api/client";
 import type { AdminGrantOperation, AdminUser, AdminUserDetail, UserBehaviorCategory, UserBehaviorEvent } from "@/api/types";
 import { formatDate } from "@/lib/format";
-import { EnvBadge, RoleBadge, StatusBadge, UserFormDialog } from "./UsersPage";
+import { RoleBadge, StatusBadge, UserFormDialog } from "./UsersPage";
 
 export function UserDetailPage() {
   const { id = "" } = useParams();
@@ -137,7 +137,6 @@ export function UserDetailPage() {
           <span className="flex flex-wrap items-center gap-2">
             {u.email}
             <RoleBadge role={u.role} />
-            <EnvBadge env={u.environment} />
           </span>
         }
         description={t("users.detailDesc")}
@@ -207,8 +206,6 @@ export function UserDetailPage() {
                 <dd><StatusBadge banned={u.banned} /></dd>
               </div>
               <div className="space-y-1">
-                <dt className="text-xs text-muted-foreground">{t("users.environment")}</dt>
-                <dd><EnvBadge env={u.environment} /></dd>
               </div>
               <div className="space-y-1">
                 <dt className="text-xs text-muted-foreground">{t("users.timezone")}</dt>
@@ -370,8 +367,8 @@ function UserGrants({ user }: { user: AdminUserDetail }) {
   const [subscriptionNote, setSubscriptionNote] = useState("");
 
   const plans = useQuery({
-    queryKey: ["subscription-plans", user.environment, "grant"],
-    queryFn: ({ signal }) => subscriptionPlansApi.list({ environment: user.environment }, signal),
+    queryKey: ["subscription-plans", "prod", "grant"],
+    queryFn: ({ signal }) => subscriptionPlansApi.list({ environment: "prod" }, signal),
   });
   const operations = useQuery({
     queryKey: ["admin-grant-operations", user.id],

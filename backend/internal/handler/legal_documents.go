@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"vita/internal/config"
 	"vita/internal/db"
 )
 
@@ -120,9 +119,9 @@ func writeLegalAcceptanceError(c *gin.Context, err error) {
 }
 
 func AdminListLegalDocuments(c *gin.Context) {
-	environment := strings.TrimSpace(c.Query("environment"))
+	environment := currentEnvironment()
 	documentType := strings.TrimSpace(c.Query("document_type"))
-	if !config.IsValidEnvironment(environment) || (documentType != "" && !validLegalDocumentType(documentType)) {
+	if documentType != "" && !validLegalDocumentType(documentType) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "a valid environment and document type are required"})
 		return
 	}
@@ -157,13 +156,13 @@ func bindLegalDocument(c *gin.Context) (legalDocument, bool) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid legal document"})
 		return input, false
 	}
-	input.Environment = strings.TrimSpace(input.Environment)
+	input.Environment = currentEnvironment()
 	input.DocumentType = strings.TrimSpace(input.DocumentType)
 	input.Version = strings.TrimSpace(input.Version)
 	input.Title = strings.TrimSpace(input.Title)
 	input.Summary = strings.TrimSpace(input.Summary)
 	input.Content = strings.TrimSpace(input.Content)
-	if !config.IsValidEnvironment(input.Environment) || !validLegalDocumentType(input.DocumentType) ||
+	if !validLegalDocumentType(input.DocumentType) ||
 		input.Version == "" || input.Title == "" || input.Content == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "environment, type, version, title, and content are required"})
 		return input, false

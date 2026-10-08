@@ -45,7 +45,7 @@ func main() {
 		log.Fatalf("failed to connect database: %v", err)
 	}
 	defer dbClient.Close()
-	mediaStorage, err := storage.NewService(dbClient, cfg.Env, cfg.AgentConfigKey)
+	mediaStorage, err := storage.NewService(dbClient, config.EnvProd, cfg.AgentConfigKey)
 	if err != nil {
 		log.Fatalf("failed to initialize media storage: %v", err)
 	}
@@ -89,10 +89,9 @@ func main() {
 	}
 
 	// The stamped environment must be set before any request creates an account.
-	handler.SetEnvironment(cfg.Env)
 
 	// Seeding needs the schema, so it runs after Open() has migrated.
-	if err := db.EnsureAdmin(cfg.AdminEmail, cfg.AdminPassword, cfg.AdminEmails, cfg.Env); err != nil {
+	if err := db.EnsureAdmin(cfg.AdminEmail, cfg.AdminPassword, cfg.AdminEmails, config.EnvProd); err != nil {
 		log.Fatalf("failed to seed administrator account: %v", err)
 	}
 
@@ -253,7 +252,6 @@ func main() {
 		{
 			admin.POST("/images", handler.AdminUploadImage)
 			admin.GET("/stats", handler.AdminStats)
-			admin.GET("/environment", handler.AdminEnvironment)
 			admin.GET("/storage-config", handler.AdminGetStorageConfig)
 			admin.PUT("/storage-config", handler.AdminUpdateStorageConfig)
 			admin.POST("/storage-config/test", handler.AdminTestStorageConfig)

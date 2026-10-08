@@ -17,7 +17,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/sonner";
 import { formatDate } from "@/lib/format";
-import { EnvBadge } from "./UsersPage";
 
 const textareaClass = "min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -85,7 +84,7 @@ export function CompanionDetailPage() {
 
   return <div className="space-y-6">
     <PageHeader
-      title={<span className="flex flex-wrap items-center gap-2">{companion.name}<EnvBadge env={companion.environment} /><Badge variant={companion.active ? "success" : "muted"}>{t(companion.active ? "companions.active" : "companions.inactive")}</Badge></span>}
+      title={<span className="flex flex-wrap items-center gap-2">{companion.name}<Badge variant={companion.active ? "success" : "muted"}>{t(companion.active ? "companions.active" : "companions.inactive")}</Badge></span>}
       description={`${companion.user_email} · ${companion.id}`}
       actions={<><Button variant="outline" asChild><Link to="/companions"><ArrowLeft />{t("companions.back")}</Link></Button><Button variant="outline" onClick={() => void detail.refetch()}><RefreshCw />{t("common.refresh")}</Button><Button variant="destructive" onClick={() => setDeleteOpen(true)}><Trash2 />{t("users.delete")}</Button></>}
     />

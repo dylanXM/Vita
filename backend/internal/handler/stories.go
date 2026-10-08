@@ -263,7 +263,7 @@ func StartStory(c *gin.Context) {
 	choices, _ := json.Marshal(chapter.Choices)
 	tx, err := db.Get().BeginTx(c.Request.Context(), nil)
 	if err == nil {
-				var companionArg any
+		var companionArg any
 		if selfMode {
 			companionArg = nil
 		} else {
@@ -532,7 +532,7 @@ func refundStorySpend(spendID string, cause error) {
 }
 
 func AdminGetStoryConfig(c *gin.Context) {
-	environment := strings.TrimSpace(c.DefaultQuery("environment", currentEnvironment()))
+	environment := currentEnvironment()
 	config, err := loadStoryConfig(c.Request.Context(), environment)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load story settings"})
@@ -543,10 +543,11 @@ func AdminGetStoryConfig(c *gin.Context) {
 
 func AdminUpdateStoryConfig(c *gin.Context) {
 	var input storyConfig
-	if err := c.ShouldBindJSON(&input); err != nil || (input.Environment != "dev" && input.Environment != "beta" && input.Environment != "prod") || input.FreeChapterLimit < 0 || input.CustomBackgroundLimit < 0 || input.StoryboardUnlockChapters < 1 || input.ChapterCoins < 1 || input.StoryboardCoins < 1 {
+	if err := c.ShouldBindJSON(&input); err != nil || input.FreeChapterLimit < 0 || input.CustomBackgroundLimit < 0 || input.StoryboardUnlockChapters < 1 || input.ChapterCoins < 1 || input.StoryboardCoins < 1 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid story settings"})
 		return
 	}
+	input.Environment = currentEnvironment()
 	tx, err := db.Get().BeginTx(c.Request.Context(), nil)
 	if err == nil {
 		_, err = tx.Exec(`INSERT INTO story_settings(environment,free_chapter_limit,custom_background_limit,storyboard_unlock_chapters) VALUES($1,$2,$3,$4) ON CONFLICT(environment) DO UPDATE SET free_chapter_limit=EXCLUDED.free_chapter_limit,custom_background_limit=EXCLUDED.custom_background_limit,storyboard_unlock_chapters=EXCLUDED.storyboard_unlock_chapters,updated_at=CURRENT_TIMESTAMP`, input.Environment, input.FreeChapterLimit, input.CustomBackgroundLimit, input.StoryboardUnlockChapters)
@@ -570,7 +571,7 @@ func AdminUpdateStoryConfig(c *gin.Context) {
 }
 
 func AdminListStoryBackgrounds(c *gin.Context) {
-	environment := strings.TrimSpace(c.DefaultQuery("environment", currentEnvironment()))
+	environment := currentEnvironment()
 	rows, err := db.Get().Query(`SELECT `+storyBackgroundColumns+` FROM story_backgrounds WHERE environment=$1 AND owner_user_id IS NULL AND deleted_at IS NULL ORDER BY sort_order,title`, environment)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load story backgrounds"})
@@ -599,6 +600,7 @@ func saveAdminStoryBackground(c *gin.Context, id string, create bool) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid story background"})
 		return
 	}
+	input.Environment = currentEnvironment()
 	normalizeStoryBackgroundInput(&input)
 	if err := validateStoryBackgroundInput(input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

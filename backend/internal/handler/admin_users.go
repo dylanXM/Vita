@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 
 	"vita/internal/auth"
-	"vita/internal/config"
 	"vita/internal/db"
 )
 
@@ -26,14 +25,13 @@ import (
 
 // AdminUser is the admin-facing view of a user account.
 type AdminUser struct {
-	ID          string    `json:"id"`
-	Email       string    `json:"email"`
-	Role        string    `json:"role"`
-	Timezone    string    `json:"timezone"`
-	Environment string    `json:"environment"` // dev | beta | prod — where the account registered
-	Banned      bool      `json:"banned"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID        string    `json:"id"`
+	Email     string    `json:"email"`
+	Role      string    `json:"role"`
+	Timezone  string    `json:"timezone"`
+	Banned    bool      `json:"banned"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // AdminUserDetail adds per-account usage counts to the base fields.
@@ -54,7 +52,7 @@ type AdminUserListResponse struct {
 	TotalPages int         `json:"total_pages"`
 }
 
-const adminUserColumns = `id, email, COALESCE(role_id, 'user'), COALESCE(timezone, 'UTC'), COALESCE(environment, 'prod'), COALESCE(banned, false), created_at, updated_at`
+const adminUserColumns = `id, email, COALESCE(role_id, 'user'), COALESCE(timezone, 'UTC'), COALESCE(banned, false), created_at, updated_at`
 
 // rowScanner is satisfied by both *sql.Row and *sql.Rows.
 type rowScanner interface {
@@ -63,7 +61,7 @@ type rowScanner interface {
 
 func scanAdminUser(sc rowScanner) (AdminUser, error) {
 	var u AdminUser
-	err := sc.Scan(&u.ID, &u.Email, &u.Role, &u.Timezone, &u.Environment, &u.Banned, &u.CreatedAt, &u.UpdatedAt)
+	err := sc.Scan(&u.ID, &u.Email, &u.Role, &u.Timezone, &u.Banned, &u.CreatedAt, &u.UpdatedAt)
 	return u, err
 }
 
@@ -87,7 +85,6 @@ var errUserNotFound = errors.New("user not found")
 //	q            string (case-insensitive email substring)
 //	role         string ("user" | "admin")
 //	status       string ("active" | "banned")
-//	environment  string ("dev" | "beta" | "prod")
 func AdminListUsers(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	if page < 1 {
@@ -116,14 +113,8 @@ func AdminListUsers(c *gin.Context) {
 		args = append(args, status == "banned")
 		conds = append(conds, fmt.Sprintf("banned = $%d", len(args)))
 	}
-	if env := strings.TrimSpace(c.Query("environment")); env != "" {
-		if !config.IsValidEnvironment(env) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "environment must be 'dev', 'beta' or 'prod'"})
-			return
-		}
-		args = append(args, env)
-		conds = append(conds, fmt.Sprintf("environment = $%d", len(args)))
-	}
+	args = append(args, currentEnvironment())
+	conds = append(conds, fmt.Sprintf("environment = $%d", len(args)))
 
 	where := ""
 	if len(conds) > 0 {
@@ -200,11 +191,10 @@ func AdminGetUser(c *gin.Context) {
 // --- Create ---
 
 type AdminCreateUserRequest struct {
-	Email       string `json:"email" binding:"required,email"`
-	Password    string `json:"password"`
-	Role        string `json:"role"`
-	Timezone    string `json:"timezone"`
-	Environment string `json:"environment"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password"`
+	Role     string `json:"role"`
+	Timezone string `json:"timezone"`
 }
 
 func AdminCreateUser(c *gin.Context) {
@@ -226,16 +216,8 @@ func AdminCreateUser(c *gin.Context) {
 	if timezone == "" {
 		timezone = "UTC"
 	}
-	// Accounts an administrator creates manually inherit the environment of
-	// the deployment they are created in unless one is given explicitly.
-	environment := strings.TrimSpace(req.Environment)
-	if environment == "" {
-		environment = currentEnvironment()
-	}
-	if !config.IsValidEnvironment(environment) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "environment must be 'dev', 'beta' or 'prod'"})
-		return
-	}
+	// User accounts are always stored in the single production scope.
+	environment := currentEnvironment()
 
 	var exists bool
 	if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`, req.Email).Scan(&exists); err != nil {
@@ -266,7 +248,7 @@ func AdminCreateUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, AdminUser{
-		ID: id, Email: req.Email, Role: role, Timezone: timezone, Environment: environment, Banned: false,
+		ID: id, Email: req.Email, Role: role, Timezone: timezone, Banned: false,
 		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
 	})
 }
@@ -277,11 +259,10 @@ func AdminCreateUser(c *gin.Context) {
 // empty password string means "keep the current password"; any non-empty value
 // replaces it.
 type AdminUpdateUserRequest struct {
-	Email       *string `json:"email"`
-	Password    *string `json:"password"`
-	Role        *string `json:"role"`
-	Timezone    *string `json:"timezone"`
-	Environment *string `json:"environment"`
+	Email    *string `json:"email"`
+	Password *string `json:"password"`
+	Role     *string `json:"role"`
+	Timezone *string `json:"timezone"`
 }
 
 func AdminUpdateUser(c *gin.Context) {
@@ -297,7 +278,7 @@ func AdminUpdateUser(c *gin.Context) {
 	var curHash string
 	err := db.Get().QueryRow(
 		`SELECT `+adminUserColumns+`, COALESCE(password_hash, '') FROM users WHERE id = $1`, id).
-		Scan(&cur.ID, &cur.Email, &cur.Role, &cur.Timezone, &cur.Environment, &cur.Banned, &cur.CreatedAt, &cur.UpdatedAt, &curHash)
+		Scan(&cur.ID, &cur.Email, &cur.Role, &cur.Timezone, &cur.Banned, &cur.CreatedAt, &cur.UpdatedAt, &curHash)
 	if errors.Is(err, sql.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 		return
@@ -342,14 +323,7 @@ func AdminUpdateUser(c *gin.Context) {
 		newTimezone = strings.TrimSpace(*req.Timezone)
 	}
 
-	newEnvironment := cur.Environment
-	if req.Environment != nil && strings.TrimSpace(*req.Environment) != "" {
-		if !config.IsValidEnvironment(strings.TrimSpace(*req.Environment)) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "environment must be 'dev', 'beta' or 'prod'"})
-			return
-		}
-		newEnvironment = strings.TrimSpace(*req.Environment)
-	}
+	newEnvironment := currentEnvironment()
 
 	newHash := curHash
 	if req.Password != nil && *req.Password != "" {

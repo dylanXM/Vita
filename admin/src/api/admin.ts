@@ -1,6 +1,5 @@
 import { http } from "./client";
 import type {
-  AdminEnvironment,
   AdminLoginResult,
   AdminStats,
   AdminUser,
@@ -89,11 +88,6 @@ export const usersApi = {
     http.post<AdminGrantResult>(`/admin/users/${id}/grant-subscription`, body),
   timeline: (id: string, params: { category?: UserBehaviorCategory; limit?: number; offset?: number }, signal?: AbortSignal) =>
     http.get<UserBehaviorTimeline>(`/admin/users/${id}/timeline`, { params, signal }),
-};
-
-/** Deployment environment of the API instance (admin-only). */
-export const envApi = {
-  get: (signal?: AbortSignal) => http.get<AdminEnvironment>("/admin/environment", { signal }),
 };
 
 export const storageApi = {

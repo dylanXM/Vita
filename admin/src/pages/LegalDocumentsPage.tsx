@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { envApi, legalDocumentsApi } from "@/api/admin";
+import { legalDocumentsApi } from "@/api/admin";
 import type { Environment, LegalDocument, LegalDocumentInput, LegalDocumentType } from "@/api/types";
-import { ENVIRONMENTS } from "@/api/types";
 import { errorMessage } from "@/api/client";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -23,11 +22,9 @@ const emptyForm = (environment: Environment, document_type: LegalDocumentType): 
 export function LegalDocumentsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const serverEnv = useQuery({ queryKey: ["admin-environment"], queryFn: ({ signal }) => envApi.get(signal) });
-  const [environment, setEnvironment] = useState<Environment | null>(null);
   const [documentType, setDocumentType] = useState<LegalDocumentType>("privacy");
   const [editing, setEditing] = useState<LegalDocument | "new" | null>(null);
-  const activeEnv = environment ?? serverEnv.data?.environment;
+  const activeEnv: Environment = "prod";
   const queryKey = ["legal-documents", activeEnv, documentType];
   const query = useQuery({
     queryKey,
@@ -41,7 +38,6 @@ export function LegalDocumentsPage() {
   return <div className="space-y-6">
     <PageHeader title={t("legal.title")} description={t("legal.desc")} actions={<div className="flex gap-2">
       <Select value={documentType} onValueChange={(value) => setDocumentType(value as LegalDocumentType)}><SelectTrigger className="w-44"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="privacy">{t("legal.privacy")}</SelectItem><SelectItem value="terms">{t("legal.terms")}</SelectItem></SelectContent></Select>
-      <Select value={activeEnv ?? ""} onValueChange={(value) => setEnvironment(value as Environment)}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent>{ENVIRONMENTS.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>
       <Button disabled={!activeEnv} onClick={() => setEditing("new")}>{t("legal.create")}</Button>
     </div>} />
     <p className="text-sm text-muted-foreground">{t("legal.immutableHint")}</p>

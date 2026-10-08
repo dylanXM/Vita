@@ -12,7 +12,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"vita/internal/config"
 	"vita/internal/db"
 )
 
@@ -34,14 +33,8 @@ func AdminListManagedCompanions(c *gin.Context) {
 		args = append(args, status == "active")
 		conds = append(conds, fmt.Sprintf("c.active=$%d", len(args)))
 	}
-	if env := strings.TrimSpace(c.Query("environment")); env != "" {
-		if !config.IsValidEnvironment(env) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "environment must be dev, beta, or prod"})
-			return
-		}
-		args = append(args, env)
-		conds = append(conds, fmt.Sprintf("u.environment=$%d", len(args)))
-	}
+	args = append(args, currentEnvironment())
+	conds = append(conds, fmt.Sprintf("u.environment=$%d", len(args)))
 	where := " WHERE " + strings.Join(conds, " AND ")
 	var total int
 	if err := db.Get().QueryRow(`SELECT COUNT(*) FROM companions c JOIN users u ON u.id=c.user_id`+where, args...).Scan(&total); err != nil {

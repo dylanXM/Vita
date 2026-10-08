@@ -24,7 +24,7 @@ func main() {
 	if err := database.Ping(); err != nil {
 		log.Fatalf("ping database: %v", err)
 	}
-	if err := db.Migrate(database); err != nil {
+	if err := db.Migrate(database, true); err != nil {
 		log.Fatalf("apply migrations: %v", err)
 	}
 	log.Println("database migrations completed")

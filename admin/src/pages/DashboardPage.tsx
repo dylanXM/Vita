@@ -16,8 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { envApi, statsApi, healthApi } from "@/api/admin";
-import { EnvBadge } from "@/pages/UsersPage";
+import { statsApi, healthApi } from "@/api/admin";
 import { formatDate, formatNumber, relativeTime } from "@/lib/format";
 
 export function DashboardPage() {
@@ -33,11 +32,6 @@ export function DashboardPage() {
     queryKey: ["api-health"],
     queryFn: ({ signal }) => healthApi.get(signal),
     refetchInterval: 60_000,
-  });
-
-  const environment = useQuery({
-    queryKey: ["admin-environment"],
-    queryFn: ({ signal }) => envApi.get(signal),
   });
 
   const data = stats.data;
@@ -132,25 +126,13 @@ export function DashboardPage() {
           <CardTitle>{t("dashboard.systemInfo")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">{t("dashboard.apiVersion")}</p>
               {health.isLoading ? (
                 <Skeleton className="h-5 w-20" />
               ) : (
                 <p className="font-medium tabular-nums">{health.data?.version ?? "—"}</p>
-              )}
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">{t("dashboard.environment")}</p>
-              {environment.isLoading ? (
-                <Skeleton className="h-5 w-20" />
-              ) : (
-                environment.data ? (
-                  <EnvBadge env={environment.data.environment} />
-                ) : (
-                  <Badge variant="muted">—</Badge>
-                )
               )}
             </div>
             <div className="space-y-1">

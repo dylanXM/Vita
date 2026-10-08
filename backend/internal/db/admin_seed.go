@@ -35,9 +35,8 @@ func EnsureAdmin(email, password string, extraEmails []string, env string) error
 	return nil
 }
 
-// env is stamped onto newly created administrator rows; pre-existing rows
-// keep whatever flag they already carry (the DO UPDATE clause never touches
-// the environment column).
+// env is the retained database scope for administrator accounts. The server
+// always passes prod; pre-existing rows are normalized by the migration.
 func upsertAdminWithPassword(email, password, env string) error {
 	hash, err := auth.HashPassword(password)
 	if err != nil {

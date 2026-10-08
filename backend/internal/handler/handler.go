@@ -33,22 +33,6 @@ const codeTTL = 5 * time.Minute
 var rdb *redis.Client
 var tokenManager *auth.TokenManager
 
-// envName is the deployment environment this server runs in (VITA_ENV: dev /
-// beta / prod). Accounts created while it is set get stamped with this value
-// so a shared database can separate pre-release accounts from live ones.
-var envName = config.EnvDev
-
-// SetEnvironment records the deployment environment (called from main).
-// Unknown values are rejected with a warning — silently relabelling a
-// mistyped VITA_ENV would stamp accounts with the wrong environment flag.
-func SetEnvironment(env string) {
-	if config.IsValidEnvironment(env) {
-		envName = env
-		return
-	}
-	fmt.Printf("warning: VITA_ENV=%q is not one of dev/beta/prod; accounts will be stamped %q\n", env, envName)
-}
-
 // mailCfg is the SMTP client used to deliver verification codes. A zero
 // value (dev) prints codes to the server log instead.
 var mailCfg = mail.Config{}
@@ -58,11 +42,9 @@ func InitMailer(cfg mail.Config) {
 	mailCfg = cfg
 }
 
-// currentEnvironment returns the environment stamped onto new accounts. It
-// is always one of dev/beta/prod: envName starts at the default and is only
-// ever replaced with a validated value (see SetEnvironment).
+// currentEnvironment is the single content and account environment.
 func currentEnvironment() string {
-	return envName
+	return config.EnvProd
 }
 
 func InitRedis(redisURL, passwordOverride string) (*redis.Client, error) {
@@ -425,17 +407,6 @@ func consumeVerificationCode(email, code string) (string, error) {
 }
 
 // --- Admin Environment ---
-
-type AdminEnvironmentResponse struct {
-	Environment string `json:"environment"`
-}
-
-// AdminEnvironment reports which deployment this API instance is running in.
-// The dashboard shows it in the system card and uses it as the default
-// environment for newly created user accounts.
-func AdminEnvironment(c *gin.Context) {
-	c.JSON(http.StatusOK, AdminEnvironmentResponse{Environment: currentEnvironment()})
-}
 
 // --- Current Account ---
 

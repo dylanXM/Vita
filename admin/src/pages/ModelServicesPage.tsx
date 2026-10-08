@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plug, Pencil, Plus, RefreshCw, Settings2, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { agentApi, envApi } from "@/api/admin";
-import { ENVIRONMENTS, type Environment, type AIProvider, type AIModel, type AIModelScenario, type AIModelTestResult, type BillingProduct } from "@/api/types";
+import { agentApi } from "@/api/admin";
+import { type AIProvider, type AIModel, type AIModelScenario, type AIModelTestResult, type BillingProduct } from "@/api/types";
 import { errorMessage } from "@/api/client";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -81,13 +81,8 @@ interface EditorState {
 export function ModelServicesPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const serverEnv = useQuery({ queryKey: ["admin-environment"], queryFn: ({ signal }) => envApi.get(signal) });
-  const [environment, setEnvironment] = useState<Environment | null>(null);
-  const activeEnv = environment ?? serverEnv.data?.environment;
+  const activeEnv = "prod" as const;
 
-  useEffect(() => {
-    if (!environment && serverEnv.data?.environment) setEnvironment(serverEnv.data.environment);
-  }, [environment, serverEnv.data]);
 
   const config = useQuery({
     queryKey: ["agent-config", activeEnv],
@@ -220,12 +215,6 @@ export function ModelServicesPage() {
               <RefreshCw className={config.isFetching ? "animate-spin" : undefined} />
               {t("common.refresh")}
             </Button>
-            <Select value={activeEnv ?? ""} onValueChange={(v) => setEnvironment(v as Environment)}>
-              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {ENVIRONMENTS.map((env) => <SelectItem key={env} value={env}>{t(`billing.env.${env}`)}</SelectItem>)}
-              </SelectContent>
-            </Select>
             <Button onClick={openCreate}>
               <Plus /> {t("modelServices.create")}
             </Button>
@@ -588,7 +577,7 @@ function ScenariosDialog({
                 <span>
                   {plan.name}
                   <span className="block text-xs text-muted-foreground">
-                    {t(`billing.env.${plan.environment}`)} · {t(`billing.platform.${plan.platform}`)} · {plan.product_id}
+                    {t(`billing.platform.${plan.platform}`)} · {plan.product_id}
                   </span>
                 </span>
               </label>

@@ -13,9 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/components/ui/sonner";
-import { coinPacksApi, envApi, subscriptionPlansApi } from "@/api/admin";
+import { coinPacksApi, subscriptionPlansApi } from "@/api/admin";
 import { errorMessage } from "@/api/client";
-import { ENVIRONMENTS, type BillingPlatform, type BillingProduct, type Environment } from "@/api/types";
+import { type BillingPlatform, type BillingProduct, type Environment } from "@/api/types";
 
 const PLATFORMS: BillingPlatform[] = ["ios", "android", "web"];
 
@@ -38,16 +38,10 @@ export function CoinPacksPage() {
 function BillingProductsPage({ plan }: { plan: boolean }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const serverEnv = useQuery({ queryKey: ["admin-environment"], queryFn: ({ signal }) => envApi.get(signal) });
-  const [environment, setEnvironment] = useState<Environment | null>(null);
   const [platform, setPlatform] = useState<BillingPlatform | "all">("all");
   const [editing, setEditing] = useState<BillingProduct | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const activeEnv = environment ?? serverEnv.data?.environment;
-
-  useEffect(() => {
-    if (!environment && serverEnv.data?.environment) setEnvironment(serverEnv.data.environment);
-  }, [environment, serverEnv.data]);
+  const activeEnv: Environment = "prod";
 
   const api = plan ? subscriptionPlansApi : coinPacksApi;
   const list = useQuery({
@@ -71,10 +65,6 @@ function BillingProductsPage({ plan }: { plan: boolean }) {
     <div className="space-y-6">
       <PageHeader title={t(titleKey)} description={t(descKey)} actions={
         <>
-          <Select value={activeEnv ?? ""} onValueChange={(v) => setEnvironment(v as Environment)}>
-            <SelectTrigger className="w-44"><SelectValue placeholder={t("billing.environment")} /></SelectTrigger>
-            <SelectContent>{ENVIRONMENTS.map((env) => <SelectItem key={env} value={env}>{t(`billing.env.${env}`)}</SelectItem>)}</SelectContent>
-          </Select>
           <Button size="sm" disabled={!activeEnv} onClick={() => { setEditing(null); setDialogOpen(true); }}>
             <Plus />{t(plan ? "billing.addPlan" : "billing.addPack")}
           </Button>
@@ -142,7 +132,6 @@ function ProductDialog({ open, onOpenChange, product, environment, plan, onSaved
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label={t("billing.name")}><Input value={form.name} onChange={(e) => set("name", e.target.value)} /></Field>
       <Field label={t("billing.key")}><Input value={form.key} onChange={(e) => set("key", e.target.value)} /></Field>
-      <Field label={t("billing.environment")}><Select value={form.environment} onValueChange={(v) => set("environment", v as Environment)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{ENVIRONMENTS.map((v) => <SelectItem key={v} value={v}>{t(`billing.env.${v}`)}</SelectItem>)}</SelectContent></Select></Field>
       <Field label={t("billing.platformLabel")}><Select value={form.platform} onValueChange={(v) => set("platform", v as BillingPlatform)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{PLATFORMS.map((v) => <SelectItem key={v} value={v}>{t(`billing.platform.${v}`)}</SelectItem>)}</SelectContent></Select></Field>
       <Field label={t("billing.coins")}><Input type="number" min={plan ? 0 : 1} value={form.coins} onChange={(e) => set("coins", Number(e.target.value))} /></Field>
       <Field label={t("billing.price")}><Input type="number" min="0" step="0.01" value={form.price_usd} onChange={(e) => set("price_usd", Number(e.target.value))} /></Field>

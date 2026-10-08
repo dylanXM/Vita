@@ -9,8 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { creditLedgerApi, envApi, purchasesApi } from "@/api/admin";
-import { ENVIRONMENTS, type BillingPlatform, type BillingPurchase, type CreditLedgerEntry, type Environment } from "@/api/types";
+import { creditLedgerApi, purchasesApi } from "@/api/admin";
+import { type BillingPlatform, type BillingPurchase, type CreditLedgerEntry } from "@/api/types";
 import { formatDate } from "@/lib/format";
 
 type ActivityPlatform = BillingPlatform | "system" | "all";
@@ -18,15 +18,12 @@ const PAGE_SIZE = 20;
 
 export function BillingActivityPage() {
   const { t } = useTranslation();
-  const serverEnv = useQuery({ queryKey: ["admin-environment"], queryFn: ({ signal }) => envApi.get(signal) });
-  const [environment, setEnvironment] = useState<Environment | null>(null);
   const [platform, setPlatform] = useState<ActivityPlatform>("all");
   const [tab, setTab] = useState<"purchases" | "ledger">("purchases");
   const [page, setPage] = useState(1);
-  const activeEnv = environment ?? serverEnv.data?.environment;
+  const activeEnv = "prod" as const;
 
-  useEffect(() => { if (!environment && serverEnv.data?.environment) setEnvironment(serverEnv.data.environment); }, [environment, serverEnv.data]);
-  useEffect(() => setPage(1), [environment, platform, tab]);
+  useEffect(() => setPage(1), [platform, tab]);
 
   const params = { environment: activeEnv!, platform: platform === "all" ? undefined : platform, page, page_size: PAGE_SIZE };
   const purchases = useQuery({
@@ -40,9 +37,7 @@ export function BillingActivityPage() {
   const result = tab === "purchases" ? purchases : ledger;
 
   return <div className="space-y-6">
-    <PageHeader title={t("billing.activityTitle")} description={t("billing.activityDesc")} actions={
-      <Select value={activeEnv ?? ""} onValueChange={(v) => setEnvironment(v as Environment)}><SelectTrigger className="w-44"><SelectValue placeholder={t("billing.environment")} /></SelectTrigger><SelectContent>{ENVIRONMENTS.map((env) => <SelectItem key={env} value={env}>{t(`billing.env.${env}`)}</SelectItem>)}</SelectContent></Select>
-    } />
+    <PageHeader title={t("billing.activityTitle")} description={t("billing.activityDesc")} />
     <Card><CardContent className="space-y-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-2">

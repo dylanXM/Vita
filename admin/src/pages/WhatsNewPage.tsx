@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { envApi, whatsNewApi } from "@/api/admin";
-import { ENVIRONMENTS, type Environment, type MobilePlatform, type WhatsNewCampaign, type WhatsNewContentPage } from "@/api/types";
+import { whatsNewApi } from "@/api/admin";
+import { type Environment, type MobilePlatform, type WhatsNewCampaign, type WhatsNewContentPage } from "@/api/types";
 import { errorMessage } from "@/api/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -22,10 +22,8 @@ const freshCampaign = (environment: Environment, platform: MobilePlatform): Camp
 export function WhatsNewPage() {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const serverEnv = useQuery({ queryKey: ["admin-environment"], queryFn: ({ signal }) => envApi.get(signal) });
-  const [environment, setEnvironment] = useState<Environment | null>(null);
   const [platform, setPlatform] = useState<MobilePlatform>("ios");
-  const activeEnv = environment ?? serverEnv.data?.environment;
+  const activeEnv: Environment = "prod";
   const query = useQuery({ queryKey: ["whats-new", activeEnv, platform], queryFn: ({ signal }) => whatsNewApi.list(activeEnv!, platform, signal), enabled: Boolean(activeEnv) });
   const [editing, setEditing] = useState<WhatsNewCampaign | null | undefined>(undefined);
 
@@ -33,7 +31,6 @@ export function WhatsNewPage() {
 
   return <div className="space-y-6">
     <PageHeader title={t("whatsNew.title")} description={t("whatsNew.desc")} actions={<div className="flex gap-2">
-      <Select value={activeEnv ?? ""} onValueChange={(v) => setEnvironment(v as Environment)}><SelectTrigger className="w-36"><SelectValue /></SelectTrigger><SelectContent>{ENVIRONMENTS.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select>
       <Select value={platform} onValueChange={(v) => setPlatform(v as MobilePlatform)}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ios">iOS</SelectItem><SelectItem value="android">Android</SelectItem></SelectContent></Select>
       <Button disabled={!activeEnv} onClick={() => setEditing(null)}><Plus />{t("whatsNew.create")}</Button>
     </div>} />

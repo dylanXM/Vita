@@ -204,6 +204,130 @@ func (s *Service) LoadBytes(ctx context.Context, id, userID string) (string, []b
 	return media.MimeType, data, err
 }
 
+// MigrateLegacyMedia copies externally stored legacy media to the configured
+// production provider before the database environment migration runs. Each
+// row is changed only after its new object has been uploaded successfully.
+// Old objects are retained for recovery.
+func (s *Service) MigrateLegacyMedia(ctx context.Context) error {
+	for _, table := range []string{"media_assets", "admin_images"} {
+		for {
+			query := `SELECT id FROM ` + table + ` WHERE storage_environment<>'prod' AND storage_provider IN ('r2','cos') ORDER BY id LIMIT 100`
+			rows, err := s.db.QueryContext(ctx, query)
+			if err != nil {
+				return err
+			}
+			ids := make([]string, 0, 100)
+			for rows.Next() {
+				var id string
+				if err := rows.Scan(&id); err != nil {
+					rows.Close()
+					return err
+				}
+				ids = append(ids, id)
+			}
+			if err := rows.Err(); err != nil {
+				rows.Close()
+				return err
+			}
+			rows.Close()
+			if len(ids) == 0 {
+				break
+			}
+			for _, id := range ids {
+				if err := s.migrateLegacyMediaRow(ctx, table, id); err != nil {
+					return fmt.Errorf("migrate %s %s: %w", table, id, err)
+				}
+			}
+		}
+	}
+	for _, environment := range []string{"dev", "beta"} {
+		legacy := *s
+		legacy.environment = environment
+		for {
+			var count int
+			if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_object_deletions WHERE environment=$1`, environment).Scan(&count); err != nil {
+				return err
+			}
+			if count == 0 {
+				break
+			}
+			if err := legacy.ProcessDeletionQueue(ctx, 100); err != nil {
+				return err
+			}
+			var remaining int
+			if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_object_deletions WHERE environment=$1`, environment).Scan(&remaining); err != nil {
+				return err
+			}
+			if remaining >= count {
+				return fmt.Errorf("legacy %s deletion queue has %d objects that could not be removed", environment, remaining)
+			}
+		}
+	}
+	return nil
+}
+
+func (s *Service) migrateLegacyMediaRow(ctx context.Context, table, id string) error {
+	var userID string
+	var mimeType string
+	var body io.ReadCloser
+	if table == "media_assets" {
+		if err := s.db.QueryRowContext(ctx, `SELECT user_id FROM media_assets WHERE id=$1`, id).Scan(&userID); err != nil {
+			return err
+		}
+		media, err := s.Open(ctx, id, userID)
+		if err != nil {
+			return err
+		}
+		mimeType, body = media.MimeType, media.Body
+	} else {
+		media, err := s.OpenAdminImage(ctx, id)
+		if err != nil {
+			return err
+		}
+		mimeType, body = media.MimeType, media.Body
+	}
+	data, err := io.ReadAll(body)
+	body.Close()
+	if err != nil {
+		return err
+	}
+	provider, cfg, err := s.activeProvider(ctx)
+	if err != nil {
+		return err
+	}
+	if provider == ProviderPostgres {
+		result, err := s.db.ExecContext(ctx, `UPDATE `+table+` SET data=$2,size_bytes=$3,storage_provider='postgres',object_key='',storage_environment='prod' WHERE id=$1 AND storage_environment<>'prod'`, id, data, len(data))
+		return mediaMigrationUpdated(result, err)
+	}
+	client, err := s.newClient(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	key := "admin-images/prod/" + id
+	if table == "media_assets" {
+		key = "media/prod/" + userID + "/" + id
+	}
+	if err := client.Put(ctx, cfg.Bucket, key, mimeType, data); err != nil {
+		return err
+	}
+	result, err := s.db.ExecContext(ctx, `UPDATE `+table+` SET data=$2,size_bytes=$3,storage_provider=$4,object_key=$5,storage_environment='prod' WHERE id=$1 AND storage_environment<>'prod'`, id, []byte{}, len(data), provider, key)
+	return mediaMigrationUpdated(result, err)
+}
+
+func mediaMigrationUpdated(result sql.Result, err error) error {
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return fmt.Errorf("media row changed during migration")
+	}
+	return nil
+}
+
 func (s *Service) TestProvider(ctx context.Context, environment, provider string) error {
 	cfg, err := s.providerConfig(ctx, environment, provider, false)
 	if err != nil {

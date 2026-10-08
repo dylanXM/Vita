@@ -5,7 +5,6 @@ import { Bot, Eye, RefreshCw, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { companionsApi } from "@/api/admin";
-import { ENVIRONMENTS, type Environment } from "@/api/types";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +14,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate } from "@/lib/format";
-import { EnvBadge } from "./UsersPage";
 
 const PAGE_SIZE = 20;
 
@@ -27,23 +25,21 @@ export function CompanionsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
-  const [environment, setEnvironment] = useState("");
 
   useEffect(() => {
     const timer = setTimeout(() => setQ(searchInput.trim()), 300);
     return () => clearTimeout(timer);
   }, [searchInput]);
-  useEffect(() => setPage(1), [q, status, environment, userID]);
+  useEffect(() => setPage(1), [q, status, userID]);
 
   const list = useQuery({
-    queryKey: ["managed-companions", { page, q, status, environment, userID }],
+    queryKey: ["managed-companions", { page, q, status, userID }],
     queryFn: ({ signal }) => companionsApi.list({
       page,
       page_size: PAGE_SIZE,
       q: q || undefined,
       user_id: userID || undefined,
       status: (status || undefined) as "active" | "inactive" | undefined,
-      environment: (environment || undefined) as Environment | undefined,
     }, signal),
   });
 
@@ -59,13 +55,6 @@ export function CompanionsPage() {
               <RefreshCw className={list.isFetching ? "animate-spin" : undefined} />
               {t("common.refresh")}
             </Button>
-            <Select value={environment || "all"} onValueChange={(value) => setEnvironment(value === "all" ? "" : value)}>
-              <SelectTrigger className="lg:w-40"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("users.allEnvironments")}</SelectItem>
-                {ENVIRONMENTS.map((env) => <SelectItem key={env} value={env}>{t(`users.env${env[0].toUpperCase()}${env.slice(1)}`)}</SelectItem>)}
-              </SelectContent>
-            </Select>
           </>
         }
       />
@@ -97,7 +86,6 @@ export function CompanionsPage() {
               <TableHeader><TableRow>
                 <TableHead>{t("companions.companion")}</TableHead>
                 <TableHead>{t("companions.owner")}</TableHead>
-                <TableHead>{t("users.environment")}</TableHead>
                 <TableHead>{t("companions.status")}</TableHead>
                 <TableHead>{t("companions.chats")}</TableHead>
                 <TableHead className="hidden xl:table-cell">{t("users.createdAt")}</TableHead>
@@ -114,7 +102,6 @@ export function CompanionsPage() {
                     </div>
                   </TableCell>
                   <TableCell><Link to={`/users/${item.user_id}`} className="hover:text-primary hover:underline">{item.user_email}</Link></TableCell>
-                  <TableCell><EnvBadge env={item.environment} /></TableCell>
                   <TableCell><div className="flex flex-wrap gap-1"><Badge variant={item.active ? "success" : "muted"}>{t(item.active ? "companions.active" : "companions.inactive")}</Badge>{item.proactive_enabled && <Badge variant="outline">{t("companions.proactive")}</Badge>}</div></TableCell>
                   <TableCell>{item.conversations} / {item.messages}</TableCell>
                   <TableCell className="hidden text-muted-foreground xl:table-cell">{formatDate(item.created_at)}</TableCell>

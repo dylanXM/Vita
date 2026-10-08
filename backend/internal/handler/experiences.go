@@ -406,11 +406,7 @@ func metadataInt(metadata map[string]any, key string, fallback int) int {
 }
 
 func AdminListCreditProducts(c *gin.Context) {
-	environment := strings.TrimSpace(c.Query("environment"))
-	if environment != "dev" && environment != "beta" && environment != "prod" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "environment is required"})
-		return
-	}
+	environment := currentEnvironment()
 	rows, err := db.Get().Query(`SELECT product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata::text
 		FROM credit_products WHERE environment=$1
 		AND COALESCE((metadata->>'hidden_from_catalog')::boolean,false)=false
@@ -435,11 +431,7 @@ func AdminListCreditProducts(c *gin.Context) {
 }
 
 func AdminUpdateCreditProduct(c *gin.Context) {
-	environment := strings.TrimSpace(c.Query("environment"))
-	if environment != "dev" && environment != "beta" && environment != "prod" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "environment is required"})
-		return
-	}
+	environment := currentEnvironment()
 	var input struct {
 		Coins     int  `json:"coins" binding:"required,min=1,max=100000"`
 		Enabled   bool `json:"enabled"`

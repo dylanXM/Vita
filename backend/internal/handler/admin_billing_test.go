@@ -8,16 +8,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestAdminBillingEnvironmentDefaultsToDeployment(t *testing.T) {
-	previous := envName
-	envName = "beta"
-	t.Cleanup(func() { envName = previous })
-
+func TestAdminBillingEnvironmentDefaultsToProduction(t *testing.T) {
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
-	c.Request = httptest.NewRequest("GET", "/v1/admin/subscription-plans", nil)
+	c.Request = httptest.NewRequest("GET", "/v1/admin/subscription-plans?environment=beta", nil)
 	environment, ok := adminBillingEnvironment(c)
-	if !ok || environment != "beta" {
-		t.Fatalf("environment = %q, ok = %v; want beta, true", environment, ok)
+	if !ok || environment != "prod" {
+		t.Fatalf("environment = %q, ok = %v; want prod, true", environment, ok)
 	}
 }
 

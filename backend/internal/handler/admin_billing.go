@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 
-	"vita/internal/config"
 	"vita/internal/db"
 )
 
@@ -38,15 +37,7 @@ func validBillingPlatform(value string) bool {
 }
 
 func adminBillingEnvironment(c *gin.Context) (string, bool) {
-	environment := strings.TrimSpace(c.Query("environment"))
-	if environment == "" {
-		environment = currentEnvironment()
-	}
-	if !config.IsValidEnvironment(environment) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "environment must be dev, beta, or prod"})
-		return "", false
-	}
-	return environment, true
+	return currentEnvironment(), true
 }
 
 func validateAdminProduct(c *gin.Context, item *adminProduct, plan bool) bool {
@@ -54,10 +45,8 @@ func validateAdminProduct(c *gin.Context, item *adminProduct, plan bool) bool {
 	item.Name = strings.TrimSpace(item.Name)
 	item.Platform = strings.ToLower(strings.TrimSpace(item.Platform))
 	item.ProductID = strings.TrimSpace(item.ProductID)
-	if item.Environment == "" {
-		item.Environment = currentEnvironment()
-	}
-	if item.Key == "" || item.Name == "" || !config.IsValidEnvironment(item.Environment) ||
+	item.Environment = currentEnvironment()
+	if item.Key == "" || item.Name == "" ||
 		!validBillingPlatform(item.Platform) || item.Coins < 0 || item.PriceUSD < 0 || item.SortOrder < 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product configuration"})
 		return false

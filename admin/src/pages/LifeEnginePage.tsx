@@ -23,7 +23,6 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate } from "@/lib/format";
-import { EnvBadge } from "./UsersPage";
 import { WorldEngineConfigDialog } from "./WorldEngineConfigDialog";
 
 export function LifeEnginePage() {
@@ -191,7 +190,6 @@ function CompanionRow({ companion, onOpenEvents, onBroadcast, onChanged }: {
       </TableCell>
       <TableCell>
         <div className="flex flex-wrap gap-1">
-          <EnvBadge env={companion.environment} />
           {companion.admin_takeover
             ? <Badge variant="warning">{t("lifeEngine.inTakeover")}</Badge>
             : <Badge variant="success">{t("lifeEngine.automatic")}</Badge>}

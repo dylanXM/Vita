@@ -110,7 +110,7 @@ func AdminAgentConfig(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load portraits"})
 		return
 	}
-	plans, err := loadModelSubscriptionPlans(strings.TrimSpace(c.Query("environment")))
+	plans, err := loadModelSubscriptionPlans(currentEnvironment())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load subscription plans"})
 		return
@@ -1067,11 +1067,7 @@ type adminCompanionInput struct {
 }
 
 func AdminListCompanions(c *gin.Context) {
-	environment := strings.TrimSpace(c.DefaultQuery("environment", currentEnvironment()))
-	if environment != "dev" && environment != "beta" && environment != "prod" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid environment"})
-		return
-	}
+	environment := currentEnvironment()
 	rows, err := db.Get().Query(`
 		SELECT c.id,c.user_id,u.email,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.city,''),COALESCE(c.occupation,''),
 		COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags,c.speaking_style,c.likes,c.dislikes,

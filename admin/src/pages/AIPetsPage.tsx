@@ -1,13 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PawPrint, Pencil, Plus, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
-import { aiPetBreedsApi, envApi, subscriptionPlansApi } from "@/api/admin";
+import { aiPetBreedsApi, subscriptionPlansApi } from "@/api/admin";
 import { errorMessage } from "@/api/client";
 import type { AIPetBreed, AIPetBreedInput, Environment } from "@/api/types";
-import { ENVIRONMENTS } from "@/api/types";
 import { ConfigurationButton } from "@/components/configuration-button";
 import { AdminImageInput, isAdminImageURL } from "@/components/admin-image-input";
 import { PageHeader } from "@/components/page-header";
@@ -17,7 +16,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const emptyForm = (environment: Environment): AIPetBreedInput => ({
@@ -32,17 +30,12 @@ function Field({ label, children, wide = false }: { label: string; children: Rea
 export function AIPetsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const envQuery = useQuery({ queryKey: ["admin-environment"], queryFn: ({ signal }) => envApi.get(signal) });
-  const [environment, setEnvironment] = useState<Environment | null>(null);
-  const activeEnv = environment ?? envQuery.data?.environment;
+  const activeEnv: Environment = "prod";
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
-  const [form, setForm] = useState<AIPetBreedInput>(emptyForm("dev"));
+  const [form, setForm] = useState<AIPetBreedInput>(emptyForm("prod"));
   const [imageUploading, setImageUploading] = useState(false);
 
-  useEffect(() => {
-    if (!environment && envQuery.data?.environment) setEnvironment(envQuery.data.environment);
-  }, [environment, envQuery.data]);
 
   const breeds = useQuery({
     queryKey: ["ai-pet-breeds", activeEnv],
@@ -73,7 +66,7 @@ export function AIPetsPage() {
   const edit = (breed: AIPetBreed) => {
     setEditing(breed.id);
     setForm({
-      environment: breed.environment, name: breed.name, species: breed.species,
+      environment: "prod", name: breed.name, species: breed.species,
       personality: breed.personality, description: breed.description,
       avatar_url: breed.avatar_url, sort_order: breed.sort_order,
       enabled: breed.enabled, subscription_plan_ids: [...(breed.subscription_plan_ids ?? [])],
@@ -83,10 +76,6 @@ export function AIPetsPage() {
 
   return <div className="space-y-6">
     <PageHeader title={t("aiPets.title")} description={t("aiPets.desc")} actions={<>
-      <Select value={activeEnv ?? ""} onValueChange={(value) => { setEnvironment(value as Environment); close(); }}>
-        <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-        <SelectContent>{ENVIRONMENTS.map((env) => <SelectItem key={env} value={env}>{t(`billing.env.${env}`)}</SelectItem>)}</SelectContent>
-      </Select>
       <ConfigurationButton label={t("aiPets.create")} icon={<Plus />} onClick={create} disabled={!activeEnv}
         details={breeds.data ? [`${t("aiPets.configuredCount")}: ${breeds.data.items.length}`, ...breeds.data.items.map((breed) => breed.name)] : [t(breeds.isError ? "common.failedToLoad" : "common.loading")]} />
     </>} />

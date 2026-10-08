@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { envApi, onboardingApi } from "@/api/admin";
+import { onboardingApi } from "@/api/admin";
 import type { Environment, MobilePlatform, OnboardingContentPage } from "@/api/types";
-import { ENVIRONMENTS } from "@/api/types";
 import { errorMessage } from "@/api/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -25,10 +24,8 @@ const newPage = (): OnboardingContentPage => ({
 export function OnboardingPage() {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const serverEnv = useQuery({ queryKey: ["admin-environment"], queryFn: ({ signal }) => envApi.get(signal) });
-  const [environment, setEnvironment] = useState<Environment | null>(null);
   const [platform, setPlatform] = useState<MobilePlatform>("ios");
-  const activeEnv = environment ?? serverEnv.data?.environment;
+  const activeEnv: Environment = "prod";
   const query = useQuery({
     queryKey: ["onboarding", activeEnv, platform],
     queryFn: ({ signal }) => onboardingApi.get(activeEnv!, platform, signal),
@@ -63,7 +60,6 @@ export function OnboardingPage() {
     <div className="space-y-6">
       <PageHeader title={t("onboarding.title")} description={t("onboarding.desc")} actions={
         <div className="flex gap-2">
-          <Select value={activeEnv ?? ""} onValueChange={(v) => setEnvironment(v as Environment)}><SelectTrigger className="w-36"><SelectValue /></SelectTrigger><SelectContent>{ENVIRONMENTS.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select>
           <Select value={platform} onValueChange={(v) => setPlatform(v as MobilePlatform)}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ios">iOS</SelectItem><SelectItem value="android">Android</SelectItem></SelectContent></Select>
         </div>
       } />

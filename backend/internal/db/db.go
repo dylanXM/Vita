@@ -19,7 +19,9 @@ func Open(cfg *config.Config) (*sql.DB, error) {
 	db.SetMaxIdleConns(5)
 
 	if cfg.AutoMigrate {
-		if err := Migrate(db); err != nil {
+		// Auto-migrate on server startup stays quiet; `make be-migrate` keeps
+		// per-statement progress output via verbose=true.
+		if err := Migrate(db, false); err != nil {
 			return nil, fmt.Errorf("migration failed: %w", err)
 		}
 	}
@@ -45,7 +47,8 @@ func Get() *sql.DB {
 
 // Migrate applies the idempotent schema required by the current backend.
 // Production runs this explicitly through cmd/migrate before the API starts.
-func Migrate(db *sql.DB) error {
+// When verbose is true, each statement is echoed to stdout as it runs.
+func Migrate(db *sql.DB, verbose bool) error {
 	queries := []string{
 		`CREATE TABLE IF NOT EXISTS roles (
 			id TEXT PRIMARY KEY,
@@ -122,7 +125,7 @@ You can correct account information, manage device permissions, sign out or perm
 6. Children and contact
 Vita is not intended for children below the minimum age required in their country. Privacy questions can be sent to support@vita.app.$$,
 		true,CURRENT_TIMESTAMP,'system'
-		FROM (VALUES ('dev'),('beta'),('prod')) AS environments(environment)
+		FROM (VALUES ('prod')) AS environments(environment)
 		ON CONFLICT(environment,document_type,version) DO NOTHING`,
 		`INSERT INTO legal_documents(id,environment,document_type,version,title,summary,content,is_effective,published_at,updated_by)
 		SELECT 'default-' || environment || '-terms', environment, 'terms', '2026-09-20', 'Terms of Service',
@@ -145,7 +148,7 @@ Prices and benefits are shown before purchase. Store subscriptions renew and are
 6. Availability and contact
 Features may change, be suspended or end. You may stop using Vita or delete your account at any time. Questions can be sent to support@vita.app.$$,
 		true,CURRENT_TIMESTAMP,'system'
-		FROM (VALUES ('dev'),('beta'),('prod')) AS environments(environment)
+		FROM (VALUES ('prod')) AS environments(environment)
 		ON CONFLICT(environment,document_type,version) DO NOTHING`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_locale TEXT NOT NULL DEFAULT 'en'`,
 		// User-editable profile fields shown on the Me tab and used as the
@@ -219,7 +222,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			('voice_call_minute','call','experience.call.voice','experience.call.voice.desc','📞',15,false,10,'{"mode":"voice","seconds":60}'),
 			('video_call_minute','call','experience.call.video','experience.call.video.desc','📹',40,false,20,'{"mode":"video","seconds":60}')
 		) AS defaults(key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata)
-		CROSS JOIN (VALUES('dev'),('beta'),('prod')) AS environments(env)
+		CROSS JOIN (VALUES('prod')) AS environments(env)
 		ON CONFLICT(environment,product_key) DO NOTHING`,
 		`CREATE TABLE IF NOT EXISTS credit_spends (
 			id TEXT PRIMARY KEY,
@@ -249,7 +252,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			reward_basis_points INTEGER NOT NULL DEFAULT 1000 CHECK (reward_basis_points >= 0 AND reward_basis_points <= 10000),
 			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
-		`INSERT INTO invitation_settings(environment) VALUES('dev'),('beta'),('prod') ON CONFLICT(environment) DO NOTHING`,
+		`INSERT INTO invitation_settings(environment) VALUES('prod') ON CONFLICT(environment) DO NOTHING`,
 		`CREATE TABLE IF NOT EXISTS invitation_rewards (
 			id TEXT PRIMARY KEY,
 			inviter_user_id TEXT NOT NULL REFERENCES users(id),
@@ -334,7 +337,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			('premium_monthly','Vita Premium Monthly',1200,19.99::numeric,'month','vita.premium.monthly',30),
 			('premium_yearly','Vita Premium Yearly',1200,159.99::numeric,'year','vita.premium.yearly',40)
 		 ) AS products(key,name,coins,price,period,product_id,sort_order)
-		 CROSS JOIN (VALUES('dev'),('beta'),('prod')) AS environments(env)
+		 CROSS JOIN (VALUES('prod')) AS environments(env)
 		 CROSS JOIN (VALUES('ios'),('android')) AS platforms(platform)
 		 ON CONFLICT(environment,platform,key) DO UPDATE SET
 			name=EXCLUDED.name,coins_granted=EXCLUDED.coins_granted,price_usd=EXCLUDED.price_usd,
@@ -347,7 +350,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			('coins_500','500 Coins',500,7.99::numeric,'vita.coins.500',true,20),
 			('coins_1200','1,200 Coins',1200,14.99::numeric,'vita.coins.1200',false,30)
 		 ) AS products(key,name,coins,price,product_id,popular,sort_order)
-		 CROSS JOIN (VALUES('dev'),('beta'),('prod')) AS environments(env)
+		 CROSS JOIN (VALUES('prod')) AS environments(env)
 		 CROSS JOIN (VALUES('ios'),('android')) AS platforms(platform)
 		 ON CONFLICT(environment,platform,key) DO UPDATE SET product_id=EXCLUDED.product_id`,
 		`CREATE TABLE IF NOT EXISTS billing_purchases (
@@ -654,7 +657,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		`CREATE INDEX IF NOT EXISTS idx_ai_pet_breeds_scope ON ai_pet_breeds(environment,enabled,sort_order,name)`,
 		`INSERT INTO ai_pet_breeds(id,environment,name,species,personality,description,avatar_url,sort_order,enabled)
 		 SELECT 'system-ai-pet-' || env || '-' || slug,env,name,species,personality,description,avatar_url,sort_order,true
-		 FROM (VALUES('dev'),('beta'),('prod')) AS environments(env)
+		 FROM (VALUES('prod')) AS environments(env)
 		 CROSS JOIN (VALUES
 			('orange-tabby','Mochi','Cat','Playful and curious','A sunny orange tabby who loves snacks, warm naps, and following you everywhere.','asset://assets/ai_pets/cat_orange.png',10),
 			('tuxedo-cat','Oreo','Cat','Clever and affectionate','A smart tuxedo cat with a gentle heart and a talent for cheering you up.','asset://assets/ai_pets/cat_tuxedo.png',20),
@@ -695,7 +698,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		`ALTER TABLE credit_products ADD CONSTRAINT credit_products_category_check CHECK (category IN ('gift','photo','voice','date','keepsake','outfit','call','pet','story'))`,
 		`INSERT INTO credit_products(environment,product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata)
 		 SELECT env,'ai_pet_feed','pet','credits.product.petFeed.name','credits.product.petFeed.description','🥣',5,true,5,'{"hidden_from_catalog":true}'::jsonb
-		 FROM (VALUES('dev'),('beta'),('prod')) AS environments(env)
+		 FROM (VALUES('prod')) AS environments(env)
 		 ON CONFLICT(environment,product_key) DO NOTHING`,
 		`CREATE TABLE IF NOT EXISTS companion_outfits (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -849,7 +852,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE TABLE IF NOT EXISTS media_storage_settings (environment TEXT PRIMARY KEY CHECK (environment IN ('dev','beta','prod')),active_provider TEXT NOT NULL DEFAULT 'postgres' CHECK (active_provider IN ('postgres','r2','cos')),updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-		`INSERT INTO media_storage_settings(environment) VALUES('dev'),('beta'),('prod') ON CONFLICT(environment) DO NOTHING`,
+		`INSERT INTO media_storage_settings(environment) VALUES('prod') ON CONFLICT(environment) DO NOTHING`,
 		`CREATE TABLE IF NOT EXISTS media_storage_configs (environment TEXT NOT NULL CHECK (environment IN ('dev','beta','prod')),provider TEXT NOT NULL CHECK (provider IN ('r2','cos')),enabled BOOLEAN NOT NULL DEFAULT false,endpoint TEXT NOT NULL DEFAULT '',bucket TEXT NOT NULL DEFAULT '',region TEXT NOT NULL DEFAULT '',access_key_ciphertext TEXT NOT NULL DEFAULT '',secret_key_ciphertext TEXT NOT NULL DEFAULT '',created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(environment,provider))`,
 		`ALTER TABLE media_assets ADD COLUMN IF NOT EXISTS storage_provider TEXT NOT NULL DEFAULT 'postgres'`,
 		`ALTER TABLE media_assets ADD COLUMN IF NOT EXISTS object_key TEXT NOT NULL DEFAULT ''`,
@@ -871,7 +874,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			PRIMARY KEY(environment, platform)
 		)`,
 		`INSERT INTO onboarding_configs(environment,platform) VALUES
-			('dev','ios'),('dev','android'),('beta','ios'),('beta','android'),('prod','ios'),('prod','android')
+			('prod','ios'),('prod','android')
 		ON CONFLICT(environment,platform) DO NOTHING`,
 		`CREATE TABLE IF NOT EXISTS whats_new_campaigns (
 			id TEXT PRIMARY KEY,
@@ -898,7 +901,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
-		`INSERT INTO social_media_links(environment) VALUES('dev'),('beta'),('prod')
+		`INSERT INTO social_media_links(environment) VALUES('prod')
 		ON CONFLICT(environment) DO NOTHING`,
 		`CREATE TABLE IF NOT EXISTS analytics_events (
 			id TEXT PRIMARY KEY,
@@ -909,13 +912,14 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			category TEXT NOT NULL DEFAULT 'general',
 			properties JSONB NOT NULL DEFAULT '{}'::jsonb,
 			platform TEXT NOT NULL DEFAULT 'unknown',
-			environment TEXT NOT NULL DEFAULT 'dev',
+			environment TEXT NOT NULL DEFAULT 'prod',
 			app_version TEXT NOT NULL DEFAULT '',
 			locale TEXT NOT NULL DEFAULT '',
 			client_at TIMESTAMP,
 			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_analytics_events_user_time ON analytics_events(user_id,created_at DESC)`,
+		`ALTER TABLE analytics_events ALTER COLUMN environment SET DEFAULT 'prod'`,
 		`CREATE INDEX IF NOT EXISTS idx_analytics_events_install ON analytics_events(anonymous_id,created_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_analytics_events_scope ON analytics_events(environment,platform,event_name,created_at DESC)`,
 		`ALTER TABLE notification_outbox ALTER COLUMN channel SET DEFAULT 'push'`,
@@ -944,13 +948,13 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			finished_at TIMESTAMP
 		)`,
 		`CREATE TABLE IF NOT EXISTS story_settings (environment TEXT PRIMARY KEY CHECK (environment IN ('dev','beta','prod')),free_chapter_limit INTEGER NOT NULL DEFAULT 3 CHECK (free_chapter_limit>=0),custom_background_limit INTEGER NOT NULL DEFAULT 3 CHECK (custom_background_limit>=0),storyboard_unlock_chapters INTEGER NOT NULL DEFAULT 8 CHECK (storyboard_unlock_chapters>0),updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-		`INSERT INTO story_settings(environment) VALUES('dev'),('beta'),('prod') ON CONFLICT(environment) DO NOTHING`,
+		`INSERT INTO story_settings(environment) VALUES('prod') ON CONFLICT(environment) DO NOTHING`,
 		`CREATE TABLE IF NOT EXISTS story_backgrounds (id TEXT PRIMARY KEY,environment TEXT NOT NULL CHECK (environment IN ('dev','beta','prod')),owner_user_id TEXT REFERENCES users(id) ON DELETE CASCADE,title TEXT NOT NULL,cover_url TEXT NOT NULL DEFAULT '',synopsis TEXT NOT NULL DEFAULT '',world_setting TEXT NOT NULL,opening TEXT NOT NULL,genre TEXT NOT NULL DEFAULT '',character_constraints TEXT NOT NULL DEFAULT '',story_goal TEXT NOT NULL DEFAULT '',sort_order INTEGER NOT NULL DEFAULT 0,enabled BOOLEAN NOT NULL DEFAULT true,deleted_at TIMESTAMP,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
 		`CREATE INDEX IF NOT EXISTS idx_story_backgrounds_catalog ON story_backgrounds(environment,owner_user_id,enabled,sort_order)`,
 		`CREATE INDEX IF NOT EXISTS idx_story_backgrounds_owner_quota ON story_backgrounds(owner_user_id,created_at)`,
-		`INSERT INTO story_backgrounds(id,environment,title,synopsis,world_setting,opening,genre,character_constraints,sort_order) SELECT 'story-default-moon-train-'||env,env,'月夜列车','一列只在月圆之夜出现的列车，载着未说出口的愿望。','现代城市与梦境交界；列车每站都通向一段被遗忘的往事。','你和 TA 在空无一人的月台登上末班列车，车票背面写着一个陌生人的名字。','奇幻','主角必须由用户选择的角色担任，保持角色原有人设。',10 FROM (VALUES('dev'),('beta'),('prod')) environments(env) ON CONFLICT(id) DO NOTHING`,
-		`INSERT INTO story_backgrounds(id,environment,title,synopsis,world_setting,opening,genre,character_constraints,sort_order) SELECT 'story-default-seaside-'||env,env,'潮汐来信','海边小镇每天退潮后都会留下来自未来的信。','安静的海滨小镇；潮汐会改变时间留下的痕迹。','你和 TA 在清晨的沙滩捡到一封落款是十年后的信，信中警告今天不要去灯塔。','治愈悬疑','主角必须由用户选择的角色担任，保持角色原有人设。',20 FROM (VALUES('dev'),('beta'),('prod')) environments(env) ON CONFLICT(id) DO NOTHING`,
-		`INSERT INTO story_backgrounds(id,environment,title,synopsis,world_setting,opening,genre,character_constraints,sort_order) SELECT 'story-default-bookshop-'||env,env,'旧书店的第十三层','旧书店不存在的楼层收藏着尚未发生的故事。','城市旧街区；书页中的故事会短暂映照现实。','打烊后，TA 发现书架后多出一段向上的楼梯，而楼上有人正在读一本写着你们名字的书。','都市奇谈','主角必须由用户选择的角色担任，保持角色原有人设。',30 FROM (VALUES('dev'),('beta'),('prod')) environments(env) ON CONFLICT(id) DO NOTHING`,
+		`INSERT INTO story_backgrounds(id,environment,title,synopsis,world_setting,opening,genre,character_constraints,sort_order) SELECT 'story-default-moon-train-'||env,env,'月夜列车','一列只在月圆之夜出现的列车，载着未说出口的愿望。','现代城市与梦境交界；列车每站都通向一段被遗忘的往事。','你和 TA 在空无一人的月台登上末班列车，车票背面写着一个陌生人的名字。','奇幻','主角必须由用户选择的角色担任，保持角色原有人设。',10 FROM (VALUES('prod')) environments(env) ON CONFLICT(id) DO NOTHING`,
+		`INSERT INTO story_backgrounds(id,environment,title,synopsis,world_setting,opening,genre,character_constraints,sort_order) SELECT 'story-default-seaside-'||env,env,'潮汐来信','海边小镇每天退潮后都会留下来自未来的信。','安静的海滨小镇；潮汐会改变时间留下的痕迹。','你和 TA 在清晨的沙滩捡到一封落款是十年后的信，信中警告今天不要去灯塔。','治愈悬疑','主角必须由用户选择的角色担任，保持角色原有人设。',20 FROM (VALUES('prod')) environments(env) ON CONFLICT(id) DO NOTHING`,
+		`INSERT INTO story_backgrounds(id,environment,title,synopsis,world_setting,opening,genre,character_constraints,sort_order) SELECT 'story-default-bookshop-'||env,env,'旧书店的第十三层','旧书店不存在的楼层收藏着尚未发生的故事。','城市旧街区；书页中的故事会短暂映照现实。','打烊后，TA 发现书架后多出一段向上的楼梯，而楼上有人正在读一本写着你们名字的书。','都市奇谈','主角必须由用户选择的角色担任，保持角色原有人设。',30 FROM (VALUES('prod')) environments(env) ON CONFLICT(id) DO NOTHING`,
 		`CREATE TABLE IF NOT EXISTS stories (id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,companion_id TEXT NOT NULL REFERENCES companions(id) ON DELETE CASCADE,background_id TEXT REFERENCES story_backgrounds(id) ON DELETE SET NULL,title TEXT NOT NULL,background_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,current_chapter_no INTEGER NOT NULL DEFAULT 0,status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','completed')),created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
 		`CREATE INDEX IF NOT EXISTS idx_stories_user ON stories(user_id,updated_at DESC)`,
 		`CREATE TABLE IF NOT EXISTS story_chapters (id TEXT PRIMARY KEY,story_id TEXT NOT NULL REFERENCES stories(id) ON DELETE CASCADE,chapter_no INTEGER NOT NULL CHECK (chapter_no>0),title TEXT NOT NULL,content TEXT NOT NULL,choices JSONB NOT NULL DEFAULT '[]'::jsonb,selected_choice_id TEXT NOT NULL DEFAULT '',selected_choice_text TEXT NOT NULL DEFAULT '',created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE(story_id,chapter_no))`,
@@ -966,8 +970,8 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		`CREATE INDEX IF NOT EXISTS idx_storyboards_story ON storyboards(story_id,created_at DESC)`,
 		`ALTER TABLE credit_products DROP CONSTRAINT IF EXISTS credit_products_category_check`,
 		`ALTER TABLE credit_products ADD CONSTRAINT credit_products_category_check CHECK (category IN ('gift','photo','voice','date','keepsake','outfit','call','pet','story'))`,
-		`INSERT INTO credit_products(environment,product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata) SELECT env,'story_chapter','story','credits.product.storyChapter.name','credits.product.storyChapter.description','📖',10,true,10,'{"hidden_from_catalog":true}'::jsonb FROM (VALUES('dev'),('beta'),('prod')) environments(env) ON CONFLICT(environment,product_key) DO NOTHING`,
-		`INSERT INTO credit_products(environment,product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata) SELECT env,'story_storyboard','story','credits.product.storyboard.name','credits.product.storyboard.description','🎞️',80,true,20,'{"hidden_from_catalog":true}'::jsonb FROM (VALUES('dev'),('beta'),('prod')) environments(env) ON CONFLICT(environment,product_key) DO NOTHING`,
+		`INSERT INTO credit_products(environment,product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata) SELECT env,'story_chapter','story','credits.product.storyChapter.name','credits.product.storyChapter.description','📖',10,true,10,'{"hidden_from_catalog":true}'::jsonb FROM (VALUES('prod')) environments(env) ON CONFLICT(environment,product_key) DO NOTHING`,
+		`INSERT INTO credit_products(environment,product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata) SELECT env,'story_storyboard','story','credits.product.storyboard.name','credits.product.storyboard.description','🎞️',80,true,20,'{"hidden_from_catalog":true}'::jsonb FROM (VALUES('prod')) environments(env) ON CONFLICT(environment,product_key) DO NOTHING`,
 		`INSERT INTO agent_media_routes(route_key,media_type,enabled,fallback_model_ids) VALUES ('text_story_chapter','text',false,'[]'::jsonb),('text_storyboard','text',false,'[]'::jsonb),('image_storyboard_sheet','image',false,'[]'::jsonb) ON CONFLICT(route_key) DO NOTHING`,
 		`UPDATE agent_media_routes target SET primary_model_id=source.primary_model_id,fallback_model_ids=source.fallback_model_ids,enabled=source.enabled FROM agent_media_routes source WHERE source.route_key='text_chat' AND target.route_key IN ('text_story_chapter','text_storyboard') AND target.primary_model_id IS NULL`,
 		`UPDATE agent_media_routes target SET primary_model_id=source.primary_model_id,fallback_model_ids=source.fallback_model_ids,enabled=source.enabled FROM agent_media_routes source WHERE source.route_key='image_requested_photo' AND target.route_key='image_storyboard_sheet' AND target.primary_model_id IS NULL`,
@@ -988,7 +992,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		)`,
 		`INSERT INTO world_places(id,environment,scene_kind,title,description)
 			SELECT 'world-'||env||'-'||kind,env,kind,title,description
-			FROM (VALUES('dev'),('beta'),('prod')) AS environments(env)
+			FROM (VALUES('prod')) AS environments(env)
 			CROSS JOIN (VALUES
 				('home','world.place.home','world.place.homeHint'),
 				('work','world.place.work','world.place.workHint'),
@@ -1038,10 +1042,15 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		if len(preview) > 60 {
 			preview = preview[:60]
 		}
-		fmt.Printf("Executing migration: %s...\n", preview)
+		if verbose {
+			fmt.Printf("Executing migration: %s...\n", preview)
+		}
 		if _, err := db.Exec(q); err != nil {
 			return fmt.Errorf("failed to execute: %w", err)
 		}
+	}
+	if err := migrateSingleEnvironment(db); err != nil {
+		return err
 	}
 	return nil
 }

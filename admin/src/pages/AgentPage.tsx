@@ -3,8 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bot, ImagePlus, Pencil, RefreshCw, Save, Settings2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { agentApi, envApi } from "@/api/admin";
-import { ENVIRONMENTS, type Environment } from "@/api/types";
+import { agentApi } from "@/api/admin";
 import type {
   AgentSettings,
   AIModel,
@@ -42,15 +41,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export function AgentPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const serverEnv = useQuery({ queryKey: ["admin-environment"], queryFn: ({ signal }) => envApi.get(signal) });
-  const [environment, setEnvironment] = useState<Environment | null>(null);
-  const activeEnv = environment ?? serverEnv.data?.environment;
+  const activeEnv = "prod" as const;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [portraitsOpen, setPortraitsOpen] = useState(false);
 
-  useEffect(() => {
-    if (!environment && serverEnv.data?.environment) setEnvironment(serverEnv.data.environment);
-  }, [environment, serverEnv.data]);
 
   const configQuery = useQuery({
     queryKey: ["agent-config", activeEnv],
@@ -92,12 +86,6 @@ export function AgentPage() {
             <Button variant="outline" onClick={refresh}>
               <RefreshCw /> {t("common.refresh")}
             </Button>
-            <Select value={activeEnv ?? ""} onValueChange={(v) => { setEnvironment(v as Environment); setSettingsOpen(false); setPortraitsOpen(false); }}>
-              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {ENVIRONMENTS.map((env) => <SelectItem key={env} value={env}>{t(`billing.env.${env}`)}</SelectItem>)}
-              </SelectContent>
-            </Select>
             <ConfigurationButton label={t("agent.routing")} icon={<Settings2 />} onClick={() => setSettingsOpen(true)} disabled={!settings} details={settingsSummary} />
             <ConfigurationButton label={t("agent.portraits")} icon={<ImagePlus />} onClick={() => setPortraitsOpen(true)} disabled={!configQuery.data} details={portraitsSummary} />
           </>

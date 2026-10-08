@@ -1,24 +1,19 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
-import { creditProductsApi, envApi } from "@/api/admin";
-import type { CreditProduct, Environment } from "@/api/types";
+import { creditProductsApi } from "@/api/admin";
+import type { CreditProduct } from "@/api/types";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export function CreditProductsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const env = useQuery({ queryKey: ["environment"], queryFn: ({ signal }) => envApi.get(signal) });
-  const [environment, setEnvironment] = useState<Environment>("dev");
-  useEffect(() => {
-    if (env.data?.environment) setEnvironment(env.data.environment);
-  }, [env.data?.environment]);
+  const environment = "prod" as const;
   const products = useQuery({
     queryKey: ["credit-products", environment],
     queryFn: ({ signal }) => creditProductsApi.list(environment, signal),
@@ -34,18 +29,7 @@ export function CreditProductsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("creditProducts.title")} description={t("creditProducts.description")} actions={
-        <div className="w-44">
-          <Select value={environment} onValueChange={(value) => setEnvironment(value as Environment)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="dev">Dev</SelectItem>
-              <SelectItem value="beta">Beta</SelectItem>
-              <SelectItem value="prod">Prod</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      } />
+      <PageHeader title={t("creditProducts.title")} description={t("creditProducts.description")} />
       <div className="overflow-hidden rounded-lg border bg-card">
         <Table>
           <TableHeader><TableRow>

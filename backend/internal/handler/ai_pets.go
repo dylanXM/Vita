@@ -18,7 +18,7 @@ import (
 )
 
 type aiPetBreedInput struct {
-	Environment         string   `json:"environment" binding:"required,oneof=dev beta prod"`
+	Environment         string   `json:"environment"`
 	Name                string   `json:"name" binding:"required"`
 	Species             string   `json:"species" binding:"required"`
 	Personality         string   `json:"personality"`
@@ -46,7 +46,7 @@ type aiPetBreed struct {
 }
 
 func AdminListAIPetBreeds(c *gin.Context) {
-	environment := strings.TrimSpace(c.DefaultQuery("environment", currentEnvironment()))
+	environment := currentEnvironment()
 	rows, err := db.Get().Query(`SELECT b.id,b.environment,b.name,b.species,b.personality,b.description,b.avatar_url,b.sort_order,b.enabled,
 		COALESCE(jsonb_agg(link.subscription_plan_id ORDER BY link.subscription_plan_id) FILTER (WHERE link.subscription_plan_id IS NOT NULL),'[]'::jsonb)::text
 		FROM ai_pet_breeds b LEFT JOIN ai_pet_breed_subscription_plans link ON link.breed_id=b.id
@@ -88,6 +88,7 @@ func saveAIPetBreed(c *gin.Context, id string, create bool) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	input.Environment = currentEnvironment()
 	input.Name = strings.TrimSpace(input.Name)
 	input.Species = strings.TrimSpace(input.Species)
 	input.Personality = strings.TrimSpace(input.Personality)

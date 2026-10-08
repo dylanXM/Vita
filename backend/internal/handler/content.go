@@ -12,7 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"vita/internal/config"
 	"vita/internal/db"
 )
 
@@ -92,10 +91,10 @@ func normalizeMobilePlatform(raw string) string {
 func validMobilePlatform(value string) bool { return value == "ios" || value == "android" }
 
 func adminContentScope(c *gin.Context) (string, string, bool) {
-	environment := strings.TrimSpace(c.Query("environment"))
+	environment := currentEnvironment()
 	platform := strings.ToLower(strings.TrimSpace(c.Query("platform")))
-	if !config.IsValidEnvironment(environment) || !validMobilePlatform(platform) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "environment and platform are required"})
+	if !validMobilePlatform(platform) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "platform is required"})
 		return "", "", false
 	}
 	return environment, platform, true
@@ -181,11 +180,7 @@ func AppContent(c *gin.Context) {
 }
 
 func AdminGetSocialMediaLinks(c *gin.Context) {
-	environment := strings.TrimSpace(c.Query("environment"))
-	if !config.IsValidEnvironment(environment) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "environment is required"})
-		return
-	}
+	environment := currentEnvironment()
 	output, err := readSocialMediaLinks(environment)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load social media links"})
@@ -195,11 +190,7 @@ func AdminGetSocialMediaLinks(c *gin.Context) {
 }
 
 func AdminUpdateSocialMediaLinks(c *gin.Context) {
-	environment := strings.TrimSpace(c.Query("environment"))
-	if !config.IsValidEnvironment(environment) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "environment is required"})
-		return
-	}
+	environment := currentEnvironment()
 	var input socialMediaLinks
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid social media links"})
@@ -324,10 +315,10 @@ func saveWhatsNew(c *gin.Context, id string) {
 		return
 	}
 	input.Name = strings.TrimSpace(input.Name)
-	input.Environment = strings.TrimSpace(input.Environment)
+	input.Environment = currentEnvironment()
 	input.Platform = strings.ToLower(strings.TrimSpace(input.Platform))
 	input.MinAppVersion = strings.TrimSpace(input.MinAppVersion)
-	if input.Name == "" || !config.IsValidEnvironment(input.Environment) || !validMobilePlatform(input.Platform) || len(input.Pages) == 0 {
+	if input.Name == "" || !validMobilePlatform(input.Platform) || len(input.Pages) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name, scope, and at least one page are required"})
 		return
 	}

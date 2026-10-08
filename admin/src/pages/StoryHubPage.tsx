@@ -4,10 +4,9 @@ import { BookOpen, Pencil, Plus, Save, Settings2, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
-import { envApi, storiesApi } from "@/api/admin";
+import { storiesApi } from "@/api/admin";
 import { errorMessage } from "@/api/client";
 import type { Environment, StoryBackground, StoryBackgroundInput, StoryConfig } from "@/api/types";
-import { ENVIRONMENTS } from "@/api/types";
 import { ConfigurationButton } from "@/components/configuration-button";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +15,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const blank = (environment: Environment): StoryBackgroundInput => ({
@@ -34,18 +32,15 @@ function Field({ label, children, wide = false }: { label: string; children: Rea
 export function StoryHubPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const env = useQuery({ queryKey: ["admin-environment"], queryFn: ({ signal }) => envApi.get(signal) });
-  const [environment, setEnvironment] = useState<Environment | null>(null);
-  const active = environment ?? env.data?.environment;
+  const active: Environment = "prod";
   const config = useQuery({ queryKey: ["story-config", active], queryFn: ({ signal }) => storiesApi.config(active!, signal), enabled: Boolean(active) });
   const backgrounds = useQuery({ queryKey: ["story-backgrounds", active], queryFn: ({ signal }) => storiesApi.backgrounds(active!, signal), enabled: Boolean(active) });
   const [rulesOpen, setRulesOpen] = useState(false);
   const [backgroundOpen, setBackgroundOpen] = useState(false);
   const [rules, setRules] = useState<StoryConfig | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
-  const [form, setForm] = useState<StoryBackgroundInput>(blank("dev"));
+  const [form, setForm] = useState<StoryBackgroundInput>(blank("prod"));
 
-  useEffect(() => { if (!environment && env.data?.environment) setEnvironment(env.data.environment); }, [environment, env.data]);
   useEffect(() => { if (!rulesOpen && config.data) setRules(config.data); }, [config.data, rulesOpen]);
   const refresh = () => { void queryClient.invalidateQueries({ queryKey: ["story-backgrounds", active] }); };
   const closeBackground = () => { setBackgroundOpen(false); setEditing(null); };
@@ -74,10 +69,6 @@ export function StoryHubPage() {
 
   return <div className="space-y-6">
     <PageHeader title={t("storyHub.title")} description={t("storyHub.desc")} actions={<>
-      <Select value={active ?? ""} onValueChange={(value) => { setEnvironment(value as Environment); setRulesOpen(false); closeBackground(); }}>
-        <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-        <SelectContent>{ENVIRONMENTS.map((item) => <SelectItem key={item} value={item}>{t(`billing.env.${item}`)}</SelectItem>)}</SelectContent>
-      </Select>
       <ConfigurationButton label={t("storyHub.rules")} icon={<Settings2 />} onClick={() => { setRules(savedRules ? { ...savedRules } : null); setRulesOpen(true); }} disabled={!savedRules} details={ruleSummary} />
       <ConfigurationButton label={t("storyHub.create")} icon={<Plus />} onClick={create} disabled={!active}
         details={backgrounds.data ? [`${t("storyHub.configuredCount")}: ${backgrounds.data.items.length}`, ...backgrounds.data.items.map((item) => item.title)] : [t(backgrounds.isError ? "common.failedToLoad" : "common.loading")]} />

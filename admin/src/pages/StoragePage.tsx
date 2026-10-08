@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { envApi, storageApi } from "@/api/admin";
+import { storageApi } from "@/api/admin";
 import type { Environment, StorageConfig, StorageConfigInput, StorageProviderInput } from "@/api/types";
-import { ENVIRONMENTS } from "@/api/types";
 import { errorMessage } from "@/api/client";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -33,9 +32,7 @@ const emptyForm = (): StorageConfigInput => ({
 export function StoragePage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const serverEnv = useQuery({ queryKey: ["admin-environment"], queryFn: ({ signal }) => envApi.get(signal) });
-  const [environment, setEnvironment] = useState<Environment | null>(null);
-  const activeEnv = environment ?? serverEnv.data?.environment;
+  const activeEnv: Environment = "prod";
   const query = useQuery({
     queryKey: ["storage-config", activeEnv],
     queryFn: ({ signal }) => storageApi.get(activeEnv!, signal),
@@ -79,12 +76,7 @@ export function StoragePage() {
   };
 
   return <div className="space-y-6">
-    <PageHeader title={t("storage.title")} description={t("storage.desc")} actions={
-      <Select value={activeEnv ?? ""} onValueChange={(value) => setEnvironment(value as Environment)}>
-        <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-        <SelectContent>{ENVIRONMENTS.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
-      </Select>
-    } />
+    <PageHeader title={t("storage.title")} description={t("storage.desc")} />
     {query.isLoading ? <Skeleton className="h-96 w-full" /> : query.isError ? <Card><CardContent className="pt-6 text-sm text-destructive">{errorMessage(query.error, t("common.failedToLoad"))}</CardContent></Card> : <>
       <Card>
         <CardHeader><CardTitle>{t("storage.activeProvider")}</CardTitle><CardDescription>{t("storage.fallbackHint")}</CardDescription></CardHeader>

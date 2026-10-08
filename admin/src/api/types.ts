@@ -39,15 +39,8 @@ export interface AdminStats {
   generated_at: string;
 }
 
-/** Deployment environments an account can be flagged with. */
-export type Environment = "dev" | "beta" | "prod";
-
-export const ENVIRONMENTS: Environment[] = ["dev", "beta", "prod"];
-
-/** `GET /v1/admin/environment` — the deployment this API instance runs in. */
-export interface AdminEnvironment {
-  environment: Environment;
-}
+/** The single content scope persisted in legacy environment columns. */
+export type Environment = "prod";
 
 export type StorageProvider = "postgres" | "r2" | "cos";
 
@@ -88,8 +81,6 @@ export interface AdminUser {
   email: string;
   role: string; // "user" | "admin"
   timezone: string;
-  /** Environment the account registered on (dev | beta | prod). */
-  environment: Environment;
   banned: boolean;
   created_at: string;
   updated_at: string;
@@ -140,7 +131,6 @@ export interface AdminUserListParams {
   q?: string;
   role?: string;
   status?: "active" | "banned";
-  environment?: Environment;
 }
 
 /** Create/update payload for a user. */
@@ -149,7 +139,6 @@ export interface AdminUserInput {
   password?: string;
   role?: string;
   timezone?: string;
-  environment?: Environment;
 }
 
 export type BillingPlatform = "ios" | "android" | "web";

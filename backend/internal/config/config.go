@@ -9,9 +9,8 @@ import (
 	"time"
 )
 
-// Deployment environments. Every account is stamped with the environment of
-// the server it registered on, so one shared database (beta and prod point at
-// the same instance) can tell pre-release test accounts apart from live ones.
+// Deployment modes control runtime safety checks and CORS. Business data is
+// always stored in the single prod content scope.
 const (
 	EnvDev  = "dev"  // local development
 	EnvBeta = "beta" // pre-release; the beta backend runs against the prod database

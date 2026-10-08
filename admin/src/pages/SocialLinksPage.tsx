@@ -1,28 +1,21 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { envApi, socialLinksApi } from "@/api/admin";
+import { socialLinksApi } from "@/api/admin";
 import type { Environment } from "@/api/types";
-import { ENVIRONMENTS } from "@/api/types";
 import { errorMessage } from "@/api/client";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
 
 export function SocialLinksPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const serverEnv = useQuery({
-    queryKey: ["admin-environment"],
-    queryFn: ({ signal }) => envApi.get(signal),
-  });
-  const [environment, setEnvironment] = useState<Environment | null>(null);
-  const activeEnv = environment ?? serverEnv.data?.environment;
+  const activeEnv: Environment = "prod";
   const query = useQuery({
     queryKey: ["social-links", activeEnv],
     queryFn: ({ signal }) => socialLinksApi.get(activeEnv!, signal),
@@ -61,14 +54,6 @@ export function SocialLinksPage() {
       <PageHeader
         title={t("social.title")}
         description={t("social.desc")}
-        actions={
-          <Select value={activeEnv ?? ""} onValueChange={(value) => setEnvironment(value as Environment)}>
-            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {ENVIRONMENTS.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        }
       />
       <Card>
         <CardHeader>
