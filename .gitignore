@@ -73,3 +73,6 @@ app/.dart_tool/
 tmp/
 .cache/
 vs_code.json
+
+# preview
+ai-pets-preview
