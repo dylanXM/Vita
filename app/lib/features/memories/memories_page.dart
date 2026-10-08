@@ -92,9 +92,22 @@ class MemoriesController extends GetxController {
   }
 }
 
-/// One clear entrance per companion; each journey has its own timeline.
-class MemoriesPage extends StatelessWidget {
+/// A compact, searchable companion directory; each entry opens its timeline.
+class MemoriesPage extends StatefulWidget {
   const MemoriesPage({super.key});
+
+  @override
+  State<MemoriesPage> createState() => _MemoriesPageState();
+}
+
+class _MemoriesPageState extends State<MemoriesPage> {
+  final TextEditingController _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -136,26 +149,91 @@ class MemoriesPage extends StatelessWidget {
       );
     }
 
-    final companions = controller.companions;
+    final companions = controller.companions.toList()
+      ..sort((a, b) => '${a['name'] ?? ''}'
+          .toLowerCase()
+          .compareTo('${b['name'] ?? ''}'.toLowerCase()));
+    final query = _search.text.trim().toLowerCase();
+    final visible = query.isEmpty
+        ? companions
+        : companions.where((companion) {
+            final name = '${companion['name'] ?? ''}'.toLowerCase();
+            final city = '${companion['city'] ?? ''}'.toLowerCase();
+            final occupation = '${companion['occupation'] ?? ''}'.toLowerCase();
+            return name.contains(query) ||
+                city.contains(query) ||
+                occupation.contains(query);
+          }).toList();
     return RefreshIndicator(
       onRefresh: controller.loadCompanions,
-      child: ListView(
+      child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 110),
-        children: [
-          VitaTabHeader(title: 'tab.journey'.tr, showDivider: false),
-          const SizedBox(height: 12),
-          for (final companion in companions)
-            _JourneyCompanionTile(
-              companion: companion,
-              onTap: () {
-                if (Get.isRegistered<ShellController>()) {
-                  ShellController.to.selectedCompanionId.value =
-                      companion['id'] as String?;
-                }
-                Get.to(() => MemoryDetailPage(companion: companion),
-                    transition: Transition.cupertino);
-              },
+        slivers: [
+          SliverToBoxAdapter(
+            child: VitaTabHeader(title: 'tab.journey'.tr, showDivider: false),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
+              child: TextField(
+                controller: _search,
+                onChanged: (_) => setState(() {}),
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  hintText: 'contacts.search'.tr,
+                  prefixIcon: Icon(Icons.search, color: context.vita.subText),
+                  suffixIcon: query.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          onPressed: () {
+                            _search.clear();
+                            setState(() {});
+                          },
+                        ),
+                  filled: true,
+                  fillColor: context.vita.surface,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (visible.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: VitaEmpty(
+                icon: Icons.search_off,
+                title: 'contacts.noResults'.tr,
+                subtitle: 'contacts.noResultsSub'.tr,
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.only(bottom: 110),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final companion = visible[index];
+                    return _JourneyCompanionTile(
+                      companion: companion,
+                      onTap: () {
+                        if (Get.isRegistered<ShellController>()) {
+                          ShellController.to.selectedCompanionId.value =
+                              companion['id'] as String?;
+                        }
+                        Get.to(() => MemoryDetailPage(companion: companion),
+                            transition: Transition.cupertino);
+                      },
+                    );
+                  },
+                  childCount: visible.length,
+                ),
+              ),
             ),
         ],
       ),
@@ -176,25 +254,48 @@ class _JourneyCompanionTile extends StatelessWidget {
         .whereType<String>()
         .where((value) => value.trim().isNotEmpty)
         .join(' · ');
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-      child: Material(
-        color: context.vita.surface,
-        borderRadius: BorderRadius.circular(18),
-        child: ListTile(
-          onTap: onTap,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          leading: VitaAvatar(
-            name: name,
-            radius: 24,
-            imageUrl: companion['portrait_url'] as String?,
-          ),
-          title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-          subtitle: details.isEmpty ? null : Text(details),
-          trailing: Icon(Icons.chevron_right, color: context.vita.subText),
+    return Material(
+      color: context.vita.pageBg,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+          child: Column(children: [
+            Row(children: [
+              VitaAvatar(
+                name: name,
+                radius: 23,
+                imageUrl: companion['portrait_url'] as String?,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: context.vita.text)),
+                    if (details.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(details,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 12.5, color: context.vita.subText)),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right, size: 18, color: context.vita.subText),
+            ]),
+            const SizedBox(height: 10),
+            Divider(height: 1, indent: 60, color: context.vita.divider),
+          ]),
         ),
       ),
     );
@@ -231,8 +332,9 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
         title: Text(name),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_horiz),
+            icon: const Icon(Icons.auto_stories_outlined),
             color: context.vita.subText,
+            tooltip: 'journey.life'.tr,
             onPressed: () => Get.to(
               () => LifeDetailPage(companion: widget.companion),
               transition: Transition.cupertino,
@@ -271,9 +373,21 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.only(top: 12, bottom: 24),
+              padding: const EdgeInsets.only(top: 8, bottom: 32),
               sliver: SliverList(
-                delegate: SliverChildListDelegate(_buildGroupedTiles(context)),
+                delegate: SliverChildListDelegate([
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),
+                    child: Text(
+                      'journey.subtitle'.tr,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: context.vita.subText,
+                      ),
+                    ),
+                  ),
+                  ..._buildGroupedTiles(context),
+                ]),
               ),
             ),
         ],
@@ -289,9 +403,10 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
       final t = DateTime.tryParse(
               m['event_time'] as String? ?? m['created_at'] as String? ?? '') ??
           DateTime.now();
-      final day = DateTime(t.year, t.month, t.day);
+      final localTime = t.toLocal();
+      final day = DateTime(localTime.year, localTime.month, localTime.day);
       if (prevDay == null || day != prevDay) {
-        tiles.add(_DateSectionHeader(label: formatDateSeparator(t.toLocal())));
+        tiles.add(_DateSectionHeader(label: formatDateSeparator(localTime)));
       }
       tiles.add(_MemoryTile(
         companionId: companionId,
@@ -309,14 +424,23 @@ class _DateSectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: context.vita.subText,
-        ),
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 14),
+      child: Row(
+        children: [
+          Icon(Icons.auto_awesome, size: 15, color: context.vita.green),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.4,
+              color: context.vita.text,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(child: Divider(color: context.vita.divider)),
+        ],
       ),
     );
   }
@@ -335,131 +459,103 @@ class _MemoryTile extends StatelessWidget {
     final type = (memory['type'] as String? ?? 'memory').trim();
     final readonly = memory['readonly'] == true;
 
-    return Container(
-      color: context.vita.surface,
-      padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+      child: Stack(
         children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: context.vita.green.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              readonly ? Icons.bookmark_outline : Icons.star_outline,
-              size: 18,
-              color: context.vita.green,
+          Positioned(
+            left: 6,
+            top: 0,
+            bottom: 0,
+            child: Container(
+              width: 1,
+              color: context.vita.green.withValues(alpha: 0.22),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (title.isNotEmpty) ...[
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.w600,
-                      color: context.vita.text,
+          Positioned(
+            left: 2,
+            top: 26,
+            child: Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: context.vita.green,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 26),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 18, 12, 20),
+              decoration: BoxDecoration(
+                color: context.vita.surface,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: context.vita.divider),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (title.isNotEmpty) ...[
+                          Text(title,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: context.vita.green,
+                              )),
+                          const SizedBox(height: 10),
+                        ],
+                        Text(
+                          type == 'world_visit'
+                              ? 'world.visitMemory'.tr
+                              : content.tr,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: context.vita.text,
+                            height: 1.55,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  if (!readonly)
+                    IconButton(
+                      onPressed: () => _showActions(context),
+                      icon: const Icon(Icons.more_vert, size: 19),
+                      color: context.vita.subText,
+                      tooltip: 'memories.delete'.tr,
+                      visualDensity: VisualDensity.compact,
+                    ),
                 ],
-                Text(
-                  type == 'world_visit' ? 'world.visitMemory'.tr : content.tr,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: context.vita.text,
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: 7),
-                Text(
-                  type,
-                  style: TextStyle(fontSize: 12, color: context.vita.subText),
-                ),
-              ],
+              ),
             ),
           ),
-          if (!readonly)
-            Builder(builder: (btnCtx) {
-              return GestureDetector(
-                onTapDown: (details) {
-                  final box = btnCtx.findRenderObject() as RenderBox;
-                  final center = box.localToGlobal(
-                      Offset(box.size.width / 2, box.size.height / 2));
-                  _showWeChatMenu(context, center);
-                },
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Icon(Icons.more_horiz,
-                      color: Color(0xFF999999), size: 20),
-                ),
-              );
-            }),
         ],
       ),
     );
   }
 
-  void _showWeChatMenu(BuildContext context, Offset tapPos) {
-    late OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (overlayCtx) => Stack(children: [
-        GestureDetector(
-          onTap: () => entry.remove(),
-          child: Container(color: Colors.transparent),
+  Future<void> _showActions(BuildContext context) async {
+    final selected = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: context.vita.surface,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: ListTile(
+          leading: const Icon(Icons.delete_outline),
+          title: Text('memories.delete'.tr),
+          onTap: () => Navigator.pop(sheetContext, true),
         ),
-        Positioned(
-          right: MediaQuery.of(context).size.width - tapPos.dx - 12,
-          top: tapPos.dy + 12,
-          child: Material(
-            color: Colors.transparent,
-            child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.topRight,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4C4C4C),
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: const [
-                        BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 8,
-                            offset: Offset(0, 2)),
-                      ],
-                    ),
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      _MenuItem(
-                        icon: Icons.delete,
-                        label: 'memories.delete'.tr,
-                        onTap: () {
-                          entry.remove();
-                          _deleteMemory(context);
-                        },
-                      ),
-                    ]),
-                  ),
-                  Positioned(
-                    top: -7,
-                    right: 6,
-                    child: CustomPaint(
-                      size: const Size(12, 7),
-                      painter: _MenuArrowPainter(),
-                    ),
-                  ),
-                ]),
-          ),
-        ),
-      ]),
+      ),
     );
-    Overlay.of(context).insert(entry);
+    if (selected == true && context.mounted) {
+      await _deleteMemory(context);
+    }
   }
 
   Future<void> _deleteMemory(BuildContext context) async {
@@ -489,44 +585,4 @@ class _MemoryTile extends StatelessWidget {
       );
     }
   }
-}
-
-class _MenuItem extends StatelessWidget {
-  const _MenuItem(
-      {required this.icon, required this.label, required this.onTap});
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 20, color: Colors.white),
-          const SizedBox(width: 12),
-          Text(label,
-              style: const TextStyle(color: Colors.white, fontSize: 16)),
-        ]),
-      ),
-    );
-  }
-}
-
-class _MenuArrowPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFF4C4C4C);
-    final path = Path();
-    path.moveTo(0, size.height);
-    path.lineTo(size.width / 2, 0);
-    path.lineTo(size.width, size.height);
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

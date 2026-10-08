@@ -184,6 +184,7 @@ func main() {
 		api.GET("/me/credits", middleware.RequireAuth(), handler.GetCredits)
 		api.POST("/credits/consume", middleware.RequireAuth(), handler.ConsumeCredits)
 		api.GET("/me/subscription", middleware.RequireAuth(), handler.GetMySubscription)
+		api.GET("/subscription-plans/benefits", middleware.RequireAuth(), handler.ListSubscriptionPlanBenefits)
 		api.POST("/stripe/checkout", middleware.RequireAuth(), handler.CreateStripeCheckout)
 		api.POST("/webhooks/revenuecat", handler.RevenueCatWebhook)
 		api.POST("/webhooks/stripe", handler.StripeWebhook)

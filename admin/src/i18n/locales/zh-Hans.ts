@@ -231,7 +231,7 @@ const zhHans = {
     addPlan: "新增订阅计划", addPack: "新增金币包", purchases: "购买记录", ledger: "金币流水",
     allPlatforms: "全部平台", platformLabel: "平台",
     platform: { ios: "iOS", android: "Android", web: "网页", system: "系统" },
-    name: "名称", key: "标识", coins: "金币", price: "价格（美元）", period: "周期", productId: "商店商品 ID",
+    name: "名称", key: "标识", coins: "金币", price: "价格（美元）", period: "周期", productId: "商店商品 ID", benefits: "套餐权益说明", benefitsHint: "每行一项，最多 12 项。仅用于 App 展示，不改变实际功能权限或发放额度。",
     periods: { week: "每周", month: "每月", year: "每年" },
     status: "状态", actions: "操作", enabled: "启用", disabled: "停用", popular: "热门",
     edit: "编辑", delete: "删除", save: "保存", cancel: "取消", sortOrder: "排序",

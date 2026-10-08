@@ -28,6 +28,7 @@ type adminProduct struct {
 	Popular     bool      `json:"popular,omitempty"`
 	Enabled     bool      `json:"enabled"`
 	SortOrder   int       `json:"sort_order"`
+	Benefits    []string  `json:"benefits,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -52,6 +53,20 @@ func validateAdminProduct(c *gin.Context, item *adminProduct, plan bool) bool {
 		return false
 	}
 	if plan {
+		if item.Benefits == nil {
+			item.Benefits = []string{}
+		}
+		if len(item.Benefits) > 12 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "too many subscription benefits"})
+			return false
+		}
+		for i, benefit := range item.Benefits {
+			item.Benefits[i] = strings.TrimSpace(benefit)
+			if item.Benefits[i] == "" || len([]rune(item.Benefits[i])) > 160 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid subscription benefit"})
+				return false
+			}
+		}
 		if item.Period != "week" && item.Period != "month" && item.Period != "year" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "period must be week, month, or year"})
 			return false
@@ -70,7 +85,7 @@ func AdminListSubscriptionPlans(c *gin.Context) {
 	}
 	platform := strings.ToLower(strings.TrimSpace(c.Query("platform")))
 	query := `SELECT id, key, name, environment, platform, coins_granted, price_usd, period,
-	                 product_id, enabled, sort_order, created_at, updated_at
+	                 product_id, enabled, sort_order, benefits, created_at, updated_at
 	          FROM subscription_plans WHERE environment = $1`
 	args := []any{environment}
 	if platform != "" {
@@ -93,11 +108,44 @@ func AdminListSubscriptionPlans(c *gin.Context) {
 		var item adminProduct
 		if err := rows.Scan(&item.ID, &item.Key, &item.Name, &item.Environment, &item.Platform,
 			&item.Coins, &item.PriceUSD, &item.Period, &item.ProductID, &item.Enabled,
-			&item.SortOrder, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			&item.SortOrder, pq.Array(&item.Benefits), &item.CreatedAt, &item.UpdatedAt); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to scan subscription plans"})
 			return
 		}
 		items = append(items, item)
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+// ListSubscriptionPlanBenefits exposes only the display copy for active store
+// products. Purchase eligibility and grants remain server-side decisions.
+func ListSubscriptionPlanBenefits(c *gin.Context) {
+	platform := strings.ToLower(strings.TrimSpace(c.GetHeader("X-Vita-Platform")))
+	if !validBillingPlatform(platform) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid platform"})
+		return
+	}
+	rows, err := db.Get().Query(`SELECT product_id, benefits FROM subscription_plans
+		WHERE environment=$1 AND platform=$2 AND enabled=true AND product_id<>''
+		ORDER BY sort_order, key`, currentEnvironment(), platform)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load subscription benefits"})
+		return
+	}
+	defer rows.Close()
+	items := []gin.H{}
+	for rows.Next() {
+		var productID string
+		var benefits []string
+		if err := rows.Scan(&productID, pq.Array(&benefits)); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to scan subscription benefits"})
+			return
+		}
+		items = append(items, gin.H{"product_id": productID, "benefits": benefits})
+	}
+	if err := rows.Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load subscription benefits"})
+		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
@@ -127,14 +175,14 @@ func adminSaveProduct(c *gin.Context, plan, update bool) {
 		if update {
 			_, err = db.Get().Exec(`UPDATE subscription_plans SET key=$1, name=$2, environment=$3, platform=$4,
 				coins_granted=$5, price_usd=$6, period=$7, product_id=$8, enabled=$9, sort_order=$10,
-				updated_at=CURRENT_TIMESTAMP WHERE id=$11`, item.Key, item.Name, item.Environment, item.Platform,
-				item.Coins, item.PriceUSD, item.Period, item.ProductID, item.Enabled, item.SortOrder, item.ID)
+				benefits=$11, updated_at=CURRENT_TIMESTAMP WHERE id=$12`, item.Key, item.Name, item.Environment, item.Platform,
+				item.Coins, item.PriceUSD, item.Period, item.ProductID, item.Enabled, item.SortOrder, pq.Array(item.Benefits), item.ID)
 		} else {
 			_, err = db.Get().Exec(`INSERT INTO subscription_plans
-				(id,key,name,environment,platform,coins_granted,price_usd,period,product_id,enabled,sort_order)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, item.ID, item.Key, item.Name,
+				(id,key,name,environment,platform,coins_granted,price_usd,period,product_id,enabled,sort_order,benefits)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, item.ID, item.Key, item.Name,
 				item.Environment, item.Platform, item.Coins, item.PriceUSD, item.Period, item.ProductID,
-				item.Enabled, item.SortOrder)
+				item.Enabled, item.SortOrder, pq.Array(item.Benefits))
 		}
 	} else {
 		if update {

@@ -32,6 +32,7 @@ class _AIPetsPageState extends State<AIPetsPage> {
 
   Future<void> _load() async {
     if (mounted) setState(() => _loading = true);
+    var navigatingToPet = false;
     try {
       final data = await ApiClient.instance.get('/v1/ai-pets/breeds');
       final items = data is Map ? data['items'] : null;
@@ -40,32 +41,36 @@ class _AIPetsPageState extends State<AIPetsPage> {
             .whereType<Map>()
             .map((item) => Map<String, dynamic>.from(item))
             .toList();
-        setState(() => _breeds = breeds);
-        // If already adopted a pet, jump straight to its detail page and
-        // replace this list page so the user cannot adopt another one.
+        // Keep the loading view visible until the adopted pet replaces this
+        // route. Rendering the breed list first exposes it for one frame.
         if (!_autoJumped) {
           for (final breed in breeds) {
             final adoptedId = '${breed['adopted_companion_id'] ?? ''}';
             if (adoptedId.isNotEmpty) {
               _autoJumped = true;
+              navigatingToPet = true;
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                Get.off(() => AIPetHomePage(
-                      companionId: adoptedId,
-                      name:
-                          '${breed['adopted_companion_name'] ?? breed['name'] ?? ''}',
-                      avatarUrl: '${breed['avatar_url'] ?? ''}',
-                      species: '${breed['species'] ?? ''}',
-                    ));
+                if (!mounted) return;
+                Get.off(
+                    () => AIPetHomePage(
+                          companionId: adoptedId,
+                          name:
+                              '${breed['adopted_companion_name'] ?? breed['name'] ?? ''}',
+                          avatarUrl: '${breed['avatar_url'] ?? ''}',
+                          species: '${breed['species'] ?? ''}',
+                        ),
+                    transition: Transition.noTransition);
               });
               break;
             }
           }
         }
+        if (!navigatingToPet) setState(() => _breeds = breeds);
       }
     } catch (_) {
       // Keep Explore usable when remote pet content is temporarily unavailable.
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && !navigatingToPet) setState(() => _loading = false);
     }
   }
 
@@ -167,7 +172,7 @@ class _AIPetsPageState extends State<AIPetsPage> {
       backgroundColor: context.vita.pageBg,
       appBar: AppBar(
           leading: const VitaBackButton(), title: Text('aiPets.title'.tr)),
-      body: _loading && _breeds.isEmpty
+      body: _loading
           ? ListView.builder(
               itemCount: 4,
               itemBuilder: (_, __) => const VitaSkeletonCard(withAvatar: true))

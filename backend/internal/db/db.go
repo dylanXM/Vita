@@ -309,6 +309,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			UNIQUE(environment, platform, key)
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_subscription_plans_scope ON subscription_plans(environment, platform, sort_order)`,
+		`ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS benefits TEXT[] NOT NULL DEFAULT '{}'`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_subscription_plans_product ON subscription_plans(environment, platform, product_id) WHERE product_id <> ''`,
 		`CREATE TABLE IF NOT EXISTS coin_packs (
 			id TEXT PRIMARY KEY,

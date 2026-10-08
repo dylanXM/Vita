@@ -127,10 +127,24 @@ class StoriesPage extends StatelessWidget {
                         'storyHub.quota'.trParams({'remaining': '$remaining'}),
                         style: TextStyle(
                             color: context.vita.subText, fontSize: 12))),
-              ...backgrounds.map((background) => _BackgroundTile(
-                  background: background,
-                  onTap: () =>
-                      _chooseCompanion(context, activeController, background))),
+              if (backgrounds.isNotEmpty)
+                SizedBox(
+                  height: 264,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: backgrounds.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (_, index) {
+                      final background = backgrounds[index];
+                      return _BackgroundTile(
+                        background: background,
+                        onTap: () => _chooseCompanion(
+                            context, activeController, background),
+                      );
+                    },
+                  ),
+                ),
               const SizedBox(height: 10),
               _SectionHeader(title: 'storyHub.myStories'.tr),
               if (activeController.stories.isEmpty)
@@ -141,22 +155,57 @@ class StoriesPage extends StatelessWidget {
                         title: 'storyHub.empty'.tr,
                         subtitle: 'storyHub.emptySub'.tr)),
               ...activeController.stories.map((story) => VitaCard(
-                  radius: 20,
-                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                  padding: EdgeInsets.zero,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: ListTile(
-                        leading: const Icon(Icons.menu_book_outlined,
-                            color: Color(0xFF576B95)),
-                        title: Text('${story['title'] ?? ''}'),
-                        subtitle: Text('storyHub.chapterCount'.trParams(
-                            {'count': '${story['current_chapter_no'] ?? 0}'})),
-                        trailing: const Icon(Icons.chevron_right),
+                    radius: 20,
+                    margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    padding: EdgeInsets.zero,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
                         onTap: () => Get.to(
                             () => StoryDetailPage(storyId: '${story['id']}'),
-                            transition: Transition.cupertino)),
-                  ))),
+                            transition: Transition.cupertino),
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Row(children: [
+                            Container(
+                              width: 48,
+                              height: 54,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF51456E),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.auto_stories_outlined,
+                                  color: Color(0xFFE4D7FF)),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                                child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('${story['title'] ?? ''}',
+                                    style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        color: context.vita.text)),
+                                const SizedBox(height: 5),
+                                Text(
+                                    'storyHub.chapterCount'.trParams({
+                                      'count':
+                                          '${story['current_chapter_no'] ?? 0}'
+                                    }),
+                                    style: TextStyle(
+                                        color: context.vita.subText,
+                                        fontSize: 12)),
+                              ],
+                            )),
+                            Icon(Icons.arrow_forward_rounded,
+                                color: context.vita.subText, size: 18),
+                          ]),
+                        ),
+                      ),
+                    ),
+                  )),
             ],
           ),
         );
@@ -235,40 +284,62 @@ class _BackgroundTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cover = '${background['cover_url'] ?? ''}';
-    return VitaCard(
-        radius: 20,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-        padding: EdgeInsets.zero,
-        child: Material(
-          color: Colors.transparent,
-          child: ListTile(
-              minVerticalPadding: 12,
-              leading: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: SizedBox(
-                      width: 72,
-                      height: 92,
-                      child: cover.isEmpty
-                          ? Container(
-                              color: context.vita.pageBg,
-                              child: const Icon(Icons.auto_stories_outlined,
-                                  color: Color(0xFF576B95)))
-                          : VitaMediaImage(url: cover))),
-              title: Row(children: [
-                Expanded(
-                    child: Text('${background['title'] ?? ''}',
-                        style: const TextStyle(fontWeight: FontWeight.w600))),
-                if (background['custom'] == true)
-                  Text('storyHub.private'.tr,
-                      style: TextStyle(fontSize: 12, color: context.vita.green))
-              ]),
-              subtitle: Text(
-                  '${background['synopsis'] ?? background['world_setting'] ?? ''}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: onTap),
-        ));
+    return SizedBox(
+      width: 214,
+      child: Material(
+        color: context.vita.surface,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SizedBox(
+              width: double.infinity,
+              height: 148,
+              child: cover.isEmpty
+                  ? Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                            colors: [Color(0xFF544678), Color(0xFF263B56)]),
+                      ),
+                      child: const Icon(Icons.auto_stories_outlined,
+                          color: Color(0xFFE4D7FF), size: 52))
+                  : VitaMediaImage(url: cover),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Expanded(
+                          child: Text('${background['title'] ?? ''}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.vita.text))),
+                      if (background['custom'] == true)
+                        Icon(Icons.lock_outline,
+                            size: 15, color: context.vita.green),
+                    ]),
+                    const SizedBox(height: 5),
+                    Text(
+                        '${background['synopsis'] ?? background['world_setting'] ?? ''}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 12,
+                            height: 1.35,
+                            color: context.vita.subText)),
+                  ]),
+            ),
+          ]),
+        ),
+      ),
+    );
   }
 }
 

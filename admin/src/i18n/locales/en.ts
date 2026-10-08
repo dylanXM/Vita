@@ -231,7 +231,7 @@ const en = {
     addPlan: "Add plan", addPack: "Add coin pack", purchases: "Purchases", ledger: "Coin ledger",
     allPlatforms: "All platforms", platformLabel: "Platform",
     platform: { ios: "iOS", android: "Android", web: "Web", system: "System" },
-    name: "Name", key: "Key", coins: "Coins", price: "Price (USD)", period: "Period", productId: "Store product ID",
+    name: "Name", key: "Key", coins: "Coins", price: "Price (USD)", period: "Period", productId: "Store product ID", benefits: "Plan benefits", benefitsHint: "One benefit per line, up to 12 lines. These are descriptions shown in the app; they do not change feature access or grants.",
     periods: { week: "Weekly", month: "Monthly", year: "Yearly" },
     status: "Status", actions: "Actions", enabled: "Enabled", disabled: "Disabled", popular: "Popular",
     edit: "Edit", delete: "Delete", save: "Save", cancel: "Cancel", sortOrder: "Sort order",

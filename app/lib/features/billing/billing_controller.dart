@@ -20,6 +20,7 @@ class BillingController extends GetxController {
   final subscription = Rxn<Map<String, dynamic>>();
   final entitlements = <String>[].obs;
   final offerings = Rxn<Offerings>();
+  final planBenefits = <String, List<String>>{}.obs;
   String? _identifiedUserID;
 
   @override
@@ -44,6 +45,28 @@ class BillingController extends GetxController {
     }
     await refreshSubscription();
     await refreshCredits();
+    await refreshPlanBenefits();
+  }
+
+  Future<void> refreshPlanBenefits() async {
+    try {
+      final data =
+          await ApiClient.instance.get('/v1/subscription-plans/benefits');
+      final items = data is Map ? data['items'] : null;
+      if (items is! List) return;
+      final benefits = <String, List<String>>{};
+      for (final item in items.whereType<Map>()) {
+        final productID = '${item['product_id'] ?? ''}';
+        if (productID.isEmpty) continue;
+        benefits[productID] = (item['benefits'] as List? ?? const [])
+            .whereType<String>()
+            .where((value) => value.trim().isNotEmpty)
+            .toList();
+      }
+      planBenefits.assignAll(benefits);
+    } catch (_) {
+      // Store packages remain purchasable when benefit copy is unavailable.
+    }
   }
 
   Future<void> syncUser(String userID) async {
