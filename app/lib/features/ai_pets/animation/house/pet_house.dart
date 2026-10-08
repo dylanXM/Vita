@@ -10,7 +10,7 @@ class PetHouse extends StatelessWidget {
     required this.worldTime,
     required this.doorAmount,
     required this.lightOn,
-    required this.smokeOn,
+    required this.smokeOpacity,
   });
 
   /// 0..1 昼夜进度。
@@ -25,8 +25,8 @@ class PetHouse extends StatelessWidget {
   /// 夜间窗户亮灯。
   final bool lightOn;
 
-  /// 烟囱冒烟。
-  final bool smokeOn;
+  /// 烟囱烟雾的过渡透明度。
+  final double smokeOpacity;
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +37,7 @@ class PetHouse extends StatelessWidget {
           worldTime: worldTime,
           doorAmount: doorAmount,
           lightOn: lightOn,
-          smokeOn: smokeOn,
+          smokeOpacity: smokeOpacity,
         ),
         size: Size.infinite,
       ),
@@ -51,14 +51,14 @@ class _HousePainter extends CustomPainter {
     required this.worldTime,
     required this.doorAmount,
     required this.lightOn,
-    required this.smokeOn,
+    required this.smokeOpacity,
   });
 
   final double dayProgress;
   final double worldTime;
   final double doorAmount;
   final bool lightOn;
-  final bool smokeOn;
+  final double smokeOpacity;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -67,8 +67,8 @@ class _HousePainter extends CustomPainter {
 
     // 墙体
     final wall = lerp(const Color(0xFF5B4A68), const Color(0xFFF3D9B1));
-    final wallRect = Rect.fromLTWH(
-        size.width * .18, size.height * .42, size.width * .68, size.height * .48);
+    final wallRect = Rect.fromLTWH(size.width * .18, size.height * .42,
+        size.width * .68, size.height * .48);
     final wallPaint = Paint()..color = wall;
     canvas.drawRRect(
         RRect.fromRectAndRadius(wallRect, const Radius.circular(6)), wallPaint);
@@ -89,8 +89,8 @@ class _HousePainter extends CustomPainter {
     canvas.drawRect(chimneyRect, Paint()..color = chimney);
 
     // 窗户
-    final windowRect = Rect.fromLTWH(size.width * .6, size.height * .56,
-        size.width * .2, size.height * .2);
+    final windowRect = Rect.fromLTWH(
+        size.width * .6, size.height * .56, size.width * .2, size.height * .2);
     final windowColor = lightOn
         ? const Color(0xFFFFD27A)
         : lerp(const Color(0xFF26304A), const Color(0xFFB9D6E8));
@@ -124,18 +124,17 @@ class _HousePainter extends CustomPainter {
         Paint()..color = const Color(0xFFFFE9A8));
     canvas.restore();
 
-    // 烟囱冒烟（smokeOn 时两朵烟上升消散）
-    if (smokeOn) {
+    // 烟囱冒烟，跟随升级状态渐入渐出。
+    if (smokeOpacity > 0) {
       for (var i = 0; i < 2; i++) {
         final progress = ((worldTime * 2 + i * .5) % 1.0);
         final p = Paint()
-          ..color = Colors.white
-              .withValues(alpha: (.6 * (1 - progress)).clamp(0.0, .6));
-        final cx = chimneyRect.center.dx +
-            math.sin((worldTime * 6 + i * 3.1)) * 2.4;
+          ..color = Colors.white.withValues(
+              alpha: (.6 * (1 - progress) * smokeOpacity).clamp(0.0, .6));
+        final cx =
+            chimneyRect.center.dx + math.sin((worldTime * 6 + i * 3.1)) * 2.4;
         final cy = chimneyRect.top - 6 - progress * size.height * .16;
-        canvas.drawCircle(
-            Offset(cx, cy), 3.5 + progress * 5, p);
+        canvas.drawCircle(Offset(cx, cy), 3.5 + progress * 5, p);
       }
     }
   }
@@ -146,5 +145,5 @@ class _HousePainter extends CustomPainter {
       old.worldTime != worldTime ||
       old.doorAmount != doorAmount ||
       old.lightOn != lightOn ||
-      old.smokeOn != smokeOn;
+      old.smokeOpacity != smokeOpacity;
 }

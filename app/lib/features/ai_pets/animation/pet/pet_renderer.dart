@@ -1,7 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 
 import '../../ai_pet_avatar.dart';
 import 'mesh_bone_pet.dart';
+import 'pet_motion_spec.dart';
 import 'pet_state_machine.dart';
 
 /// 宠物本体渲染：由状态机 + 世界时钟驱动「网格形变骨骼动画」。
@@ -38,14 +41,31 @@ class PetRenderer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final blinkPath = aiPetClosedEyeAssetPath(imageUrl);
+    final walkingWeight = machine.weightFor(PetState.walking);
+    final walkingDistance = PetMotionSpec.table[PetState.walking]!.driftX;
+    final walkX = walkingWeight *
+        walkingDistance *
+        .5 *
+        math.sin(worldTime * math.pi * 2 * 10);
+    var scale = 0.0;
+    for (final entry in machine.stateWeights.entries) {
+      scale += PetMotionSpec.table[entry.key]!.scale * entry.value;
+    }
     return SizedBox(
       width: 340,
       height: 340,
-      child: MeshBonePet(
-        imageProvider: _provider(imageUrl),
-        closedEyeProvider: blinkPath == null ? null : AssetImage(blinkPath),
-        machine: machine,
-        worldTime: worldTime,
+      child: Transform.translate(
+        offset: Offset(walkX, 0),
+        child: Transform.scale(
+          alignment: Alignment.bottomCenter,
+          scale: scale,
+          child: MeshBonePet(
+            imageProvider: _provider(imageUrl),
+            closedEyeProvider: blinkPath == null ? null : AssetImage(blinkPath),
+            machine: machine,
+            worldTime: worldTime,
+          ),
+        ),
       ),
     );
   }

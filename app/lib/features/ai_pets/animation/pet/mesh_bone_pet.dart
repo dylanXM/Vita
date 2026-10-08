@@ -9,7 +9,7 @@ import 'pet_motion_spec.dart';
 import 'pet_state_machine.dart';
 
 /// 网格形变骨骼姿态：全部为归一化参数（位移以图宽/高比例计，角度为弧度）。
-/// 状态切换时对「旧姿态 → 新姿态」逐参数插值，保证形变连贯。
+/// 状态切换时按各状态权重混合参数，快速连续切换仍保持当前形变。
 class MeshPose {
   const MeshPose({
     this.headDx = 0,
@@ -63,6 +63,32 @@ class MeshPose {
         swingAmt: swingAmt + (other.swingAmt - swingAmt) * t,
         squashAll: squashAll + (other.squashAll - squashAll) * t,
         tailSwing: tailSwing + (other.tailSwing - tailSwing) * t,
+      );
+
+  MeshPose scaled(double weight) => MeshPose(
+        headDx: headDx * weight,
+        headDy: headDy * weight,
+        headRot: headRot * weight,
+        bodyLean: bodyLean * weight,
+        bodyBend: bodyBend * weight,
+        bodyDy: bodyDy * weight,
+        legSquash: legSquash * weight,
+        swingAmt: swingAmt * weight,
+        squashAll: squashAll * weight,
+        tailSwing: tailSwing * weight,
+      );
+
+  MeshPose operator +(MeshPose other) => MeshPose(
+        headDx: headDx + other.headDx,
+        headDy: headDy + other.headDy,
+        headRot: headRot + other.headRot,
+        bodyLean: bodyLean + other.bodyLean,
+        bodyBend: bodyBend + other.bodyBend,
+        bodyDy: bodyDy + other.bodyDy,
+        legSquash: legSquash + other.legSquash,
+        swingAmt: swingAmt + other.swingAmt,
+        squashAll: squashAll + other.squashAll,
+        tailSwing: tailSwing + other.tailSwing,
       );
 }
 
@@ -192,22 +218,29 @@ class _MeshBonePetState extends State<MeshBonePet> {
   }
 
   Future<void> _load() async {
-    _image = null;
-    _closedEye = null;
-    if (mounted) setState(() {});
+    final imageProvider = widget.imageProvider;
+    final closedEyeProvider = widget.closedEyeProvider;
     try {
-      final img = await _resolve(widget.imageProvider);
+      final img = await _resolve(imageProvider);
       ui.Image? close;
-      if (widget.closedEyeProvider != null) {
-        close = await _resolve(widget.closedEyeProvider!);
+      if (closedEyeProvider != null) {
+        try {
+          close = await _resolve(closedEyeProvider);
+        } catch (_) {
+          // A missing blink frame must not hide the primary artwork.
+        }
       }
-      if (!mounted) return;
+      if (!mounted ||
+          widget.imageProvider != imageProvider ||
+          widget.closedEyeProvider != closedEyeProvider) return;
       setState(() {
         _image = img;
         _closedEye = close;
       });
     } catch (_) {
-      if (mounted) setState(() => _failed = true);
+      if (mounted && widget.imageProvider == imageProvider) {
+        setState(() => _failed = true);
+      }
     }
   }
 
@@ -230,68 +263,31 @@ class _MeshBonePetState extends State<MeshBonePet> {
   }
 
   double _blinkAmount(double worldTime) {
-    final progress = (worldTime * 14.28) % 1.0;
+    final progress = (worldTime * 15) % 1.0;
     if (progress < .86 || progress > .96) return 0;
     if (progress < .91) return (progress - .86) / .05;
     return 1 - ((progress - .91) / .05);
   }
 
   /// 计算某状态在给定相位下的基础形变姿态。
-  MeshPose _poseFor(PetState state, double cycle, double worldTime) {
+  MeshPose _poseFor(PetState state, double cycle) {
     final base = kMeshPoseTable[state] ?? kMeshPoseTable[PetState.standing]!;
-    // 呼吸：约 2.6 秒一个周期。
-    final idle = math.sin(worldTime * math.pi * 2 * 23);
+    final spec = PetMotionSpec.table[state]!;
+    final wave = math.sin(cycle * math.pi * 2);
     final actionWave = math.sin(cycle * math.pi);
-    final repeatingWave = math.sin(cycle * math.pi * 2);
-
-    double bodyDy = base.bodyDy;
-    double headRot = base.headRot;
-    double swing = base.swingAmt;
-
-    switch (state) {
-      case PetState.standing:
-      case PetState.idle:
-        bodyDy += idle * .006;
-        break;
-      case PetState.walking:
-        bodyDy += repeatingWave.abs() * .012;
-        headRot += repeatingWave * .02;
-        break;
-      case PetState.happy:
-        bodyDy -= actionWave.abs() * .09;
-        headRot += actionWave * .04;
-        break;
-      case PetState.feeding:
-        bodyDy += repeatingWave.abs() * .02;
-        break;
-      case PetState.sleeping:
-        bodyDy += idle * .005;
-        break;
-      case PetState.levelUp:
-        bodyDy -= actionWave.abs() * .07;
-        break;
-      case PetState.sitting:
-      case PetState.tired:
-      case PetState.hungry:
-      case PetState.thinking:
-      case PetState.sick:
-        bodyDy += idle * .004;
-        break;
-    }
     return MeshPose(
       headDx: base.headDx,
       headDy: base.headDy,
-      headRot: headRot + idle * .02,
+      headRot: base.headRot + spec.sway * wave,
       bodyLean: base.bodyLean,
       bodyBend: base.bodyBend,
-      bodyDy: bodyDy,
+      bodyDy: base.bodyDy +
+          spec.driftY / 340 * wave * .5 -
+          spec.bounce / 340 * actionWave.abs(),
       legSquash: base.legSquash,
-      swingAmt: swing,
-      squashAll: base.squashAll,
-      tailSwing: base.tailSwing + (state == PetState.standing ||
-              state == PetState.idle
-          ? .03 * math.sin(worldTime * math.pi * 4)
-          : 0),
+      swingAmt: base.swingAmt,
+      squashAll: base.squashAll + spec.squash * wave.abs() * .25,
+      tailSwing: base.tailSwing,
     );
   }
 
@@ -308,31 +304,28 @@ class _MeshBonePetState extends State<MeshBonePet> {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFF9B7CFF), width: 2.5),
+                    border:
+                        Border.all(color: const Color(0xFF9B7CFF), width: 2.5),
                   ),
                 ),
               ),
             );
     }
-    final state = widget.machine.state;
     final cycle = widget.machine.controller.value;
     final phase = cycle * math.pi * 2;
-    final from = _poseFor(widget.machine.previous, cycle, widget.worldTime);
-    final to = _poseFor(state, cycle, widget.worldTime);
-    final pose = from.lerp(to, widget.machine.blendValue);
-    final blink = state == PetState.sleeping
-        ? 1.0
-        : state == PetState.feeding
-            ? 0.0
-            : _blinkAmount(widget.worldTime);
+    final weights = widget.machine.stateWeights;
+    var pose = const MeshPose();
+    for (final entry in weights.entries) {
+      pose = pose + _poseFor(entry.key, cycle).scaled(entry.value);
+    }
+    final sleepWeight = weights[PetState.sleeping] ?? 0;
+    final feedWeight = weights[PetState.feeding] ?? 0;
+    final blink = sleepWeight +
+        (1 - sleepWeight - feedWeight) * _blinkAmount(widget.worldTime);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cw = constraints.hasBoundedWidth
-            ? constraints.maxWidth
-            : 300.0;
-        final ch = constraints.hasBoundedHeight
-            ? constraints.maxHeight
-            : 300.0;
+        final cw = constraints.hasBoundedWidth ? constraints.maxWidth : 300.0;
+        final ch = constraints.hasBoundedHeight ? constraints.maxHeight : 300.0;
         return CustomPaint(
           size: Size(cw, ch),
           painter: _MeshPainter(
@@ -366,10 +359,11 @@ Offset offsetAt(MeshPose pose, double u, double v, double phase) {
   }
 
   // ---- 躯干带：前倾 / 弓起 / 呼吸 ----
-  final bodyW = (1 - _smoothstep(.40, .54, v)) * _smoothstep(.66, .80, v);
+  final bodyW = _smoothstep(.30, .44, v) * (1 - _smoothstep(.68, .82, v));
   if (bodyW > 0) {
-    dx += bodyW * (pose.bodyLean * (.72 - v) +
-        pose.bodyBend * math.sin((v - .40) / (.72 - .40) * math.pi));
+    dx += bodyW *
+        (pose.bodyLean * (.72 - v) +
+            pose.bodyBend * math.sin((v - .40) / (.72 - .40) * math.pi));
     dy += bodyW * pose.bodyDy;
   }
 
@@ -388,8 +382,8 @@ Offset offsetAt(MeshPose pose, double u, double v, double phase) {
 
   // ---- 尾巴：侧向摆动 ----
   final tailW = _smoothstep(.60, .74, u) *
-      (1 - _smoothstep(.28, .44, v)) *
-      _smoothstep(.58, .70, v);
+      _smoothstep(.28, .44, v) *
+      (1 - _smoothstep(.70, .84, v));
   if (tailW > 0) {
     dx += tailW * pose.tailSwing * math.sin(phase * 2) * (u - .55) * 3;
     dy += tailW * pose.tailSwing * math.cos(phase * 2) * .06;
@@ -473,7 +467,8 @@ class _MeshPainter extends CustomPainter {
     Offset d2,
   ) {
     // 闭合三角形路径（向外扩张 0.5px，消除相邻三角形间的细缝）。
-    final centroid = Offset((d0.dx + d1.dx + d2.dx) / 3, (d0.dy + d1.dy + d2.dy) / 3);
+    final centroid =
+        Offset((d0.dx + d1.dx + d2.dx) / 3, (d0.dy + d1.dy + d2.dy) / 3);
     Offset grow(Offset p) {
       final d = p - centroid;
       final len = math.sqrt(d.dx * d.dx + d.dy * d.dy);
@@ -506,8 +501,8 @@ class _MeshPainter extends CustomPainter {
   }
 
   /// 由三点对计算 2D 仿射矩阵（src → dst）。
-  Float64List _affine(Offset p0, Offset p1, Offset p2, Offset q0, Offset q1,
-      Offset q2) {
+  Float64List _affine(
+      Offset p0, Offset p1, Offset p2, Offset q0, Offset q1, Offset q2) {
     final ux = p1.dx - p0.dx, uy = p1.dy - p0.dy;
     final vx = p2.dx - p0.dx, vy = p2.dy - p0.dy;
     final det = ux * vy - uy * vx;

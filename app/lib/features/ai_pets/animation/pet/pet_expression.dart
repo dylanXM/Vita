@@ -1,17 +1,50 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'pet_motion_spec.dart';
+import 'pet_state_machine.dart';
 
 /// 状态特效叠加层：♥ / Zzz / 星星 / 汗水 / 音符 / 食盆 / AI 气泡。
 class PetFxLayer extends StatelessWidget {
-  const PetFxLayer({super.key, required this.state, this.speech});
+  const PetFxLayer({super.key, required this.machine, this.speech});
 
-  final PetState state;
+  final PetStateMachine machine;
   final String? speech;
 
   @override
   Widget build(BuildContext context) {
-    final fx = PetMotionSpec.table[state]?.fx ?? const <PetFx>[];
+    final weights = machine.stateWeights;
+    return Stack(children: [
+      for (final entry in weights.entries)
+        if (entry.value > 0 && PetMotionSpec.table[entry.key]!.fx.isNotEmpty)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: entry.value.clamp(0.0, 1.0),
+                child: Transform.translate(
+                  offset: Offset(
+                    0,
+                    entry.key == PetState.feeding
+                        ? 0
+                        : -4 * math.sin(machine.controller.value * math.pi * 2),
+                  ),
+                  child: _buildEffects(PetMotionSpec.table[entry.key]!.fx),
+                ),
+              ),
+            ),
+          ),
+      if (speech != null && speech!.isNotEmpty)
+        Positioned(
+          top: 12,
+          left: 0,
+          right: 0,
+          child: Center(child: PetSpeechBubble(text: speech!)),
+        ),
+    ]);
+  }
+
+  Widget _buildEffects(List<PetFx> fx) {
     return Stack(children: [
       if (fx.contains(PetFx.hearts))
         const Positioned(
@@ -72,16 +105,8 @@ class PetFxLayer extends StatelessWidget {
                 child: DecoratedBox(
                     decoration: BoxDecoration(
                         color: Color(0x22000000),
-                        borderRadius:
-                            BorderRadius.all(Radius.circular(100))))),
+                        borderRadius: BorderRadius.all(Radius.circular(100))))),
           ]),
-        ),
-      if (speech != null && speech!.isNotEmpty)
-        Positioned(
-          top: 12,
-          left: 0,
-          right: 0,
-          child: Center(child: PetSpeechBubble(text: speech!)),
         ),
     ]);
   }
@@ -92,8 +117,8 @@ class _FxStar extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) => Icon(Icons.star_rounded,
-      size: size, color: const Color(0xFFFFB930));
+  Widget build(BuildContext context) =>
+      Icon(Icons.star_rounded, size: size, color: const Color(0xFFFFB930));
 }
 
 /// AI 说话气泡（预留：由 AIPetBrain 的 speech 驱动）。
@@ -111,9 +136,7 @@ class PetSpeechBubble extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           boxShadow: const [
             BoxShadow(
-                color: Color(0x22000000),
-                blurRadius: 8,
-                offset: Offset(0, 3))
+                color: Color(0x22000000), blurRadius: 8, offset: Offset(0, 3))
           ],
         ),
         child: Text(text,

@@ -8,9 +8,7 @@ import 'pet_motion_spec.dart';
 /// 宠物状态机：管理状态迁移、环境定时与动作动画。
 /// 只消费 PetIntent/服务器数值，不感知 AI 来源。
 ///
-/// 连贯性设计：所有状态都驱动在同一个循环时钟 [_motion] 上，状态切换时不重置
-/// 相位；同时用 [_blend]（320ms）把「旧姿态 → 新姿态」插值过渡，渲染层再对
-/// 姿态做线性混合，因此肉眼观察不到跳变。
+/// 所有状态共用循环时钟；320ms 过渡从当前混合姿态出发，可连续打断。
 class PetStateMachine extends ChangeNotifier {
   PetStateMachine({required TickerProvider vsync})
       : _motion = AnimationController(
@@ -20,7 +18,10 @@ class PetStateMachine extends ChangeNotifier {
         _blend = AnimationController(
           vsync: vsync,
           duration: const Duration(milliseconds: 320),
-        );
+        ) {
+    _motion.addListener(notifyListeners);
+    _blend.addListener(notifyListeners);
+  }
 
   /// 循环姿态时钟：所有状态的相位共用这一个时钟，保证切换连续。
   final AnimationController _motion;
@@ -29,26 +30,49 @@ class PetStateMachine extends ChangeNotifier {
   final AnimationController _blend;
 
   PetState _state = PetState.standing;
-  PetState _previous = PetState.standing;
+  Map<PetState, double> _fromWeights = {PetState.standing: 1};
   bool needsSleep = false;
   bool needsFood = false;
   bool needsRest = false;
-  bool reducedMotion = false;
+  bool _reducedMotion = false;
   Timer? _ambientTimer;
   Timer? _actionTimer;
   final math.Random _random = math.Random();
 
   PetState get state => _state;
 
-  /// 过渡开始前的状态（渲染层用它做姿态插值）。
-  PetState get previous => _previous;
-
   AnimationController get controller => _motion;
 
+  bool get reducedMotion => _reducedMotion;
+  set reducedMotion(bool value) {
+    if (_reducedMotion == value) return;
+    _reducedMotion = value;
+    if (value) {
+      _motion.stop();
+      _blend.value = 1;
+    } else {
+      _applySpec();
+    }
+    notifyListeners();
+  }
+
   /// 当前过渡进度 0..1（已缓动），无过渡时为 1。
-  double get blendValue => _blend.isAnimating || _blend.value > 0
-      ? Curves.easeInOutCubic.transform(_blend.value)
-      : 1;
+  double get blendValue => Curves.easeInOutCubic.transform(_blend.value);
+
+  /// State weights at this exact frame. A new transition starts from the
+  /// already blended pose, so interrupting a transition cannot snap back.
+  Map<PetState, double> get stateWeights {
+    final blend = blendValue;
+    final weights = <PetState, double>{};
+    for (final entry in _fromWeights.entries) {
+      final weight = entry.value * (1 - blend);
+      if (weight > 0) weights[entry.key] = weight;
+    }
+    weights[_state] = (weights[_state] ?? 0) + blend;
+    return weights;
+  }
+
+  double weightFor(PetState state) => stateWeights[state] ?? 0;
 
   bool get _locked => _state == PetState.feeding;
 
@@ -71,7 +95,8 @@ class PetStateMachine extends ChangeNotifier {
 
   /// 刷新生命数值：同步「困 / 饿 / 要睡觉」标志。
   /// 状态切换由调用方根据 [suggestFromState] 驱动。
-  void updateVitals({required int energy, required int hunger, required int happiness}) {
+  void updateVitals(
+      {required int energy, required int hunger, required int happiness}) {
     needsSleep = energy < 20;
     needsFood = hunger < 30;
     needsRest = energy < 50;
@@ -82,7 +107,7 @@ class PetStateMachine extends ChangeNotifier {
     if (next == _state) return;
     _actionTimer?.cancel();
     _ambientTimer?.cancel();
-    _previous = _state;
+    _fromWeights = stateWeights;
     _state = next;
     _applySpec();
     if (reducedMotion) {
@@ -97,7 +122,7 @@ class PetStateMachine extends ChangeNotifier {
   void showAction(PetState action, {Duration? duration}) {
     _actionTimer?.cancel();
     _ambientTimer?.cancel();
-    _previous = _state;
+    _fromWeights = stateWeights;
     _state = action;
     _applySpec();
     if (reducedMotion) {
@@ -109,7 +134,7 @@ class PetStateMachine extends ChangeNotifier {
     if (duration != null) {
       _actionTimer = Timer(duration, () {
         if (_state != action) return;
-        _previous = _state;
+        _fromWeights = stateWeights;
         _state = _fallback;
         _applySpec();
         if (reducedMotion) {
@@ -130,7 +155,7 @@ class PetStateMachine extends ChangeNotifier {
     if (_locked || needsSleep) return;
     _ambientTimer = Timer(_nextLifeDelay(), () {
       if (_locked || needsSleep || !hasListeners) return;
-      _previous = _state;
+      _fromWeights = stateWeights;
       _state = _nextLifeState();
       _applySpec();
       if (reducedMotion) {
@@ -161,9 +186,9 @@ class PetStateMachine extends ChangeNotifier {
     final roll = _random.nextDouble();
     return switch (_state) {
       PetState.walking => roll < .5 ? PetState.standing : PetState.sitting,
-      PetState.sitting =>
-        roll < .6 ? PetState.standing : PetState.walking,
-      PetState.tired || PetState.hungry =>
+      PetState.sitting => roll < .6 ? PetState.standing : PetState.walking,
+      PetState.tired ||
+      PetState.hungry =>
         roll < .5 ? PetState.standing : PetState.sitting,
       _ => roll < .42
           ? PetState.sitting

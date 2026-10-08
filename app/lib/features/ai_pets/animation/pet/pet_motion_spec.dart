@@ -81,7 +81,7 @@ class PetMotionSpec {
       duration: Duration(milliseconds: 900),
       repeat: true,
       bounce: 24,
-      scale: 0.06,
+      scale: 1.06,
       fx: [PetFx.hearts],
     ),
     PetState.sleeping: PetMotionSpec(
@@ -97,7 +97,7 @@ class PetMotionSpec {
       duration: Duration(milliseconds: 900),
       repeat: true,
       bounce: 18,
-      scale: 0.12,
+      scale: 1.12,
       fx: [PetFx.stars],
     ),
     PetState.thinking: PetMotionSpec(

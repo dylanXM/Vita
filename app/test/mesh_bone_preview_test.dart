@@ -13,6 +13,7 @@ import 'package:vita/features/ai_pets/animation/pet/pet_state_machine.dart';
 void main() {
   testWidgets('mesh bone pet render preview', (tester) async {
     final machine = PetStateMachine(vsync: const TestVSync());
+    addTearDown(machine.dispose);
     final outDir = Directory('/tmp/mesh_shots');
     outDir.createSync(recursive: true);
 

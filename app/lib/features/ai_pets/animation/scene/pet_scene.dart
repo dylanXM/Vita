@@ -50,10 +50,9 @@ class PetScene extends StatelessWidget {
             builder: (context, _) {
               final dayProgress = worldClock.dayProgress;
               final worldTime = worldClock.worldTime;
-              final state = machine.state;
               final night = dayProgress < .2 || dayProgress > .8;
-              final doorOpen = state == PetState.sleeping;
-              final smokeOn = state == PetState.levelUp;
+              final doorAmount = machine.weightFor(PetState.sleeping);
+              final smokeOpacity = machine.weightFor(PetState.levelUp);
               return Stack(
                 fit: StackFit.expand,
                 children: [
@@ -69,9 +68,9 @@ class PetScene extends StatelessWidget {
                       child: PetHouse(
                         dayProgress: dayProgress,
                         worldTime: worldTime,
-                        doorAmount: doorOpen ? 1 : 0,
+                        doorAmount: doorAmount,
                         lightOn: night,
-                        smokeOn: smokeOn,
+                        smokeOpacity: smokeOpacity,
                       ),
                     ),
                   ),
@@ -87,7 +86,7 @@ class PetScene extends StatelessWidget {
                       worldTime: worldTime,
                     ),
                   ),
-                  PetFxLayer(state: state, speech: speech),
+                  PetFxLayer(machine: machine, speech: speech),
                 ],
               );
             },
