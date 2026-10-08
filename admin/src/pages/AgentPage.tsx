@@ -15,6 +15,7 @@ import type {
 import { errorMessage } from "@/api/client";
 import { PageHeader } from "@/components/page-header";
 import { ConfigurationButton } from "@/components/configuration-button";
+import { AdminImageInput, isAdminImageURL } from "@/components/admin-image-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -149,6 +150,7 @@ function NumberField({ label, value, min, max, onChange }: { label: string; valu
 function PortraitSection({ portraits, onSaved }: { portraits: CompanionPortrait[]; onSaved: () => void }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState<CompanionPortrait | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
   const [name, setName] = useState(""); const [imageUrl, setImageUrl] = useState(""); const [gender, setGender] = useState("custom"); const [tags, setTags] = useState(""); const [isDefault, setIsDefault] = useState(false);
   const reset = () => { setEditing(null); setName(""); setImageUrl(""); setGender("custom"); setTags(""); setIsDefault(false); };
   const edit = (portrait: CompanionPortrait) => { setEditing(portrait); setName(portrait.name); setImageUrl(portrait.image_url); setGender(portrait.gender); setTags(portrait.personality_tags.join(", ")); setIsDefault(portrait.is_default); };
@@ -157,7 +159,7 @@ function PortraitSection({ portraits, onSaved }: { portraits: CompanionPortrait[
     return editing ? agentApi.updatePortrait(editing.id, body) : agentApi.createPortrait(body);
   }, onSuccess: () => { reset(); toast.success(t("agent.saved")); onSaved(); }, onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))) });
   const toggleDefault = useMutation({ mutationFn: (portrait: CompanionPortrait) => agentApi.updatePortrait(portrait.id, { ...portrait, is_default: !portrait.is_default }), onSuccess: onSaved, onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))) });
-  return <Card><CardHeader><CardTitle>{t("agent.portraits")}</CardTitle><CardDescription>{t("agent.portraitsDesc")}</CardDescription></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 md:grid-cols-4"><Field label={t("agent.portraitName")}><Input value={name} onChange={(e) => setName(e.target.value)} /></Field><Field label={t("agent.imageUrl")}><Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} /></Field><Field label={t("agent.gender")}><Input value={gender} onChange={(e) => setGender(e.target.value)} /></Field><Field label={t("agent.tags")}><Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="warm, calm" /></Field></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />{t("agent.defaultCompanion")}</label><div className="flex gap-2"><Button disabled={!name.trim() || !imageUrl.trim() || save.isPending} onClick={() => save.mutate()}>{editing ? <Save /> : <ImagePlus />}{editing ? t("users.save") : t("agent.addPortrait")}</Button>{editing && <Button variant="outline" onClick={reset}>{t("users.cancel")}</Button>}</div><div className="flex flex-wrap gap-3">{portraits.map((portrait) => <div key={portrait.id} className="flex items-center gap-3 rounded-md border p-2">{portrait.image_url.startsWith("asset://") ? <div className="grid size-12 place-items-center rounded-full bg-muted"><Bot className="size-5" /></div> : <img className="size-12 rounded-full object-cover" src={portrait.image_url} alt="" />}<div><div className="text-sm font-medium">{portrait.name}{portrait.is_default ? <Badge className="ms-2" variant="outline">{t("agent.defaultCompanionBadge")}</Badge> : null}</div><div className="text-xs text-muted-foreground">{portrait.personality_tags.join(" · ")}</div></div><Button size="sm" variant="ghost" onClick={() => edit(portrait)}><Pencil />{t("users.edit")}</Button><Button size="sm" variant="ghost" disabled={toggleDefault.isPending} onClick={() => toggleDefault.mutate(portrait)}>{portrait.is_default ? t("agent.removeDefaultCompanion") : t("agent.makeDefaultCompanion")}</Button></div>)}</div></CardContent></Card>;
+  return <Card><CardHeader><CardTitle>{t("agent.portraits")}</CardTitle><CardDescription>{t("agent.portraitsDesc")}</CardDescription></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 md:grid-cols-4"><Field label={t("agent.portraitName")}><Input value={name} onChange={(e) => setName(e.target.value)} /></Field><Field label={t("agent.imageUrl")}><AdminImageInput value={imageUrl} onChange={setImageUrl} onUploadingChange={setImageUploading} /></Field><Field label={t("agent.gender")}><Input value={gender} onChange={(e) => setGender(e.target.value)} /></Field><Field label={t("agent.tags")}><Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="warm, calm" /></Field></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />{t("agent.defaultCompanion")}</label><div className="flex gap-2"><Button disabled={!name.trim() || !isAdminImageURL(imageUrl.trim()) || imageUploading || save.isPending} onClick={() => save.mutate()}>{editing ? <Save /> : <ImagePlus />}{editing ? t("users.save") : t("agent.addPortrait")}</Button>{editing && <Button variant="outline" onClick={reset}>{t("users.cancel")}</Button>}</div><div className="flex flex-wrap gap-3">{portraits.map((portrait) => <div key={portrait.id} className="flex items-center gap-3 rounded-md border p-2">{portrait.image_url.startsWith("asset://") ? <div className="grid size-12 place-items-center rounded-full bg-muted"><Bot className="size-5" /></div> : <img className="size-12 rounded-full object-cover" src={portrait.image_url} alt="" />}<div><div className="text-sm font-medium">{portrait.name}{portrait.is_default ? <Badge className="ms-2" variant="outline">{t("agent.defaultCompanionBadge")}</Badge> : null}</div><div className="text-xs text-muted-foreground">{portrait.personality_tags.join(" · ")}</div></div><Button size="sm" variant="ghost" onClick={() => edit(portrait)}><Pencil />{t("users.edit")}</Button><Button size="sm" variant="ghost" disabled={toggleDefault.isPending} onClick={() => toggleDefault.mutate(portrait)}>{portrait.is_default ? t("agent.removeDefaultCompanion") : t("agent.makeDefaultCompanion")}</Button></div>)}</div></CardContent></Card>;
 }
 
 function CompanionSection({ companions, models, portraits, loading, onSaved }: {
@@ -169,6 +171,7 @@ function CompanionSection({ companions, models, portraits, loading, onSaved }: {
 }) {
   const { t } = useTranslation();
   const [form, setForm] = useState<AdminCompanion | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
   const chatModels = models.filter((model) => (model.configured_scenarios ?? []).includes("text_chat"));
   const save = useMutation({
     mutationFn: () => {
@@ -190,12 +193,14 @@ function CompanionSection({ companions, models, portraits, loading, onSaved }: {
         </TableRow></TableHeader><TableBody>{companions.map((item) => {
           const portrait = portraits.find((entry) => entry.id === item.portrait_id);
           const model = models.find((entry) => entry.id === item.model_id);
+          const imageURL = item.avatar_url || portrait?.image_url || "";
           const summary = [
             `${t("agent.name")}: ${item.name}`,
             `${t("agent.city")}: ${item.city || "—"}`,
             `${t("agent.occupation")}: ${item.occupation || "—"}`,
             `${t("agent.model")}: ${model?.display_name ?? item.model_id ?? t("agent.useDefault")}`,
             `${t("agent.portrait")}: ${portrait?.name ?? item.portrait_id ?? t("agent.noPortrait")}`,
+            `${t("agent.imageUrl")}: ${imageURL || "—"}`,
             `${t("agent.tags")}: ${item.personality_tags.join(", ") || "—"}`,
             `${t("agent.proactiveEnabled")}: ${t(item.proactive_enabled ? "content.enabled" : "content.disabled")}`,
             `${t("agent.persona")}: ${item.persona || "—"}`,
@@ -205,8 +210,8 @@ function CompanionSection({ companions, models, portraits, loading, onSaved }: {
           ];
           return <TableRow key={item.id}>
             <TableCell><div className="flex items-center gap-3">
-              {portrait?.image_url && !portrait.image_url.startsWith("asset://")
-                ? <img src={portrait.image_url} alt="" className="size-10 rounded-full object-cover" />
+              {imageURL.startsWith("http://") || imageURL.startsWith("https://")
+                ? <img src={imageURL} alt="" className="size-10 rounded-full object-cover" />
                 : <span className="grid size-10 place-items-center rounded-full bg-muted"><Bot className="size-5" /></span>}
               <div><div className="font-medium">{item.name}</div><div className="text-xs text-muted-foreground">{item.occupation || "—"}</div></div>
             </div></TableCell>
@@ -235,6 +240,8 @@ function CompanionSection({ companions, models, portraits, loading, onSaved }: {
             </Select></Field>
             <Field label={t("agent.tags")}><Input value={form.personality_tags.join(", ")} onChange={(e) => setForm({ ...form, personality_tags: e.target.value.split(",").map((value) => value.trim()).filter(Boolean) })} /></Field>
           </div>
+          <Field label={t("agent.imageUrl")}><AdminImageInput value={form.avatar_url} allowExistingValue={companions.find((item) => item.id === form.id)?.avatar_url} onChange={(url) => setForm({ ...form, avatar_url: url })} onUploadingChange={setImageUploading} /></Field>
+          <p className="text-xs text-muted-foreground">{t("adminImages.inheritPortrait")}</p>
           <div className="grid gap-3 md:grid-cols-2">
             <Field label={t("agent.persona")}><textarea className={textareaClass} value={form.persona} onChange={(e) => setForm({ ...form, persona: e.target.value })} /></Field>
             <Field label={t("agent.backstory")}><textarea className={textareaClass} value={form.backstory} onChange={(e) => setForm({ ...form, backstory: e.target.value })} /></Field>
@@ -242,7 +249,7 @@ function CompanionSection({ companions, models, portraits, loading, onSaved }: {
             <Field label={t("agent.habitsGoal")}><textarea className={textareaClass} value={`${form.life_habits}\n${form.life_goal}`} onChange={(e) => { const [life_habits, ...rest] = e.target.value.split("\n"); setForm({ ...form, life_habits, life_goal: rest.join("\n") }); }} /></Field>
           </div>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.proactive_enabled} onChange={(e) => setForm({ ...form, proactive_enabled: e.target.checked })} />{t("agent.proactiveEnabled")}</label>
-          <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setForm(null)}>{t("users.cancel")}</Button><Button disabled={save.isPending} onClick={() => save.mutate()}><Save />{t("agent.saveCompanion")}</Button></div>
+          <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setForm(null)}>{t("users.cancel")}</Button><Button disabled={save.isPending || imageUploading || (form.avatar_url.trim() !== "" && form.avatar_url !== companions.find((item) => item.id === form.id)?.avatar_url && !isAdminImageURL(form.avatar_url.trim()))} onClick={() => save.mutate()}><Save />{t("agent.saveCompanion")}</Button></div>
         </div>}
       </DialogContent>
     </Dialog>

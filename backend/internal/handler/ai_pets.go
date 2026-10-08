@@ -98,6 +98,10 @@ func saveAIPetBreed(c *gin.Context, id string, create bool) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name and species are required"})
 		return
 	}
+	if !validArtworkURL(input.AvatarURL) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "pet avatar must be an HTTP(S) image URL or bundled asset"})
+		return
+	}
 	tx, err := db.Get().BeginTx(c.Request.Context(), nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save AI pet breed"})
@@ -126,6 +130,10 @@ func saveAIPetBreed(c *gin.Context, id string, create bool) {
 	}
 	if err == nil {
 		_, err = tx.Exec(`DELETE FROM ai_pet_breed_subscription_plans WHERE breed_id=$1`, id)
+	}
+	if err == nil && !create {
+		_, err = tx.Exec(`UPDATE companions SET avatar_url=$2,updated_at=CURRENT_TIMESTAMP
+			WHERE pet_breed_id=$1 AND creation_source='ai_pet' AND avatar_url IS DISTINCT FROM $2`, id, input.AvatarURL)
 	}
 	for _, planID := range input.SubscriptionPlanIDs {
 		if err == nil {
@@ -258,6 +266,7 @@ func AdoptAIPet(c *gin.Context) {
 }
 
 type petStateResponse struct {
+	AvatarURL  string     `json:"avatar_url"`
 	Hunger     int        `json:"hunger"`
 	Happiness  int        `json:"happiness"`
 	Energy     int        `json:"energy"`
@@ -342,11 +351,11 @@ func loadAndDecayPetState(ctx context.Context, userID, companionID string) (petS
 	var state petStateResponse
 	var lastDecay time.Time
 	var lastFed sql.NullTime
-	err := db.Get().QueryRowContext(ctx, `SELECT s.hunger,s.happiness,s.energy,s.health,s.experience,s.level,s.last_fed_at,s.last_decay_at,u.credits_balance,
+	err := db.Get().QueryRowContext(ctx, `SELECT c.avatar_url,s.hunger,s.happiness,s.energy,s.health,s.experience,s.level,s.last_fed_at,s.last_decay_at,u.credits_balance,
 		COALESCE((SELECT p.coins FROM credit_products p WHERE p.environment=u.environment AND p.product_key='ai_pet_feed' AND p.enabled=true),5)
 		FROM ai_pet_states s JOIN companions c ON c.id=s.companion_id JOIN users u ON u.id=c.user_id
 		WHERE c.id=$1 AND c.user_id=$2 AND c.active=true AND c.creation_source='ai_pet'`, companionID, userID).Scan(
-		&state.Hunger, &state.Happiness, &state.Energy, &state.Health, &state.Experience, &state.Level, &lastFed, &lastDecay, &state.Coins, &state.FeedCoins)
+		&state.AvatarURL, &state.Hunger, &state.Happiness, &state.Energy, &state.Health, &state.Experience, &state.Level, &lastFed, &lastDecay, &state.Coins, &state.FeedCoins)
 	if err != nil {
 		return state, err
 	}

@@ -589,7 +589,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			('system-nora','Nora','asset://assets/companions/nora.png','girlfriend','["witty","curious","outgoing"]'::jsonb,true,20),
 			('system-leo','Leo','asset://assets/companions/leo.png','boyfriend','["calm","creative","independent"]'::jsonb,true,30),
 			('system-kai','Kai','asset://assets/companions/kai.png','boyfriend','["thoughtful","playful","ambitious"]'::jsonb,true,40)
-		ON CONFLICT (id) DO UPDATE SET image_url=EXCLUDED.image_url, personality_tags=EXCLUDED.personality_tags`,
+		ON CONFLICT (id) DO NOTHING`,
 		`UPDATE companion_portraits SET is_default=true WHERE id='system-mia' AND NOT EXISTS (SELECT 1 FROM companion_portraits WHERE is_default=true)`,
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS model_id TEXT REFERENCES ai_models(id) ON DELETE SET NULL`,
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS personality_tags JSONB NOT NULL DEFAULT '[]'::jsonb`,
@@ -838,6 +838,16 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_media_assets_user ON media_assets(user_id,created_at DESC)`,
+		`CREATE TABLE IF NOT EXISTS admin_images (
+			id TEXT PRIMARY KEY,
+			mime_type TEXT NOT NULL,
+			data BYTEA NOT NULL,
+			size_bytes INTEGER NOT NULL,
+			storage_provider TEXT NOT NULL DEFAULT 'postgres',
+			object_key TEXT NOT NULL DEFAULT '',
+			storage_environment TEXT NOT NULL,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
 		`CREATE TABLE IF NOT EXISTS media_storage_settings (environment TEXT PRIMARY KEY CHECK (environment IN ('dev','beta','prod')),active_provider TEXT NOT NULL DEFAULT 'postgres' CHECK (active_provider IN ('postgres','r2','cos')),updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
 		`INSERT INTO media_storage_settings(environment) VALUES('dev'),('beta'),('prod') ON CONFLICT(environment) DO NOTHING`,
 		`CREATE TABLE IF NOT EXISTS media_storage_configs (environment TEXT NOT NULL CHECK (environment IN ('dev','beta','prod')),provider TEXT NOT NULL CHECK (provider IN ('r2','cos')),enabled BOOLEAN NOT NULL DEFAULT false,endpoint TEXT NOT NULL DEFAULT '',bucket TEXT NOT NULL DEFAULT '',region TEXT NOT NULL DEFAULT '',access_key_ciphertext TEXT NOT NULL DEFAULT '',secret_key_ciphertext TEXT NOT NULL DEFAULT '',created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(environment,provider))`,

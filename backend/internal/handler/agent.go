@@ -923,6 +923,11 @@ func upsertPortrait(c *gin.Context, id string) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	input.ImageURL = strings.TrimSpace(input.ImageURL)
+	if !validArtworkURL(input.ImageURL) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "portrait image must be an HTTP(S) image URL or bundled asset"})
+		return
+	}
 	if id == "" {
 		id = uuid.New().String()
 	}
@@ -1053,6 +1058,7 @@ type adminCompanionInput struct {
 	LifeGoal          string          `json:"life_goal"`
 	Backstory         string          `json:"backstory"`
 	PortraitID        *string         `json:"portrait_id"`
+	AvatarURL         *string         `json:"avatar_url"`
 	ModelID           *string         `json:"model_id"`
 	ProactiveEnabled  *bool           `json:"proactive_enabled"`
 	Active            *bool           `json:"active"`
@@ -1061,11 +1067,16 @@ type adminCompanionInput struct {
 }
 
 func AdminListCompanions(c *gin.Context) {
+	environment := strings.TrimSpace(c.DefaultQuery("environment", currentEnvironment()))
+	if environment != "dev" && environment != "beta" && environment != "prod" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid environment"})
+		return
+	}
 	rows, err := db.Get().Query(`
 		SELECT c.id,c.user_id,u.email,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.city,''),COALESCE(c.occupation,''),
 		COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags,c.speaking_style,c.likes,c.dislikes,
-		c.life_habits,c.life_goal,c.backstory,c.model_id,c.portrait_id,c.proactive_enabled,c.active,c.voice_enabled,c.voice_config,c.created_at,c.updated_at
-		FROM companions c JOIN users u ON u.id=c.user_id ORDER BY c.created_at DESC`)
+		c.life_habits,c.life_goal,c.backstory,c.model_id,c.portrait_id,c.avatar_url,c.proactive_enabled,c.active,c.voice_enabled,c.voice_config,c.created_at,c.updated_at
+		FROM companions c JOIN users u ON u.id=c.user_id WHERE u.environment=$1 ORDER BY c.created_at DESC`, environment)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list companions"})
 		return
@@ -1077,14 +1088,15 @@ func AdminListCompanions(c *gin.Context) {
 		var speakingStyle, likes, dislikes, lifeHabits, lifeGoal, backstory string
 		var tags json.RawMessage
 		var modelID, portraitID sql.NullString
+		var avatarURL string
 		var proactive, active, voiceEnabled bool
 		var voiceConfig json.RawMessage
 		var created, updated time.Time
-		if err := rows.Scan(&id, &userID, &email, &name, &gender, &persona, &city, &occupation, &interests, &relationshipStage, &tags, &speakingStyle, &likes, &dislikes, &lifeHabits, &lifeGoal, &backstory, &modelID, &portraitID, &proactive, &active, &voiceEnabled, &voiceConfig, &created, &updated); err != nil {
+		if err := rows.Scan(&id, &userID, &email, &name, &gender, &persona, &city, &occupation, &interests, &relationshipStage, &tags, &speakingStyle, &likes, &dislikes, &lifeHabits, &lifeGoal, &backstory, &modelID, &portraitID, &avatarURL, &proactive, &active, &voiceEnabled, &voiceConfig, &created, &updated); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read companions"})
 			return
 		}
-		items = append(items, gin.H{"id": id, "user_id": userID, "user_email": email, "name": name, "gender": gender, "persona": persona, "city": city, "occupation": occupation, "interests": interests, "relationship_stage": relationshipStage, "personality_tags": tags, "speaking_style": speakingStyle, "likes": likes, "dislikes": dislikes, "life_habits": lifeHabits, "life_goal": lifeGoal, "backstory": backstory, "model_id": nullString(modelID), "portrait_id": nullString(portraitID), "proactive_enabled": proactive, "active": active, "voice_enabled": voiceEnabled, "voice_config": voiceConfig, "created_at": created, "updated_at": updated})
+		items = append(items, gin.H{"id": id, "user_id": userID, "user_email": email, "name": name, "gender": gender, "persona": persona, "city": city, "occupation": occupation, "interests": interests, "relationship_stage": relationshipStage, "personality_tags": tags, "speaking_style": speakingStyle, "likes": likes, "dislikes": dislikes, "life_habits": lifeHabits, "life_goal": lifeGoal, "backstory": backstory, "model_id": nullString(modelID), "portrait_id": nullString(portraitID), "avatar_url": avatarURL, "proactive_enabled": proactive, "active": active, "voice_enabled": voiceEnabled, "voice_config": voiceConfig, "created_at": created, "updated_at": updated})
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
@@ -1101,6 +1113,17 @@ func saveAdminCompanion(c *gin.Context, id string) {
 	if id == "" && input.UserID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id is required"})
 		return
+	}
+	if input.AvatarURL != nil {
+		avatarURL := strings.TrimSpace(*input.AvatarURL)
+		if avatarURL != "" && !validArtworkURL(avatarURL) {
+			var currentURL string
+			if id == "" || db.Get().QueryRow(`SELECT avatar_url FROM companions WHERE id=$1`, id).Scan(&currentURL) != nil || avatarURL != currentURL {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "companion avatar must be an HTTP(S) image URL or bundled asset"})
+				return
+			}
+		}
+		input.AvatarURL = &avatarURL
 	}
 	tags, _ := json.Marshal(input.PersonalityTags)
 	proactive, active := true, true
@@ -1146,8 +1169,8 @@ func saveAdminCompanion(c *gin.Context, id string) {
 			return
 		}
 		defer tx.Rollback()
-		_, err = tx.Exec(`INSERT INTO companions (id,user_id,name,gender,persona,city,occupation,interests,relationship_stage,personality_tags,speaking_style,likes,dislikes,life_habits,life_goal,backstory,portrait_id,model_id,creation_source,proactive_enabled,active,voice_enabled,voice_config) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'admin',$19,$20,$21,$22)`,
-			id, input.UserID, input.Name, input.Gender, input.Persona, input.City, input.Occupation, input.Interests, input.RelationshipStage, tags, input.SpeakingStyle, input.Likes, input.Dislikes, input.LifeHabits, input.LifeGoal, input.Backstory, input.PortraitID, input.ModelID, proactive, active, voiceEnabled, voiceConfig)
+		_, err = tx.Exec(`INSERT INTO companions (id,user_id,name,gender,persona,city,occupation,interests,relationship_stage,personality_tags,speaking_style,likes,dislikes,life_habits,life_goal,backstory,portrait_id,model_id,avatar_url,creation_source,proactive_enabled,active,voice_enabled,voice_config) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,COALESCE($19,''),'admin',$20,$21,$22,$23)`,
+			id, input.UserID, input.Name, input.Gender, input.Persona, input.City, input.Occupation, input.Interests, input.RelationshipStage, tags, input.SpeakingStyle, input.Likes, input.Dislikes, input.LifeHabits, input.LifeGoal, input.Backstory, input.PortraitID, input.ModelID, input.AvatarURL, proactive, active, voiceEnabled, voiceConfig)
 		if err == nil {
 			_, err = tx.Exec(`INSERT INTO relationship_states (companion_id) VALUES ($1) ON CONFLICT DO NOTHING`, id)
 		}
@@ -1166,8 +1189,8 @@ func saveAdminCompanion(c *gin.Context, id string) {
 		if len(input.VoiceConfig) > 0 {
 			voiceConfig = input.VoiceConfig
 		}
-		result, err := db.Get().Exec(`UPDATE companions SET name=$2,gender=$3,persona=$4,city=$5,occupation=$6,interests=$7,relationship_stage=$8,personality_tags=$9,speaking_style=$10,likes=$11,dislikes=$12,life_habits=$13,life_goal=$14,backstory=$15,portrait_id=$16,model_id=$17,proactive_enabled=$18,active=$19,voice_enabled=COALESCE($20,voice_enabled),voice_config=COALESCE($21,voice_config),updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
-			id, input.Name, input.Gender, input.Persona, input.City, input.Occupation, input.Interests, input.RelationshipStage, tags, input.SpeakingStyle, input.Likes, input.Dislikes, input.LifeHabits, input.LifeGoal, input.Backstory, input.PortraitID, input.ModelID, proactive, active, input.VoiceEnabled, voiceConfig)
+		result, err := db.Get().Exec(`UPDATE companions SET name=$2,gender=$3,persona=$4,city=$5,occupation=$6,interests=$7,relationship_stage=$8,personality_tags=$9,speaking_style=$10,likes=$11,dislikes=$12,life_habits=$13,life_goal=$14,backstory=$15,portrait_id=$16,model_id=$17,proactive_enabled=$18,active=$19,voice_enabled=COALESCE($20,voice_enabled),voice_config=COALESCE($21,voice_config),avatar_url=COALESCE($22,avatar_url),updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
+			id, input.Name, input.Gender, input.Persona, input.City, input.Occupation, input.Interests, input.RelationshipStage, tags, input.SpeakingStyle, input.Likes, input.Dislikes, input.LifeHabits, input.LifeGoal, input.Backstory, input.PortraitID, input.ModelID, proactive, active, input.VoiceEnabled, voiceConfig, input.AvatarURL)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to update companion"})
 			return

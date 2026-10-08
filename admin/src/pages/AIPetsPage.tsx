@@ -9,6 +9,7 @@ import { errorMessage } from "@/api/client";
 import type { AIPetBreed, AIPetBreedInput, Environment } from "@/api/types";
 import { ENVIRONMENTS } from "@/api/types";
 import { ConfigurationButton } from "@/components/configuration-button";
+import { AdminImageInput, isAdminImageURL } from "@/components/admin-image-input";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ export function AIPetsPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState<AIPetBreedInput>(emptyForm("dev"));
+  const [imageUploading, setImageUploading] = useState(false);
 
   useEffect(() => {
     if (!environment && envQuery.data?.environment) setEnvironment(envQuery.data.environment);
@@ -126,7 +128,7 @@ export function AIPetsPage() {
             <Field label={t("aiPets.name")}><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
             <Field label={t("aiPets.species")}><Input value={form.species} onChange={(e) => setForm({ ...form, species: e.target.value })} /></Field>
             <Field label={t("aiPets.personality")}><Input value={form.personality} onChange={(e) => setForm({ ...form, personality: e.target.value })} placeholder={t("aiPets.personalityHint")} /></Field>
-            <Field label={t("aiPets.avatarUrl")}><Input value={form.avatar_url} onChange={(e) => setForm({ ...form, avatar_url: e.target.value })} placeholder="https://…" /></Field>
+            <Field label={t("aiPets.avatarUrl")}><AdminImageInput value={form.avatar_url} onChange={(url) => setForm((current) => ({ ...current, avatar_url: url }))} onUploadingChange={setImageUploading} /></Field>
             <Field wide label={t("aiPets.description")}><textarea className="min-h-24 w-full rounded-md border bg-background p-3 text-sm" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
             <Field label={t("aiPets.sortOrder")}><Input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) || 0 })} /></Field>
             <div className="flex items-end"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />{t("content.enabled")}</label></div>
@@ -137,7 +139,7 @@ export function AIPetsPage() {
             </div>
           </div>
         </div>
-        <DialogFooter><Button variant="outline" onClick={close}>{t("users.cancel")}</Button><Button disabled={!activeEnv || !form.name.trim() || !form.species.trim() || save.isPending} onClick={() => save.mutate()}>{editing ? <Save /> : <Plus />}{editing ? t("aiPets.update") : t("aiPets.add")}</Button></DialogFooter>
+        <DialogFooter><Button variant="outline" onClick={close}>{t("users.cancel")}</Button><Button disabled={!activeEnv || !form.name.trim() || !form.species.trim() || !isAdminImageURL(form.avatar_url.trim()) || imageUploading || save.isPending} onClick={() => save.mutate()}>{editing ? <Save /> : <Plus />}{editing ? t("aiPets.update") : t("aiPets.add")}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   </div>;

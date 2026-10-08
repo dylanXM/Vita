@@ -28,24 +28,25 @@ func IsValidEnvironment(env string) bool {
 }
 
 type Config struct {
-	Env             string
-	HTTPAddr        string
-	DBDriver        string
-	DBDSN           string
-	RedisURL        string
-	RedisPassword   string
-	JWTSecret       string
-	JWTTTL          time.Duration
-	JWTRefreshTTL   time.Duration
-	AllowedOrigins  []string
-	MockGeneration  bool
-	AutoMigrate     bool
-	StorageProvider string
-	S3Bucket        string
-	S3Endpoint      string
-	S3AccessKey     string
-	S3SecretKey     string
-	ServerPort      string
+	Env              string
+	HTTPAddr         string
+	DBDriver         string
+	DBDSN            string
+	RedisURL         string
+	RedisPassword    string
+	JWTSecret        string
+	JWTTTL           time.Duration
+	JWTRefreshTTL    time.Duration
+	AllowedOrigins   []string
+	MockGeneration   bool
+	AutoMigrate      bool
+	StorageProvider  string
+	S3Bucket         string
+	S3Endpoint       string
+	S3AccessKey      string
+	S3SecretKey      string
+	ServerPort       string
+	PublicAPIBaseURL string
 
 	// AdminEmail + AdminPassword seed the initial administrator account on
 	// startup (see db.EnsureAdmin). AdminEmails is the comma-separated
@@ -91,24 +92,25 @@ type Config struct {
 
 func Load() *Config {
 	return &Config{
-		Env:             strings.ToLower(getEnv("VITA_ENV", EnvDev)),
-		HTTPAddr:        getEnv("VITA_HTTP_ADDR", ":8080"),
-		DBDriver:        getEnv("VITA_DB_DRIVER", "postgres"),
-		DBDSN:           getEnv("VITA_DB_DSN", "postgres://tovideo:tovideo_dev_password@127.0.0.1:5433/vita?sslmode=disable"),
-		RedisURL:        getEnv("VITA_REDIS_URL", "redis://localhost:6380/0"),
-		RedisPassword:   getEnv("REDIS_PASSWORD", ""),
-		JWTSecret:       getEnv("VITA_JWT_SECRET", "dev-secret-change-me-32-characters-min"),
-		JWTTTL:          durationEnv(getEnv("VITA_JWT_ACCESS_TTL", "15m"), 15*time.Minute),
-		JWTRefreshTTL:   durationEnv(getEnv("VITA_JWT_REFRESH_TTL", "720h"), 30*24*time.Hour),
-		AllowedOrigins:  splitCSV(getEnv("VITA_ALLOWED_ORIGINS", "http://localhost:8261,http://localhost:8263")),
-		MockGeneration:  getEnv("VITA_MOCK_GENERATION", "true") == "true",
-		AutoMigrate:     getEnv("VITA_AUTO_MIGRATE", "true") == "true",
-		StorageProvider: getEnv("VITA_STORAGE_PROVIDER", "s3"),
-		S3Bucket:        getEnv("VITA_S3_BUCKET", "vita-media"),
-		S3Endpoint:      getEnv("VITA_S3_ENDPOINT", "http://rustfs:9000"),
-		S3AccessKey:     getEnv("VITA_S3_ACCESS_KEY", "vita_rustfs"),
-		S3SecretKey:     getEnv("VITA_S3_SECRET_KEY", "vita_rustfs_secret"),
-		ServerPort:      getEnv("SERVER_PORT", "8080"),
+		Env:              strings.ToLower(getEnv("VITA_ENV", EnvDev)),
+		HTTPAddr:         getEnv("VITA_HTTP_ADDR", ":8080"),
+		DBDriver:         getEnv("VITA_DB_DRIVER", "postgres"),
+		DBDSN:            getEnv("VITA_DB_DSN", "postgres://tovideo:tovideo_dev_password@127.0.0.1:5433/vita?sslmode=disable"),
+		RedisURL:         getEnv("VITA_REDIS_URL", "redis://localhost:6380/0"),
+		RedisPassword:    getEnv("REDIS_PASSWORD", ""),
+		JWTSecret:        getEnv("VITA_JWT_SECRET", "dev-secret-change-me-32-characters-min"),
+		JWTTTL:           durationEnv(getEnv("VITA_JWT_ACCESS_TTL", "15m"), 15*time.Minute),
+		JWTRefreshTTL:    durationEnv(getEnv("VITA_JWT_REFRESH_TTL", "720h"), 30*24*time.Hour),
+		AllowedOrigins:   splitCSV(getEnv("VITA_ALLOWED_ORIGINS", "http://localhost:8261,http://localhost:8263")),
+		MockGeneration:   getEnv("VITA_MOCK_GENERATION", "true") == "true",
+		AutoMigrate:      getEnv("VITA_AUTO_MIGRATE", "true") == "true",
+		StorageProvider:  getEnv("VITA_STORAGE_PROVIDER", "s3"),
+		S3Bucket:         getEnv("VITA_S3_BUCKET", "vita-media"),
+		S3Endpoint:       getEnv("VITA_S3_ENDPOINT", "http://rustfs:9000"),
+		S3AccessKey:      getEnv("VITA_S3_ACCESS_KEY", "vita_rustfs"),
+		S3SecretKey:      getEnv("VITA_S3_SECRET_KEY", "vita_rustfs_secret"),
+		ServerPort:       getEnv("SERVER_PORT", "8080"),
+		PublicAPIBaseURL: strings.TrimRight(getEnv("VITA_PUBLIC_API_BASE_URL", ""), "/"),
 
 		AdminEmail:    getEnv("VITA_ADMIN_EMAIL", ""),
 		AdminPassword: getEnv("VITA_ADMIN_PASSWORD", ""),
@@ -182,6 +184,12 @@ func (c *Config) Validate() error {
 	redisURL, err := url.Parse(c.RedisURL)
 	if err != nil || (redisURL.Scheme != "redis" && redisURL.Scheme != "rediss") || redisURL.Host == "" {
 		return fmt.Errorf("VITA_REDIS_URL must be a valid redis:// or rediss:// URL")
+	}
+	if c.PublicAPIBaseURL != "" {
+		publicURL, err := url.Parse(c.PublicAPIBaseURL)
+		if err != nil || (publicURL.Scheme != "http" && publicURL.Scheme != "https") || publicURL.Host == "" || publicURL.Path != "" || publicURL.RawQuery != "" || publicURL.Fragment != "" || publicURL.User != nil {
+			return fmt.Errorf("VITA_PUBLIC_API_BASE_URL must be an HTTP(S) origin without a path")
+		}
 	}
 	if c.Env == EnvBeta || c.Env == EnvProd {
 		for name, value := range map[string]string{

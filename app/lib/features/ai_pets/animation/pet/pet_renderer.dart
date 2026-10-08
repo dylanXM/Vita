@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
 import '../../ai_pet_avatar.dart';
 import 'mesh_bone_pet.dart';
@@ -26,20 +26,27 @@ class PetRenderer extends StatelessWidget {
   final PetStateMachine machine;
   final double worldTime;
 
-  static const String _fallbackAsset = 'assets/ai_pets/cat_orange.png';
-
   ImageProvider _provider(String url) {
     if (url.startsWith('asset://')) {
       return AssetImage(url.substring('asset://'.length));
     }
-    if (url.isNotEmpty && url.startsWith('http')) {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
       return NetworkImage(url);
     }
-    return const AssetImage(_fallbackAsset);
+    throw ArgumentError.value(url, 'url', 'Unsupported pet image URL');
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!imageUrl.startsWith('asset://') &&
+        !imageUrl.startsWith('http://') &&
+        !imageUrl.startsWith('https://')) {
+      return const SizedBox(
+        width: 340,
+        height: 340,
+        child: Icon(Icons.pets_rounded, size: 120),
+      );
+    }
     final blinkPath = aiPetClosedEyeAssetPath(imageUrl);
     final walkingWeight = machine.weightFor(PetState.walking);
     final walkingDistance = PetMotionSpec.table[PetState.walking]!.driftX;

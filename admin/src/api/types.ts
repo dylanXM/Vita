@@ -511,6 +511,7 @@ export interface AdminCompanion {
   backstory: string;
   model_id: string | null;
   portrait_id: string | null;
+  avatar_url: string;
   proactive_enabled: boolean;
   active: boolean;
   voice_enabled: boolean;

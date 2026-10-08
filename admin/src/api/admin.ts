@@ -192,6 +192,14 @@ export const aiPetBreedsApi = {
     http.put<AIPetBreed>(`/admin/ai-pet-breeds/${id}`, body),
 };
 
+export const adminImagesApi = {
+  upload: async (file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return http.post<{ url: string }>("/admin/images", body);
+  },
+};
+
 export const storiesApi = {
   config: (environment: Environment, signal?: AbortSignal) =>
     http.get<StoryConfig>("/admin/story-config", { params: { environment }, signal }),

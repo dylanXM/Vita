@@ -51,11 +51,16 @@ class _AIPetHomePageState extends State<AIPetHomePage>
   Map<String, dynamic> get _companion => {
         'id': widget.companionId,
         'name': widget.name,
-        'portrait_url': widget.avatarUrl,
+        'portrait_url': _currentAvatarUrl,
         'occupation': widget.species,
         'creation_source': 'ai_pet',
         'friendship_active': true,
       };
+
+  String get _currentAvatarUrl {
+    final saved = _state?['avatar_url'];
+    return saved is String && saved.isNotEmpty ? saved : widget.avatarUrl;
+  }
 
   @override
   void initState() {
@@ -228,7 +233,7 @@ class _AIPetHomePageState extends State<AIPetHomePage>
             name: widget.name,
             species: widget.species,
             level: level,
-            imageUrl: widget.avatarUrl,
+            imageUrl: _currentAvatarUrl,
             machine: _machine,
             clock: _worldClock,
             weather: _weather,
@@ -260,8 +265,7 @@ class _AIPetHomePageState extends State<AIPetHomePage>
                 decoration: BoxDecoration(
                   color: context.vita.glass,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                      color: context.vita.glassRing, width: .8),
+                  border: Border.all(color: context.vita.glassRing, width: .8),
                 ),
                 child: CircularProgressIndicator(
                     strokeWidth: 2.5, color: context.vita.green),

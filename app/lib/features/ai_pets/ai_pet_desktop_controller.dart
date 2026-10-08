@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 
 import '../../core/api_client.dart';
@@ -10,6 +12,7 @@ class AIPetDesktopController extends GetxController {
   final pet = Rxn<Map<String, dynamic>>();
   Worker? _settingsWorker;
   Worker? _profileWorker;
+  Timer? _refreshTimer;
   int _requestGeneration = 0;
 
   @override
@@ -24,6 +27,8 @@ class AIPetDesktopController extends GetxController {
       (_) => refreshPet(),
     );
     refreshPet();
+    _refreshTimer =
+        Timer.periodic(const Duration(minutes: 5), (_) => refreshPet());
   }
 
   Future<void> refreshPet() async {
@@ -48,12 +53,13 @@ class AIPetDesktopController extends GetxController {
       }
       pet.value = adopted == null ? null : Map<String, dynamic>.from(adopted);
     } catch (_) {
-      if (generation == _requestGeneration) pet.value = null;
+      // Keep the current pet visible until the next successful refresh.
     }
   }
 
   @override
   void onClose() {
+    _refreshTimer?.cancel();
     _settingsWorker?.dispose();
     _profileWorker?.dispose();
     super.onClose();

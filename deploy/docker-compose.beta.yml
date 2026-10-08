@@ -23,6 +23,7 @@ services:
         condition: service_completed_successfully
     environment:
       VITA_ENV: "${VITA_ENV:-beta}"
+      VITA_PUBLIC_API_BASE_URL: "${WEBAPP_API_URL:?set public WEBAPP_API_URL in .env.beta}"
       VITA_HTTP_ADDR: ":8080"
       VITA_DB_DSN: "${VITA_DB_DSN:?set VITA_DB_DSN in .env.beta}"
       VITA_REDIS_URL: "${VITA_REDIS_URL:?set VITA_REDIS_URL in .env.beta}"

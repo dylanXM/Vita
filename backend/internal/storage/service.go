@@ -100,6 +100,67 @@ func (s *Service) Store(ctx context.Context, userID, id, kind, mimeType string, 
 	return nil
 }
 
+// StoreAdminImage keeps public configuration artwork independent of the admin
+// account that uploaded it, while using the environment's selected provider.
+func (s *Service) StoreAdminImage(ctx context.Context, id, mimeType string, data []byte) error {
+	provider, cfg, err := s.activeProvider(ctx)
+	if err != nil {
+		return err
+	}
+	if provider == ProviderPostgres {
+		_, err = s.db.ExecContext(ctx, `INSERT INTO admin_images(id,mime_type,data,size_bytes,storage_provider,object_key,storage_environment)
+			VALUES($1,$2,$3,$4,'postgres','',$5)`, id, mimeType, data, len(data), s.environment)
+		return err
+	}
+	client, err := s.newClient(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("create %s storage client: %w", provider, err)
+	}
+	objectKey := fmt.Sprintf("admin-images/%s/%s", s.environment, id)
+	if err := client.Put(ctx, cfg.Bucket, objectKey, mimeType, data); err != nil {
+		return fmt.Errorf("upload admin image to %s: %w", provider, err)
+	}
+	if _, err := s.db.ExecContext(ctx, `INSERT INTO admin_images(id,mime_type,data,size_bytes,storage_provider,object_key,storage_environment)
+		VALUES($1,$2,$3,$4,$5,$6,$7)`, id, mimeType, []byte{}, len(data), provider, objectKey, s.environment); err != nil {
+		_ = client.Delete(ctx, cfg.Bucket, objectKey)
+		return err
+	}
+	return nil
+}
+
+func (s *Service) OpenAdminImage(ctx context.Context, id string) (*Media, error) {
+	var mimeType, provider, objectKey, environment string
+	var data []byte
+	var size int64
+	err := s.db.QueryRowContext(ctx, `SELECT mime_type,data,size_bytes,storage_provider,object_key,storage_environment
+		FROM admin_images WHERE id=$1`, id).Scan(&mimeType, &data, &size, &provider, &objectKey, &environment)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if provider == ProviderPostgres {
+		return &Media{MimeType: mimeType, Size: int64(len(data)), Body: io.NopCloser(bytes.NewReader(data))}, nil
+	}
+	cfg, err := s.providerConfig(ctx, environment, provider, false)
+	if err != nil {
+		return nil, err
+	}
+	client, err := s.newClient(ctx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("create %s storage client: %w", provider, err)
+	}
+	body, remoteSize, err := client.Get(ctx, cfg.Bucket, objectKey)
+	if err != nil {
+		return nil, fmt.Errorf("download admin image from %s: %w", provider, err)
+	}
+	if remoteSize >= 0 {
+		size = remoteSize
+	}
+	return &Media{MimeType: mimeType, Size: size, Body: body}, nil
+}
+
 func (s *Service) Open(ctx context.Context, id, userID string) (*Media, error) {
 	var mimeType, provider, objectKey, environment string
 	var data []byte

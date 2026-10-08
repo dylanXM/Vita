@@ -50,6 +50,7 @@ func main() {
 		log.Fatalf("failed to initialize media storage: %v", err)
 	}
 	handler.InitMediaStorage(mediaStorage)
+	handler.InitAdminImageBaseURL(cfg.PublicAPIBaseURL)
 
 	pushClient, err := agent.NewFCMClient(cfg.FirebaseProjectID, cfg.FirebaseServiceAccountBase64)
 	if err != nil {
@@ -228,6 +229,7 @@ func main() {
 			media.POST("/generate", middleware.RequireAuth(), handler.GenerateMedia)
 			media.GET("/:id", middleware.RequireAuth(), handler.GetMedia)
 		}
+		api.GET("/admin-images/:id", handler.GetAdminImage)
 
 		api.GET("/health", handler.Health)
 		api.GET("/app-content", handler.AppContent)
@@ -242,6 +244,7 @@ func main() {
 
 		admin := api.Group("/admin", middleware.RequireAdmin())
 		{
+			admin.POST("/images", handler.AdminUploadImage)
 			admin.GET("/stats", handler.AdminStats)
 			admin.GET("/environment", handler.AdminEnvironment)
 			admin.GET("/storage-config", handler.AdminGetStorageConfig)
