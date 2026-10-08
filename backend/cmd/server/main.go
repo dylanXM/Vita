@@ -290,6 +290,7 @@ func main() {
 			admin.GET("/ai-pet-breeds", handler.AdminListAIPetBreeds)
 			admin.POST("/ai-pet-breeds", handler.AdminCreateAIPetBreed)
 			admin.PUT("/ai-pet-breeds/:id", handler.AdminUpdateAIPetBreed)
+			admin.DELETE("/ai-pet-breeds/:id", handler.AdminDeleteAIPetBreed)
 			admin.GET("/story-config", handler.AdminGetStoryConfig)
 			admin.PUT("/story-config", handler.AdminUpdateStoryConfig)
 			admin.GET("/story-backgrounds", handler.AdminListStoryBackgrounds)

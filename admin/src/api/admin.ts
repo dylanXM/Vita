@@ -184,6 +184,7 @@ export const aiPetBreedsApi = {
   create: (body: AIPetBreedInput) => http.post<AIPetBreed>("/admin/ai-pet-breeds", body),
   update: (id: string, body: AIPetBreedInput) =>
     http.put<AIPetBreed>(`/admin/ai-pet-breeds/${id}`, body),
+  remove: (id: string) => http.del<{ message: string }>(`/admin/ai-pet-breeds/${id}`),
 };
 
 export const adminImagesApi = {

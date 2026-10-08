@@ -165,6 +165,29 @@ func saveAIPetBreed(c *gin.Context, id string, create bool) {
 	c.JSON(map[bool]int{true: http.StatusCreated, false: http.StatusOK}[create], aiPetBreed{ID: id, Environment: input.Environment, Name: input.Name, Species: input.Species, Personality: input.Personality, Description: input.Description, AvatarURL: input.AvatarURL, SpriteSheetURL: input.SpriteSheetURL, ActionSheetURL: input.ActionSheetURL, SortOrder: input.SortOrder, Enabled: input.Enabled, SubscriptionPlanIDs: input.SubscriptionPlanIDs})
 }
 
+func AdminDeleteAIPetBreed(c *gin.Context) {
+	result, err := db.Get().Exec(`DELETE FROM ai_pet_breeds WHERE id=$1 AND environment=$2`, c.Param("id"), currentEnvironment())
+	rowsAffected := int64(0)
+	if err == nil {
+		rowsAffected, _ = result.RowsAffected()
+	}
+	writeAIPetBreedDeleteResult(c, err, rowsAffected)
+}
+
+// writeAIPetBreedDeleteResult writes the HTTP response for an AI pet breed
+// deletion. rowsAffected is only meaningful when err is nil.
+func writeAIPetBreedDeleteResult(c *gin.Context, err error, rowsAffected int64) {
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete AI pet breed"})
+		return
+	}
+	if rowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "AI pet breed not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "AI pet breed deleted"})
+}
+
 func ListAIPetBreeds(c *gin.Context) {
 	userID := c.GetString("user_id")
 	rows, err := db.Get().Query(`SELECT b.id,b.environment,b.name,b.species,b.personality,b.description,b.avatar_url,b.sprite_sheet_url,b.action_sheet_url,b.sort_order,b.enabled,

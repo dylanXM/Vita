@@ -10,6 +10,7 @@ import type { Environment, StoryBackground, StoryBackgroundInput, StoryConfig } 
 import { ConfigurationButton } from "@/components/configuration-button";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -39,6 +40,7 @@ export function StoryHubPage() {
   const [backgroundOpen, setBackgroundOpen] = useState(false);
   const [rules, setRules] = useState<StoryConfig | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<StoryBackground | null>(null);
   const [form, setForm] = useState<StoryBackgroundInput>(blank("prod"));
 
   useEffect(() => { if (!rulesOpen && config.data) setRules(config.data); }, [config.data, rulesOpen]);
@@ -59,7 +61,7 @@ export function StoryHubPage() {
     onSuccess: () => { toast.success(t("storyHub.saved")); closeBackground(); refresh(); },
     onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))),
   });
-  const remove = useMutation({ mutationFn: storiesApi.removeBackground, onSuccess: () => { toast.success(t("storyHub.deleted")); refresh(); }, onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))) });
+  const remove = useMutation({ mutationFn: storiesApi.removeBackground, onSuccess: () => { toast.success(t("storyHub.deleted")); setDeleteTarget(null); refresh(); }, onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))) });
   const create = () => { if (!active) return; setEditing(null); setForm(blank(active)); setBackgroundOpen(true); };
   const edit = (item: StoryBackground) => { const { id: _, ...input } = item; setEditing(item.id); setForm(input); setBackgroundOpen(true); };
   const savedRules = config.data;
@@ -96,7 +98,7 @@ export function StoryHubPage() {
               `${t("storyHub.world")}: ${item.world_setting}`, `${t("storyHub.opening")}: ${item.opening}`,
               `${t("storyHub.constraints")}: ${item.character_constraints || "—"}`, `${t("storyHub.goal")}: ${item.story_goal || "—"}`,
             ]} />
-            <Button size="sm" variant="destructive" disabled={remove.isPending} onClick={() => { if (confirm(t("storyHub.deleteConfirm"))) remove.mutate(item.id); }}><Trash2 />{t("storyHub.delete")}</Button>
+            <Button size="sm" variant="destructive" disabled={remove.isPending} onClick={() => setDeleteTarget(item)}><Trash2 />{t("storyHub.delete")}</Button>
           </div></TableCell>
         </TableRow>)}</TableBody></Table>}
     </CardContent></Card>
@@ -127,5 +129,11 @@ export function StoryHubPage() {
         <DialogFooter><Button variant="outline" onClick={closeBackground}>{t("users.cancel")}</Button><Button disabled={!form.title.trim() || !form.world_setting.trim() || !form.opening.trim() || save.isPending} onClick={() => save.mutate()}>{editing ? <Save /> : <Plus />}{t("storyHub.saveBackground")}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
+    <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(next) => { if (!next) setDeleteTarget(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader><AlertDialogTitle>{t("storyHub.deleteTitle")}</AlertDialogTitle><AlertDialogDescription>{t("storyHub.deleteDesc", { name: deleteTarget?.title ?? "" })}</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogFooter><AlertDialogCancel disabled={remove.isPending}>{t("users.cancel")}</AlertDialogCancel><AlertDialogAction asChild><Button variant="destructive" disabled={remove.isPending} onClick={(event) => { event.preventDefault(); if (deleteTarget) remove.mutate(deleteTarget.id); }}>{t("storyHub.deleteConfirm")}</Button></AlertDialogAction></AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>;
 }

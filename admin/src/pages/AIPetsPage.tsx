@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PawPrint, Pencil, Plus, Save } from "lucide-react";
+import { PawPrint, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
@@ -10,6 +10,7 @@ import type { AIPetBreed, AIPetBreedInput, Environment } from "@/api/types";
 import { ConfigurationButton } from "@/components/configuration-button";
 import { AdminImageInput, isAdminImageURL } from "@/components/admin-image-input";
 import { PageHeader } from "@/components/page-header";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,6 +34,7 @@ export function AIPetsPage() {
   const activeEnv: Environment = "prod";
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AIPetBreed | null>(null);
   const [form, setForm] = useState<AIPetBreedInput>(emptyForm("prod"));
   const [imageUploading, setImageUploading] = useState(false);
 
@@ -48,6 +50,15 @@ export function AIPetsPage() {
     enabled: Boolean(activeEnv),
   });
   const close = () => { setOpen(false); setEditing(null); };
+  const remove = useMutation({
+    mutationFn: (id: string) => aiPetBreedsApi.remove(id),
+    onSuccess: () => {
+      toast.success(t("aiPets.deleted"));
+      setDeleteTarget(null);
+      void queryClient.invalidateQueries({ queryKey: ["ai-pet-breeds", activeEnv] });
+    },
+    onError: (error) => toast.error(errorMessage(error, t("common.failedToLoad"))),
+  });
   const save = useMutation({
     mutationFn: () => editing ? aiPetBreedsApi.update(editing, form) : aiPetBreedsApi.create(form),
     onSuccess: () => {
@@ -96,7 +107,7 @@ export function AIPetsPage() {
           <TableCell>{breed.species}</TableCell>
           <TableCell>{breed.subscription_plan_ids.length ? t("aiPets.selectedPlans", { count: breed.subscription_plan_ids.length }) : t("aiPets.allPlans")}</TableCell>
           <TableCell><Badge variant={breed.enabled ? "success" : "outline"}>{t(breed.enabled ? "content.enabled" : "content.disabled")}</Badge></TableCell>
-          <TableCell className="text-end"><ConfigurationButton label={t("users.edit")} icon={<Pencil />} onClick={() => edit(breed)}
+          <TableCell className="text-end"><div className="flex items-center justify-end gap-2"><ConfigurationButton label={t("users.edit")} icon={<Pencil />} onClick={() => edit(breed)}
             details={[
               `${t("aiPets.name")}: ${breed.name}`,
               `${t("aiPets.species")}: ${breed.species}`,
@@ -108,7 +119,7 @@ export function AIPetsPage() {
               `${t("aiPets.subscriptionAccess")}: ${breed.subscription_plan_ids.length ? breed.subscription_plan_ids.map((id) => plans.data?.items.find((plan) => plan.id === id)?.name ?? id).join(", ") : t("aiPets.allPlans")}`,
               `${t("aiPets.sortOrder")}: ${breed.sort_order}`,
               `${t("content.enabled")}: ${t(breed.enabled ? "content.enabled" : "content.disabled")}`,
-            ]} /></TableCell>
+            ]} /><Button size="sm" variant="ghost" disabled={remove.isPending} onClick={() => setDeleteTarget(breed)}><Trash2 /></Button></div></TableCell>
         </TableRow>)}</TableBody></Table>}
     </CardContent></Card>
     <Dialog open={open} onOpenChange={(next) => { if (!next) close(); }}>
@@ -135,5 +146,11 @@ export function AIPetsPage() {
         <DialogFooter><Button variant="outline" onClick={close}>{t("users.cancel")}</Button><Button disabled={!activeEnv || !form.name.trim() || !form.species.trim() || !isAdminImageURL(form.avatar_url.trim()) || !isAdminImageURL(form.sprite_sheet_url.trim()) || !isAdminImageURL(form.action_sheet_url.trim()) || imageUploading || save.isPending} onClick={() => save.mutate()}>{editing ? <Save /> : <Plus />}{editing ? t("aiPets.update") : t("aiPets.add")}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
+    <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(next) => { if (!next) setDeleteTarget(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader><AlertDialogTitle>{t("aiPets.deleteTitle")}</AlertDialogTitle><AlertDialogDescription>{t("aiPets.deleteDesc", { name: deleteTarget?.name ?? "" })}</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogFooter><AlertDialogCancel disabled={remove.isPending}>{t("users.cancel")}</AlertDialogCancel><AlertDialogAction asChild><Button variant="destructive" disabled={remove.isPending} onClick={(event) => { event.preventDefault(); if (deleteTarget) remove.mutate(deleteTarget.id); }}>{t("aiPets.deleteConfirm")}</Button></AlertDialogAction></AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>;
 }
