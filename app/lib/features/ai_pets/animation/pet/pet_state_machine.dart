@@ -8,23 +8,15 @@ import 'pet_motion_spec.dart';
 /// 宠物状态机：管理状态迁移、环境定时与动作动画。
 /// 只消费 PetIntent/服务器数值，不感知 AI 来源。
 ///
-/// 所有状态共用循环时钟；320ms 过渡从当前混合姿态出发，可连续打断。
+/// 周期姿态由 WorldClock 驱动；600ms 过渡从当前混合姿态出发，可连续打断。
 class PetStateMachine extends ChangeNotifier {
   PetStateMachine({required TickerProvider vsync})
-      : _motion = AnimationController(
+      : _blend = AnimationController(
           vsync: vsync,
-          duration: const Duration(milliseconds: 2600),
-        ),
-        _blend = AnimationController(
-          vsync: vsync,
-          duration: const Duration(milliseconds: 320),
+          duration: const Duration(milliseconds: 600),
         ) {
-    _motion.addListener(notifyListeners);
     _blend.addListener(notifyListeners);
   }
-
-  /// 循环姿态时钟：所有状态的相位共用这一个时钟，保证切换连续。
-  final AnimationController _motion;
 
   /// 状态过渡混合：0 → 1，驱动新旧姿态插值。
   final AnimationController _blend;
@@ -40,24 +32,20 @@ class PetStateMachine extends ChangeNotifier {
   final math.Random _random = math.Random();
 
   PetState get state => _state;
-
-  AnimationController get controller => _motion;
+  bool get isActionActive => _actionTimer?.isActive == true;
 
   bool get reducedMotion => _reducedMotion;
   set reducedMotion(bool value) {
     if (_reducedMotion == value) return;
     _reducedMotion = value;
     if (value) {
-      _motion.stop();
       _blend.value = 1;
-    } else {
-      _applySpec();
     }
     notifyListeners();
   }
 
   /// 当前过渡进度 0..1（已缓动），无过渡时为 1。
-  double get blendValue => Curves.easeInOutCubic.transform(_blend.value);
+  double get blendValue => Curves.easeInOutSine.transform(_blend.value);
 
   /// State weights at this exact frame. A new transition starts from the
   /// already blended pose, so interrupting a transition cannot snap back.
@@ -74,7 +62,7 @@ class PetStateMachine extends ChangeNotifier {
 
   double weightFor(PetState state) => stateWeights[state] ?? 0;
 
-  bool get _locked => _state == PetState.feeding;
+  bool get _locked => isActionActive || _state == PetState.feeding;
 
   PetState get _fallback => needsSleep ? PetState.sleeping : PetState.standing;
 
@@ -109,7 +97,6 @@ class PetStateMachine extends ChangeNotifier {
     _ambientTimer?.cancel();
     _fromWeights = stateWeights;
     _state = next;
-    _applySpec();
     if (reducedMotion) {
       _blend.value = 1;
     } else {
@@ -124,7 +111,6 @@ class PetStateMachine extends ChangeNotifier {
     _ambientTimer?.cancel();
     _fromWeights = stateWeights;
     _state = action;
-    _applySpec();
     if (reducedMotion) {
       _blend.value = 1;
     } else {
@@ -136,7 +122,6 @@ class PetStateMachine extends ChangeNotifier {
         if (_state != action) return;
         _fromWeights = stateWeights;
         _state = _fallback;
-        _applySpec();
         if (reducedMotion) {
           _blend.value = 1;
         } else {
@@ -152,18 +137,27 @@ class PetStateMachine extends ChangeNotifier {
   /// 并根据数值穿插困 / 饿 / 睡。
   void scheduleAmbient() {
     _ambientTimer?.cancel();
-    if (_locked || needsSleep) return;
+    if (_locked) return;
     _ambientTimer = Timer(_nextLifeDelay(), () {
-      if (_locked || needsSleep || !hasListeners) return;
-      _fromWeights = stateWeights;
-      _state = _nextLifeState();
-      _applySpec();
-      if (reducedMotion) {
-        _blend.value = 1;
-      } else {
-        _blend.forward(from: 0);
+      if (_locked || !hasListeners) return;
+      if (needsSleep) {
+        // Low server energy must not freeze the character indefinitely.
+        // It rests most of the time, with brief wakeful moments.
+        final action =
+            _random.nextBool() ? PetState.sitting : PetState.drinking;
+        showAction(action, duration: const Duration(milliseconds: 2600));
+        return;
       }
-      notifyListeners();
+      final next = _nextLifeState();
+      if (next == PetState.feeding || next == PetState.drinking) {
+        showAction(next, duration: const Duration(milliseconds: 2600));
+        return;
+      }
+      if (next == PetState.sleeping) {
+        showAction(next, duration: const Duration(milliseconds: 5200));
+        return;
+      }
+      transition(next);
       scheduleAmbient();
     });
   }
@@ -174,6 +168,7 @@ class PetStateMachine extends ChangeNotifier {
       PetState.sitting => 3 + _random.nextInt(5),
       PetState.tired => 3 + _random.nextInt(3),
       PetState.hungry => 3 + _random.nextInt(3),
+      PetState.drinking => 4 + _random.nextInt(3),
       _ => 4 + _random.nextInt(5),
     };
     return Duration(seconds: seconds);
@@ -181,40 +176,30 @@ class PetStateMachine extends ChangeNotifier {
 
   PetState _nextLifeState() {
     // 数值越差，困 / 饿越容易被触发。
-    if (needsFood && _random.nextDouble() < .8) return PetState.hungry;
+    if (needsFood && _random.nextDouble() < .55) return PetState.feeding;
+    if (needsFood && _random.nextDouble() < .6) return PetState.hungry;
     if (needsRest && _random.nextDouble() < .8) return PetState.tired;
     final roll = _random.nextDouble();
+    if (roll < .08) return PetState.sleeping;
+    if (roll < .22) return PetState.drinking;
     return switch (_state) {
       PetState.walking => roll < .5 ? PetState.standing : PetState.sitting,
       PetState.sitting => roll < .6 ? PetState.standing : PetState.walking,
       PetState.tired ||
       PetState.hungry =>
         roll < .5 ? PetState.standing : PetState.sitting,
-      _ => roll < .42
+      _ => roll < .45
           ? PetState.sitting
-          : roll < .7
+          : roll < .78
               ? PetState.walking
               : PetState.standing,
     };
-  }
-
-  void _applySpec() {
-    final spec = PetMotionSpec.table[_state]!;
-    _motion.duration = spec.duration;
-    if (spec.repeat && !reducedMotion) {
-      // 不重置相位：从当前值继续循环，切换瞬间保持连贯。
-      _motion.repeat();
-    } else {
-      _motion.stop();
-      _motion.value = 0;
-    }
   }
 
   @override
   void dispose() {
     _ambientTimer?.cancel();
     _actionTimer?.cancel();
-    _motion.dispose();
     _blend.dispose();
     super.dispose();
   }

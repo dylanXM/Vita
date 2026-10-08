@@ -7,7 +7,7 @@ import '../../../../core/theme.dart';
 
 /// 右下角悬浮操作按钮：点击展开操作面板。
 /// 面板包含状态条（饱腹/开心/精力/健康）、经验/金币，以及
-/// 喂食 / 生活 / 刷新 操作。
+/// 喂食 / 喝水 / 生活 / 刷新 操作。
 class PetActionMenu extends StatefulWidget {
   const PetActionMenu({
     super.key,
@@ -18,6 +18,10 @@ class PetActionMenu extends StatefulWidget {
     required this.feeding,
     required this.feedCost,
     required this.onFeed,
+    required this.onDrink,
+    required this.onWalk,
+    required this.onSit,
+    required this.onRest,
     required this.onLife,
     required this.onRefresh,
   });
@@ -29,6 +33,10 @@ class PetActionMenu extends StatefulWidget {
   final bool feeding;
   final int feedCost;
   final VoidCallback onFeed;
+  final VoidCallback onDrink;
+  final VoidCallback onWalk;
+  final VoidCallback onSit;
+  final VoidCallback onRest;
   final VoidCallback onLife;
   final VoidCallback onRefresh;
 
@@ -57,7 +65,8 @@ class _PetActionMenuState extends State<PetActionMenu>
       vsync: this,
       duration: const Duration(milliseconds: 2600),
     )..repeat();
-    final curved = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+    final curved =
+        CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
     _panelScale = Tween<double>(begin: .8, end: 1).animate(curved);
     _panelFade = Tween<double>(begin: 0, end: 1).animate(curved);
     _panelSlide = Tween<Offset>(begin: const Offset(0, .12), end: Offset.zero)
@@ -132,7 +141,9 @@ class _PetActionMenuState extends State<PetActionMenu>
         border: Border.all(color: vita.glassRing, width: .8),
         boxShadow: [
           BoxShadow(
-              color: vita.glassShadow, blurRadius: 24, offset: const Offset(0, 8)),
+              color: vita.glassShadow,
+              blurRadius: 24,
+              offset: const Offset(0, 8)),
         ],
       ),
       child: Column(
@@ -180,15 +191,13 @@ class _PetActionMenuState extends State<PetActionMenu>
               value: (state['health'] as num?)?.toInt() ?? 0,
               color: vita.green),
           const SizedBox(height: 4),
-          Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('aiPets.experience'.trParams(
-                        {'value': '${widget.experience}'}),
-                    style: TextStyle(fontSize: 11.5, color: vita.subText)),
-                Text('aiPets.coins'.trParams({'value': '${widget.coins}'}),
-                    style: TextStyle(fontSize: 11.5, color: vita.subText)),
-              ]),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text(
+                'aiPets.experience'.trParams({'value': '${widget.experience}'}),
+                style: TextStyle(fontSize: 11.5, color: vita.subText)),
+            Text('aiPets.coins'.trParams({'value': '${widget.coins}'}),
+                style: TextStyle(fontSize: 11.5, color: vita.subText)),
+          ]),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 10),
             child: Divider(height: 1),
@@ -201,6 +210,26 @@ class _PetActionMenuState extends State<PetActionMenu>
                 : 'aiPets.feed'.trParams({'coins': '${widget.feedCost}'}),
             onTap: widget.feeding ? null : () => _run(widget.onFeed),
           ),
+          _ActionTile(
+            icon: Icons.water_drop_outlined,
+            iconColor: const Color(0xFF67B9DB),
+            label: 'aiPets.drink'.tr,
+            onTap: widget.feeding ? null : () => _run(widget.onDrink),
+          ),
+          Row(children: [
+            _QuickAction(
+                icon: Icons.directions_walk_rounded,
+                label: 'aiPets.walk'.tr,
+                onTap: widget.feeding ? null : () => _run(widget.onWalk)),
+            _QuickAction(
+                icon: Icons.chair_alt_rounded,
+                label: 'aiPets.sit'.tr,
+                onTap: widget.feeding ? null : () => _run(widget.onSit)),
+            _QuickAction(
+                icon: Icons.bedtime_outlined,
+                label: 'aiPets.rest'.tr,
+                onTap: widget.feeding ? null : () => _run(widget.onRest)),
+          ]),
           _ActionTile(
             icon: Icons.auto_stories_outlined,
             iconColor: const Color(0xFF4A90E2),
@@ -260,6 +289,40 @@ class _PetActionMenuState extends State<PetActionMenu>
           ),
         );
       },
+    );
+  }
+}
+
+class _QuickAction extends StatelessWidget {
+  const _QuickAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final vita = context.vita;
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 21, color: onTap == null ? vita.hint : vita.text),
+            const SizedBox(height: 3),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 11,
+                    color: onTap == null ? vita.hint : vita.text)),
+          ]),
+        ),
+      ),
     );
   }
 }

@@ -127,8 +127,8 @@ class _AIPetHomePageState extends State<AIPetHomePage>
       hunger: (nextState['hunger'] as num?)?.toInt() ?? 100,
       happiness: (nextState['happiness'] as num?)?.toInt() ?? 100,
     );
-    // 进食中不打断动画。
-    if (_machine.state != PetState.feeding) {
+    // 数值轮询只更新需要，不打断当前的短动作或手动喂食。
+    if (!_feeding && !_machine.isActionActive) {
       _machine.transition(intent.state);
       _machine.scheduleAmbient();
     }
@@ -181,7 +181,7 @@ class _AIPetHomePageState extends State<AIPetHomePage>
             'pet-feed-${widget.companionId}-${DateTime.now().microsecondsSinceEpoch}'
       });
       final animationElapsed = DateTime.now().difference(animationStartedAt);
-      const minimumFeedingDuration = Duration(milliseconds: 1200);
+      const minimumFeedingDuration = Duration(milliseconds: 2600);
       if (animationElapsed < minimumFeedingDuration) {
         await Future<void>.delayed(minimumFeedingDuration - animationElapsed);
       }
@@ -223,8 +223,33 @@ class _AIPetHomePageState extends State<AIPetHomePage>
   }
 
   void _petTap() {
+    if (_feeding) return;
     _machine.showAction(PetState.happy,
-        duration: const Duration(milliseconds: 1400));
+        duration: const Duration(milliseconds: 2000));
+  }
+
+  void _drink() {
+    if (_feeding) return;
+    _machine.showAction(PetState.drinking,
+        duration: const Duration(milliseconds: 2800));
+  }
+
+  void _walk() {
+    if (_feeding) return;
+    _machine.showAction(PetState.walking,
+        duration: const Duration(milliseconds: 6000));
+  }
+
+  void _sit() {
+    if (_feeding) return;
+    _machine.showAction(PetState.sitting,
+        duration: const Duration(milliseconds: 4000));
+  }
+
+  void _rest() {
+    if (_feeding) return;
+    _machine.showAction(PetState.sleeping,
+        duration: const Duration(milliseconds: 6000));
   }
 
   @override
@@ -259,6 +284,10 @@ class _AIPetHomePageState extends State<AIPetHomePage>
                 feeding: _feeding,
                 feedCost: (state['feed_coin_cost'] as num?)?.toInt() ?? 5,
                 onFeed: _feed,
+                onDrink: _drink,
+                onWalk: _walk,
+                onSit: _sit,
+                onRest: _rest,
                 onLife: () =>
                     Get.to(() => LifeDetailPage(companion: _companion)),
                 onRefresh: _refreshState,

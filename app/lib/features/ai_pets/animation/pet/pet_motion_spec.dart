@@ -5,6 +5,7 @@ enum PetState {
   sitting,
   walking,
   feeding,
+  drinking,
   happy,
   sleeping,
   levelUp,
@@ -15,7 +16,7 @@ enum PetState {
 }
 
 /// 状态附加特效。
-enum PetFx { hearts, stars, sweat, notes, zzz, bowl, tired, hungry }
+enum PetFx { hearts, stars, sweat, notes, zzz, bowl, water, tired, hungry }
 
 /// 每个状态的动画规格：时长/是否循环/平移/弹跳/摇摆/压扁/缩放/特效。
 class PetMotionSpec {
@@ -64,18 +65,25 @@ class PetMotionSpec {
     PetState.walking: PetMotionSpec(
       duration: Duration(milliseconds: 6000),
       repeat: true,
-      driftX: 62,
+      driftX: 84,
       driftY: 7,
       sway: 0.025,
       squash: 0.025,
     ),
     PetState.feeding: PetMotionSpec(
-      duration: Duration(milliseconds: 560),
+      duration: Duration(milliseconds: 1800),
       repeat: true,
-      driftY: 28,
-      sway: 0.055,
-      squash: 0.035,
+      driftY: 8,
+      sway: 0.025,
+      squash: 0.02,
       fx: [PetFx.bowl],
+    ),
+    PetState.drinking: PetMotionSpec(
+      duration: Duration(milliseconds: 1800),
+      repeat: true,
+      driftY: 5,
+      sway: 0.02,
+      fx: [PetFx.water],
     ),
     PetState.happy: PetMotionSpec(
       duration: Duration(milliseconds: 900),

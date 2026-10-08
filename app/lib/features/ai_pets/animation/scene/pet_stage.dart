@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../house/pet_house.dart';
@@ -91,23 +93,42 @@ class PetStage extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Center(
-                      child: PetRenderer(
-                        name: name,
-                        imageUrl: imageUrl,
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final size =
+                            math.min(constraints.maxWidth * .72, 280.0);
+                        return Center(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: onTap,
+                            child: PetRenderer(
+                              name: name,
+                              imageUrl: imageUrl,
+                              machine: machine,
+                              worldTime: worldTime,
+                              size: size,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    IgnorePointer(
+                      child: PetFxLayer(
                         machine: machine,
                         worldTime: worldTime,
+                        speech: speech,
                       ),
                     ),
-                    PetFxLayer(machine: machine, speech: speech),
                   ],
                 ),
               ),
               // 5. 天气粒子。
               Positioned.fill(
-                child: WeatherParticles(
-                  weather: weather,
-                  worldTime: worldTime,
+                child: IgnorePointer(
+                  child: WeatherParticles(
+                    weather: weather,
+                    worldTime: worldTime,
+                  ),
                 ),
               ),
               // 6. 动画标题栏（顶部）。
@@ -115,17 +136,13 @@ class PetStage extends StatelessWidget {
                 left: 16,
                 right: 16,
                 top: safeTop + 10,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: onTap,
-                  child: PetTitleBar(
-                    name: name,
-                    level: level,
-                    species: species,
-                    machine: machine,
-                    clock: clock,
-                    onBack: onBack,
-                  ),
+                child: PetTitleBar(
+                  name: name,
+                  level: level,
+                  species: species,
+                  machine: machine,
+                  clock: clock,
+                  onBack: onBack,
                 ),
               ),
             ],

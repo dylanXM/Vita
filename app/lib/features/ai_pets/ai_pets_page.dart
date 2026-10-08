@@ -6,7 +6,6 @@ import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
-import '../../shared/world_scene_banner.dart';
 import 'ai_pet_avatar.dart';
 import 'ai_pet_desktop_controller.dart';
 import 'ai_pet_home_page.dart';
@@ -186,11 +185,6 @@ class _AIPetsPageState extends State<AIPetsPage> {
                   : ListView(
                       padding: const EdgeInsets.only(bottom: 28),
                       children: [
-                        WorldSceneBanner(
-                          title: 'aiPets.title'.tr,
-                          subtitle: 'discover.pets'.tr,
-                          icon: Icons.pets_outlined,
-                        ),
                         for (final breed in _breeds)
                           Padding(
                             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),

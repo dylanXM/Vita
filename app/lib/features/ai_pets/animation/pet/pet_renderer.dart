@@ -19,12 +19,14 @@ class PetRenderer extends StatelessWidget {
     required this.imageUrl,
     required this.machine,
     required this.worldTime,
+    this.size = 260,
   });
 
   final String name;
   final String imageUrl;
   final PetStateMachine machine;
   final double worldTime;
+  final double size;
 
   ImageProvider _provider(String url) {
     if (url.startsWith('asset://')) {
@@ -41,36 +43,37 @@ class PetRenderer extends StatelessWidget {
     if (!imageUrl.startsWith('asset://') &&
         !imageUrl.startsWith('http://') &&
         !imageUrl.startsWith('https://')) {
-      return const SizedBox(
-        width: 340,
-        height: 340,
-        child: Icon(Icons.pets_rounded, size: 120),
+      return SizedBox(
+        width: size,
+        height: size,
+        child: const Icon(Icons.pets_rounded, size: 120),
       );
     }
     final blinkPath = aiPetClosedEyeAssetPath(imageUrl);
     final walkingWeight = machine.weightFor(PetState.walking);
     final walkingDistance = PetMotionSpec.table[PetState.walking]!.driftX;
-    final walkX = walkingWeight *
-        walkingDistance *
-        .5 *
-        math.sin(worldTime * math.pi * 2 * 10);
+    final walkPhase = worldTime * math.pi * 2 * 10;
+    final walkX = walkingWeight * walkingDistance * .5 * math.sin(walkPhase);
     var scale = 0.0;
     for (final entry in machine.stateWeights.entries) {
       scale += PetMotionSpec.table[entry.key]!.scale * entry.value;
     }
     return SizedBox(
-      width: 340,
-      height: 340,
+      width: size,
+      height: size,
       child: Transform.translate(
         offset: Offset(walkX, 0),
         child: Transform.scale(
           alignment: Alignment.bottomCenter,
           scale: scale,
-          child: MeshBonePet(
-            imageProvider: _provider(imageUrl),
-            closedEyeProvider: blinkPath == null ? null : AssetImage(blinkPath),
-            machine: machine,
-            worldTime: worldTime,
+          child: RepaintBoundary(
+            child: MeshBonePet(
+              imageProvider: _provider(imageUrl),
+              closedEyeProvider:
+                  blinkPath == null ? null : AssetImage(blinkPath),
+              machine: machine,
+              worldTime: worldTime,
+            ),
           ),
         ),
       ),

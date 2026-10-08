@@ -7,14 +7,21 @@ import 'pet_state_machine.dart';
 
 /// 状态特效叠加层：♥ / Zzz / 星星 / 汗水 / 音符 / 食盆 / AI 气泡。
 class PetFxLayer extends StatelessWidget {
-  const PetFxLayer({super.key, required this.machine, this.speech});
+  const PetFxLayer({
+    super.key,
+    required this.machine,
+    required this.worldTime,
+    this.speech,
+  });
 
   final PetStateMachine machine;
+  final double worldTime;
   final String? speech;
 
   @override
   Widget build(BuildContext context) {
     final weights = machine.stateWeights;
+    final cycle = (worldTime * 23) % 1;
     return Stack(children: [
       for (final entry in weights.entries)
         if (entry.value > 0 && PetMotionSpec.table[entry.key]!.fx.isNotEmpty)
@@ -27,9 +34,12 @@ class PetFxLayer extends StatelessWidget {
                     0,
                     entry.key == PetState.feeding
                         ? 0
-                        : -4 * math.sin(machine.controller.value * math.pi * 2),
+                        : -4 * math.sin(cycle * math.pi * 2),
                   ),
-                  child: _buildEffects(PetMotionSpec.table[entry.key]!.fx),
+                  child: _buildEffects(
+                    PetMotionSpec.table[entry.key]!.fx,
+                    cycle,
+                  ),
                 ),
               ),
             ),
@@ -44,15 +54,23 @@ class PetFxLayer extends StatelessWidget {
     ]);
   }
 
-  Widget _buildEffects(List<PetFx> fx) {
+  Widget _buildEffects(List<PetFx> fx, double cycle) {
     return Stack(children: [
       if (fx.contains(PetFx.hearts))
-        const Positioned(
-          top: 58,
-          right: 54,
-          child: Text('♥',
-              style: TextStyle(fontSize: 42, color: Color(0xFFF06A89))),
-        ),
+        for (var i = 0; i < 3; i++)
+          Positioned(
+            top: 78 - i * 27.0,
+            right: 62 + i * 22.0,
+            child: Transform.translate(
+              offset: Offset(0, -12 * math.sin(cycle * math.pi * 2 + i)),
+              child: Text('♥',
+                  style: TextStyle(
+                    fontSize: 23.0 + i * 6,
+                    color:
+                        const Color(0xFFF06A89).withValues(alpha: .7 + i * .1),
+                  )),
+            ),
+          ),
       if (fx.contains(PetFx.zzz))
         const Positioned(
           top: 58,
@@ -106,6 +124,28 @@ class PetFxLayer extends StatelessWidget {
                     decoration: BoxDecoration(
                         color: Color(0x22000000),
                         borderRadius: BorderRadius.all(Radius.circular(100))))),
+          ]),
+        ),
+      if (fx.contains(PetFx.water))
+        Positioned(
+          bottom: 15,
+          left: 0,
+          right: 0,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.water_drop_rounded,
+                size: 28, color: const Color(0xFF72C8EC)),
+            Transform.scale(
+              scaleX: 1 + .06 * math.sin(cycle * math.pi * 2),
+              child: Container(
+                width: 76,
+                height: 15,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF74BDDD),
+                  borderRadius: BorderRadius.circular(100),
+                  border: Border.all(color: const Color(0xFFD8F4FF), width: 2),
+                ),
+              ),
+            ),
           ]),
         ),
     ]);

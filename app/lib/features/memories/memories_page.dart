@@ -92,24 +92,9 @@ class MemoriesController extends GetxController {
   }
 }
 
-/// A shared journey with a companion selector and a dated timeline.
-class MemoriesPage extends StatefulWidget {
+/// One clear entrance per companion; each journey has its own timeline.
+class MemoriesPage extends StatelessWidget {
   const MemoriesPage({super.key});
-
-  @override
-  State<MemoriesPage> createState() => _MemoriesPageState();
-}
-
-class _MemoriesPageState extends State<MemoriesPage> {
-  String? _selectedId;
-
-  void _select(Map<String, dynamic> companion) {
-    final id = companion['id'] as String? ?? '';
-    if (id.isEmpty || id == _selectedId) return;
-    setState(() => _selectedId = id);
-    ShellController.to.selectedCompanionId.value = id;
-    MemoriesController.to.loadMemories(id);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -152,93 +137,67 @@ class _MemoriesPageState extends State<MemoriesPage> {
     }
 
     final companions = controller.companions;
-    final activeId =
-        ShellController.to.selectedCompanionId.value ?? _selectedId;
-    final selected = companions.firstWhere(
-      (item) => item['id'] == activeId,
-      orElse: () => companions.first,
-    );
-    final selectedId = selected['id'] as String? ?? '';
-    if (_selectedId != selectedId && selectedId.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _select(selected);
-      });
-    }
     return RefreshIndicator(
-      onRefresh: () async {
-        await controller.loadCompanions();
-        if (selectedId.isNotEmpty) await controller.loadMemories(selectedId);
-      },
+      onRefresh: controller.loadCompanions,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(bottom: 110),
         children: [
           VitaTabHeader(title: 'tab.journey'.tr, showDivider: false),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 18),
-            child: Text('journey.subtitle'.tr,
-                style: TextStyle(color: context.vita.subText, fontSize: 13)),
-          ),
-          SizedBox(
-            height: 48,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              scrollDirection: Axis.horizontal,
-              itemCount: companions.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, i) => ChoiceChip(
-                label: Text('${companions[i]['name'] ?? 'chat.companion'.tr}'),
-                selected: companions[i]['id'] == selectedId,
-                onSelected: (_) => _select(companions[i]),
-              ),
+          const SizedBox(height: 12),
+          for (final companion in companions)
+            _JourneyCompanionTile(
+              companion: companion,
+              onTap: () {
+                if (Get.isRegistered<ShellController>()) {
+                  ShellController.to.selectedCompanionId.value =
+                      companion['id'] as String?;
+                }
+                Get.to(() => MemoryDetailPage(companion: companion),
+                    transition: Transition.cupertino);
+              },
             ),
-          ),
-          const SizedBox(height: 14),
-          _CompanionMemoryHeader(companion: selected),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-            child: OutlinedButton.icon(
-              onPressed: () =>
-                  Get.to(() => LifeDetailPage(companion: selected)),
-              icon: const Icon(Icons.auto_awesome_outlined),
-              label: Text('journey.life'.tr),
-            ),
-          ),
-          if (controller.memoriesLoading.value && controller.memories.isEmpty)
-            const VitaSkeletonCard(withAvatar: false)
-          else if (controller.memories.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 44),
-              child: VitaEmpty(
-                icon: Icons.star_border,
-                title: 'memories.empty'.tr,
-                subtitle: 'memories.emptySub'.tr,
-              ),
-            )
-          else
-            ..._timeline(controller.memories, selectedId),
         ],
       ),
     );
   }
+}
 
-  List<Widget> _timeline(List<Map<String, dynamic>> memories, String id) {
-    final result = <Widget>[];
-    DateTime? previous;
-    for (final memory in memories) {
-      final date = (DateTime.tryParse(memory['event_time'] as String? ??
-                  memory['created_at'] as String? ??
-                  '') ??
-              DateTime.now())
-          .toLocal();
-      final day = DateTime(date.year, date.month, date.day);
-      if (previous != day) {
-        result.add(_DateSectionHeader(label: formatDateSeparator(date)));
-      }
-      result.add(_MemoryTile(companionId: id, memory: memory));
-      previous = day;
-    }
-    return result;
+class _JourneyCompanionTile extends StatelessWidget {
+  const _JourneyCompanionTile({required this.companion, required this.onTap});
+
+  final Map<String, dynamic> companion;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = '${companion['name'] ?? 'chat.companion'.tr}';
+    final details = [companion['city'], companion['occupation']]
+        .whereType<String>()
+        .where((value) => value.trim().isNotEmpty)
+        .join(' · ');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+      child: Material(
+        color: context.vita.surface,
+        borderRadius: BorderRadius.circular(18),
+        child: ListTile(
+          onTap: onTap,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          leading: VitaAvatar(
+            name: name,
+            radius: 24,
+            imageUrl: companion['portrait_url'] as String?,
+          ),
+          title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+          subtitle: details.isEmpty ? null : Text(details),
+          trailing: Icon(Icons.chevron_right, color: context.vita.subText),
+        ),
+      ),
+    );
   }
 }
 
@@ -301,8 +260,6 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
-          SliverToBoxAdapter(
-              child: _CompanionMemoryHeader(companion: widget.companion)),
           if (controller.memories.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
@@ -360,52 +317,6 @@ class _DateSectionHeader extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: context.vita.subText,
         ),
-      ),
-    );
-  }
-}
-
-class _CompanionMemoryHeader extends StatelessWidget {
-  const _CompanionMemoryHeader({required this.companion});
-
-  final Map<String, dynamic> companion;
-
-  @override
-  Widget build(BuildContext context) {
-    final name = companion['name'] as String? ?? 'chat.companion'.tr;
-    return Container(
-      color: context.vita.surface,
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
-      child: Row(
-        children: [
-          VitaAvatar(
-            name: name,
-            radius: 30,
-            imageUrl: companion['portrait_url'] as String?,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: context.vita.text,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'memories.subtitle'.tr,
-                  style: TextStyle(fontSize: 13, color: context.vita.subText),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

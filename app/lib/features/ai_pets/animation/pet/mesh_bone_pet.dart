@@ -115,11 +115,20 @@ const Map<PetState, MeshPose> kMeshPoseTable = {
   ),
   // 进食：低头探食、前倾。
   PetState.feeding: MeshPose(
-    headDx: .06,
-    headDy: .05,
-    bodyLean: .06,
-    bodyDy: .04,
+    headDx: .025,
+    headDy: .10,
+    headRot: .10,
+    bodyLean: .035,
+    bodyDy: .02,
     tailSwing: .04,
+  ),
+  PetState.drinking: MeshPose(
+    headDx: .035,
+    headDy: .12,
+    headRot: .12,
+    bodyLean: .04,
+    bodyDy: .02,
+    tailSwing: .025,
   ),
   // 开心：仰头挺胸，弹跳由相位驱动。
   PetState.happy: MeshPose(headDy: -.03, headRot: -.08, tailSwing: .08),
@@ -164,8 +173,8 @@ const Map<PetState, MeshPose> kMeshPoseTable = {
 };
 
 /// 归一化网格参数。
-const int kMeshRows = 9; // v 方向控制点
-const int kMeshCols = 7; // u 方向控制点
+const int kMeshRows = 7; // v 方向控制点
+const int kMeshCols = 5; // u 方向控制点
 
 double _smoothstep(double a, double b, double x) {
   final t = ((x - a) / (b - a)).clamp(0.0, 1.0);
@@ -275,9 +284,12 @@ class _MeshBonePetState extends State<MeshBonePet> {
     final spec = PetMotionSpec.table[state]!;
     final wave = math.sin(cycle * math.pi * 2);
     final actionWave = math.sin(cycle * math.pi);
+    final nibble = state == PetState.feeding || state == PetState.drinking
+        ? .018 * (1 + math.sin(cycle * math.pi * 4)) / 2
+        : 0.0;
     return MeshPose(
       headDx: base.headDx,
-      headDy: base.headDy,
+      headDy: base.headDy + nibble,
       headRot: base.headRot + spec.sway * wave,
       bodyLean: base.bodyLean,
       bodyBend: base.bodyBend,
@@ -311,11 +323,15 @@ class _MeshBonePetState extends State<MeshBonePet> {
               ),
             );
     }
-    final cycle = widget.machine.controller.value;
-    final phase = cycle * math.pi * 2;
+    final phase = widget.worldTime * math.pi * 2 * 10;
     final weights = widget.machine.stateWeights;
     var pose = const MeshPose();
     for (final entry in weights.entries) {
+      final period = PetMotionSpec.table[entry.key]!.duration.inMilliseconds;
+      // The world clock wraps every minute. Use a whole number of cycles per
+      // minute so the wrap does not visibly snap the pose.
+      final cyclesPerMinute = (60000 / period).round();
+      final cycle = (widget.worldTime * cyclesPerMinute) % 1;
       pose = pose + _poseFor(entry.key, cycle).scaled(entry.value);
     }
     final sleepWeight = weights[PetState.sleeping] ?? 0;
@@ -378,7 +394,7 @@ Offset offsetAt(MeshPose pose, double u, double v, double phase) {
     dy -= legW * pose.legSquash * (v - .72);
     final side = u < .5 ? -1.0 : 1.0;
     final swingW = _smoothstep(.76, .92, v);
-    dy += legW * swingW * pose.swingAmt * side * math.sin(phase);
+    dy += legW * swingW * pose.swingAmt * side * math.sin(phase * 4);
   }
 
   // ---- 尾巴：侧向摆动 ----

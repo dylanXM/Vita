@@ -14,7 +14,6 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
-import '../../shared/world_scene_banner.dart';
 import '../shell/shell_page.dart';
 import 'chat_controller.dart';
 import '../auth/auth_controller.dart';
@@ -301,15 +300,6 @@ class _ChatPageState extends State<ChatPage> {
       ),
       body: Column(
         children: [
-          WorldSceneBanner(
-            title: widget.name,
-            subtitle: widget.companion?['friendship_active'] == false
-                ? 'chat.notFriends'.tr
-                : 'world.ready'.tr,
-            icon: Icons.auto_awesome,
-            imageUrl: widget.companion?['portrait_url'] as String?,
-            height: 172,
-          ),
           Obx(() => ctrl.accessError.value == null
               ? const SizedBox.shrink()
               : Container(

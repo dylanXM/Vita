@@ -86,7 +86,11 @@ class PetScene extends StatelessWidget {
                       worldTime: worldTime,
                     ),
                   ),
-                  PetFxLayer(machine: machine, speech: speech),
+                  PetFxLayer(
+                    machine: machine,
+                    worldTime: worldTime,
+                    speech: speech,
+                  ),
                 ],
               );
             },

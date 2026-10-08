@@ -12,7 +12,6 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
-import '../../shared/world_scene_banner.dart';
 import '../auth/auth_controller.dart';
 
 String _requestKey() =>
@@ -110,11 +109,6 @@ class StoriesPage extends StatelessWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.only(top: 12, bottom: 32),
             children: [
-              WorldSceneBanner(
-                title: 'storyHub.title'.tr,
-                subtitle: 'discover.stories'.tr,
-                icon: Icons.auto_stories_outlined,
-              ),
               _SectionHeader(
                   title: 'storyHub.backgrounds'.tr,
                   action: subscribed

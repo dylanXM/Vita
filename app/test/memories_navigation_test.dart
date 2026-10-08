@@ -76,6 +76,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('The day we met'), findsOneWidget);
-    expect(find.text('Moments you keep together'), findsOneWidget);
+    expect(find.text('Moments you keep together'), findsNothing);
   });
 }
