@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
 import '../life/life_detail_page.dart';
 import '../shell/shell_page.dart';
@@ -92,7 +93,7 @@ class MemoriesController extends GetxController {
   }
 }
 
-/// A compact, searchable companion directory; each entry opens its timeline.
+/// A searchable collection of companion journeys.
 class MemoriesPage extends StatefulWidget {
   const MemoriesPage({super.key});
 
@@ -102,6 +103,7 @@ class MemoriesPage extends StatefulWidget {
 
 class _MemoriesPageState extends State<MemoriesPage> {
   final TextEditingController _search = TextEditingController();
+  bool _showSearch = false;
 
   @override
   void dispose() {
@@ -170,36 +172,53 @@ class _MemoriesPageState extends State<MemoriesPage> {
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverToBoxAdapter(
-            child: VitaTabHeader(title: 'tab.journey'.tr, showDivider: false),
+            child: VitaTabHeader(
+              title: 'tab.journey'.tr,
+              showDivider: false,
+              actions: IconButton(
+                tooltip: 'contacts.search'.tr,
+                icon: Icon(_showSearch ? Icons.close : Icons.search_rounded),
+                onPressed: () {
+                  setState(() {
+                    _showSearch = !_showSearch;
+                    if (!_showSearch) _search.clear();
+                  });
+                },
+              ),
+            ),
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
-              child: TextField(
-                controller: _search,
-                onChanged: (_) => setState(() {}),
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  hintText: 'contacts.search'.tr,
-                  prefixIcon: Icon(Icons.search, color: context.vita.subText),
-                  suffixIcon: query.isEmpty
-                      ? null
-                      : IconButton(
-                          icon: const Icon(Icons.close, size: 18),
-                          onPressed: () {
-                            _search.clear();
-                            setState(() {});
-                          },
-                        ),
-                  filled: true,
-                  fillColor: context.vita.surface,
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none,
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'journey.subtitle'.tr,
+                    style: TextStyle(fontSize: 13, color: context.vita.subText),
                   ),
-                ),
+                  if (_showSearch) ...[
+                    const SizedBox(height: 18),
+                    TextField(
+                      controller: _search,
+                      autofocus: true,
+                      onChanged: (_) => setState(() {}),
+                      textInputAction: TextInputAction.search,
+                      decoration: InputDecoration(
+                        hintText: 'contacts.search'.tr,
+                        prefixIcon:
+                            Icon(Icons.search, color: context.vita.subText),
+                        filled: true,
+                        fillColor: context.vita.surface,
+                        isDense: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
@@ -214,24 +233,32 @@ class _MemoriesPageState extends State<MemoriesPage> {
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.only(bottom: 110),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final companion = visible[index];
-                    return _JourneyCompanionTile(
-                      companion: companion,
-                      onTap: () {
-                        if (Get.isRegistered<ShellController>()) {
-                          ShellController.to.selectedCompanionId.value =
-                              companion['id'] as String?;
-                        }
-                        Get.to(() => MemoryDetailPage(companion: companion),
-                            transition: Transition.cupertino);
-                      },
-                    );
-                  },
-                  childCount: visible.length,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
+              sliver: SliverLayoutBuilder(
+                builder: (context, constraints) => SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: constraints.crossAxisExtent < 320 ? 1 : 2,
+                    mainAxisExtent: 248,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final companion = visible[index];
+                      return _JourneyCompanionTile(
+                        companion: companion,
+                        onTap: () {
+                          if (Get.isRegistered<ShellController>()) {
+                            ShellController.to.selectedCompanionId.value =
+                                companion['id'] as String?;
+                          }
+                          Get.to(() => MemoryDetailPage(companion: companion),
+                              transition: Transition.cupertino);
+                        },
+                      );
+                    },
+                    childCount: visible.length,
+                  ),
                 ),
               ),
             ),
@@ -242,7 +269,10 @@ class _MemoriesPageState extends State<MemoriesPage> {
 }
 
 class _JourneyCompanionTile extends StatelessWidget {
-  const _JourneyCompanionTile({required this.companion, required this.onTap});
+  const _JourneyCompanionTile({
+    required this.companion,
+    required this.onTap,
+  });
 
   final Map<String, dynamic> companion;
   final VoidCallback onTap;
@@ -250,56 +280,83 @@ class _JourneyCompanionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = '${companion['name'] ?? 'chat.companion'.tr}';
+    final portraitUrl = (companion['portrait_url'] as String?)?.trim() ?? '';
     final details = [companion['city'], companion['occupation']]
         .whereType<String>()
         .where((value) => value.trim().isNotEmpty)
         .join(' · ');
     return Material(
-      color: context.vita.pageBg,
+      color: context.vita.surface,
+      borderRadius: BorderRadius.circular(22),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-          child: Column(children: [
-            Row(children: [
-              VitaAvatar(
-                name: name,
-                radius: 23,
-                imageUrl: companion['portrait_url'] as String?,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: SizedBox.expand(
+                child: portraitUrl.isEmpty
+                    ? _PortraitFallback(name: name)
+                    : VitaMediaImage(
+                        url: portraitUrl,
+                        errorBuilder: (_, __, ___) =>
+                            _PortraitFallback(name: name),
+                      ),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: context.vita.text)),
-                    if (details.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(details,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontSize: 12.5, color: context.vita.subText)),
-                    ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 11, 14, 13),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: context.vita.text,
+                      )),
+                  if (details.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      details,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          TextStyle(fontSize: 11, color: context.vita.subText),
+                    ),
                   ],
-                ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Icon(Icons.chevron_right, size: 18, color: context.vita.subText),
-            ]),
-            const SizedBox(height: 10),
-            Divider(height: 1, indent: 60, color: context.vita.divider),
-          ]),
+            ),
+          ],
         ),
       ),
     );
   }
+}
+
+class _PortraitFallback extends StatelessWidget {
+  const _PortraitFallback({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+        color: context.vita.greenTint,
+        child: Center(
+          child: Text(
+            name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase(),
+            style: TextStyle(
+              fontSize: 56,
+              fontWeight: FontWeight.w300,
+              color: context.vita.green,
+            ),
+          ),
+        ),
+      );
 }
 
 /// Second level: all memories belonging to one companion.

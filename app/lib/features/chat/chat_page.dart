@@ -19,6 +19,8 @@ import 'chat_controller.dart';
 import '../auth/auth_controller.dart';
 import 'chat_info_page.dart';
 import 'chat_message_content.dart';
+import 'companion_moment_page.dart';
+import 'companion_transfer_sheet.dart';
 import 'experience_sheet.dart';
 
 /// Conversation within a companion's world.
@@ -434,6 +436,7 @@ class _ChatPageState extends State<ChatPage> {
                       child: _ChatMessageBody(
                         message: m,
                         companionId: widget.companionId,
+                        avatarUrl: widget.companion?['portrait_url'] as String?,
                         onPlayVoice: _playVoice,
                       ),
                     ),
@@ -578,10 +581,20 @@ class _ChatPageState extends State<ChatPage> {
         children: [
           _MorePanelButton(
             icon: Icons.swap_horiz_rounded,
-            label: '转账',
+            label: 'chat.transfer'.tr,
             onTap: () {
               _panel.value = null;
-              Get.snackbar('转账', '转账功能即将上线');
+              showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: context.vita.surface,
+                showDragHandle: true,
+                builder: (_) => CompanionTransferSheet(
+                  companionId: widget.companionId,
+                  companionName: widget.name,
+                  onCompleted: ctrl.poll,
+                ),
+              );
             },
           ),
           const SizedBox(width: 20),
@@ -596,7 +609,29 @@ class _ChatPageState extends State<ChatPage> {
                   backgroundColor: context.vita.surface,
                   showDragHandle: true,
                   builder: (_) => ExperienceSheet(
-                      companionId: widget.companionId, onCompleted: ctrl.poll));
+                      companionId: widget.companionId,
+                      onCompleted: ctrl.poll,
+                      onResult: (response) async {
+                        await ctrl.experienceCompleted(response);
+                        final result = response['result'];
+                        final product = response['product'];
+                        final eventId =
+                            result is Map ? result['event_id'] : null;
+                        if (mounted &&
+                            product is Map &&
+                            product['category'] == 'date' &&
+                            eventId is String) {
+                          Navigator.of(context).pop();
+                          Get.to(() => CompanionMomentPage(
+                                companionId: widget.companionId,
+                                eventId: eventId,
+                                name: widget.name,
+                                avatarUrl: widget.companion?['portrait_url']
+                                    as String?,
+                                controller: ctrl,
+                              ));
+                        }
+                      }));
             },
           ),
         ],
@@ -609,11 +644,13 @@ class _ChatMessageBody extends StatelessWidget {
   const _ChatMessageBody({
     required this.message,
     required this.companionId,
+    this.avatarUrl,
     required this.onPlayVoice,
   });
 
   final Map<String, dynamic> message;
   final String companionId;
+  final String? avatarUrl;
   final ValueChanged<String> onPlayVoice;
 
   @override
@@ -630,6 +667,70 @@ class _ChatMessageBody extends StatelessWidget {
         key: ValueKey(message['id']),
         content: parsed,
         animate: message['_animate_gift'] == true,
+      );
+    }
+    if (type == 'transfer') {
+      final coins = payload['coins'];
+      return Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.north_east_rounded, color: context.vita.green, size: 20),
+        const SizedBox(width: 8),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('chat.transfer'.tr,
+              style: TextStyle(
+                  fontWeight: FontWeight.w700, color: context.vita.text)),
+          Text('gift.coins'.trParams({'coins': '$coins'}),
+              style: TextStyle(fontSize: 12, color: context.vita.subText)),
+        ]),
+      ]);
+    }
+    if (type == 'scene_card' && payload['event_id'] is String) {
+      final scheduled =
+          DateTime.tryParse('${payload['scheduled_at'] ?? ''}')?.toLocal();
+      final endsAt =
+          DateTime.tryParse('${payload['ends_at'] ?? ''}')?.toLocal();
+      final timeLabel = scheduled == null
+          ? ''
+          : endsAt != null && !DateTime.now().isBefore(endsAt)
+              ? 'moment.ended'.tr
+              : !DateTime.now().isBefore(scheduled)
+                  ? 'moment.live'.tr
+                  : 'moment.scheduled'.trParams({
+                      'time': '${MaterialLocalizations.of(context).formatMediumDate(scheduled)} '
+                          '${TimeOfDay.fromDateTime(scheduled).format(context)}'
+                    });
+      return InkWell(
+        onTap: () => Get.to(() => CompanionMomentPage(
+              companionId: companionId,
+              eventId: payload['event_id'] as String,
+              name: Get.find<ChatController>(tag: companionId).companionName,
+              controller: Get.find<ChatController>(tag: companionId),
+              avatarUrl: avatarUrl,
+            )),
+        borderRadius: BorderRadius.circular(16),
+        child: Row(children: [
+          Icon(Icons.auto_awesome_outlined, color: context.vita.green),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text('moment.open'.tr,
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700, color: context.vita.text)),
+                const SizedBox(height: 4),
+                Text(displayContent,
+                    style:
+                        TextStyle(fontSize: 12, color: context.vita.subText)),
+                if (scheduled != null) ...[
+                  const SizedBox(height: 4),
+                  Text(timeLabel,
+                      style:
+                          TextStyle(fontSize: 11, color: context.vita.green)),
+                ],
+              ])),
+          Icon(Icons.arrow_forward_ios_rounded,
+              size: 14, color: context.vita.subText),
+        ]),
       );
     }
     if (parsed.mediaKind == ChatMediaKind.voice) {

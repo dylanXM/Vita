@@ -1357,7 +1357,9 @@ func SendMessage(c *gin.Context) {
 	defer tx.Rollback()
 	var activeLifeID sql.NullString
 	if !isDefault {
-		lookupErr := tx.QueryRowContext(c.Request.Context(), `SELECT id FROM life_events WHERE companion_id=$1 AND status='active' AND start_time<=CURRENT_TIMESTAMP AND end_time>CURRENT_TIMESTAMP ORDER BY start_time DESC,id DESC LIMIT 1`, companionID).Scan(&activeLifeID)
+		lookupErr := tx.QueryRowContext(c.Request.Context(), `SELECT id FROM life_events WHERE companion_id=$1 AND status='active' AND start_time<=CURRENT_TIMESTAMP AND end_time>CURRENT_TIMESTAMP
+			ORDER BY CASE WHEN event_type='shared_activity' AND generation_source='user_purchase' THEN 0 ELSE 1 END,
+			start_time DESC,id DESC LIMIT 1`, companionID).Scan(&activeLifeID)
 		if lookupErr != nil && !errors.Is(lookupErr, sql.ErrNoRows) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load current world event"})
 			return
@@ -1385,7 +1387,7 @@ func SendMessage(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save message"})
 		return
 	}
-	userMessage := &agent.SavedMessage{ID: msgID, ConversationID: conversationID, SenderType: "user", MessageType: req.MessageType, Content: req.Content, MediaURL: mediaURL, Payload: map[string]any{}, Source: "user", DeliveryStatus: "delivered", CreatedAt: createdAt}
+	userMessage := &agent.SavedMessage{ID: msgID, ConversationID: conversationID, SenderType: "user", MessageType: req.MessageType, Content: req.Content, MediaURL: mediaURL, Payload: map[string]any{}, Source: "user", LifeEventID: activeLifeID.String, DeliveryStatus: "delivered", CreatedAt: createdAt}
 	response := SendMessageResponse{ID: msgID, Content: req.Content, Sender: "user", Created: createdAt, UserMessage: userMessage}
 	if companionAgent == nil {
 		response.AgentError = "agent service is unavailable"

@@ -130,13 +130,7 @@ class _PetPoseSheetState extends State<PetPoseSheet> {
         actions: _actions,
         weights: widget.machine.stateWeights,
         worldTime: widget.worldTime,
-        actionSeconds: math.max(
-          0.0,
-          widget.machine.stateElapsed.inMilliseconds / 1000 -
-              (widget.machine.reducedMotion
-                  ? 0.0
-                  : PetStateMachine.transitionDuration.inMilliseconds / 2000),
-        ),
+        actionSeconds: widget.machine.stateElapsed.inMilliseconds / 1000,
       ),
       child: const SizedBox.expand(),
     );
@@ -189,47 +183,32 @@ class _PoseSheetPainter extends CustomPainter {
       }
     }
 
-    // The authored sheets have no in-between drawings. Briefly soften the
-    // single silhouette around the hand-off instead of superimposing two
-    // complete animals for the whole transition.
-    final handoff = ((.62 - strongest) / .12).clamp(0.0, 1.0).toDouble();
-    if (handoff > 0) {
-      canvas.saveLayer(
-        dest.inflate(8),
-        Paint()
-          ..imageFilter = ui.ImageFilter.blur(
-            sigmaX: 2.0 * handoff,
-            sigmaY: 2.0 * handoff,
-          ),
-      );
-    }
-
     final actionImage = actions;
     if (actionImage != null) {
       if (state == PetState.walking) {
-        final frame = (actionSeconds * 6).floor() % 3;
+        // A return stroke prevents the third drawing from jumping straight
+        // back to the first drawing at the end of every stride.
+        const stride = [0, 1, 2, 1];
+        final frame = stride[(actionSeconds * 4).floor() % stride.length];
         _drawCell(canvas, actionImage, frame, dest);
-        if (handoff > 0) canvas.restore();
         return;
       }
       if (state == PetState.feeding) {
-        final frame = (actionSeconds * 3).floor() % 2;
-        _drawCell(canvas, actionImage, 3 + frame, dest);
-        if (handoff > 0) canvas.restore();
+        // Spend more time at the bowl than in the head-lowered drawing.
+        const bites = [3, 4, 4, 3];
+        _drawCell(
+            canvas, actionImage, bites[(actionSeconds * 2).floor() % 4], dest);
         return;
       }
       if (state == PetState.drinking) {
-        final frame = (actionSeconds * 3).floor() % 2;
-        _drawCell(
-            canvas, frame == 0 ? image : actionImage, frame == 0 ? 4 : 5, dest);
-        if (handoff > 0) canvas.restore();
+        final lowered = (actionSeconds * 2).floor() % 4 >= 1;
+        _drawCell(canvas, lowered ? actionImage : image, lowered ? 5 : 4, dest);
         return;
       }
     }
     final breath = state == PetState.sleeping ? .007 : .004;
     final rise = breath * edge * math.sin(worldTime * math.pi * 2 * 12);
     _drawCell(canvas, image, _cellFor(state), dest.shift(Offset(0, rise)));
-    if (handoff > 0) canvas.restore();
   }
 
   void _drawCell(Canvas canvas, ui.Image sheet, int index, Rect dest) {
@@ -244,7 +223,7 @@ class _PoseSheetPainter extends CustomPainter {
         cellHeight,
       ),
       dest,
-      Paint()..filterQuality = FilterQuality.low,
+      Paint()..filterQuality = FilterQuality.medium,
     );
   }
 

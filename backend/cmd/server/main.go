@@ -164,6 +164,10 @@ func main() {
 			companions.POST("/:id/restore", handler.RestoreCompanion)
 			companions.GET("/:id/experiences", handler.ListCompanionExperiences)
 			companions.POST("/:id/experiences/:product_key", handler.PurchaseCompanionExperience)
+			companions.GET("/:id/moments/:event_id", handler.GetCompanionMoment)
+			companions.POST("/:id/moments/:event_id/start", handler.StartCompanionMoment)
+			companions.PUT("/:id/moments/:event_id/artifact", handler.SaveCompanionMomentArtifact)
+			companions.POST("/:id/transfers", middleware.RateLimit(10, time.Minute), handler.TransferToCompanion)
 		}
 		api.GET("/companions-deleted", middleware.RequireAuth(), handler.ListDeletedCompanions)
 		api.GET("/companion-options", middleware.RequireAuth(), handler.CompanionOptions)

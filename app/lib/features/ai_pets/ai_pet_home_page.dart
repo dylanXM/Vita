@@ -6,7 +6,6 @@ import 'package:get/get.dart';
 import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
-import '../life/life_detail_page.dart';
 import 'animation/brain/pet_brain.dart';
 import 'animation/pet/pet_motion_spec.dart';
 import 'animation/pet/pet_state_machine.dart';
@@ -46,15 +45,6 @@ class _AIPetHomePageState extends State<AIPetHomePage>
   final Weather _weather = Weather.none;
   Timer? _vitalsTimer;
   bool _reduceMotion = false;
-
-  Map<String, dynamic> get _companion => {
-        'id': widget.companionId,
-        'name': widget.name,
-        'portrait_url': _currentAvatarUrl,
-        'occupation': widget.species,
-        'creation_source': 'ai_pet',
-        'friendship_active': true,
-      };
 
   String get _currentAvatarUrl {
     final saved = _state?['avatar_url'];
@@ -280,8 +270,6 @@ class _AIPetHomePageState extends State<AIPetHomePage>
                 onWalk: _walk,
                 onSit: _sit,
                 onRest: _rest,
-                onLife: () =>
-                    Get.to(() => LifeDetailPage(companion: _companion)),
                 onRefresh: _refreshState,
               ),
             ),

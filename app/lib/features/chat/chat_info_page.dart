@@ -18,6 +18,7 @@ import '../billing/subscription_page.dart';
 import '../life/life_detail_page.dart';
 import '../memories/memories_page.dart';
 import 'experience_sheet.dart';
+import 'companion_moment_page.dart';
 
 class ChatInfoPage extends StatelessWidget {
   const ChatInfoPage({
@@ -160,7 +161,24 @@ class ChatInfoPage extends StatelessWidget {
       builder: (_) => ExperienceSheet(
         companionId: companionId,
         onCompleted: onExperienceCompleted,
-        onResult: onExperienceResult,
+        onResult: (response) async {
+          await onExperienceResult?.call(response);
+          final result = response['result'];
+          final product = response['product'];
+          final eventId = result is Map ? result['event_id'] : null;
+          if (context.mounted &&
+              product is Map &&
+              product['category'] == 'date' &&
+              eventId is String) {
+            Navigator.of(context).pop();
+            Get.to(() => CompanionMomentPage(
+                  companionId: companionId,
+                  eventId: eventId,
+                  name: name,
+                  avatarUrl: companion['portrait_url'] as String?,
+                ));
+          }
+        },
       ),
     );
   }
@@ -174,7 +192,8 @@ class ChatInfoPage extends StatelessWidget {
         actions: [
           CupertinoDialogAction(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text('common.cancel'.tr, style: const TextStyle(color: CupertinoColors.systemGrey)),
+            child: Text('common.cancel'.tr,
+                style: const TextStyle(color: CupertinoColors.systemGrey)),
           ),
           CupertinoDialogAction(
             onPressed: () => Navigator.pop(dialogContext, true),
@@ -192,7 +211,8 @@ class ChatInfoPage extends StatelessWidget {
         actions: [
           CupertinoDialogAction(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text('common.cancel'.tr, style: const TextStyle(color: CupertinoColors.systemGrey)),
+            child: Text('common.cancel'.tr,
+                style: const TextStyle(color: CupertinoColors.systemGrey)),
           ),
           CupertinoDialogAction(
             isDestructiveAction: true,
@@ -408,7 +428,8 @@ class _ChatMediaPageState extends State<ChatMediaPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(leading: const VitaBackButton(), title: Text('chatInfo.media'.tr)),
+      appBar: AppBar(
+          leading: const VitaBackButton(), title: Text('chatInfo.media'.tr)),
       body: RefreshIndicator(
         onRefresh: () => _load(refresh: true),
         child: _items.isEmpty && !_loading

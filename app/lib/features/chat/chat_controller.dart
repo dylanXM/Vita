@@ -150,7 +150,7 @@ class ChatController extends GetxController {
   /// to deliver shows up as a failed bubble in the list. Returns `false` when
   /// nothing could be queued, so the caller keeps the draft, and records the
   /// reason in [sendError].
-  Future<bool> send(String text) async {
+  Future<bool> send(String text, {String? momentEventId}) async {
     final content = text.trim();
     if (content.isEmpty) return false;
     if (sending.value) return false;
@@ -170,6 +170,7 @@ class ChatController extends GetxController {
       'sender_type': 'user',
       'message_type': 'text',
       'source': 'user',
+      'life_event_id': momentEventId ?? '',
       'payload': <String, dynamic>{},
       'delivery_status': 'sending',
       'created_at': DateTime.now().toUtc().toIso8601String(),

@@ -7,7 +7,7 @@ import '../../../../core/theme.dart';
 
 /// 右下角悬浮操作按钮：点击展开操作面板。
 /// 面板包含状态条（饱腹/开心/精力/健康）、经验/金币，以及
-/// 喂食 / 喝水 / 生活 / 刷新 操作。
+/// 喂食 / 喝水 / 散步 / 坐下 / 睡觉 / 刷新操作。
 class PetActionMenu extends StatefulWidget {
   const PetActionMenu({
     super.key,
@@ -22,7 +22,6 @@ class PetActionMenu extends StatefulWidget {
     required this.onWalk,
     required this.onSit,
     required this.onRest,
-    required this.onLife,
     required this.onRefresh,
   });
 
@@ -37,7 +36,6 @@ class PetActionMenu extends StatefulWidget {
   final VoidCallback onWalk;
   final VoidCallback onSit;
   final VoidCallback onRest;
-  final VoidCallback onLife;
   final VoidCallback onRefresh;
 
   @override
@@ -230,12 +228,6 @@ class _PetActionMenuState extends State<PetActionMenu>
                 label: 'aiPets.rest'.tr,
                 onTap: widget.feeding ? null : () => _run(widget.onRest)),
           ]),
-          _ActionTile(
-            icon: Icons.auto_stories_outlined,
-            iconColor: const Color(0xFF4A90E2),
-            label: 'aiPets.life'.tr,
-            onTap: () => _run(widget.onLife),
-          ),
         ],
       ),
     );

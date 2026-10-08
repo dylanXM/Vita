@@ -5,6 +5,7 @@ import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../chat/chat_page.dart';
 import '../chat/experience_sheet.dart';
+import '../chat/companion_moment_page.dart';
 
 class LifeDetailPage extends StatelessWidget {
   const LifeDetailPage({super.key, required this.companion});
@@ -37,27 +38,54 @@ class LifeDetailPage extends StatelessWidget {
             title: 'contactDetail.profile'.tr,
             rows: [
               _DetailRow(label: 'chat.city'.tr, value: _text('city')),
-              _DetailRow(label: 'chat.occupation'.tr, value: _text('occupation')),
-              _DetailRow(label: 'chat.relationship'.tr, value: _text('relationship_stage')),
+              _DetailRow(
+                  label: 'chat.occupation'.tr, value: _text('occupation')),
+              _DetailRow(
+                  label: 'chat.relationship'.tr,
+                  value: _text('relationship_stage')),
               _DetailRow(label: 'chat.interests'.tr, value: _text('interests')),
             ],
           ),
           _Section(
             title: 'contactDetail.personality'.tr,
             rows: [
-              _DetailRow(label: 'contactDetail.persona'.tr, value: _text('persona'), multiline: true),
-              _DetailRow(label: 'contactDetail.appearance'.tr, value: _text('appearance'), multiline: true),
-              _DetailRow(label: 'contactDetail.speakingStyle'.tr, value: _text('speaking_style'), multiline: true),
-              _DetailRow(label: 'contactDetail.likes'.tr, value: _text('likes'), multiline: true),
-              _DetailRow(label: 'contactDetail.dislikes'.tr, value: _text('dislikes'), multiline: true),
+              _DetailRow(
+                  label: 'contactDetail.persona'.tr,
+                  value: _text('persona'),
+                  multiline: true),
+              _DetailRow(
+                  label: 'contactDetail.appearance'.tr,
+                  value: _text('appearance'),
+                  multiline: true),
+              _DetailRow(
+                  label: 'contactDetail.speakingStyle'.tr,
+                  value: _text('speaking_style'),
+                  multiline: true),
+              _DetailRow(
+                  label: 'contactDetail.likes'.tr,
+                  value: _text('likes'),
+                  multiline: true),
+              _DetailRow(
+                  label: 'contactDetail.dislikes'.tr,
+                  value: _text('dislikes'),
+                  multiline: true),
             ],
           ),
           _Section(
             title: 'contactDetail.life'.tr,
             rows: [
-              _DetailRow(label: 'contactDetail.lifeHabits'.tr, value: _text('life_habits'), multiline: true),
-              _DetailRow(label: 'contactDetail.lifeGoal'.tr, value: _text('life_goal'), multiline: true),
-              _DetailRow(label: 'contactDetail.backstory'.tr, value: _text('backstory'), multiline: true),
+              _DetailRow(
+                  label: 'contactDetail.lifeHabits'.tr,
+                  value: _text('life_habits'),
+                  multiline: true),
+              _DetailRow(
+                  label: 'contactDetail.lifeGoal'.tr,
+                  value: _text('life_goal'),
+                  multiline: true),
+              _DetailRow(
+                  label: 'contactDetail.backstory'.tr,
+                  value: _text('backstory'),
+                  multiline: true),
             ],
           ),
           _TagsSection(tags: _tags()),
@@ -75,7 +103,10 @@ class LifeDetailPage extends StatelessWidget {
   List<String> _tags() {
     final raw = companion['personality_tags'];
     if (raw is List) {
-      return raw.whereType<String>().where((item) => item.trim().isNotEmpty).toList();
+      return raw
+          .whereType<String>()
+          .where((item) => item.trim().isNotEmpty)
+          .toList();
     }
     return const [];
   }
@@ -99,6 +130,23 @@ class LifeDetailPage extends StatelessWidget {
       builder: (_) => ExperienceSheet(
         companionId: _id,
         onCompleted: () async {},
+        onResult: (response) async {
+          final result = response['result'];
+          final product = response['product'];
+          final eventId = result is Map ? result['event_id'] : null;
+          if (context.mounted &&
+              product is Map &&
+              product['category'] == 'date' &&
+              eventId is String) {
+            Navigator.of(context).pop();
+            Get.to(() => CompanionMomentPage(
+                  companionId: _id,
+                  eventId: eventId,
+                  name: _name,
+                  avatarUrl: companion['portrait_url'] as String?,
+                ));
+          }
+        },
       ),
     );
   }
@@ -120,7 +168,8 @@ class _ProfileHeader extends StatelessWidget {
     final name = companion['name'] as String? ?? 'chat.companion'.tr;
     final city = (companion['city'] as String? ?? '').trim();
     final occupation = (companion['occupation'] as String? ?? '').trim();
-    final subtitle = [city, occupation].where((item) => item.isNotEmpty).join(' · ');
+    final subtitle =
+        [city, occupation].where((item) => item.isNotEmpty).join(' · ');
     final persona = (companion['persona'] as String? ?? '').trim();
     final canChat = companion['can_chat'] != false;
     final friendshipActive = companion['friendship_active'] != false;
@@ -265,7 +314,8 @@ class _DetailRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
-        crossAxisAlignment: multiline ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+        crossAxisAlignment:
+            multiline ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         children: [
           SizedBox(
             width: 88,
@@ -279,7 +329,8 @@ class _DetailRow extends StatelessWidget {
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style: TextStyle(fontSize: 15, height: 1.45, color: context.vita.text),
+              style: TextStyle(
+                  fontSize: 15, height: 1.45, color: context.vita.text),
             ),
           ),
         ],
@@ -303,7 +354,8 @@ class _TagsSection extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-            child: Text('contactDetail.tags'.tr, style: context.vita.sectionTitle),
+            child:
+                Text('contactDetail.tags'.tr, style: context.vita.sectionTitle),
           ),
           Container(
             width: double.infinity,
@@ -315,7 +367,8 @@ class _TagsSection extends StatelessWidget {
               children: tags
                   .map(
                     (tag) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                         color: context.vita.greenTint,
                         borderRadius: BorderRadius.circular(4),

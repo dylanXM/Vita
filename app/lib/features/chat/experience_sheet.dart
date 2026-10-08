@@ -79,8 +79,8 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
         actions: [
           CupertinoDialogAction(
               onPressed: () => Navigator.pop(dialogContext, false),
-              
-              child: Text('common.cancel'.tr, style: const TextStyle(color: CupertinoColors.systemGrey))),
+              child: Text('common.cancel'.tr,
+                  style: const TextStyle(color: CupertinoColors.systemGrey))),
           CupertinoDialogAction(
               onPressed: () => Navigator.pop(dialogContext, true),
               child: Text(owned ? 'experience.equip'.tr : 'experience.use'.tr)),
@@ -113,7 +113,11 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
         'product_key': key,
         'coins': owned ? 0 : coins,
       });
-      if (!mounted) return;
+      final result = data is Map ? data['result'] : null;
+      if (!mounted ||
+          (widget.onResult != null &&
+              result is Map &&
+              result['event_id'] is String)) return;
       Get.snackbar('experience.done'.tr,
           owned ? 'experience.equipped'.tr : 'experience.doneMessage'.tr);
       await _load();
@@ -227,8 +231,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     );
   }
 
-  Widget _buildActionButton(
-      BuildContext context, Map<String, dynamic> product,
+  Widget _buildActionButton(BuildContext context, Map<String, dynamic> product,
       {required bool owned, required bool equipped}) {
     final key = product['key'] as String? ?? '';
     if (equipped) {
@@ -250,9 +253,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
                 height: 16,
                 child: CircularProgressIndicator(strokeWidth: 2))
             : Text(
-                owned
-                    ? 'experience.equip'.tr
-                    : '${product['coins']}',
+                owned ? 'experience.equip'.tr : '${product['coins']}',
                 style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,

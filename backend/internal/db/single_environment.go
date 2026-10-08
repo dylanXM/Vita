@@ -79,6 +79,21 @@ func migrateSingleEnvironment(database *sql.DB) error {
 		`UPDATE coin_packs SET environment='prod' WHERE environment<>'prod'`,
 		`UPDATE ai_pet_breeds SET environment='prod' WHERE environment<>'prod'`,
 		`UPDATE story_backgrounds SET environment='prod' WHERE environment<>'prod'`,
+		// The original story seed created one copy per environment. Keep the
+		// prod seed as the active template after consolidation; retain the old
+		// rows for stories that still reference their IDs.
+		`UPDATE story_backgrounds legacy SET enabled=false,deleted_at=COALESCE(legacy.deleted_at,CURRENT_TIMESTAMP)
+		 WHERE legacy.owner_user_id IS NULL
+		 AND legacy.id IN (
+			'story-default-moon-train-dev','story-default-moon-train-beta',
+			'story-default-seaside-dev','story-default-seaside-beta',
+			'story-default-bookshop-dev','story-default-bookshop-beta'
+		 )
+		 AND EXISTS (
+			SELECT 1 FROM story_backgrounds prod
+			WHERE prod.id=regexp_replace(legacy.id,'-(dev|beta)$','-prod')
+			AND prod.environment='prod'
+		 )`,
 		`UPDATE whats_new_campaigns SET environment='prod' WHERE environment<>'prod'`,
 		`UPDATE world_campaigns SET environment='prod' WHERE environment<>'prod'`,
 		`UPDATE users SET environment='prod' WHERE environment<>'prod'`,

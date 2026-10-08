@@ -1046,6 +1046,29 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_world_one_visit_per_day ON world_interactions(companion_id,local_date) WHERE kind='visit'`,
 		`CREATE INDEX IF NOT EXISTS idx_world_interactions_companion ON world_interactions(companion_id,created_at DESC)`,
+		`CREATE TABLE IF NOT EXISTS companion_moment_sessions (
+			event_id TEXT PRIMARY KEY REFERENCES life_events(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			companion_id TEXT NOT NULL REFERENCES companions(id) ON DELETE CASCADE,
+			opening_message_id TEXT REFERENCES messages(id) ON DELETE SET NULL,
+			artifact_text TEXT NOT NULL DEFAULT '',
+			artifact_user_text TEXT NOT NULL DEFAULT '',
+			artifact_companion_text TEXT NOT NULL DEFAULT '',
+			artifact_updated_at TIMESTAMP,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE IF NOT EXISTS companion_transfers (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			companion_id TEXT NOT NULL REFERENCES companions(id) ON DELETE CASCADE,
+			request_key TEXT NOT NULL,
+			coins INTEGER NOT NULL CHECK (coins BETWEEN 1 AND 1000),
+			message_id TEXT,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(user_id,request_key)
+		)`,
+		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS gifted_coins_balance INTEGER NOT NULL DEFAULT 0`,
+		`CREATE INDEX IF NOT EXISTS idx_companion_transfers_companion ON companion_transfers(companion_id,created_at DESC)`,
 		`INSERT INTO roles (id, name, description) VALUES ('user', 'user', 'Regular user') ON CONFLICT (id) DO NOTHING`,
 		`INSERT INTO roles (id, name, description) VALUES ('admin', 'admin', 'Administrator') ON CONFLICT (id) DO NOTHING`,
 	}

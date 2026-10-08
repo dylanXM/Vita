@@ -17,7 +17,8 @@ class CreditsPage extends StatelessWidget {
     final ctrl = BillingController.to;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(leading: const VitaBackButton(), title: Text('credits.title'.tr)),
+      appBar: AppBar(
+          leading: const VitaBackButton(), title: Text('credits.title'.tr)),
       body: Obx(() => RefreshIndicator(
             onRefresh: ctrl.refreshCredits,
             child: _body(context, ctrl),
@@ -250,6 +251,9 @@ class _TxRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final amount = (tx['amount'] as num?)?.toInt() ?? 0;
     final description = tx['description'] as String? ?? '';
+    final displayDescription = description.startsWith('companion-transfer:')
+        ? 'chat.transfer'.tr
+        : description;
     final kind = tx['kind'] as String? ?? '';
     final createdAt = tx['created_at'] as String?;
     return ConstrainedBox(
@@ -262,7 +266,7 @@ class _TxRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(description.isEmpty ? kind : description,
+                Text(displayDescription.isEmpty ? kind : displayDescription,
                     style: TextStyle(fontSize: 15, color: context.vita.text)),
                 if (createdAt != null) ...[
                   const SizedBox(height: 3),

@@ -232,7 +232,8 @@ func fulfillVirtualDate(ctx context.Context, userID, companionID string, product
 		return nil, "", err
 	}
 	messageID := uuid.New().String()
-	messagePayload, _ := json.Marshal(map[string]any{"event_id": eventID, "product_key": product.Key, "scheduled_at": start})
+	messagePayload, _ := json.Marshal(map[string]any{"event_id": eventID, "product_key": product.Key,
+		"scheduled_at": start, "ends_at": start.Add(duration)})
 	var timezone string
 	_ = db.Get().QueryRowContext(ctx, `SELECT timezone FROM users WHERE id=$1`, userID).Scan(&timezone)
 	locationZone, zoneErr := time.LoadLocation(timezone)

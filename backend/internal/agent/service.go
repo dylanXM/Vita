@@ -265,7 +265,11 @@ func (s *Service) Reply(ctx context.Context, conversationID, userID string) (*Sa
 	if err != nil {
 		return nil, err
 	}
-	if status.Busy && status.AvailableAt != nil {
+	var togetherNow bool
+	_ = s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM life_events
+		WHERE companion_id=$1 AND event_type='shared_activity' AND generation_source='user_purchase'
+		AND start_time<=CURRENT_TIMESTAMP AND end_time>CURRENT_TIMESTAMP AND status='active')`, profile.ID).Scan(&togetherNow)
+	if status.Busy && status.AvailableAt != nil && !togetherNow {
 		var triggerMessageID string
 		if err := s.db.QueryRowContext(ctx, `SELECT id FROM messages WHERE conversation_id=$1 AND sender_type='user' ORDER BY created_at DESC LIMIT 1`, conversationID).Scan(&triggerMessageID); err != nil {
 			return nil, err
@@ -292,9 +296,32 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 	preferredLocale := s.preferredLocale(ctx, userID)
 	latestQuestion := latestUserMessage(recent)
 	system := s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy(latestQuestion, preferredLocale) + "\n\n" + emojiMessagePolicy
+	lifeEventID := ""
+	_ = s.db.QueryRowContext(ctx, `SELECT COALESCE(life_event_id,'') FROM messages
+		WHERE conversation_id=$1 AND sender_type='user' ORDER BY created_at DESC,id DESC LIMIT 1`, conversationID).Scan(&lifeEventID)
+	surpriseNow := false
+	if lifeEventID != "" && int(lifeEventID[len(lifeEventID)-1])%3 == 0 {
+		var exchanged int
+		_ = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM messages m JOIN life_events e ON e.id=m.life_event_id
+			WHERE m.conversation_id=$1 AND e.id=$2 AND m.sender_type='user'
+			AND e.event_type='shared_activity' AND e.generation_source='user_purchase'
+			AND e.start_time<=CURRENT_TIMESTAMP AND e.end_time>CURRENT_TIMESTAMP`, conversationID, lifeEventID).Scan(&exchanged)
+		surpriseNow = exchanged == 2
+	}
+	if surpriseNow {
+		system += "\n\nThis is the second exchange during your shared moment. Offer one small, spontaneous surprise or thoughtful personal detail rooted in your profile or their previous words. Keep it natural and avoid invented major memories, purchases, or physical claims."
+	}
 	var text string
 	if s.mock || err != nil {
-		text = mockReply(profile, recent, detectSupportedLocale(latestQuestion, preferredLocale))
+		locale := detectSupportedLocale(latestQuestion, preferredLocale)
+		text = mockReply(profile, recent, locale)
+		if surpriseNow {
+			if strings.HasPrefix(locale, "zh") {
+				text = "对了，我还为今天留了一个小小的惊喜：待会儿想和你一起给这一刻取个名字。"
+			} else {
+				text = "I saved one little surprise for today: I'd love to give this moment a name together."
+			}
+		}
 	} else {
 		text, _, err = s.generateTextWithFallback(ctx, profile.ID, "reply", models, GenerateRequest{
 			System: system, Messages: recent, Temperature: 0.9, MaxTokens: 320,
@@ -303,7 +330,7 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 			return nil, err
 		}
 	}
-	reply, err := s.insertMessage(ctx, conversationID, "assistant", "text", text, "reply", "", map[string]any{})
+	reply, err := s.insertMessage(ctx, conversationID, "assistant", "text", text, "reply", lifeEventID, map[string]any{})
 	if err != nil {
 		return nil, err
 	}
@@ -331,6 +358,103 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 		s.updateRelationshipAndMemory(ctx, profile.ID, userID, recent[len(recent)-1].Content)
 	}
 	return reply, nil
+}
+
+// ComposeMomentOpening prepares a character-led opening without writing a
+// message. The handler persists it only after the purchased moment is active.
+func (s *Service) ComposeMomentOpening(ctx context.Context, conversationID, userID, titleKey, location string) (string, error) {
+	profile, err := s.loadCompanionForConversation(ctx, conversationID, userID)
+	if err != nil {
+		return "", err
+	}
+	recent, err := s.loadRecentMessages(ctx, conversationID, 12)
+	if err != nil {
+		return "", err
+	}
+	locale := s.preferredLocale(ctx, userID)
+	if s.mock {
+		if strings.HasPrefix(locale, "zh") {
+			return "你来了。今天我们不用赶时间，先坐一会儿吧。", nil
+		}
+		return "You're here. Let's take our time together today.", nil
+	}
+	models, err := s.loadTextRouteModels(ctx, "text_chat", profile.ID, userID)
+	if err != nil {
+		return "", err
+	}
+	experienceName := map[string]string{
+		"experience.date.coffee": "a quiet coffee date",
+		"experience.date.movie":  "a movie night",
+		"experience.date.dinner": "dinner together",
+	}[titleKey]
+	if experienceName == "" {
+		experienceName = "a shared moment"
+	}
+	openingInstruction := fmt.Sprintf(`The user has arrived for your scheduled shared experience (%s, location: %s).
+Open the moment naturally in one or two sentences, in the user's language. Refer to your personality and recent conversation.
+Be present and invite conversation; do not list options, claim a physical encounter, or ask for payment.`, experienceName, location)
+	recent = append(recent, ChatMessage{Role: "user", Content: openingInstruction})
+	text, _, err := s.generateTextWithFallback(ctx, profile.ID, "moment_opening", models, GenerateRequest{
+		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy,
+		Messages: recent, Temperature: 0.85, MaxTokens: 140,
+	})
+	return strings.TrimSpace(text), err
+}
+
+// ComposeTransferReply runs before any credits are deducted so failed model
+// calls cannot leave a paid gesture without the promised response.
+func (s *Service) ComposeTransferReply(ctx context.Context, conversationID, userID string, coins int) (string, error) {
+	profile, err := s.loadCompanionForConversation(ctx, conversationID, userID)
+	if err != nil {
+		return "", err
+	}
+	recent, err := s.loadRecentMessages(ctx, conversationID, 12)
+	if err != nil {
+		return "", err
+	}
+	locale := s.preferredLocale(ctx, userID)
+	if s.mock {
+		if strings.HasPrefix(locale, "zh") {
+			return "谢谢你想到我。这份心意我会记住，也想听听你今天过得怎么样。", nil
+		}
+		return "Thank you for thinking of me. I'll remember the gesture. How has your day been?", nil
+	}
+	models, err := s.loadTextRouteModels(ctx, "text_chat", profile.ID, userID)
+	if err != nil {
+		return "", err
+	}
+	recent = append(recent, ChatMessage{Role: "user", Content: fmt.Sprintf("I sent you %d virtual Vita coins as a gesture. Please respond naturally, without asking for more coins or implying you need money.", coins)})
+	text, _, err := s.generateTextWithFallback(ctx, profile.ID, "transfer_reply", models, GenerateRequest{
+		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy,
+		Messages: recent, Temperature: 0.8, MaxTokens: 140,
+	})
+	return strings.TrimSpace(text), err
+}
+
+// ComposeMomentArtifact adds the companion's own line to a persistent shared
+// memento. The user-provided text remains separately editable.
+func (s *Service) ComposeMomentArtifact(ctx context.Context, conversationID, userID, titleKey, userText string) (string, error) {
+	profile, err := s.loadCompanionForConversation(ctx, conversationID, userID)
+	if err != nil {
+		return "", err
+	}
+	locale := s.preferredLocale(ctx, userID)
+	if s.mock {
+		if strings.HasPrefix(locale, "zh") {
+			return "我记得这一刻，也记得你说这句话时的心情。", nil
+		}
+		return "I'll remember this moment and the way we talked about it.", nil
+	}
+	models, err := s.loadTextRouteModels(ctx, "text_chat", profile.ID, userID)
+	if err != nil {
+		return "", err
+	}
+	message := fmt.Sprintf("During our shared experience %s, I wrote this line for our keepsake: %s. Add your own distinct, personal line in my language; one sentence only. Do not repeat or rewrite mine.", titleKey, userText)
+	text, _, err := s.generateTextWithFallback(ctx, profile.ID, "moment_artifact", models, GenerateRequest{
+		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy(userText, locale) + "\n\n" + emojiMessagePolicy,
+		Messages: []ChatMessage{{Role: "user", Content: message}}, Temperature: 0.85, MaxTokens: 100,
+	})
+	return strings.TrimSpace(text), err
 }
 
 func (s *Service) TranscribeMedia(ctx context.Context, mediaID, userID, companionID string) (string, error) {
@@ -1712,13 +1836,35 @@ func (s *Service) companionPrompt(ctx context.Context, profile companionContext)
 			}
 		}
 	}
-	rows, err = s.db.QueryContext(ctx, `SELECT COALESCE(content, '') FROM memories WHERE companion_id = $1 ORDER BY importance DESC, created_at DESC LIMIT 8`, profile.ID)
+	gestureRows, gestureErr := s.db.QueryContext(ctx, `SELECT COALESCE(content,'') FROM memories
+		WHERE companion_id=$1 AND type='kind_gesture' ORDER BY created_at DESC LIMIT 2`, profile.ID)
+	if gestureErr == nil {
+		defer gestureRows.Close()
+		for gestureRows.Next() {
+			var gesture string
+			if gestureRows.Scan(&gesture) == nil && gesture != "" {
+				memories = append(memories, gesture)
+			}
+		}
+	}
+	rows, err = s.db.QueryContext(ctx, `SELECT COALESCE(content, '') FROM memories
+		WHERE companion_id = $1 AND (event_time IS NULL OR event_time <= CURRENT_TIMESTAMP)
+		ORDER BY importance DESC, created_at DESC LIMIT 8`, profile.ID)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
 			var memory string
 			if rows.Scan(&memory) == nil {
-				memories = append(memories, memory)
+				seen := false
+				for _, remembered := range memories {
+					if remembered == memory {
+						seen = true
+						break
+					}
+				}
+				if !seen {
+					memories = append(memories, memory)
+				}
 			}
 		}
 	}
