@@ -1,7 +1,6 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../../core/push_notification_service.dart';
 import '../../core/app_content_controller.dart';
@@ -132,14 +131,7 @@ const List<_NavItem> _kTabs = [
   ),
 ];
 
-/// Floating glass bottom dock with a liquid-glass selection pill.
-///
-/// The capsule keeps the reference glass treatment; the active tab gets a
-/// frosted, near-transparent pill behind it while its icon and label turn
-/// brand green.
-///
-/// Hosted inside [SafeArea] rather than Scaffold defaults, so the pill
-/// always floats above the home indicator/navigation gesture area.
+/// The same liquid-glass dock used by ToVideo, with Vita's four destinations.
 class VitaTabBar extends StatelessWidget {
   const VitaTabBar({super.key, required this.index, required this.onTap});
 
@@ -149,7 +141,6 @@ class VitaTabBar extends StatelessWidget {
   static const double pillHeight = 60;
   static const double edgeInset = 8;
   static const double reservedHeight = pillHeight + edgeInset * 2;
-  static const double _iconSize = 24;
 
   @override
   Widget build(BuildContext context) {
@@ -157,167 +148,36 @@ class VitaTabBar extends StatelessWidget {
     final dark = vita.brightness == Brightness.dark;
     return SafeArea(
       top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, edgeInset, 14, edgeInset),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(VitaRadius.pill),
-            boxShadow: [
-              BoxShadow(
-                color: vita.glassShadow,
-                blurRadius: dark ? 32 : 24,
-                offset: Offset(0, dark ? 12 : 8),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(VitaRadius.pill),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  // Dark mode: a light white tint reads as glass, while the
-                  // gray token just smudges the near-black canvas.
-                  color: dark
-                      ? const Color(0x29FFFFFF)
-                      : vita.glass.withValues(alpha: 0.58),
-                  borderRadius: BorderRadius.circular(VitaRadius.pill),
-                  border: Border.all(
-                    color: dark
-                        ? Colors.white.withValues(alpha: 0.16)
-                        : vita.glassRing.withValues(alpha: 0.7),
-                    width: dark ? 0.75 : 0.5,
-                  ),
-                ),
-                child: SizedBox(
-                  height: pillHeight,
-                  child: Stack(
-                    children: [
-                      // Liquid-glass selection pill sliding under the
-                      // active tab.
-                      AnimatedAlign(
-                        alignment: Alignment(
-                          -1 + (index * 2 / (_kTabs.length - 1)),
-                          0,
-                        ),
-                        duration: const Duration(milliseconds: 260),
-                        curve: Curves.easeOutCubic,
-                        child: FractionallySizedBox(
-                          widthFactor: 1 / _kTabs.length,
-                          heightFactor: 1,
-                          child: Padding(
-                            padding: const EdgeInsets.all(6),
-                            child: const _LiquidGlassPill(),
-                          ),
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          for (var i = 0; i < _kTabs.length; i++)
-                            Expanded(
-                              child: _TabButton(
-                                item: _kTabs[i],
-                                selected: i == index,
-                                onTap: () => onTap(i),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+      child: GlassTabBar.bottom(
+        selectedIndex: index,
+        onTabSelected: onTap,
+        barHeight: pillHeight,
+        verticalPadding: edgeInset,
+        horizontalPadding: 14,
+        spacing: 2,
+        tabPadding: const EdgeInsets.symmetric(horizontal: 2),
+        iconSize: 24,
+        labelFontSize: 10,
+        iconLabelSpacing: 2,
+        indicatorColor: vita.green,
+        selectedIconColor: Colors.white,
+        selectedLabelColor: Colors.white,
+        unselectedIconColor: vita.subText,
+        unselectedLabelColor: vita.subText,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
+        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
+        settings: LiquidGlassSettings(
+          glassColor: vita.surface.withValues(alpha: dark ? 0.44 : 0.58),
+          blur: 8,
+        ),
+        tabs: [
+          for (final item in _kTabs)
+            GlassTab(
+              icon: Icon(item.icon),
+              activeIcon: Icon(item.activeIcon),
+              label: item.labelKey.tr,
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TabButton extends StatefulWidget {
-  const _TabButton({
-    required this.item,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final _NavItem item;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  State<_TabButton> createState() => _TabButtonState();
-}
-
-class _TabButtonState extends State<_TabButton> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final vita = context.vita;
-    final label = widget.item.labelKey.tr;
-    final color = widget.selected ? vita.green : vita.tabInactive;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTapCancel: () => setState(() => _pressed = false),
-      onTap: widget.onTap,
-      child: Semantics(
-        label: label,
-        selected: widget.selected,
-        child: AnimatedScale(
-          scale: _pressed ? 0.92 : 1,
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOut,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                widget.selected ? widget.item.activeIcon : widget.item.icon,
-                size: VitaTabBar._iconSize,
-                color: color,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 10,
-                  height: 1.0,
-                  fontWeight:
-                      widget.selected ? FontWeight.w600 : FontWeight.w500,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Frosted liquid-glass selection pill that slides under the active tab.
-class _LiquidGlassPill extends StatelessWidget {
-  const _LiquidGlassPill();
-
-  @override
-  Widget build(BuildContext context) {
-    final vita = context.vita;
-    final dark = vita.brightness == Brightness.dark;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(VitaRadius.pill),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: dark ? const Color(0x3DFFFFFF) : const Color(0x80FFFFFF),
-            borderRadius: BorderRadius.circular(VitaRadius.pill),
-          ),
-        ),
+        ],
       ),
     );
   }
