@@ -6,13 +6,13 @@ import 'package:get/get.dart';
 import '../../core/theme.dart';
 import '../../core/api_client.dart';
 import '../../shared/media_image.dart';
+import '../../shared/widgets.dart';
 import '../billing/billing_controller.dart';
 import '../chat/chat_list_controller.dart';
 import '../chat/chat_list_presentation.dart';
 import '../chat/chat_page.dart';
 import '../companion/companion_create_method_page.dart';
 import '../shell/shell_page.dart';
-import '../ai_pets/ai_pets_page.dart';
 
 /// The landing place for companions. The chat list remains in the controller,
 /// but the user's first view is a character and a place instead of an inbox.
@@ -184,7 +184,31 @@ class _WorldPageState extends State<WorldPage>
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                if (companions.length > 1) ...[
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    height: 78,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: companions.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 10),
+                      itemBuilder: (context, index) {
+                        final item = companions[index];
+                        final selected = item['id'] == current?['id'];
+                        final unread =
+                            ChatListPresentation.from(item).unreadCount;
+                        return _CompanionSelector(
+                          companion: item,
+                          selected: selected,
+                          unread: unread,
+                          onTap: () => ShellController.to.selectedCompanionId
+                              .value = item['id'] as String?,
+                        );
+                      },
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 14),
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 450),
                   child: _WorldStage(
@@ -195,48 +219,7 @@ class _WorldPageState extends State<WorldPage>
                     breathing: _breathing,
                   ),
                 ),
-                if (current != null && activeScene != null) ...[
-                  const SizedBox(height: 14),
-                  _SceneSummary(scene: activeScene),
-                ],
-                if (companions.length > 1) ...[
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    height: 48,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: companions.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        final item = companions[index];
-                        final selected = item['id'] == current?['id'];
-                        final unread =
-                            ChatListPresentation.from(item).unreadCount;
-                        return ChoiceChip(
-                          label: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text('${item['name'] ?? 'chat.companion'.tr}'),
-                              if (unread > 0) ...[
-                                const SizedBox(width: 6),
-                                Text(unread > 99 ? '99+' : '$unread',
-                                    style: TextStyle(
-                                        color: context.vita.red,
-                                        fontWeight: FontWeight.w700)),
-                              ],
-                            ],
-                          ),
-                          selected: selected,
-                          onSelected: (_) => ShellController
-                              .to
-                              .selectedCompanionId
-                              .value = item['id'] as String?,
-                        );
-                      },
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 18),
+                const SizedBox(height: 14),
                 if (current == null)
                   FilledButton.icon(
                     onPressed: _createCompanion,
@@ -244,62 +227,46 @@ class _WorldPageState extends State<WorldPage>
                     label: Text('world.create'.tr),
                   )
                 else ...[
-                  if (activeScene != null) ...[
-                    _WorldAction(
-                      icon: (activeScene['visited_today'] == true)
-                          ? Icons.check_circle_outline
-                          : Icons.favorite_border,
-                      title: (activeScene['visited_today'] == true)
-                          ? 'world.visited'.tr
-                          : 'world.visit'.tr,
-                      onTap: (activeScene['visited_today'] == true)
-                          ? null
-                          : () => _visit(currentId),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                  _WorldAction(
-                    icon: Icons.chat_bubble_outline,
-                    title: 'world.talk'.tr,
-                    subtitle: 'world.talkHint'.tr,
-                    onTap: () async {
-                      final id = current['id'] as String? ?? '';
-                      if (id.isEmpty) return;
-                      await Get.to(() => ChatPage(
-                            companionId: id,
-                            name: '${current['name'] ?? 'chat.companion'.tr}',
-                            companion: current,
-                          ));
-                      await controller.load();
-                      await _loadScene(id);
-                    },
-                  ),
-                  const SizedBox(height: 10),
                   Row(
                     children: [
                       Expanded(
                         child: _WorldAction(
-                          icon: Icons.auto_stories_outlined,
-                          title: 'world.journey'.tr,
-                          onTap: () => ShellController.to.switchTo(1),
+                          icon: activeScene?['visited_today'] == true
+                              ? Icons.check_circle_outline
+                              : Icons.favorite_border,
+                          title: activeScene?['visited_today'] == true
+                              ? 'world.visited'.tr
+                              : 'world.visit'.tr,
+                          onTap: activeScene == null ||
+                                  activeScene['visited_today'] == true
+                              ? null
+                              : () => _visit(currentId),
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: _WorldAction(
-                          icon: Icons.explore_outlined,
-                          title: 'world.discover'.tr,
-                          onTap: () => ShellController.to.switchTo(2),
+                          icon: Icons.chat_bubble_outline,
+                          title: 'world.talk'.tr,
+                          onTap: () async {
+                            final id = current['id'] as String? ?? '';
+                            if (id.isEmpty) return;
+                            await Get.to(() => ChatPage(
+                                  companionId: id,
+                                  name: '${current['name'] ?? 'chat.companion'.tr}',
+                                  companion: current,
+                                ));
+                            await controller.load();
+                            await _loadScene(id);
+                          },
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  _WorldAction(
-                    icon: Icons.pets_outlined,
-                    title: 'world.petGarden'.tr,
-                    onTap: () => Get.to(() => const AIPetsPage()),
-                  ),
+                  if (activeScene != null) ...[
+                    const SizedBox(height: 14),
+                    _SceneSummary(scene: activeScene),
+                  ],
                 ],
               ],
             ),
@@ -310,8 +277,112 @@ class _WorldPageState extends State<WorldPage>
   }
 }
 
+class _CompanionSelector extends StatelessWidget {
+  const _CompanionSelector({
+    required this.companion,
+    required this.selected,
+    required this.unread,
+    required this.onTap,
+  });
+
+  final Map<String, dynamic> companion;
+  final bool selected;
+  final int unread;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = '${companion['name'] ?? 'chat.companion'.tr}';
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: name,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          width: 68,
+          child: Column(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color:
+                            selected ? context.vita.green : Colors.transparent,
+                        width: 2,
+                      ),
+                    ),
+                    child: VitaAvatar(
+                      name: name,
+                      imageUrl: companion['portrait_url'] as String?,
+                      radius: 22,
+                    ),
+                  ),
+                  if (unread > 0)
+                    Positioned(
+                      right: -3,
+                      top: -3,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        constraints: const BoxConstraints(minWidth: 17),
+                        decoration: BoxDecoration(
+                          color: context.vita.red,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Text(
+                          unread > 99 ? '99+' : '$unread',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 10),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? context.vita.text : context.vita.subText,
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _SceneSummary extends StatelessWidget {
   const _SceneSummary({required this.scene});
+
+  final Map<String, dynamic> scene;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: context.vita.surface,
+        borderRadius: BorderRadius.circular(20),
+        child: ExpansionTile(
+          shape: const Border(),
+          collapsedShape: const Border(),
+          title: Text('world.phase.${scene['phase'] ?? 'quiet'}'.tr),
+          children: [_SceneDetails(scene: scene)],
+        ),
+      );
+}
+
+class _SceneDetails extends StatelessWidget {
+  const _SceneDetails({required this.scene});
 
   final Map<String, dynamic> scene;
 
@@ -475,7 +546,7 @@ class _WorldStage extends StatelessWidget {
             photoLabel: 'chat.photoMessage'.tr,
           );
     return Container(
-      height: 420,
+      height: 360,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
@@ -491,11 +562,6 @@ class _WorldStage extends StatelessWidget {
             child: CustomPaint(
                 painter: _WorldBackdropPainter(visualKind, ambience)),
           ),
-          const Positioned(
-            top: 54,
-            right: 38,
-            child: Icon(Icons.auto_awesome, size: 38, color: Color(0x88FFFFFF)),
-          ),
           Positioned(
             left: 22,
             top: 22,
@@ -509,30 +575,6 @@ class _WorldStage extends StatelessWidget {
                 child: Text('${place['title'] ?? 'world.place.home'.tr}'.tr,
                     style: const TextStyle(
                         color: Colors.white, fontWeight: FontWeight.w600)),
-              ),
-            ),
-          ),
-          Positioned(
-            right: -62,
-            bottom: -170,
-            child: Container(
-              width: 330,
-              height: 330,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.2),
-              ),
-            ),
-          ),
-          Positioned(
-            left: -70,
-            bottom: -170,
-            child: Container(
-              width: 310,
-              height: 310,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF8D78B7).withValues(alpha: 0.22),
               ),
             ),
           ),
@@ -552,8 +594,8 @@ class _WorldStage extends StatelessWidget {
                   ? Icon(Icons.auto_awesome,
                       size: 132, color: Colors.white.withValues(alpha: 0.82))
                   : Container(
-                      width: 230,
-                      height: 280,
+                      width: 218,
+                      height: 258,
                       clipBehavior: Clip.antiAlias,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(110),
@@ -620,10 +662,10 @@ class _WorldBackdropPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final line = Paint()
-      ..color = Colors.white.withValues(alpha: 0.21)
+      ..color = Colors.white.withValues(alpha: 0.10)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3;
-    final fill = Paint()..color = Colors.white.withValues(alpha: 0.13);
+    final fill = Paint()..color = Colors.white.withValues(alpha: 0.07);
     final floor = size.height * 0.77;
     canvas.drawLine(Offset(0, floor), Offset(size.width, floor), line);
     if (kind == 'outdoors') {
@@ -682,7 +724,7 @@ class _WorldBackdropPainter extends CustomPainter {
     final paint = Paint()
       ..color = Colors.white.withValues(alpha: 0.36)
       ..strokeWidth = 2;
-    for (var i = 0; i < 20; i++) {
+    for (var i = 0; i < 8; i++) {
       final x = ((i * 83) % 97) / 97 * size.width;
       final y = ((i * 47) % 89) / 89 * size.height * .7;
       if (ambience == 'snow') {

@@ -7,6 +7,7 @@ import '../../core/theme.dart';
 import 'ai_pet_avatar.dart';
 import 'ai_pet_desktop_controller.dart';
 import 'ai_pet_home_page.dart';
+import '../shell/shell_page.dart';
 
 class AIPetDesktopOverlay extends StatelessWidget {
   const AIPetDesktopOverlay({super.key, required this.child});
@@ -18,12 +19,14 @@ class AIPetDesktopOverlay extends StatelessWidget {
         final desktop = AIPetDesktopController.to;
         final pet = desktop.pet.value;
         final petHomeVisible = desktop.petHomeVisible.value;
+        final worldHomeVisible = desktop.currentRoute.value == '/shell' &&
+            ShellController.to.index.value == 0;
         return LayoutBuilder(
           builder: (context, constraints) => Stack(
             fit: StackFit.expand,
             children: [
               child,
-              if (pet != null && !petHomeVisible)
+              if (pet != null && !petHomeVisible && !worldHomeVisible)
                 _DraggablePet(
                   pet: pet,
                   availableSize: constraints.biggest,

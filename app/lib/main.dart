@@ -16,6 +16,7 @@ import 'features/billing/credits_page.dart';
 import 'features/billing/subscription_page.dart';
 import 'features/companion/companion_create_method_page.dart';
 import 'features/ai_pets/ai_pet_desktop_overlay.dart';
+import 'features/ai_pets/ai_pet_desktop_controller.dart';
 import 'features/shell/shell_page.dart';
 
 Future<void> main() async {
@@ -69,6 +70,9 @@ class _VitaAppState extends State<VitaApp> {
       routingCallback: (routing) {
         final route = routing?.current;
         if (route != null && route.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            AIPetDesktopController.to.currentRoute.value = route;
+          });
           AnalyticsService.to.screen(route);
         }
       },
