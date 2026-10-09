@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
+import '../../shared/media_image.dart';
 import '../chat/chat_page.dart';
 import '../chat/companion_moment_page.dart';
 import '../chat/experience_sheet.dart';
@@ -216,7 +217,8 @@ class _Portrait extends StatelessWidget {
         height: 286,
         child: Stack(fit: StackFit.expand, children: [
           if (url != null && url.isNotEmpty)
-            Image.network(url,
+            VitaMediaImage(
+                url: url,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => _PortraitFallback(name: name))
           else

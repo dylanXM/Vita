@@ -59,7 +59,8 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
           products.insert(0, products.removeAt(index));
         }
       }
-      final selected = products.where((item) => item['key'] == _selectedKey).firstOrNull;
+      final selected =
+          products.where((item) => item['key'] == _selectedKey).firstOrNull;
       final recommended = recommendedKey == null
           ? null
           : products.where((item) => item['key'] == recommendedKey).firstOrNull;
@@ -240,11 +241,11 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     final groups = ['gift', 'date', 'other']
         .where((group) => _products.any((item) => _categoryFor(item) == group))
         .toList();
-    final visible = _products
-        .where((item) => _categoryFor(item) == _category)
-        .toList();
-    final selected = visible.where((item) => item['key'] == _selectedKey).firstOrNull ??
-        visible.firstOrNull;
+    final visible =
+        _products.where((item) => _categoryFor(item) == _category).toList();
+    final selected =
+        visible.where((item) => item['key'] == _selectedKey).firstOrNull ??
+            visible.firstOrNull;
     return SafeArea(
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.78,
@@ -260,11 +261,13 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
                         fontWeight: FontWeight.w700)),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
                 decoration: BoxDecoration(
                     color: context.vita.greenTint,
                     borderRadius: BorderRadius.circular(20)),
-                child: Text('experience.balance'.trParams({'coins': '$_balance'}),
+                child: Text(
+                    'experience.balance'.trParams({'coins': '$_balance'}),
                     style: TextStyle(
                         color: context.vita.green,
                         fontSize: 12,
@@ -285,7 +288,8 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Row(
                             children: groups
-                                .map((group) => _buildCategoryTab(context, group))
+                                .map((group) =>
+                                    _buildCategoryTab(context, group))
                                 .toList(),
                           ),
                         ),
@@ -309,18 +313,16 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
                                 ),
                                 const SizedBox(height: 14),
                                 if (selected != null)
-                                  AnimatedSwitcher(
-                                    duration: const Duration(milliseconds: 220),
-                                    child: _buildPreview(context, selected,
-                                        index: visible.indexOf(selected) + 1,
-                                        total: visible.length),
-                                  ),
+                                  _buildPreview(context, selected,
+                                      index: visible.indexOf(selected) + 1,
+                                      total: visible.length),
                               ],
                             ),
                           ),
                         ),
-                        if (selected != null) _buildPurchaseBar(context, selected),
-                      ),
+                        if (selected != null)
+                          _buildPurchaseBar(context, selected),
+                      ]),
           ),
         ]),
       ),
@@ -346,130 +348,246 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     };
   }
 
-  Widget _buildProductCard(BuildContext context, Map<String, dynamic> product) {
-    final key = product['key'] as String? ?? '';
-    final gift = product['category'] == 'gift';
-    final date = product['category'] == 'date';
-    final owned = _owned[key] == true;
-    final equipped = _equipped == key;
-    return Container(
-      height: 190,
-      padding: const EdgeInsets.fromLTRB(18, 15, 18, 15),
-      decoration: BoxDecoration(
-        color: context.vita.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: context.vita.divider),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text((product['name_key'] as String? ?? key).tr,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      color: context.vita.text,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700)),
-              const SizedBox(height: 5),
-              Text((product['description_key'] as String? ?? '').tr,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      color: context.vita.subText,
-                      fontSize: 12.5,
-                      height: 1.35)),
-            ]),
-          ),
-          const SizedBox(width: 10),
-          Container(
-            width: 62,
-            height: 62,
+  String _categoryFor(Map<String, dynamic>? product) =>
+      switch (product?['category']) {
+        'gift' => 'gift',
+        'date' => 'date',
+        _ => 'other',
+      };
+
+  String _categoryLabel(String category) => switch (category) {
+        'gift' => 'experience.collection.gifts'.tr,
+        'date' => 'experience.collection.dates'.tr,
+        _ => 'experience.collection.more'.tr,
+      };
+
+  Widget _buildCategoryTab(BuildContext context, String category) {
+    final active = _category == category;
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(13),
+          onTap: _buying != null
+              ? null
+              : () {
+                  final next = _products
+                      .where((item) => _categoryFor(item) == category)
+                      .firstOrNull;
+                  if (next == null) return;
+                  setState(() {
+                    _category = category;
+                    _selectedKey = next['key'] as String?;
+                  });
+                },
+          child: Container(
+            height: 42,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-                color: context.vita.greenTint,
-                borderRadius: BorderRadius.circular(18)),
-            child: Icon(_productIcon(product),
-                size: 30, color: context.vita.green),
+              color: active ? context.vita.greenTint : context.vita.surface,
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(
+                  color: active ? context.vita.green : context.vita.divider),
+            ),
+            child: Text(_categoryLabel(category),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: active ? context.vita.green : context.vita.subText,
+                    fontSize: 13,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w500)),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOption(BuildContext context, Map<String, dynamic> product) {
+    final key = product['key'] as String? ?? '';
+    final selected = _selectedKey == key;
+    return InkWell(
+      onTap: _buying != null ? null : () => setState(() => _selectedKey = key),
+      borderRadius: BorderRadius.circular(17),
+      child: Container(
+        width: 102,
+        height: 90,
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+        decoration: BoxDecoration(
+          color: selected ? context.vita.greenTint : context.vita.surface,
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(
+              color: selected ? context.vita.green : context.vita.divider,
+              width: selected ? 1.5 : 1),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(_productIcon(product),
+              size: 24,
+              color: selected ? context.vita.green : context.vita.text),
+          const Spacer(),
+          Text((product['name_key'] as String? ?? key).tr,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  color: context.vita.text,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600)),
+          Text('gift.coins'.trParams({'coins': "${product['coins']}"}),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: context.vita.subText, fontSize: 10.5)),
         ]),
-        const Spacer(),
-        if (gift) ...[
-          _buildOutcome(context, Icons.chat_bubble_outline_rounded,
-              'experience.gift.chatResult'.tr),
-          const SizedBox(height: 7),
-        ] else if (date) ...[
-          _buildOutcome(context, Icons.event_available_rounded,
-              'experience.date.value'.tr,
-              maxLines: 2),
-          const SizedBox(height: 7),
-        ],
-        Row(children: [
-          if (gift)
-            Expanded(
-                child: _buildOutcome(context, Icons.favorite_border_rounded,
-                    'experience.gift.bondResult'.tr))
-          else
+      ),
+    );
+  }
+
+  Widget _buildPreview(BuildContext context, Map<String, dynamic> product,
+      {required int index, required int total}) {
+    final key = product['key'] as String? ?? '';
+    final gift = _categoryFor(product) == 'gift';
+    final date = _categoryFor(product) == 'date';
+    final indexLabel = index.toString().padLeft(2, '0');
+    final totalLabel = total.toString().padLeft(2, '0');
+    return Container(
+      height: 306,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [context.vita.greenTint, context.vita.surface],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: context.vita.green.withValues(alpha: .32)),
+      ),
+      child: Stack(children: [
+        Positioned(
+          right: -52,
+          top: -64,
+          child: Container(
+            width: 210,
+            height: 210,
+            decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                    color: context.vita.green.withValues(alpha: .16))),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Text(
+                '$indexLabel / $totalLabel',
+                style: TextStyle(
+                    color: context.vita.green,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.5),
+              ),
+              const Spacer(),
+              Container(
+                width: 66,
+                height: 66,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                    color: context.vita.surface.withValues(alpha: .76),
+                    borderRadius: BorderRadius.circular(21)),
+                child: Icon(_productIcon(product),
+                    color: context.vita.green, size: 34),
+              ),
+            ]),
             const Spacer(),
-          const SizedBox(width: 8),
-          _buildActionButton(context, product,
-              owned: owned, equipped: equipped, gift: gift),
-        ]),
+            Text((product['name_key'] as String? ?? key).tr,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: context.vita.text,
+                    fontSize: 27,
+                    fontWeight: FontWeight.w700)),
+            const SizedBox(height: 7),
+            Text((product['description_key'] as String? ?? '').tr,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: context.vita.subText, fontSize: 13, height: 1.4)),
+            const SizedBox(height: 16),
+            Divider(height: 1, color: context.vita.divider),
+            const SizedBox(height: 13),
+            if (gift) ...[
+              _previewResult(context, Icons.chat_bubble_outline_rounded,
+                  'experience.gift.chatResult'.tr),
+              const SizedBox(height: 9),
+              _previewResult(context, Icons.favorite_border_rounded,
+                  'experience.gift.bondResult'.tr),
+            ] else if (date)
+              _previewResult(context, Icons.event_available_rounded,
+                  'experience.date.value'.tr,
+                  maxLines: 2)
+            else
+              Text(_categoryLabel('other'),
+                  style: TextStyle(
+                      color: context.vita.green,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
+          ]),
+        ),
       ]),
     );
   }
 
-  Widget _buildOutcome(BuildContext context, IconData icon, String text,
+  Widget _previewResult(BuildContext context, IconData icon, String label,
       {int maxLines = 1}) {
     return Row(children: [
-      Icon(icon, size: 15, color: context.vita.green),
-      const SizedBox(width: 6),
+      Icon(icon, color: context.vita.green, size: 17),
+      const SizedBox(width: 9),
       Expanded(
-        child: Text(text,
+        child: Text(label,
             maxLines: maxLines,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: context.vita.subText, fontSize: 12)),
+            style: TextStyle(color: context.vita.text, fontSize: 12.5)),
       ),
     ]);
   }
 
-  Widget _buildActionButton(BuildContext context, Map<String, dynamic> product,
-      {required bool owned, required bool equipped, bool gift = false}) {
+  Widget _buildPurchaseBar(BuildContext context, Map<String, dynamic> product) {
     final key = product['key'] as String? ?? '';
-    final price = 'gift.coins'.trParams({'coins': '${product['coins']}'});
-    if (equipped) {
-      return Text('experience.equipped'.tr,
-          style: TextStyle(fontSize: 13, color: context.vita.hint));
-    }
-    final buying = _buying == key;
-    return GestureDetector(
-      onTap: (_buying == null && !equipped) ? () => _purchase(product) : null,
-      child: Container(
-        constraints: const BoxConstraints(minWidth: 108, minHeight: 36),
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: owned ? context.vita.greenTint : context.vita.green,
-          borderRadius: BorderRadius.circular(6),
+    final owned = _owned[key] == true;
+    final equipped = _equipped == key;
+    final gift = _categoryFor(product) == 'gift';
+    final price = 'gift.coins'.trParams({'coins': "${product['coins']}"});
+    final label = equipped
+        ? 'experience.equipped'.tr
+        : owned
+            ? 'experience.equip'.tr
+            : gift
+                ? 'experience.gift.send'
+                    .trParams({'coins': "${product['coins']}"})
+                : "${'experience.use'.tr} · $price";
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+      decoration: BoxDecoration(
+          color: context.vita.surface,
+          border: Border(top: BorderSide(color: context.vita.divider))),
+      child: ElevatedButton(
+        onPressed:
+            _buying != null || equipped ? null : () => _purchase(product),
+        style: ElevatedButton.styleFrom(
+          minimumSize: const Size.fromHeight(52),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
-        child: buying
+        child: _buying == key
             ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2))
-            : Text(
-                owned
-                    ? 'experience.equip'.tr
-                    : gift
-                        ? 'experience.gift.send'
-                            .trParams({'coins': '${product['coins']}'})
-                        : '${'experience.use'.tr} · $price',
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: owned ? context.vita.green : Colors.white),
-              ),
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white))
+            : Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
       ),
     );
   }

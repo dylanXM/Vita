@@ -6,6 +6,11 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../chat/companion_moment_page.dart';
 
+String _storyDescription(dynamic raw) {
+  final value = raw is String ? raw : '';
+  return value.startsWith('experience.') ? value.tr : value;
+}
+
 /// Displays only persisted, user-owned records returned by /story.
 class CompanionStorySection extends StatefulWidget {
   const CompanionStorySection({
@@ -120,13 +125,12 @@ class _CompanionStorySectionState extends State<CompanionStorySection> {
       return;
     }
     if (!mounted) return;
+    final description = _storyDescription(item['description']);
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(_title(item)),
-        content: '${item['description'] ?? ''}'.trim().isEmpty
-            ? null
-            : Text('${item['description']}'),
+        content: description.trim().isEmpty ? null : Text(description),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -138,116 +142,17 @@ class _CompanionStorySectionState extends State<CompanionStorySection> {
   }
 
   Future<void> _editMemory(Map<String, dynamic> memory) async {
-    final controller =
-        TextEditingController(text: '${memory['description'] ?? ''}');
-    try {
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        backgroundColor: context.vita.surface,
-        builder: (sheetContext) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            10,
-            20,
-            20 + MediaQuery.viewInsetsOf(sheetContext).bottom,
-          ),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text('story.memory'.tr,
-                style: TextStyle(
-                    color: sheetContext.vita.text,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700)),
-            const SizedBox(height: 14),
-            TextField(
-              controller: controller,
-              maxLines: 4,
-              maxLength: 500,
-              decoration: InputDecoration(hintText: 'story.editHint'.tr),
-            ),
-            const SizedBox(height: 8),
-            Row(children: [
-              IconButton(
-                tooltip: memory['is_favorite'] == true
-                    ? 'story.unfavorite'.tr
-                    : 'story.favorite'.tr,
-                icon: Icon(memory['is_favorite'] == true
-                    ? Icons.bookmark_rounded
-                    : Icons.bookmark_outline_rounded),
-                onPressed: () async {
-                  try {
-                    await ApiClient.instance.put(
-                      '/v1/companions/${widget.companionId}/memories/${memory['id']}/favorite',
-                      data: {'favorite': memory['is_favorite'] != true},
-                    );
-                    if (sheetContext.mounted) Navigator.pop(sheetContext);
-                    await _load();
-                  } on ApiException catch (error) {
-                    VitaNotice.error('story.memory'.tr, error.message);
-                  }
-                },
-              ),
-              IconButton(
-                tooltip: 'story.delete'.tr,
-                icon: const Icon(Icons.delete_outline_rounded),
-                onPressed: () async {
-                  final confirmed = await showDialog<bool>(
-                    context: sheetContext,
-                    builder: (dialogContext) => AlertDialog(
-                      title: Text('story.delete'.tr),
-                      content: Text('story.deleteConfirm'.tr),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(dialogContext, false),
-                          child: Text('common.cancel'.tr),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(dialogContext, true),
-                          child: Text('story.delete'.tr),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirmed != true) return;
-                  try {
-                    await ApiClient.instance.delete(
-                      '/v1/companions/${widget.companionId}/memories/${memory['id']}',
-                    );
-                    if (sheetContext.mounted) Navigator.pop(sheetContext);
-                    await _load();
-                  } on ApiException catch (error) {
-                    VitaNotice.error('story.memory'.tr, error.message);
-                  }
-                },
-              ),
-              const Spacer(),
-              FilledButton(
-                onPressed: () async {
-                  final content = controller.text.trim();
-                  if (content.isEmpty || content == memory['description']) {
-                    return;
-                  }
-                  try {
-                    await ApiClient.instance.put(
-                      '/v1/companions/${widget.companionId}/memories/${memory['id']}',
-                      data: {'content': content},
-                    );
-                    if (sheetContext.mounted) Navigator.pop(sheetContext);
-                    await _load();
-                  } on ApiException catch (error) {
-                    VitaNotice.error('story.memory'.tr, error.message);
-                  }
-                },
-                child: Text('story.save'.tr),
-              ),
-            ]),
-          ]),
-        ),
-      );
-    } finally {
-      controller.dispose();
-    }
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: context.vita.surface,
+      builder: (_) => _MemoryEditorSheet(
+        companionId: widget.companionId,
+        memory: memory,
+      ),
+    );
+    if (changed == true && mounted) await _load();
   }
 
   @override
@@ -312,7 +217,7 @@ class _CompanionStorySectionState extends State<CompanionStorySection> {
             title: _title(item),
             subtitle:
                 '${_date(item['occurred_at'])}  ${item['kind'] == 'memory' ? 'story.memory'.tr : item['kind'] == 'first_chat' ? 'story.firstChat'.tr : 'story.event'.tr}',
-            description: '${item['description'] ?? ''}',
+            description: _storyDescription(item['description']),
             icon: item['kind'] == 'memory'
                 ? Icons.bookmark_outline_rounded
                 : item['kind'] == 'first_chat'
@@ -336,7 +241,7 @@ class _CompanionStorySectionState extends State<CompanionStorySection> {
           _StoryTile(
             title: _title(event),
             subtitle: _date(event['occurred_at']),
-            description: '${event['description'] ?? ''}',
+            description: _storyDescription(event['description']),
             icon: Icons.bolt_rounded,
             onTap: () => _openItem(event),
           ),
@@ -351,7 +256,7 @@ class _CompanionStorySectionState extends State<CompanionStorySection> {
                 ? 'story.favorite'.tr
                 : 'story.memory'.tr,
             subtitle: _date(memory['occurred_at']),
-            description: '${memory['description'] ?? ''}',
+            description: _storyDescription(memory['description']),
             icon: memory['is_favorite'] == true
                 ? Icons.bookmark_rounded
                 : Icons.bookmark_outline_rounded,
@@ -404,6 +309,146 @@ class _CompanionStorySectionState extends State<CompanionStorySection> {
         ),
       ],
     ]);
+  }
+}
+
+class _MemoryEditorSheet extends StatefulWidget {
+  const _MemoryEditorSheet({
+    required this.companionId,
+    required this.memory,
+  });
+
+  final String companionId;
+  final Map<String, dynamic> memory;
+
+  @override
+  State<_MemoryEditorSheet> createState() => _MemoryEditorSheetState();
+}
+
+class _MemoryEditorSheetState extends State<_MemoryEditorSheet> {
+  late final TextEditingController _controller;
+  bool _working = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: _storyDescription(widget.memory['description']),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _perform(Future<void> Function() action) async {
+    if (_working) return;
+    setState(() => _working = true);
+    try {
+      await action();
+      if (mounted) Navigator.pop(context, true);
+    } on ApiException catch (error) {
+      VitaNotice.error('story.memory'.tr, error.message);
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('story.delete'.tr),
+        content: Text('story.deleteConfirm'.tr),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text('common.cancel'.tr),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text('story.delete'.tr),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _perform(() async {
+      await ApiClient.instance.delete(
+        '/v1/companions/${widget.companionId}/memories/${widget.memory['id']}',
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final favorite = widget.memory['is_favorite'] == true;
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        10,
+        20,
+        20 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text('story.memory'.tr,
+            style: TextStyle(
+                color: context.vita.text,
+                fontSize: 18,
+                fontWeight: FontWeight.w700)),
+        const SizedBox(height: 14),
+        TextField(
+          controller: _controller,
+          maxLines: 4,
+          maxLength: 500,
+          decoration: InputDecoration(hintText: 'story.editHint'.tr),
+        ),
+        const SizedBox(height: 8),
+        Row(children: [
+          IconButton(
+            tooltip: favorite ? 'story.unfavorite'.tr : 'story.favorite'.tr,
+            icon: Icon(favorite
+                ? Icons.bookmark_rounded
+                : Icons.bookmark_outline_rounded),
+            onPressed: _working
+                ? null
+                : () => _perform(() async {
+                      await ApiClient.instance.put(
+                        '/v1/companions/${widget.companionId}/memories/${widget.memory['id']}/favorite',
+                        data: {'favorite': !favorite},
+                      );
+                    }),
+          ),
+          IconButton(
+            tooltip: 'story.delete'.tr,
+            icon: const Icon(Icons.delete_outline_rounded),
+            onPressed: _working ? null : _delete,
+          ),
+          const Spacer(),
+          FilledButton(
+            onPressed: _working
+                ? null
+                : () {
+                    final content = _controller.text.trim();
+                    if (content.isEmpty ||
+                        content ==
+                            _storyDescription(widget.memory['description'])) {
+                      return;
+                    }
+                    _perform(() async {
+                      await ApiClient.instance.put(
+                        '/v1/companions/${widget.companionId}/memories/${widget.memory['id']}',
+                        data: {'content': content},
+                      );
+                    });
+                  },
+            child: Text('story.save'.tr),
+          ),
+        ]),
+      ]),
+    );
   }
 }
 
