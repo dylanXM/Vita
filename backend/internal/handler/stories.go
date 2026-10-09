@@ -223,7 +223,7 @@ func StartStory(c *gin.Context) {
 		return
 	}
 	userID := c.GetString("user_id")
-	var environment, companionName string
+	var environment, companionName, creationSource string
 	selfMode := strings.TrimSpace(input.CompanionID) == ""
 	if selfMode {
 		// User-as-protagonist: pull environment and display name straight from
@@ -232,8 +232,12 @@ func StartStory(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "account not found"})
 			return
 		}
-	} else if err := db.Get().QueryRow(`SELECT u.environment,c.name FROM companions c JOIN users u ON u.id=c.user_id WHERE c.id=$1 AND c.user_id=$2 AND c.deleted_at IS NULL AND c.active=true`, input.CompanionID, userID).Scan(&environment, &companionName); err != nil {
+	} else if err := db.Get().QueryRow(`SELECT u.environment,c.name,COALESCE(c.creation_source,'') FROM companions c JOIN users u ON u.id=c.user_id WHERE c.id=$1 AND c.user_id=$2 AND c.deleted_at IS NULL AND c.active=true`, input.CompanionID, userID).Scan(&environment, &companionName, &creationSource); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "companion not found"})
+		return
+	}
+	if creationSource == "ai_pet" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "pets cannot be story protagonists"})
 		return
 	}
 	background, err := loadAccessibleBackground(input.BackgroundID, userID, environment)

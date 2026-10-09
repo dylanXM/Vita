@@ -45,7 +45,8 @@ class StoriesController extends GetxController {
       ]);
       catalog.assignAll(_map(values[0]));
       stories.assignAll(_maps(_map(values[1])['items']));
-      companions.assignAll(_maps(values[2]));
+      companions.assignAll(_maps(values[2])
+          .where((item) => item['creation_source'] != 'ai_pet'));
     } catch (error) {
       _showError(error);
     } finally {
@@ -128,9 +129,34 @@ class StoriesPage extends StatelessWidget {
           onRefresh: activeController.load,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(top: 12, bottom: 32),
+            padding: const EdgeInsets.only(top: 18, bottom: 32),
             children: [
+              if (activeController.stories.isNotEmpty) ...[
+                _SectionHeader(title: 'storyHub.myStories'.tr),
+                const SizedBox(height: 7),
+                for (final story in activeController.stories)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    child: _StoryBookTile(
+                      story: story,
+                      onTap: () async {
+                        await Get.to(
+                            () => StoryDetailPage(storyId: '${story['id']}'),
+                            transition: Transition.cupertino);
+                        await activeController.load();
+                      },
+                    ),
+                  ),
+                const SizedBox(height: 16),
+              ],
               _SectionHeader(title: 'storyHub.backgrounds'.tr),
+              if (activeController.stories.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Text('storyHub.emptySub'.tr,
+                      style:
+                          TextStyle(color: context.vita.subText, fontSize: 13)),
+                ),
               if (subscribed)
                 Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -139,94 +165,15 @@ class StoriesPage extends StatelessWidget {
                         style: TextStyle(
                             color: context.vita.subText, fontSize: 12))),
               if (backgrounds.isNotEmpty)
-                SizedBox(
-                  height: 264,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    scrollDirection: Axis.horizontal,
-                    itemCount: backgrounds.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 12),
-                    itemBuilder: (_, index) {
-                      final background = backgrounds[index];
-                      return _BackgroundTile(
-                        background: background,
-                        onTap: () => _chooseCompanion(
-                            context, activeController, background),
-                      );
-                    },
-                  ),
-                ),
-              const SizedBox(height: 10),
-              _SectionHeader(title: 'storyHub.myStories'.tr),
-              if (activeController.stories.isEmpty)
-                Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: VitaEmpty(
-                        icon: Icons.auto_stories_outlined,
-                        title: 'storyHub.empty'.tr,
-                        subtitle: 'storyHub.emptySub'.tr)),
-              ...activeController.stories.map((story) => VitaCard(
-                    radius: 20,
-                    margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                    padding: EdgeInsets.zero,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(20),
-                        onTap: () => Get.to(
-                            () => StoryDetailPage(storyId: '${story['id']}'),
-                            transition: Transition.cupertino),
-                        child: Padding(
-                          padding: const EdgeInsets.all(18),
-                          child: Row(children: [
-                            Container(
-                              width: 48,
-                              height: 54,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF51456E),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.auto_stories_outlined,
-                                  color: Color(0xFFE4D7FF)),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                                child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('${story['title'] ?? ''}',
-                                    style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                        color: context.vita.text)),
-                                const SizedBox(height: 5),
-                                Text(
-                                    'storyHub.chapterCount'.trParams({
-                                      'count':
-                                          '${story['current_chapter_no'] ?? 0}'
-                                    }),
-                                    style: TextStyle(
-                                        color: context.vita.subText,
-                                        fontSize: 12)),
-                              ],
-                            )),
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.arrow_forward_rounded,
-                                    color: context.vita.subText, size: 18),
-                                const SizedBox(height: 4),
-                                Text('storyHub.continue'.tr,
-                                    style: TextStyle(
-                                        color: context.vita.subText,
-                                        fontSize: 11)),
-                              ],
-                            ),
-                          ]),
-                        ),
-                      ),
+                for (final background in backgrounds)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    child: _BackgroundTile(
+                      background: background,
+                      onTap: () => _previewBackground(
+                          context, activeController, background),
                     ),
-                  )),
+                  ),
             ],
           ),
         );
@@ -234,53 +181,247 @@ class StoriesPage extends StatelessWidget {
     );
   }
 
-  void _chooseCompanion(BuildContext context, StoriesController controller,
-      Map<String, dynamic> background) {
-    showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: context.vita.surface,
-        builder: (_) => SafeArea(
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text('storyHub.chooseCompanion'.tr,
-                      style: const TextStyle(
-                          fontSize: 17, fontWeight: FontWeight.w600))),
-              // Self-as-protagonist entry: no AI companion, the user themselves
-              // is the lead character.
-              Obx(() {
+  Future<void> _previewBackground(BuildContext context,
+      StoriesController controller, Map<String, dynamic> background) async {
+    final cover = '${background['cover_url'] ?? ''}'.trim();
+    final description =
+        '${background['synopsis'] ?? background['world_setting'] ?? ''}'.trim();
+    final selected = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: context.vita.surface,
+      builder: (sheetContext) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 190,
+                  child: ColoredBox(
+                    color: const Color(0xFF51456E),
+                    child: cover.isEmpty
+                        ? const Center(
+                            child: Icon(Icons.auto_stories_outlined,
+                                size: 48, color: Colors.white70))
+                        : VitaMediaImage(
+                            url: cover,
+                            errorBuilder: (_, __, ___) =>
+                                const SizedBox.expand(),
+                          ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text('${background['title'] ?? ''}',
+                  style: TextStyle(
+                      color: sheetContext.vita.text,
+                      fontSize: 23,
+                      fontWeight: FontWeight.w700)),
+              if (description.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(description,
+                    style: TextStyle(
+                        color: sheetContext.vita.subText,
+                        fontSize: 15,
+                        height: 1.55)),
+              ],
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(sheetContext, true),
+                  child: Text('storyHub.chooseCompanion'.tr),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (selected == true && context.mounted) {
+      await _chooseCompanion(context, controller, background);
+    }
+  }
+
+  Future<void> _chooseCompanion(BuildContext context,
+      StoriesController controller, Map<String, dynamic> background) async {
+    final selection = await showModalBottomSheet<(bool, Map<String, dynamic>?)>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: context.vita.surface,
+      builder: (sheetContext) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: .68,
+        minChildSize: .4,
+        maxChildSize: .9,
+        builder: (context, scrollController) => SafeArea(
+          top: false,
+          child: Column(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 18),
+              child: Row(children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: SizedBox(
+                    width: 52,
+                    height: 58,
+                    child: ColoredBox(
+                      color: const Color(0xFF51456E),
+                      child: '${background['cover_url'] ?? ''}'.trim().isEmpty
+                          ? const Icon(Icons.auto_stories_outlined,
+                              color: Colors.white70)
+                          : VitaMediaImage(
+                              url: '${background['cover_url']}',
+                              errorBuilder: (_, __, ___) =>
+                                  const SizedBox.expand(),
+                            ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('storyHub.chooseCompanion'.tr,
+                          style: TextStyle(
+                            color: context.vita.text,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          )),
+                      const SizedBox(height: 4),
+                      Text('${background['title'] ?? ''}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: context.vita.subText, fontSize: 13)),
+                    ],
+                  ),
+                ),
+              ]),
+            ),
+            Expanded(
+              child: Obx(() {
                 final auth = AuthController.to;
-                final name = auth.nickname.isNotEmpty
+                final selfName = auth.nickname.isNotEmpty
                     ? auth.nickname
                     : (auth.email.isNotEmpty ? auth.email : 'storyHub.self'.tr);
-                return ListTile(
-                    leading: VitaAvatar(
-                      name: name,
-                      radius: 22,
-                      imageUrl: auth.avatarUrl,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    title: Text(name),
-                    onTap: () {
-                      Get.back();
-                      controller.start(background, null);
-                    });
-              }),
-              const Divider(height: 0.5, indent: 72),
-              ...controller.companions.map((companion) => ListTile(
-                  leading: VitaAvatar(
+                final companions = controller.companions
+                    .where((item) => item['creation_source'] != 'ai_pet')
+                    .toList();
+                final enabled = !controller.loading.value;
+                return ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  itemCount: companions.length + 1,
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return _ProtagonistOption(
+                        name: selfName,
+                        subtitle: 'storyHub.self'.tr,
+                        imageUrl: auth.avatarUrl,
+                        onTap: enabled
+                            ? () => Navigator.pop(sheetContext, (true, null))
+                            : null,
+                      );
+                    }
+                    final companion = companions[index - 1];
+                    return _ProtagonistOption(
                       name: '${companion['name'] ?? ''}',
-                      radius: 22,
-                      imageUrl: '${companion['portrait_url'] ?? ''}',
-                      borderRadius: BorderRadius.circular(8)),
-                  title: Text('${companion['name'] ?? ''}'),
-                  onTap: () {
-                    Get.back();
-                    controller.start(background, companion);
-                  })),
-              const SizedBox(height: 8)
-            ])));
+                      subtitle: '',
+                      imageUrl: companion['portrait_url'] as String?,
+                      onTap: enabled
+                          ? () => Navigator.pop(sheetContext, (true, companion))
+                          : null,
+                    );
+                  },
+                );
+              }),
+            ),
+          ]),
+        ),
+      ),
+    );
+    if (selection != null && context.mounted) {
+      await controller.start(background, selection.$2);
+    }
   }
+}
+
+class _ProtagonistOption extends StatelessWidget {
+  const _ProtagonistOption({
+    required this.name,
+    required this.subtitle,
+    required this.imageUrl,
+    required this.onTap,
+  });
+
+  final String name;
+  final String subtitle;
+  final String? imageUrl;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Material(
+          color: context.vita.pageBg,
+          borderRadius: BorderRadius.circular(16),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: SizedBox(
+              height: 76,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 13),
+                child: Row(children: [
+                  VitaAvatar(
+                    name: name,
+                    radius: 25,
+                    imageUrl: imageUrl,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: context.vita.text,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            )),
+                        if (subtitle.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: context.vita.subText, fontSize: 12)),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(Icons.arrow_forward_rounded,
+                      size: 18, color: context.vita.green),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -296,6 +437,95 @@ class _SectionHeader extends StatelessWidget {
       ]));
 }
 
+class _StoryBookTile extends StatelessWidget {
+  const _StoryBookTile({required this.story, required this.onTap});
+
+  final Map<String, dynamic> story;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cover = '${story['cover_url'] ?? ''}'.trim();
+    final title = '${story['title'] ?? ''}'.trim();
+    return SizedBox(
+      height: 128,
+      child: Material(
+        color: const Color(0xFF3E3654),
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Row(children: [
+            SizedBox(
+              width: 96,
+              height: double.infinity,
+              child: Stack(fit: StackFit.expand, children: [
+                if (cover.isNotEmpty)
+                  VitaMediaImage(
+                    url: cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.expand(),
+                  ),
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 8,
+                    color: const Color(0xAA21192F),
+                    alignment: Alignment.centerRight,
+                    child: Container(width: 1, color: Colors.white24),
+                  ),
+                ),
+              ]),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title.isEmpty ? 'storyHub.story'.tr : title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          height: 1.2,
+                          fontWeight: FontWeight.w700,
+                        )),
+                    const SizedBox(height: 5),
+                    Text(
+                      'storyHub.chapterCount'.trParams(
+                          {'count': '${story['current_chapter_no'] ?? 0}'}),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          const TextStyle(color: Colors.white70, fontSize: 11),
+                    ),
+                    const Spacer(),
+                    Row(children: [
+                      Flexible(
+                        child: Text('storyHub.continue'.tr,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 12)),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.arrow_forward_rounded,
+                          size: 13, color: Colors.white),
+                    ]),
+                  ],
+                ),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
 class _BackgroundTile extends StatelessWidget {
   const _BackgroundTile({required this.background, required this.onTap});
   final Map<String, dynamic> background;
@@ -304,56 +534,66 @@ class _BackgroundTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final cover = '${background['cover_url'] ?? ''}';
     return SizedBox(
-      width: 214,
+      height: 178,
       child: Material(
-        color: context.vita.surface,
-        borderRadius: BorderRadius.circular(20),
+        color: const Color(0xFF51456E),
+        borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            SizedBox(
-              width: double.infinity,
-              height: 148,
-              child: cover.isEmpty
-                  ? Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                            colors: [Color(0xFF544678), Color(0xFF263B56)]),
-                      ),
-                      child: const Icon(Icons.auto_stories_outlined,
-                          color: Color(0xFFE4D7FF), size: 52))
-                  : VitaMediaImage(url: cover),
+          child: Stack(fit: StackFit.expand, children: [
+            if (cover.isNotEmpty)
+              VitaMediaImage(
+                url: cover,
+                errorBuilder: (_, __, ___) => const SizedBox.expand(),
+              ),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0x00000000), Color(0xE8191525)],
+                  stops: [.25, 1],
+                ),
+              ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+            if (background['custom'] == true)
+              const Positioned(
+                top: 14,
+                right: 14,
+                child: Icon(Icons.lock_outline, size: 18, color: Colors.white),
+              ),
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 18,
               child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Expanded(
-                          child: Text('${background['title'] ?? ''}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: context.vita.text))),
-                      if (background['custom'] == true)
-                        Icon(Icons.lock_outline,
-                            size: 15, color: context.vita.green),
-                    ]),
-                    const SizedBox(height: 5),
-                    Text(
-                        '${background['synopsis'] ?? background['world_setting'] ?? ''}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            fontSize: 12,
-                            height: 1.35,
-                            color: context.vita.subText)),
-                  ]),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('${background['title'] ?? ''}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 20,
+                          height: 1.15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white)),
+                  const SizedBox(height: 8),
+                  Text(
+                      '${background['synopsis'] ?? background['world_setting'] ?? ''}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 12, height: 1.35, color: Colors.white70)),
+                  const SizedBox(height: 12),
+                  const Align(
+                    alignment: Alignment.centerRight,
+                    child: Icon(Icons.arrow_forward_rounded,
+                        size: 20, color: Colors.white),
+                  ),
+                ],
+              ),
             ),
           ]),
         ),
@@ -573,26 +813,7 @@ class _StoryDetailPageState extends State<StoryDetailPage> {
               padding: const EdgeInsets.only(top: 12, bottom: 30),
               children: [
                 ...chapters.map(
-                  (chapter) => VitaCard(
-                    radius: 0,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('${chapter['title'] ?? ''}',
-                            style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 10),
-                        Text('${chapter['content'] ?? ''}',
-                            style: const TextStyle(fontSize: 16, height: 1.7)),
-                        if ('${chapter['selected_choice_text'] ?? ''}'
-                            .isNotEmpty) ...[
-                          const Divider(height: 28),
-                          Text('✓ ${chapter['selected_choice_text']}',
-                              style: TextStyle(color: context.vita.subText)),
-                        ],
-                      ],
-                    ),
-                  ),
+                  (chapter) => _ChapterReadingPage(chapter: chapter),
                 ),
                 if (latestOpen) ...[
                   _SectionHeader(title: 'storyHub.chooseNext'.tr),
@@ -604,16 +825,37 @@ class _StoryDetailPageState extends State<StoryDetailPage> {
                     ),
                   if (canContinue)
                     ..._maps(chapters.last['choices']).map(
-                      (choice) => VitaCard(
-                        radius: 0,
-                        padding: EdgeInsets.zero,
+                      (choice) => Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
                         child: Material(
-                          color: Colors.transparent,
-                          child: ListTile(
-                            title: Text('${choice['text'] ?? ''}'),
-                            trailing: const Icon(Icons.chevron_right),
-                            enabled: !loading,
-                            onTap: () => _choose('${choice['id']}'),
+                          color: context.vita.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            onTap: loading
+                                ? null
+                                : () => _choose('${choice['id']}'),
+                            child: SizedBox(
+                              height: 76,
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                child: Row(children: [
+                                  Expanded(
+                                    child: Text('${choice['text'] ?? ''}',
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                            color: context.vita.text,
+                                            fontSize: 15,
+                                            height: 1.35)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Icon(Icons.arrow_forward_rounded,
+                                      size: 18, color: context.vita.green),
+                                ]),
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -635,38 +877,72 @@ class _StoryDetailPageState extends State<StoryDetailPage> {
                       final status = '${board['status'] ?? ''}';
                       final ready = status == 'completed';
                       final summary = '${board['summary'] ?? ''}'.trim();
-                      return VitaCard(
-                        radius: 0,
-                        padding: EdgeInsets.zero,
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
                         child: Material(
-                          color: Colors.transparent,
-                          child: ListTile(
-                            leading: const Icon(Icons.movie_outlined,
-                                color: Color(0xFF576B95)),
-                            title: Text(
-                                summary.isNotEmpty
-                                    ? summary
-                                    : status == 'failed'
-                                        ? 'storyHub.storyboardFailed'.tr
-                                        : 'storyHub.storyboardGenerating'.tr,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis),
-                            subtitle: Text('storyHub.panelsCount'.trParams(
-                                {'count': '${board['panel_count'] ?? 0}'})),
-                            trailing: ready
-                                ? const Icon(Icons.chevron_right)
-                                : status == 'failed'
-                                    ? const Icon(Icons.error_outline,
-                                        color: Colors.redAccent)
-                                    : const SizedBox.square(
-                                        dimension: 18,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2)),
+                          color: context.vita.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
                             onTap: ready
                                 ? () => Get.to(
                                     () => StoryboardPage(board: board),
                                     transition: Transition.cupertino)
                                 : null,
+                            child: SizedBox(
+                              height: 88,
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                child: Row(children: [
+                                  const Icon(Icons.movie_outlined,
+                                      color: Color(0xFF576B95)),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                            summary.isNotEmpty
+                                                ? summary
+                                                : status == 'failed'
+                                                    ? 'storyHub.storyboardFailed'
+                                                        .tr
+                                                    : 'storyHub.storyboardGenerating'
+                                                        .tr,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis),
+                                        Text(
+                                            'storyHub.panelsCount'.trParams({
+                                              'count':
+                                                  '${board['panel_count'] ?? 0}'
+                                            }),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                                color: context.vita.subText,
+                                                fontSize: 12)),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  if (ready)
+                                    const Icon(Icons.chevron_right)
+                                  else if (status == 'failed')
+                                    const Icon(Icons.error_outline,
+                                        color: Colors.redAccent)
+                                  else
+                                    const SizedBox.square(
+                                      dimension: 18,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    ),
+                                ]),
+                              ),
+                            ),
                           ),
                         ),
                       );
@@ -679,6 +955,49 @@ class _StoryDetailPageState extends State<StoryDetailPage> {
                       child: Center(child: CircularProgressIndicator())),
               ],
             ),
+    );
+  }
+}
+
+class _ChapterReadingPage extends StatelessWidget {
+  const _ChapterReadingPage({required this.chapter});
+
+  final Map<String, dynamic> chapter;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = context.vita.brightness == Brightness.dark;
+    final paper = dark ? const Color(0xFF211E26) : const Color(0xFFFFFBF3);
+    final ink = dark ? const Color(0xFFF4EDE3) : const Color(0xFF2C2630);
+    final secondary = dark ? const Color(0xFFB6AABD) : const Color(0xFF766A70);
+    final selected = '${chapter['selected_choice_text'] ?? ''}'.trim();
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      padding: const EdgeInsets.fromLTRB(23, 26, 23, 30),
+      decoration: BoxDecoration(
+        color: paper,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${chapter['title'] ?? ''}',
+            style: TextStyle(
+                color: ink,
+                fontSize: 23,
+                height: 1.25,
+                fontWeight: FontWeight.w700)),
+        const SizedBox(height: 15),
+        Container(width: 38, height: 2, color: context.vita.green),
+        const SizedBox(height: 24),
+        Text('${chapter['content'] ?? ''}',
+            style: TextStyle(color: ink, fontSize: 16, height: 1.85)),
+        if (selected.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Divider(color: secondary.withValues(alpha: .35)),
+          const SizedBox(height: 8),
+          Text(selected,
+              style: TextStyle(color: secondary, fontSize: 14, height: 1.5)),
+        ],
+      ]),
     );
   }
 }

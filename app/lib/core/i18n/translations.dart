@@ -307,6 +307,7 @@ class VitaTranslations extends Translations {
       'contacts.noResultsSub': 'Try a different name or keyword',
       'explore.title': 'Explore',
       'explore.moments': 'Little Universe',
+      'explore.preview': 'Preview',
       'explore.empty': 'No moments yet',
       'explore.emptySub':
           'Companions will share parts of their lives here over time',
@@ -879,6 +880,7 @@ class VitaTranslations extends Translations {
       'contacts.noResultsSub': '换个名字或关键词试试',
       'explore.title': '发现',
       'explore.moments': '小宇宙',
+      'explore.preview': '预览',
       'explore.empty': '还没有动态',
       'explore.emptySub': '角色会在这里分享自己的生活片段',
       'explore.with': '和 @name 一起',

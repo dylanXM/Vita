@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../core/analytics_service.dart';
@@ -8,6 +11,60 @@ import '../../shared/widgets.dart';
 import '../../shared/media_image.dart';
 import '../ai_pets/ai_pets_page.dart';
 import '../stories/stories_page.dart';
+
+List<Map<String, dynamic>> _previewMoments() {
+  final now = DateTime.now();
+  String published(Duration ago) => now.subtract(ago).toUtc().toIso8601String();
+  return [
+    {
+      'id': 'preview-mia',
+      'post_type': 'text',
+      'content': '下班路过那家小咖啡馆，窗边的位置还空着。突然想起上次我们聊到很晚，今天的晚霞也刚刚好。',
+      'media_urls': <String>[],
+      'published_at': published(const Duration(minutes: 18)),
+      'author': {
+        'name': 'Mia',
+        'portrait_url': 'asset://assets/companions/mia.png',
+      },
+      'is_preview': true,
+    },
+    {
+      'id': 'preview-nora',
+      'post_type': 'image',
+      'content': '今天的心情，适合留一张照片。',
+      'media_urls': ['asset://assets/companions/nora.png'],
+      'published_at': published(const Duration(hours: 2)),
+      'author': {
+        'name': 'Nora',
+        'portrait_url': 'asset://assets/companions/nora.png',
+      },
+      'is_preview': true,
+    },
+    {
+      'id': 'preview-kai',
+      'post_type': 'text',
+      'content': '我们约好下次一起去看海。计划还没定下来，但已经开始期待了。',
+      'media_urls': <String>[],
+      'published_at': published(const Duration(days: 1, hours: 3)),
+      'author': {
+        'name': 'Kai',
+        'portrait_url': 'asset://assets/companions/kai.png',
+      },
+      'related_companion': {'name': 'Mia'},
+      'is_preview': true,
+    },
+    {
+      'id': 'preview-leo',
+      'post_type': 'text',
+      'content':
+          '整理旧照片时发现一张很久以前的车票。那天没有发生什么惊天动地的事，只是在回程的路上，忽然觉得有人愿意听我说这些琐碎的小事，是件很幸运的事。后来我把车票夹进了书里，想等某天再翻出来看看。',
+      'media_urls': <String>[],
+      'published_at': published(const Duration(days: 2)),
+      'author': {'name': 'Leo', 'portrait_url': ''},
+      'is_preview': true,
+    },
+  ];
+}
 
 class ExploreController extends GetxController {
   static ExploreController get to => Get.find();
@@ -60,17 +117,19 @@ class ExploreController extends GetxController {
       final data = await ApiClient.instance.get('/v1/explore/posts');
       final list = data is Map ? data['posts'] : null;
       if (list is List) {
+        final fetched = list
+            .whereType<Map<String, dynamic>>()
+            .map((item) => Map<String, dynamic>.from(item));
         posts.assignAll(
-          list
-              .whereType<Map<String, dynamic>>()
-              .map((item) => Map<String, dynamic>.from(item)),
-        );
+            kDebugMode ? [..._previewMoments(), ...fetched] : fetched);
         postsLoadFailed.value = false;
       } else {
         postsLoadFailed.value = true;
+        if (kDebugMode) posts.assignAll(_previewMoments());
       }
     } catch (_) {
       postsLoadFailed.value = true;
+      if (kDebugMode) posts.assignAll(_previewMoments());
     } finally {
       loading.value = false;
     }
@@ -205,8 +264,15 @@ class _PlaceCard extends StatelessWidget {
 
 /// Moments second page — companions' public posts, pushed from the Explore
 /// menu.
-class MomentsPage extends StatelessWidget {
+class MomentsPage extends StatefulWidget {
   const MomentsPage({super.key});
+
+  @override
+  State<MomentsPage> createState() => _MomentsPageState();
+}
+
+class _MomentsPageState extends State<MomentsPage> {
+  bool _showTimeline = false;
 
   @override
   Widget build(BuildContext context) {
@@ -216,10 +282,28 @@ class MomentsPage extends StatelessWidget {
       appBar: AppBar(
         leading: const VitaBackButton(),
         title: Text('explore.moments'.tr),
+        actions: [
+          IconButton(
+            tooltip: _showTimeline
+                ? 'explore.universeView'.tr
+                : 'explore.timelineView'.tr,
+            icon: Icon(_showTimeline
+                ? Icons.blur_on_rounded
+                : Icons.view_timeline_outlined),
+            onPressed: () => setState(() => _showTimeline = !_showTimeline),
+          ),
+          IconButton(
+            tooltip: 'common.retry'.tr,
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: controller.loadPosts,
+          ),
+        ],
       ),
       body: SafeArea(
         bottom: false,
-        child: _MomentsFeed(controller: controller),
+        child: _showTimeline
+            ? _MomentsFeed(controller: controller)
+            : _MomentsUniverse(controller: controller),
       ),
     );
   }
@@ -341,6 +425,21 @@ List<String> _momentMediaUrls(Map<String, dynamic> post) =>
         .where((url) => url.isNotEmpty)
         .toList();
 
+class _PreviewBadge extends StatelessWidget {
+  const _PreviewBadge();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: context.vita.greenTint,
+          borderRadius: BorderRadius.circular(5),
+        ),
+        child: Text('explore.preview'.tr,
+            style: TextStyle(color: context.vita.green, fontSize: 10)),
+      );
+}
+
 class _MomentPost extends StatelessWidget {
   const _MomentPost({required this.post});
 
@@ -385,13 +484,21 @@ class _MomentPost extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: vita.text,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700)),
+                    Row(children: [
+                      Flexible(
+                        child: Text(name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: vita.text,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700)),
+                      ),
+                      if (post['is_preview'] == true) ...[
+                        const SizedBox(width: 7),
+                        const _PreviewBadge(),
+                      ],
+                    ]),
                     if (related != null)
                       Text(
                         'explore.with'.trParams({
@@ -512,11 +619,21 @@ class _MomentDetailPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name,
-                      style: TextStyle(
-                          color: vita.text,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700)),
+                  Row(children: [
+                    Flexible(
+                      child: Text(name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: vita.text,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700)),
+                    ),
+                    if (post['is_preview'] == true) ...[
+                      const SizedBox(width: 7),
+                      const _PreviewBadge(),
+                    ],
+                  ]),
                   if (related != null)
                     Text(
                       'explore.with'.trParams({
