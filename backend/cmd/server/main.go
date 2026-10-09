@@ -217,6 +217,7 @@ func main() {
 			memories.PUT("/:memory_id/favorite", handler.SetMemoryFavorite)
 			memories.DELETE("/:memory_id", handler.DeleteMemory)
 		}
+		api.GET("/journey", middleware.RequireAuth(), handler.GetJourney)
 		api.GET("/explore/posts", middleware.RequireAuth(), handler.GetExplorePosts)
 		aiPets := api.Group("/ai-pets", middleware.RequireAuth())
 		{

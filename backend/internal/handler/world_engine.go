@@ -131,6 +131,20 @@ func GetWorldScene(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load world visits"})
 		return
 	}
+	var nextID, nextType, nextTitle, nextDescription, nextLocation string
+	var nextStart time.Time
+	nextErr := db.Get().QueryRowContext(c.Request.Context(), `SELECT id,COALESCE(event_type,''),COALESCE(title,''),COALESCE(description,''),COALESCE(location,''),start_time
+		FROM life_events WHERE companion_id=$1 AND status IN ('active','scheduled') AND start_time>CURRENT_TIMESTAMP
+		ORDER BY start_time ASC,id ASC LIMIT 1`, companionID).Scan(&nextID, &nextType, &nextTitle, &nextDescription, &nextLocation, &nextStart)
+	if nextErr != nil && !errors.Is(nextErr, sql.ErrNoRows) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load next world event"})
+		return
+	}
+	var nextEvent any
+	if nextErr == nil {
+		nextEvent = gin.H{"id": nextID, "event_type": nextType, "title": nextTitle,
+			"description": nextDescription, "location": nextLocation, "start_time": nextStart}
+	}
 	var lastActionKind sql.NullString
 	var lastActionAt sql.NullTime
 	if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT kind,created_at FROM world_interactions WHERE companion_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1`, companionID).Scan(&lastActionKind, &lastActionAt); err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -215,7 +229,7 @@ func GetWorldScene(c *gin.Context) {
 		"companion_id": companionID, "local_date": localNow.Format("2006-01-02"), "region_code": region,
 		"local_hour": localNow.Hour(),
 		"phase":      phase, "place": gin.H{"kind": kind, "title": placeTitle, "description": placeDescription},
-		"event": event, "campaign": campaign, "mood": mood, "visited_today": visitsToday > 0,
+		"event": event, "next_event": nextEvent, "campaign": campaign, "mood": mood, "visited_today": visitsToday > 0,
 		"memories": memories, "connections": connections, "last_action": lastAction,
 	})
 }
@@ -256,6 +270,7 @@ func VisitWorld(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify world visit"})
 		return
 	}
+	memoryID := ""
 	if changed > 0 {
 		if _, err := tx.ExecContext(c.Request.Context(), `INSERT INTO relationship_states(companion_id,familiarity,trust,enthusiasm,updated_at) VALUES($1,1,1,2,CURRENT_TIMESTAMP)
 			ON CONFLICT(companion_id) DO UPDATE SET familiarity=LEAST(100,relationship_states.familiarity+1),trust=LEAST(100,relationship_states.trust+1),enthusiasm=LEAST(100,relationship_states.enthusiasm+2),updated_at=CURRENT_TIMESTAMP`, companionID); err != nil {
@@ -267,8 +282,9 @@ func VisitWorld(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update world mood"})
 			return
 		}
+		memoryID = uuid.New().String()
 		if _, err := tx.ExecContext(c.Request.Context(), `INSERT INTO memories(id,companion_id,type,content,importance,event_time,metadata)
-			VALUES($1,$2,'world_visit',$3,40,CURRENT_TIMESTAMP,$4)`, uuid.New().String(), companionID, "The user visited me today.", string(payload)); err != nil {
+			VALUES($1,$2,'world_visit',$3,40,CURRENT_TIMESTAMP,$4)`, memoryID, companionID, "The user visited me today.", string(payload)); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record visit memory"})
 			return
 		}
@@ -277,5 +293,12 @@ func VisitWorld(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save world visit"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"visited_today": true, "new_visit": changed > 0})
+	effects := gin.H{"familiarity": 0, "trust": 0, "enthusiasm": 0, "mood": 0}
+	if changed > 0 {
+		effects = gin.H{"familiarity": 1, "trust": 1, "enthusiasm": 2, "mood": 2}
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"visited_today": true, "new_visit": changed > 0, "memory_id": memoryID,
+		"effects": effects,
+	})
 }

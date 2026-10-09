@@ -8,7 +8,6 @@ import '../../core/theme.dart';
 import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
 import '../life/life_detail_page.dart';
-import '../shell/shell_page.dart';
 
 class MemoriesController extends GetxController {
   static MemoriesController get to => Get.find();
@@ -17,12 +16,83 @@ class MemoriesController extends GetxController {
   final memoriesLoading = false.obs;
   final companions = <Map<String, dynamic>>[].obs;
   final memories = <Map<String, dynamic>>[].obs;
+  final journey = <Map<String, dynamic>>[].obs;
+  final journeyLoading = false.obs;
+  final journeyLoadingMore = false.obs;
+  final journeyFailed = false.obs;
+  final journeyHasMore = false.obs;
   final activeCompanionId = RxnString();
+  String? _journeyCompanionId;
+  String _journeyQuery = '';
+  int _journeyOffset = 0;
+  int _journeyRequest = 0;
 
   @override
   void onInit() {
     super.onInit();
     loadCompanions();
+    loadJourney();
+  }
+
+  Future<void> loadJourney({String? companionId, String query = ''}) async {
+    _journeyCompanionId = companionId;
+    _journeyQuery = query.trim();
+    final request = ++_journeyRequest;
+    journey.clear();
+    journeyHasMore.value = false;
+    _journeyOffset = 0;
+    journeyLoading.value = true;
+    journeyFailed.value = false;
+    try {
+      final data = await ApiClient.instance.get('/v1/journey', query: {
+        'limit': 30,
+        if (companionId != null) 'companion_id': companionId,
+        if (_journeyQuery.isNotEmpty) 'q': _journeyQuery,
+      });
+      if (request != _journeyRequest) return;
+      final payload = data is Map ? data : const {};
+      journey.assignAll((payload['items'] as List? ?? const [])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item)));
+      _journeyOffset =
+          (payload['next_offset'] as num?)?.toInt() ?? journey.length;
+      journeyHasMore.value = payload['has_more'] == true;
+    } catch (_) {
+      if (request == _journeyRequest) journeyFailed.value = true;
+    } finally {
+      if (request == _journeyRequest) journeyLoading.value = false;
+    }
+  }
+
+  Future<void> loadMoreJourney() async {
+    if (journeyLoading.value ||
+        journeyLoadingMore.value ||
+        !journeyHasMore.value) {
+      return;
+    }
+    final request = _journeyRequest;
+    journeyLoadingMore.value = true;
+    try {
+      final data = await ApiClient.instance.get('/v1/journey', query: {
+        'limit': 30,
+        'offset': _journeyOffset,
+        if (_journeyCompanionId != null) 'companion_id': _journeyCompanionId,
+        if (_journeyQuery.isNotEmpty) 'q': _journeyQuery,
+      });
+      if (request != _journeyRequest) return;
+      final payload = data is Map ? data : const {};
+      final next = (payload['items'] as List? ?? const [])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item));
+      journey.addAll(next);
+      _journeyOffset =
+          (payload['next_offset'] as num?)?.toInt() ?? journey.length;
+      journeyHasMore.value = payload['has_more'] == true;
+    } catch (_) {
+      if (request == _journeyRequest) journeyFailed.value = true;
+    } finally {
+      journeyLoadingMore.value = false;
+    }
   }
 
   Future<void> loadCompanions() async {
@@ -103,241 +173,513 @@ class MemoriesPage extends StatefulWidget {
 
 class _MemoriesPageState extends State<MemoriesPage> {
   final TextEditingController _search = TextEditingController();
+  final ScrollController _scroll = ScrollController();
   bool _showSearch = false;
+  String? _selectedCompanionId;
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(() {
+      if (_scroll.hasClients &&
+          _scroll.position.extentAfter < 500 &&
+          Get.isRegistered<MemoriesController>()) {
+        MemoriesController.to.loadMoreJourney();
+      }
+    });
+  }
 
   @override
   void dispose() {
     _search.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
+  Future<void> _reload() async {
+    final controller = MemoriesController.to;
+    await Future.wait([
+      controller.loadCompanions(),
+      controller.loadJourney(companionId: _selectedCompanionId, query: _query),
+    ]);
+  }
+
+  Future<void> _chooseCompanion(BuildContext context) async {
+    final controller = MemoriesController.to;
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: context.vita.surface,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            ListTile(
+              title: Text('journey.allCompanions'.tr),
+              trailing: _selectedCompanionId == null
+                  ? Icon(Icons.check, color: context.vita.green)
+                  : null,
+              onTap: () => Navigator.pop(sheetContext, ''),
+            ),
+            for (final companion in controller.companions)
+              ListTile(
+                leading: VitaAvatar(
+                  name: '${companion['name'] ?? ''}',
+                  radius: 20,
+                  imageUrl: companion['portrait_url'] as String?,
+                ),
+                title: Text('${companion['name'] ?? ''}',
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                trailing: _selectedCompanionId == '${companion['id']}'
+                    ? Icon(Icons.check, color: context.vita.green)
+                    : null,
+                onTap: () => Navigator.pop(sheetContext, '${companion['id']}'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (selected == null || !mounted) return;
+    setState(() => _selectedCompanionId = selected.isEmpty ? null : selected);
+    await controller.loadJourney(
+        companionId: _selectedCompanionId, query: _query);
+  }
+
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: context.vita.pageBg,
-      body: SafeArea(
-        bottom: false,
-        child: Obx(() => _buildBody(context, MemoriesController.to)),
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: context.vita.pageBg,
+        body: SafeArea(
+          bottom: false,
+          child: Obx(() => _buildBody(context, MemoriesController.to)),
+        ),
+      );
+
+  Widget _buildBody(BuildContext context, MemoriesController controller) {
+    final selected = controller.companions.firstWhereOrNull(
+        (companion) => '${companion['id']}' == _selectedCompanionId);
+    final label = selected == null
+        ? 'journey.allCompanions'.tr
+        : '${selected['name'] ?? ''}';
+    return RefreshIndicator(
+      onRefresh: _reload,
+      child: CustomScrollView(
+        controller: _scroll,
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(
+              child: VitaTabHeader(
+            title: 'tab.journey'.tr,
+            showDivider: false,
+            actions: IconButton(
+              tooltip: 'contacts.search'.tr,
+              icon: Icon(_showSearch ? Icons.close : Icons.search_rounded),
+              onPressed: () {
+                setState(() {
+                  _showSearch = !_showSearch;
+                  if (!_showSearch) {
+                    _search.clear();
+                    _query = '';
+                    controller.loadJourney(companionId: _selectedCompanionId);
+                  }
+                });
+              },
+            ),
+          )),
+          SliverToBoxAdapter(
+              child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 2, 18, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => _chooseCompanion(context),
+                icon: const Icon(Icons.tune_rounded, size: 18),
+                label:
+                    Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+            ),
+          )),
+          if (_showSearch)
+            SliverToBoxAdapter(
+                child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+              child: TextField(
+                controller: _search,
+                autofocus: true,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (value) {
+                  _query = value.trim();
+                  controller.loadJourney(
+                      companionId: _selectedCompanionId, query: _query);
+                },
+                decoration: InputDecoration(
+                  hintText: 'contacts.search'.tr,
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  filled: true,
+                  fillColor: context.vita.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: context.vita.divider),
+                  ),
+                ),
+              ),
+            )),
+          if ((controller.journeyLoading.value ||
+                  controller.companionsLoading.value) &&
+              controller.journey.isEmpty)
+            SliverList.builder(
+              itemCount: 3,
+              itemBuilder: (_, __) => const VitaSkeletonCard(withAvatar: true),
+            )
+          else if (controller.journey.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: VitaEmpty(
+                icon: controller.journeyFailed.value
+                    ? Icons.wifi_off_outlined
+                    : Icons.auto_stories_outlined,
+                title: controller.journeyFailed.value
+                    ? 'common.loadFailed'.tr
+                    : _query.isNotEmpty
+                        ? 'contacts.noResults'.tr
+                        : controller.companions.isEmpty
+                            ? 'memories.createFirst'.tr
+                            : 'memories.empty'.tr,
+                subtitle: controller.journeyFailed.value
+                    ? 'common.pullToRetry'.tr
+                    : _query.isNotEmpty
+                        ? 'contacts.noResultsSub'.tr
+                        : controller.companions.isEmpty
+                            ? 'memories.createFirstSub'.tr
+                            : 'memories.emptySub'.tr,
+              ),
+            )
+          else ...[
+            ..._journeyMonthSlivers(controller.journey),
+            if (controller.journeyHasMore.value ||
+                controller.journeyLoadingMore.value)
+              SliverToBoxAdapter(
+                  child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 110),
+                child: Center(
+                    child: controller.journeyLoadingMore.value
+                        ? const CircularProgressIndicator()
+                        : TextButton(
+                            onPressed: controller.loadMoreJourney,
+                            child: Text('journey.loadMore'.tr),
+                          )),
+              ))
+            else
+              const SliverToBoxAdapter(child: SizedBox(height: 110)),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _buildBody(BuildContext context, MemoriesController controller) {
-    if (controller.companionsLoading.value && controller.companions.isEmpty) {
-      return ListView(
-        children: [
-          VitaTabHeader(title: 'tab.journey'.tr, showDivider: false),
-          const VitaSkeletonCard(withAvatar: true),
-        ],
-      );
+  List<Widget> _journeyMonthSlivers(List<Map<String, dynamic>> items) {
+    final groups = <({String? month, List<Map<String, dynamic>> items})>[];
+    for (final item in items) {
+      final date = DateTime.tryParse('${item['event_time'] ?? ''}')?.toLocal();
+      final month = date == null
+          ? null
+          : '${date.year}.${date.month.toString().padLeft(2, '0')}';
+      if (groups.isEmpty || groups.last.month != month) {
+        groups.add((month: month, items: [item]));
+      } else {
+        groups.last.items.add(item);
+      }
     }
-    if (controller.companions.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: controller.loadCompanions,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: [
-            VitaTabHeader(title: 'tab.journey'.tr, showDivider: false),
-            SizedBox(
-              height: MediaQuery.sizeOf(context).height * 0.62,
-              child: VitaEmpty(
-                icon: Icons.star_border,
-                title: 'memories.createFirst'.tr,
-                subtitle: 'memories.createFirstSub'.tr,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final companions = controller.companions.toList()
-      ..sort((a, b) => '${a['name'] ?? ''}'
-          .toLowerCase()
-          .compareTo('${b['name'] ?? ''}'.toLowerCase()));
-    final query = _search.text.trim().toLowerCase();
-    final visible = query.isEmpty
-        ? companions
-        : companions.where((companion) {
-            final name = '${companion['name'] ?? ''}'.toLowerCase();
-            final city = '${companion['city'] ?? ''}'.toLowerCase();
-            final occupation = '${companion['occupation'] ?? ''}'.toLowerCase();
-            return name.contains(query) ||
-                city.contains(query) ||
-                occupation.contains(query);
-          }).toList();
-    return RefreshIndicator(
-      onRefresh: controller.loadCompanions,
-      child: CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(
-            child: VitaTabHeader(
-              title: 'tab.journey'.tr,
-              showDivider: false,
-              actions: IconButton(
-                tooltip: 'contacts.search'.tr,
-                icon: Icon(_showSearch ? Icons.close : Icons.search_rounded),
-                onPressed: () {
-                  setState(() {
-                    _showSearch = !_showSearch;
-                    if (!_showSearch) _search.clear();
-                  });
-                },
-              ),
+    return [
+      for (final group in groups) ...[
+        if (group.month != null)
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _JourneyMonthHeader(
+              group.month!,
+              background: context.vita.pageBg,
+              foreground: context.vita.subText,
             ),
           ),
-          if (_showSearch)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                child: TextField(
-                  controller: _search,
-                  autofocus: true,
-                  onChanged: (_) => setState(() {}),
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    hintText: 'contacts.search'.tr,
-                    prefixIcon: Icon(Icons.search, color: context.vita.subText),
-                    filled: true,
-                    fillColor: context.vita.surface,
-                    isDense: true,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(18),
-                      borderSide: BorderSide(color: context.vita.divider),
-                    ),
-                  ),
-                ),
+        SliverList.builder(
+          itemCount: group.items.length,
+          itemBuilder: (context, index) {
+            final item = group.items[index];
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+              child: _JourneyEventTile(
+                item: item,
+                onTap: () => _openEvent(context, item),
               ),
-            ),
-          if (visible.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: VitaEmpty(
-                icon: Icons.search_off,
-                title: 'contacts.noResults'.tr,
-                subtitle: 'contacts.noResultsSub'.tr,
-              ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
-              sliver: SliverList.builder(
-                itemCount: visible.length,
-                itemBuilder: (context, index) {
-                  final companion = visible[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _JourneyCompanionTile(
-                      companion: companion,
-                      onTap: () {
-                        if (Get.isRegistered<ShellController>()) {
-                          ShellController.to.selectedCompanionId.value =
-                              companion['id'] as String?;
-                        }
-                        Get.to(() => MemoryDetailPage(companion: companion),
-                            transition: Transition.cupertino);
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
-        ],
+            );
+          },
+        ),
+      ],
+    ];
+  }
+
+  void _openEvent(BuildContext context, Map<String, dynamic> item) {
+    final companion =
+        Map<String, dynamic>.from(item['companion'] as Map? ?? {});
+    final time = DateTime.tryParse('${item['event_time'] ?? ''}')?.toLocal();
+    final content = item['type'] == 'world_visit'
+        ? 'world.visitMemory'.tr
+        : '${item['content'] ?? ''}'.tr;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: context.vita.surface,
+      builder: (sheetContext) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('${companion['name'] ?? ''}',
+                  style: TextStyle(color: context.vita.subText, fontSize: 13)),
+              if (time != null) ...[
+                const SizedBox(height: 6),
+                Text(formatDateSeparator(time),
+                    style:
+                        TextStyle(color: context.vita.subText, fontSize: 12)),
+              ],
+              if ('${item['title'] ?? ''}'.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Text('${item['title']}'.tr,
+                    style: TextStyle(
+                        color: context.vita.text,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w700)),
+              ],
+              const SizedBox(height: 18),
+              Text(content,
+                  style: TextStyle(
+                      color: context.vita.text, fontSize: 16, height: 1.6)),
+              const SizedBox(height: 24),
+              SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      Get.to(() => MemoryDetailPage(companion: companion),
+                          transition: Transition.cupertino);
+                    },
+                    child: Text('journey.openCompanion'.tr),
+                  )),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class _JourneyCompanionTile extends StatelessWidget {
-  const _JourneyCompanionTile({
-    required this.companion,
-    required this.onTap,
-  });
+class _JourneyMonthHeader extends SliverPersistentHeaderDelegate {
+  const _JourneyMonthHeader(this.label,
+      {required this.background, required this.foreground});
 
-  final Map<String, dynamic> companion;
+  final String label;
+  final Color background;
+  final Color foreground;
+
+  @override
+  double get minExtent => 48;
+
+  @override
+  double get maxExtent => 48;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return ColoredBox(
+      color: background,
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.only(left: 30, right: 20),
+          child: Text(label,
+              style: TextStyle(
+                  color: foreground,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 2)),
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _JourneyMonthHeader oldDelegate) =>
+      label != oldDelegate.label ||
+      background != oldDelegate.background ||
+      foreground != oldDelegate.foreground;
+}
+
+class _JourneyEventTile extends StatelessWidget {
+  const _JourneyEventTile({required this.item, required this.onTap});
+
+  final Map<String, dynamic> item;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final name = '${companion['name'] ?? 'chat.companion'.tr}';
-    final portraitUrl = (companion['portrait_url'] as String?)?.trim() ?? '';
-    final details = [companion['city'], companion['occupation']]
-        .whereType<String>()
-        .where((value) => value.trim().isNotEmpty)
-        .join(' · ');
-    final persona = (companion['persona'] as String?)?.trim() ?? '';
-    final interests = (companion['interests'] as String?)?.trim() ?? '';
-    final summary = details.isNotEmpty
-        ? details
-        : (persona.isNotEmpty ? persona : interests);
-    final vita = context.vita;
-    return Material(
-      color: const Color(0xFF222127),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: vita.divider.withValues(alpha: .35)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: SizedBox(
-          height: 132,
-          child: Column(children: [
-            const _FilmPerforations(),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 5, 13, 5),
-                child: Row(children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: SizedBox(
-                      width: 88,
-                      height: double.infinity,
-                      child: portraitUrl.isEmpty
-                          ? _PortraitFallback(name: name)
-                          : VitaMediaImage(
-                              url: portraitUrl,
-                              errorBuilder: (_, __, ___) =>
-                                  _PortraitFallback(name: name),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(name,
-                            maxLines: 1,
+    final companion =
+        Map<String, dynamic>.from(item['companion'] as Map? ?? {});
+    final name = '${companion['name'] ?? ''}';
+    final imageUrl = '${companion['portrait_url'] ?? ''}';
+    final time = DateTime.tryParse('${item['event_time'] ?? ''}')?.toLocal();
+    final title = '${item['title'] ?? ''}'.trim();
+    final content = item['type'] == 'world_visit'
+        ? 'world.visitMemory'.tr
+        : '${item['content'] ?? ''}'.tr;
+    final isKeepsake = item['type'] == 'keepsake';
+    final accent = context.vita.green;
+    return SizedBox(
+      height: 190,
+      child: Row(children: [
+        SizedBox(
+            width: 19,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned(
+                    top: 0,
+                    bottom: 0,
+                    child: Container(
+                        width: 1, color: accent.withValues(alpha: .36))),
+                Positioned(
+                    top: 34,
+                    child: Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                            color: accent,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                  color: accent.withValues(alpha: .5),
+                                  blurRadius: 10,
+                                  spreadRadius: 2)
+                            ]))),
+              ],
+            )),
+        const SizedBox(width: 7),
+        Expanded(
+            child: Material(
+          color: context.vita.surface,
+          borderRadius: BorderRadius.circular(23),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Stack(fit: StackFit.expand, children: [
+              DecoratedBox(
+                  decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  accent.withValues(alpha: .66),
+                  context.vita.surface,
+                  context.vita.surface
+                ],
+                stops: const [0, .6, 1],
+              ))),
+              if (imageUrl.isNotEmpty)
+                Positioned(
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 145,
+                    child: VitaMediaImage(
+                        url: imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox.expand())),
+              Positioned.fill(
+                  child: DecoratedBox(
+                      decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  context.vita.surface,
+                  context.vita.surface.withValues(alpha: .96),
+                  context.vita.surface.withValues(alpha: .48)
+                ],
+                stops: const [0, .54, 1],
+              )))),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 17, 18, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Icon(
+                          isKeepsake
+                              ? Icons.bookmark_rounded
+                              : item['type'] == 'world_visit'
+                                  ? Icons.waving_hand_rounded
+                                  : Icons.auto_awesome_rounded,
+                          size: 15,
+                          color: accent),
+                      const SizedBox(width: 7),
+                      Expanded(
+                          child: Text(name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: context.vita.text,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700))),
+                      if (time != null)
+                        Text(formatClock(time),
+                            style: TextStyle(
+                                color: context.vita.subText, fontSize: 11)),
+                    ]),
+                    const Spacer(),
+                    if (title.isNotEmpty) ...[
+                      FractionallySizedBox(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: .78,
+                          child: Text(title.tr,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: context.vita.text,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700))),
+                      const SizedBox(height: 6),
+                    ],
+                    FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: .78,
+                        child: Text(content,
+                            maxLines: title.isEmpty ? 3 : 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            )),
-                        const SizedBox(height: 4),
-                        Text(summary.isEmpty ? 'journey.subtitle'.tr : summary,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 12,
-                                height: 1.35,
-                                color: Colors.white70)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  const Icon(Icons.arrow_forward_rounded,
-                      size: 18, color: Colors.white70),
-                ]),
+                            style: TextStyle(
+                                color: context.vita.text,
+                                fontSize: title.isEmpty ? 17 : 13,
+                                fontWeight: title.isEmpty
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                                height: 1.35))),
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Text(time == null ? '' : formatDateSeparator(time),
+                          style: TextStyle(
+                              color: context.vita.subText, fontSize: 11)),
+                      const Spacer(),
+                      Icon(Icons.arrow_forward_rounded,
+                          size: 16, color: accent),
+                    ]),
+                  ],
+                ),
               ),
-            ),
-            const _FilmPerforations(),
-          ]),
-        ),
-      ),
+            ]),
+          ),
+        )),
+      ]),
     );
   }
 }
@@ -413,17 +755,6 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
       appBar: AppBar(
         leading: const VitaBackButton(),
         title: Text('tab.journey'.tr),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.auto_stories_outlined),
-            color: context.vita.green,
-            tooltip: 'journey.life'.tr,
-            onPressed: () => Get.to(
-              () => LifeDetailPage(companion: widget.companion),
-              transition: Transition.cupertino,
-            ),
-          ),
-        ],
       ),
       body: SafeArea(
         bottom: false,
@@ -436,7 +767,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
     if (controller.memoriesLoading.value && controller.memories.isEmpty) {
       return ListView(
         children: [
-          _JourneyDetailHeader(companion: widget.companion),
+          _JourneyDetailHeader(companion: widget.companion, onTap: _openLife),
           for (var i = 0; i < 3; i++) const VitaSkeletonCard(withAvatar: false),
         ],
       );
@@ -448,7 +779,8 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverToBoxAdapter(
-            child: _JourneyDetailHeader(companion: widget.companion),
+            child: _JourneyDetailHeader(
+                companion: widget.companion, onTap: _openLife),
           ),
           if (controller.memories.isEmpty)
             SliverToBoxAdapter(
@@ -501,12 +833,18 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
             memory['created_at'] as String? ??
             '',
       );
+
+  void _openLife() => Get.to(
+        () => LifeDetailPage(companion: widget.companion),
+        transition: Transition.cupertino,
+      );
 }
 
 class _JourneyDetailHeader extends StatelessWidget {
-  const _JourneyDetailHeader({required this.companion});
+  const _JourneyDetailHeader({required this.companion, required this.onTap});
 
   final Map<String, dynamic> companion;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -518,99 +856,113 @@ class _JourneyDetailHeader extends StatelessWidget {
         .join(' · ');
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-      child: Container(
-        height: 182,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: const Color(0xFF222127),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: portraitUrl.isEmpty
-                  ? _PortraitFallback(name: name)
-                  : VitaMediaImage(
-                      url: portraitUrl,
-                      errorBuilder: (_, __, ___) =>
-                          _PortraitFallback(name: name),
-                    ),
+      child: Semantics(
+        button: true,
+        label: 'journey.life'.tr,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Container(
+            height: 182,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: const Color(0xFF222127),
+              borderRadius: BorderRadius.circular(16),
             ),
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: .06),
-                      Colors.black.withValues(alpha: .14),
-                      Colors.black.withValues(alpha: .75),
-                    ],
-                    stops: const [0, .42, 1],
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: portraitUrl.isEmpty
+                      ? _PortraitFallback(name: name)
+                      : VitaMediaImage(
+                          url: portraitUrl,
+                          errorBuilder: (_, __, ___) =>
+                              _PortraitFallback(name: name),
+                        ),
+                ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: .06),
+                          Colors.black.withValues(alpha: .14),
+                          Colors.black.withValues(alpha: .75),
+                        ],
+                        stops: const [0, .42, 1],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            Positioned(
-              left: 22,
-              right: 22,
-              bottom: 24,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'tab.journey'.tr.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 2,
-                      color: Colors.white.withValues(alpha: .8),
-                    ),
+                Positioned(
+                  left: 22,
+                  right: 22,
+                  bottom: 24,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'tab.journey'.tr.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 2,
+                          color: Colors.white.withValues(alpha: .8),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 27,
+                            height: 1.1,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          )),
+                      const SizedBox(height: 8),
+                      Text(
+                        details.isEmpty ? 'journey.subtitle'.tr : details,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.35,
+                          color: Colors.white.withValues(alpha: .86),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 27,
-                        height: 1.1,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      )),
-                  const SizedBox(height: 8),
-                  Text(
-                    details.isEmpty ? 'journey.subtitle'.tr : details,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.35,
-                      color: Colors.white.withValues(alpha: .86),
-                    ),
+                ),
+                Positioned(
+                  top: 23,
+                  right: 20,
+                  child: Icon(Icons.arrow_outward_rounded,
+                      size: 21, color: Colors.white.withValues(alpha: .9)),
+                ),
+                const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: ColoredBox(
+                    color: Color(0xFF222127),
+                    child: _FilmPerforations(),
                   ),
-                ],
-              ),
+                ),
+                const Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: ColoredBox(
+                    color: Color(0xFF222127),
+                    child: _FilmPerforations(),
+                  ),
+                ),
+              ],
             ),
-            const Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: ColoredBox(
-                color: Color(0xFF222127),
-                child: _FilmPerforations(),
-              ),
-            ),
-            const Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: ColoredBox(
-                color: Color(0xFF222127),
-                child: _FilmPerforations(),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
