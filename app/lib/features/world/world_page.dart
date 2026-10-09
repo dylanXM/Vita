@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import '../../core/notice.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
 import '../billing/billing_controller.dart';
 import '../billing/subscription_page.dart';
@@ -24,6 +25,11 @@ class WorldPage extends StatefulWidget {
 }
 
 class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
+  static const _originPage = 10000;
+  late final PageController _pages =
+      PageController(initialPage: _originPage, viewportFraction: .84);
+  int _visiblePage = _originPage;
+  String? _originCompanionId;
   Timer? _sceneTimer;
   String? _sceneCompanionId;
   Map<String, dynamic>? _scene;
@@ -71,9 +77,19 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
     return items.first;
   }
 
+  Map<String, dynamic> _companionAt(
+      List<Map<String, dynamic>> items, int page) {
+    final origin = items.indexWhere((item) => item['id'] == _originCompanionId);
+    final index =
+        ((origin < 0 ? 0 : origin) + page - _originPage) % items.length;
+    return items[index];
+  }
+
   void _refreshVisibleScene() {
     if (ShellController.to.index.value != 0) return;
-    final current = _selectedCompanion(ChatListController.to.companions);
+    final companions = ChatListController.to.companions;
+    final current =
+        companions.isEmpty ? null : _companionAt(companions, _visiblePage);
     final id = current?['id'] as String? ?? '';
     if (id.isNotEmpty) _loadScene(id);
   }
@@ -97,6 +113,7 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _sceneTimer?.cancel();
+    _pages.dispose();
     super.dispose();
   }
 
@@ -119,7 +136,7 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
           companion: companion,
         ));
     await ChatListController.to.load();
-    if (mounted) await _loadScene(id);
+    if (mounted && _sceneCompanionId == id) await _loadScene(id);
   }
 
   @override
@@ -131,13 +148,37 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
         bottom: false,
         child: Obx(() {
           final companions = controller.companions.toList();
-          final current = _selectedCompanion(companions);
+          if (companions.isNotEmpty) {
+            _originCompanionId ??=
+                _selectedCompanion(companions)?['id'] as String?;
+          }
+          final current = companions.isEmpty
+              ? null
+              : _companionAt(companions, _visiblePage);
           final currentId = current?['id'] as String? ?? '';
+          final selectedId = ShellController.to.selectedCompanionId.value;
+          if (companions.length > 1 &&
+              selectedId != null &&
+              selectedId != currentId &&
+              companions.any((item) => item['id'] == selectedId)) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || !_pages.hasClients) return;
+              final selectedIndex =
+                  companions.indexWhere((item) => item['id'] == selectedId);
+              final currentIndex = companions.indexWhere(
+                (item) => item['id'] == currentId,
+              );
+              if (selectedIndex >= 0 && currentIndex >= 0) {
+                _pages.jumpToPage(_visiblePage + selectedIndex - currentIndex);
+              }
+            });
+          }
           final activeScene = _sceneCompanionId == currentId ? _scene : null;
           if (currentId != _sceneCompanionId) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted) return;
               if (currentId.isEmpty) {
+                _sceneRequestId++;
                 setState(() {
                   _sceneCompanionId = null;
                   _scene = null;
@@ -148,50 +189,92 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
               }
             });
           }
-          return RefreshIndicator(
-            onRefresh: () async {
-              await controller.load();
-              _refreshVisibleScene();
-            },
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.only(bottom: VitaTabBar.reservedHeight + 34),
-              children: [
-                VitaTabHeader(
-                  title: 'tab.world'.tr,
-                  showDivider: false,
-                  actions: IconButton.filledTonal(
-                    tooltip: 'world.create'.tr,
-                    onPressed: _createCompanion,
-                    icon: const Icon(Icons.add),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (current == null)
-                        _EmptyRelationship(onCreate: _createCompanion)
-                      else
-                        for (final item in companions) ...[
-                          _RelationshipCard(
-                            key: ValueKey(item['id']),
-                            companion: item,
-                            scene: item['id'] == currentId ? activeScene : null,
-                            onChat: () => _openChat(item),
-                            onVisit: item['id'] == currentId
-                                ? () => _visit(currentId)
-                                : null,
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                    ],
-                  ),
-                ),
-              ],
+          return Column(children: [
+            VitaTabHeader(
+              title: 'tab.world'.tr,
+              showDivider: false,
+              actions: IconButton.filledTonal(
+                tooltip: 'world.create'.tr,
+                onPressed: _createCompanion,
+                icon: const Icon(Icons.add),
+              ),
             ),
-          );
+            Expanded(
+              child: current == null
+                  ? Center(
+                      child: _EmptyRelationship(onCreate: _createCompanion))
+                  : Padding(
+                      padding: EdgeInsets.only(
+                        top: 14,
+                        bottom: VitaTabBar.reservedHeight + 50,
+                      ),
+                      child: companions.length == 1
+                          ? FractionallySizedBox(
+                              widthFactor: .84,
+                              child: _RelationshipCard(
+                                companion: current,
+                                scene: activeScene,
+                                onChat: () => _openChat(current),
+                                onVisit: () => _visit(currentId),
+                              ),
+                            )
+                          : PageView.builder(
+                              controller: _pages,
+                              physics: const PageScrollPhysics(),
+                              onPageChanged: (page) {
+                                final next = _companionAt(companions, page);
+                                final id = next['id'] as String? ?? '';
+                                setState(() {
+                                  _visiblePage = page;
+                                  _scene = null;
+                                });
+                                ShellController.to.selectedCompanionId.value =
+                                    id;
+                                _loadScene(id);
+                              },
+                              itemBuilder: (context, page) {
+                                final item = _companionAt(companions, page);
+                                final id = item['id'] as String? ?? '';
+                                return AnimatedBuilder(
+                                  animation: _pages,
+                                  builder: (context, child) {
+                                    final position = _pages.hasClients
+                                        ? (_pages.page ??
+                                            _visiblePage.toDouble())
+                                        : _visiblePage.toDouble();
+                                    final distance =
+                                        (page - position).clamp(-1.0, 1.0);
+                                    final depth = distance.abs();
+                                    return Transform(
+                                      alignment: Alignment.center,
+                                      transform: Matrix4.identity()
+                                        ..setEntry(3, 2, .001)
+                                        ..translateByDouble(0, depth * 24, 0, 1)
+                                        ..rotateY(-distance * .24)
+                                        ..scaleByDouble(1 - depth * .11,
+                                            1 - depth * .11, 1, 1),
+                                      child: child,
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 5),
+                                    child: _RelationshipCard(
+                                      companion: item,
+                                      scene:
+                                          id == currentId ? activeScene : null,
+                                      onChat: () => _openChat(item),
+                                      onVisit: id == currentId
+                                          ? () => _visit(id)
+                                          : null,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+            ),
+          ]);
         }),
       ),
     );
@@ -200,7 +283,6 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
 
 class _RelationshipCard extends StatelessWidget {
   const _RelationshipCard({
-    super.key,
     required this.companion,
     required this.scene,
     required this.onChat,
@@ -214,15 +296,26 @@ class _RelationshipCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final vita = context.vita;
     final name = '${companion['name'] ?? 'chat.companion'.tr}';
+    final imageUrl = companion['portrait_url'] as String? ?? '';
     final presentation = ChatListPresentation.from(companion);
     final event = scene?['event'] is Map ? scene!['event'] as Map : null;
     final place = scene?['place'] is Map ? scene!['place'] as Map : null;
     final eventTitle = '${event?['title'] ?? ''}'.trim();
     final placeTitle = '${place?['title'] ?? ''}'.trim();
     final waiting = presentation.unreadCount > 0;
+    final phase = scene?['phase'] as String?;
+    final phaseLabel = switch (phase) {
+      'active' ||
+      'celebration' ||
+      'together' ||
+      'quiet' =>
+        'world.phase.$phase'.tr,
+      _ => 'world.ready'.tr,
+    };
     final preview = !waiting && eventTitle.isNotEmpty
-        ? eventTitle
+        ? eventTitle.tr
         : presentation.message.isNotEmpty
             ? presentation.preview(
                 fallback: 'world.ready'.tr,
@@ -234,94 +327,138 @@ class _RelationshipCard extends StatelessWidget {
         onVisit != null &&
         scene != null &&
         scene!['visited_today'] != true;
-    return Container(
-      width: double.infinity,
-      height: 196,
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 15),
-      decoration: BoxDecoration(
-        color: context.vita.surface,
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              VitaAvatar(
-                name: name,
-                imageUrl: companion['portrait_url'] as String?,
-                radius: 27,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: context.vita.text,
-                          fontSize: 19,
-                          fontWeight: FontWeight.w700,
-                        )),
-                    Text(
-                        placeTitle.isNotEmpty
-                            ? placeTitle.tr
-                            : 'world.ready'.tr,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: context.vita.subText,
-                          fontSize: 12,
-                        )),
-                  ],
-                ),
-              ),
-              if (waiting)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: context.vita.greenTint,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text('world.waiting'.tr,
-                      style:
-                          TextStyle(color: context.vita.green, fontSize: 12)),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
+    final hour = scene?['local_hour'] is num
+        ? (scene!['local_hour'] as num).toInt()
+        : DateTime.now().hour;
+    final night = hour < 6 || hour >= 19;
+    final sky = night ? const Color(0xFF252446) : const Color(0xFFB988A5);
+    final glow = night ? const Color(0xFF7265A2) : const Color(0xFFE9AF88);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(30),
+      child: ColoredBox(
+        color: vita.surface,
+        child: Column(children: [
           Expanded(
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: Text(preview,
-                  maxLines: 2,
+            child: Stack(fit: StackFit.expand, children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [sky, glow],
+                  ),
+                ),
+              ),
+              if (imageUrl.isNotEmpty)
+                VitaMediaImage(
+                  url: imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox.expand(),
+                ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      sky.withValues(alpha: .20),
+                      Colors.transparent,
+                      const Color(0xFF17141F).withValues(alpha: .85),
+                    ],
+                    stops: const [0, .47, 1],
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 18,
+                left: 18,
+                right: 18,
+                child: Row(children: [
+                  const Icon(Icons.circle, size: 7, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      placeTitle.isEmpty ? 'world.ready'.tr : placeTitle.tr,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${hour.toString().padLeft(2, '0')}:00',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ]),
+              ),
+              Positioned(
+                left: 20,
+                right: 20,
+                bottom: 18,
+                child: Text(
+                  name,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: context.vita.text,
-                    fontSize: 15,
-                    height: 1.4,
-                  )),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(19, 13, 19, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 18,
+                  child: Text(
+                    waiting ? 'world.waiting'.tr : phaseLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: waiting ? vita.green : vita.subText,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                SizedBox(
+                  height: 44,
+                  child: Text(preview,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: vita.text, fontSize: 16, height: 1.35)),
+                ),
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: onChat,
+                      child: Text('world.talk'.tr),
+                    ),
+                  ),
+                  if (canVisit) ...[
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      onPressed: onVisit,
+                      child: Text('world.visit'.tr),
+                    ),
+                  ],
+                ]),
+              ],
             ),
           ),
-          Row(children: [
-            Expanded(
-              child: FilledButton(
-                onPressed: onChat,
-                child: Text('world.talk'.tr),
-              ),
-            ),
-            if (canVisit) ...[
-              const SizedBox(width: 8),
-              OutlinedButton(
-                onPressed: onVisit,
-                child: Text('world.visit'.tr),
-              ),
-            ],
-          ]),
-        ],
+        ]),
       ),
     );
   }
