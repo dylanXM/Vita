@@ -33,6 +33,8 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
   List<Map<String, dynamic>> _products = const [];
   Map<String, bool> _owned = const {};
   String _equipped = '';
+  String _category = 'gift';
+  String? _selectedKey;
 
   @override
   void initState() {
@@ -57,12 +59,22 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
           products.insert(0, products.removeAt(index));
         }
       }
+      final selected = products.where((item) => item['key'] == _selectedKey).firstOrNull;
+      final recommended = recommendedKey == null
+          ? null
+          : products.where((item) => item['key'] == recommendedKey).firstOrNull;
+      final initial = selected ??
+          recommended ??
+          products.where((item) => item['category'] == 'gift').firstOrNull ??
+          products.firstOrNull;
       setState(() {
         _balance = data['balance'] as int? ?? 0;
         _products = products;
         _owned = (data['owned_outfits'] as Map? ?? const {})
             .map((key, value) => MapEntry('$key', value == true));
         _equipped = data['equipped_outfit'] as String? ?? '';
+        _selectedKey = initial?['key'] as String?;
+        _category = _categoryFor(initial);
         _loading = false;
       });
     } on ApiException catch (error) {
@@ -225,32 +237,40 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final hasGifts = _products.any((product) => product['category'] == 'gift');
+    final groups = ['gift', 'date', 'other']
+        .where((group) => _products.any((item) => _categoryFor(item) == group))
+        .toList();
+    final visible = _products
+        .where((item) => _categoryFor(item) == _category)
+        .toList();
+    final selected = visible.where((item) => item['key'] == _selectedKey).firstOrNull ??
+        visible.firstOrNull;
     return SafeArea(
       child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.72,
+        height: MediaQuery.of(context).size.height * 0.78,
         child: Column(children: [
-          // Header — centered title, matching the app nav-bar style.
-          SizedBox(
-            height: 52,
-            child: Center(
-              child: Text('experience.title'.tr,
-                  style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                      color: context.vita.text)),
-            ),
-          ),
-          Divider(height: 0.5, thickness: 0.5, color: context.vita.divider),
-          // Balance strip.
-          Container(
-            width: double.infinity,
-            color: context.vita.pageBg,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text(
-              'experience.balance'.trParams({'coins': '$_balance'}),
-              style: TextStyle(fontSize: 13, color: context.vita.subText),
-            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+            child: Row(children: [
+              Expanded(
+                child: Text('experience.title'.tr,
+                    style: TextStyle(
+                        color: context.vita.text,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700)),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                decoration: BoxDecoration(
+                    color: context.vita.greenTint,
+                    borderRadius: BorderRadius.circular(20)),
+                child: Text('experience.balance'.trParams({'coins': '$_balance'}),
+                    style: TextStyle(
+                        color: context.vita.green,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700)),
+              ),
+            ]),
           ),
           Expanded(
             child: _loading
@@ -260,91 +280,46 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
                         icon: Icons.auto_awesome_outlined,
                         title: 'experience.empty'.tr,
                         subtitle: '')
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-                        itemCount: _products.length + (hasGifts ? 1 : 0),
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          if (hasGifts && index == 0) {
-                            return _buildGiftIntro(context);
-                          }
-                          final product = _products[index - (hasGifts ? 1 : 0)];
-                          final key = product['key'] as String? ?? '';
-                          final owned = _owned[key] == true;
-                          final equipped = _equipped == key;
-                          final isDate = product['category'] == 'date';
-                          if (product['category'] == 'gift') {
-                            return _buildGiftCard(context, product);
-                          }
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: context.vita.surface,
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            padding: const EdgeInsets.all(16),
+                    : Column(children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: groups
+                                .map((group) => _buildCategoryTab(context, group))
+                                .toList(),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Row(children: [
-                                  Container(
-                                    width: 48,
-                                    height: 48,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      color: context.vita.greenTint,
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    child: Text(
-                                        product['emoji'] as String? ?? '✨',
-                                        style: const TextStyle(fontSize: 26)),
+                                SizedBox(
+                                  height: 90,
+                                  child: ListView.separated(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: visible.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(width: 9),
+                                    itemBuilder: (context, index) =>
+                                        _buildOption(context, visible[index]),
                                   ),
-                                  const SizedBox(width: 13),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                            (product['name_key'] as String? ??
-                                                    key)
-                                                .tr,
-                                            style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w700,
-                                                color: context.vita.text)),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                            (product['description_key']
-                                                        as String? ??
-                                                    '')
-                                                .tr,
-                                            style: TextStyle(
-                                                fontSize: 12.5,
-                                                color: context.vita.subText,
-                                                height: 1.35)),
-                                      ],
-                                    ),
-                                  ),
-                                ]),
-                                if (isDate) ...[
-                                  const SizedBox(height: 12),
-                                  Text('experience.date.value'.tr,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        height: 1.4,
-                                        color: context.vita.green,
-                                      )),
-                                ],
-                                const SizedBox(height: 12),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: _buildActionButton(context, product,
-                                      owned: owned, equipped: equipped),
                                 ),
+                                const SizedBox(height: 14),
+                                if (selected != null)
+                                  AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 220),
+                                    child: _buildPreview(context, selected,
+                                        index: visible.indexOf(selected) + 1,
+                                        total: visible.length),
+                                  ),
                               ],
                             ),
-                          );
-                        },
+                          ),
+                        ),
+                        if (selected != null) _buildPurchaseBar(context, selected),
                       ),
           ),
         ]),
@@ -352,26 +327,31 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     );
   }
 
-  Widget _buildGiftIntro(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 5, 4, 7),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('experience.gift.headline'.tr,
-            style: TextStyle(
-                color: context.vita.text,
-                fontSize: 21,
-                fontWeight: FontWeight.w700)),
-        const SizedBox(height: 5),
-        Text('experience.gift.intro'.tr,
-            style: TextStyle(
-                color: context.vita.subText, fontSize: 13, height: 1.4)),
-      ]),
-    );
+  IconData _productIcon(Map<String, dynamic> product) {
+    return switch (product['key']) {
+      'gift_coffee' || 'date_coffee' => Icons.local_cafe_rounded,
+      'gift_flowers' => Icons.local_florist_rounded,
+      'gift_cake' => Icons.cake_rounded,
+      'gift_keepsake' => Icons.redeem_rounded,
+      'date_movie' => Icons.movie_rounded,
+      'date_dinner' => Icons.restaurant_rounded,
+      'life_photo' => Icons.photo_camera_rounded,
+      'voice_reply' => Icons.graphic_eq_rounded,
+      'memory_card' => Icons.auto_stories_rounded,
+      'outfit_casual' ||
+      'outfit_evening' ||
+      'outfit_travel' =>
+        Icons.checkroom_rounded,
+      _ => Icons.auto_awesome_rounded,
+    };
   }
 
-  Widget _buildGiftCard(BuildContext context, Map<String, dynamic> product) {
-    final emoji = product['emoji'] as String? ?? '🎁';
+  Widget _buildProductCard(BuildContext context, Map<String, dynamic> product) {
     final key = product['key'] as String? ?? '';
+    final gift = product['category'] == 'gift';
+    final date = product['category'] == 'date';
+    final owned = _owned[key] == true;
+    final equipped = _equipped == key;
     return Container(
       height: 190,
       padding: const EdgeInsets.fromLTRB(18, 15, 18, 15),
@@ -410,43 +390,54 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
             decoration: BoxDecoration(
                 color: context.vita.greenTint,
                 borderRadius: BorderRadius.circular(18)),
-            child: Text(emoji, style: const TextStyle(fontSize: 34)),
+            child: Icon(_productIcon(product),
+                size: 30, color: context.vita.green),
           ),
         ]),
         const Spacer(),
+        if (gift) ...[
+          _buildOutcome(context, Icons.chat_bubble_outline_rounded,
+              'experience.gift.chatResult'.tr),
+          const SizedBox(height: 7),
+        ] else if (date) ...[
+          _buildOutcome(context, Icons.event_available_rounded,
+              'experience.date.value'.tr,
+              maxLines: 2),
+          const SizedBox(height: 7),
+        ],
         Row(children: [
-          Icon(Icons.chat_bubble_outline_rounded,
-              size: 15, color: context.vita.green),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text('experience.gift.chatResult'.tr,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: context.vita.subText, fontSize: 12)),
-          ),
-        ]),
-        const SizedBox(height: 7),
-        Row(children: [
-          Icon(Icons.favorite_border_rounded,
-              size: 15, color: context.vita.green),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text('experience.gift.bondResult'.tr,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: context.vita.subText, fontSize: 12)),
-          ),
+          if (gift)
+            Expanded(
+                child: _buildOutcome(context, Icons.favorite_border_rounded,
+                    'experience.gift.bondResult'.tr))
+          else
+            const Spacer(),
           const SizedBox(width: 8),
           _buildActionButton(context, product,
-              owned: false, equipped: false, gift: true),
+              owned: owned, equipped: equipped, gift: gift),
         ]),
       ]),
     );
   }
 
+  Widget _buildOutcome(BuildContext context, IconData icon, String text,
+      {int maxLines = 1}) {
+    return Row(children: [
+      Icon(icon, size: 15, color: context.vita.green),
+      const SizedBox(width: 6),
+      Expanded(
+        child: Text(text,
+            maxLines: maxLines,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: context.vita.subText, fontSize: 12)),
+      ),
+    ]);
+  }
+
   Widget _buildActionButton(BuildContext context, Map<String, dynamic> product,
       {required bool owned, required bool equipped, bool gift = false}) {
     final key = product['key'] as String? ?? '';
+    final price = 'gift.coins'.trParams({'coins': '${product['coins']}'});
     if (equipped) {
       return Text('experience.equipped'.tr,
           style: TextStyle(fontSize: 13, color: context.vita.hint));
@@ -455,6 +446,8 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     return GestureDetector(
       onTap: (_buying == null && !equipped) ? () => _purchase(product) : null,
       child: Container(
+        constraints: const BoxConstraints(minWidth: 108, minHeight: 36),
+        alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: owned ? context.vita.greenTint : context.vita.green,
@@ -471,7 +464,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
                     : gift
                         ? 'experience.gift.send'
                             .trParams({'coins': '${product['coins']}'})
-                        : '${product['coins']}',
+                        : '${'experience.use'.tr} · $price',
                 style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
