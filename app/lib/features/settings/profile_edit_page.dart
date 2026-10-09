@@ -85,7 +85,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   }
 
   Future<void> _save() async {
-    if (_saving) return;
+    if (_saving || _uploadingAvatar) return;
     final nickname = _nicknameController.text.trim();
     if (nickname.runes.length > 30) {
       VitaNotice.warning('profile.nickname'.tr, 'profile.nicknameTooLong'.tr);
@@ -118,97 +118,136 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       appBar: AppBar(
         leading: const VitaBackButton(),
         title: Text('profile.edit.title'.tr),
-        actions: [
-          TextButton(
-            onPressed: _saving ? null : _save,
-            child: _saving
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(vita.green),
-                    ),
-                  )
-                : Text('common.save'.tr),
-          ),
-        ],
       ),
       body: ListView(
-        padding: const EdgeInsets.only(top: 12, bottom: 24),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
-          // Avatar picker — large centered circle, tap to replace.
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: GestureDetector(
-                onTap: _pickAvatar,
-                behavior: HitTestBehavior.opaque,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    _AvatarCircle(
-                      url: (_avatarUrl != null && _avatarUrl!.isNotEmpty)
-                          ? _avatarUrl!
-                          : existingAvatar,
-                      radius: 56,
-                    ),
-                    if (_uploadingAvatar)
-                      Container(
-                        width: 112,
-                        height: 112,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.35),
-                          shape: BoxShape.circle,
+          VitaCard(
+            radius: 12,
+            margin: EdgeInsets.zero,
+            padding: EdgeInsets.zero,
+            child: Column(children: [
+              SizedBox(
+                height: 80,
+                child: InkWell(
+                  onTap: _uploadingAvatar || _saving ? null : _pickAvatar,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(children: [
+                      Expanded(
+                        child: Text('profile.avatar'.tr,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: vita.text, fontSize: 15)),
+                      ),
+                      Stack(alignment: Alignment.center, children: [
+                        _AvatarCircle(
+                          url: (_avatarUrl != null && _avatarUrl!.isNotEmpty)
+                              ? _avatarUrl!
+                              : existingAvatar,
+                          radius: 27,
                         ),
-                        child: const Center(
-                          child: SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.4,
-                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                        if (_uploadingAvatar)
+                          Container(
+                            width: 54,
+                            height: 54,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.4),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor:
+                                      AlwaysStoppedAnimation(Colors.white),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                  ],
+                      ]),
+                      const SizedBox(width: 8),
+                      Icon(Icons.chevron_right_rounded,
+                          size: 20, color: vita.chevron),
+                    ]),
+                  ),
                 ),
               ),
-            ),
-          ),
-          // Nickname field, in the same flat grouped surface as other settings.
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text('profile.nickname'.tr, style: vita.sectionTitle),
-          ),
-          const SizedBox(height: 12),
-          VitaCard(
-            radius: 0,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            margin: EdgeInsets.zero,
-            child: TextField(
-              controller: _nicknameController,
-              maxLength: 30,
-              textInputAction: TextInputAction.done,
-              decoration: InputDecoration(
-                counterText: '',
-                hintText: 'profile.nickname.hint'.tr,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                filled: false,
-                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              const Divider(height: 0.5, indent: 16),
+              SizedBox(
+                height: 64,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(children: [
+                    Text('profile.nickname'.tr,
+                        style: TextStyle(color: vita.text, fontSize: 15)),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextField(
+                        controller: _nicknameController,
+                        maxLength: 30,
+                        textAlign: TextAlign.right,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _save(),
+                        decoration: InputDecoration(
+                          counterText: '',
+                          hintText: 'profile.nickname.hint'.tr,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          filled: false,
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        style: TextStyle(fontSize: 15, color: vita.text),
+                      ),
+                    ),
+                  ]),
+                ),
               ),
-              style: TextStyle(fontSize: 16, color: vita.text),
-            ),
+              const Divider(height: 0.5, indent: 16),
+              SizedBox(
+                height: 56,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(children: [
+                    Text('auth.email'.tr,
+                        style: TextStyle(color: vita.text, fontSize: 15)),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(AuthController.to.email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
+                          style: TextStyle(color: vita.subText, fontSize: 13)),
+                    ),
+                  ]),
+                ),
+              ),
+            ]),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'profile.nickname.help'.tr,
-              style: vita.sub,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text('profile.nickname.help'.tr, style: vita.sub),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            height: 48,
+            child: FilledButton(
+              onPressed: _saving || _uploadingAvatar ? null : _save,
+              child: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                      ),
+                    )
+                  : Text('common.save'.tr),
             ),
           ),
         ],

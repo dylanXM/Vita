@@ -77,7 +77,7 @@ class _VitaAppState extends State<VitaApp> {
         }
       },
       initialRoute: '/',
-      defaultTransition: Transition.fadeIn,
+      defaultTransition: Transition.cupertino,
       transitionDuration: const Duration(milliseconds: 280),
       getPages: [
         GetPage(name: '/', page: () => const SplashPage()),
@@ -89,7 +89,7 @@ class _VitaAppState extends State<VitaApp> {
         GetPage(
           name: '/login',
           page: () => const LoginPage(),
-          transition: Transition.cupertino,
+          transition: Transition.fadeIn,
         ),
         GetPage(
           name: '/register',

@@ -396,11 +396,13 @@ class _ChatPageState extends State<ChatPage> {
       final isUser = _isUserMessage(m);
       final parsed = ChatMessageContent.from(m);
       final isGift = parsed.isGift;
+      final isSceneCard =
+          parsed.type == 'scene_card' && parsed.payload['event_id'] is String;
       final deliveryStatus = m['delivery_status'] as String? ?? 'delivered';
       final bubbleColor = isGift
           ? Colors.transparent
           : isUser
-              ? context.vita.bubbleGreen
+              ? context.vita.greenTint
               : context.vita.surface;
       items.add(
         Padding(
@@ -424,17 +426,28 @@ class _ChatPageState extends State<ChatPage> {
                   children: [
                     Container(
                       constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.66,
+                        maxWidth: MediaQuery.of(context).size.width *
+                            (isSceneCard ? 0.75 : 0.66),
                       ),
-                      padding: isGift
+                      padding: isGift || isSceneCard
                           ? EdgeInsets.zero
                           : const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 10),
-                      decoration: isGift
+                      decoration: isGift || isSceneCard
                           ? null
                           : BoxDecoration(
                               color: bubbleColor,
-                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: isUser
+                                    ? context.vita.green.withValues(alpha: .18)
+                                    : context.vita.text.withValues(alpha: .06),
+                              ),
+                              borderRadius: BorderRadius.only(
+                                topLeft: const Radius.circular(20),
+                                topRight: const Radius.circular(20),
+                                bottomLeft: Radius.circular(isUser ? 20 : 7),
+                                bottomRight: Radius.circular(isUser ? 7 : 20),
+                              ),
                             ),
                       child: _ChatMessageBody(
                         message: m,
@@ -712,39 +725,71 @@ class _ChatMessageBody extends StatelessWidget {
                       'time': '${MaterialLocalizations.of(context).formatMediumDate(scheduled)} '
                           '${TimeOfDay.fromDateTime(scheduled).format(context)}'
                     });
-      return InkWell(
-        onTap: () => Get.to(() => CompanionMomentPage(
-              companionId: companionId,
-              eventId: payload['event_id'] as String,
-              name: Get.find<ChatController>(tag: companionId).companionName,
-              controller: Get.find<ChatController>(tag: companionId),
-              avatarUrl: avatarUrl,
-            )),
-        borderRadius: BorderRadius.circular(16),
-        child: Row(children: [
-          Icon(Icons.auto_awesome_outlined, color: context.vita.green),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text('moment.open'.tr,
-                    style: TextStyle(
-                        fontWeight: FontWeight.w700, color: context.vita.text)),
-                const SizedBox(height: 4),
-                Text(displayContent,
-                    style:
-                        TextStyle(fontSize: 12, color: context.vita.subText)),
-                if (scheduled != null) ...[
-                  const SizedBox(height: 4),
-                  Text(timeLabel,
-                      style:
-                          TextStyle(fontSize: 11, color: context.vita.green)),
+      return Material(
+        color: context.vita.surface,
+        borderRadius: BorderRadius.circular(18),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => Get.to(() => CompanionMomentPage(
+                companionId: companionId,
+                eventId: payload['event_id'] as String,
+                name: Get.find<ChatController>(tag: companionId).companionName,
+                controller: Get.find<ChatController>(tag: companionId),
+                avatarUrl: avatarUrl,
+              )),
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            width: 250,
+            padding: const EdgeInsets.fromLTRB(15, 14, 14, 14),
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(
+                    color: context.vita.green.withValues(alpha: .48), width: 2),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Icon(Icons.auto_awesome_rounded,
+                      color: context.vita.green, size: 17),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text('moment.open'.tr,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: context.vita.text)),
+                  ),
+                  Icon(Icons.arrow_outward_rounded,
+                      size: 17, color: context.vita.subText),
+                ]),
+                if (displayContent.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(displayContent,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 12,
+                          height: 1.4,
+                          color: context.vita.subText)),
                 ],
-              ])),
-          Icon(Icons.arrow_forward_ios_rounded,
-              size: 14, color: context.vita.subText),
-        ]),
+                if (scheduled != null) ...[
+                  const SizedBox(height: 9),
+                  Text(timeLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: context.vita.green)),
+                ],
+              ],
+            ),
+          ),
+        ),
       );
     }
     if (parsed.mediaKind == ChatMediaKind.voice) {

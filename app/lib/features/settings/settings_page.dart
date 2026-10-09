@@ -384,12 +384,12 @@ class _OptionListPage extends StatelessWidget {
         shape: const Border(),
       ),
       body: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 24),
+        padding: const EdgeInsets.only(top: 16, bottom: 24),
         children: [
           VitaCard(
-            radius: 20,
+            radius: 12,
             margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.symmetric(vertical: 4),
+            padding: EdgeInsets.zero,
             child: Column(
               children: [
                 for (var i = 0; i < options.length; i++) ...[
@@ -410,11 +410,13 @@ class _Option {
     required this.labelKey,
     required this.selected,
     required this.onTap,
+    this.icon,
   });
 
   final String labelKey;
   final bool selected;
   final VoidCallback onTap;
+  final IconData? icon;
 }
 
 class _OptionRow extends StatelessWidget {
@@ -425,27 +427,39 @@ class _OptionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vita = context.vita;
-    return InkWell(
-      onTap: option.onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                option.labelKey.tr,
-                style: TextStyle(
-                  fontSize: 15.5,
-                  fontWeight: FontWeight.w500,
-                  color: vita.text,
+    return SizedBox(
+      height: 58,
+      child: InkWell(
+        onTap: option.onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              if (option.icon != null) ...[
+                Icon(option.icon,
+                    size: 20,
+                    color: option.selected ? vita.green : vita.subText),
+                const SizedBox(width: 14),
+              ],
+              Expanded(
+                child: Text(
+                  option.labelKey.tr,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight:
+                        option.selected ? FontWeight.w600 : FontWeight.w400,
+                    color: vita.text,
+                  ),
                 ),
               ),
-            ),
-            if (option.selected)
-              Icon(Icons.check_rounded, size: 20, color: vita.green)
-            else
-              const SizedBox(width: 20),
-          ],
+              if (option.selected)
+                Icon(Icons.check_rounded, size: 20, color: vita.green)
+              else
+                const SizedBox(width: 20),
+            ],
+          ),
         ),
       ),
     );
@@ -459,29 +473,28 @@ class LanguagePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = VitaSettingsController.to;
-    return _OptionListPage(
-      title: 'lang.title',
-      options: [
-        _Option(
-          labelKey: 'lang.system',
-          selected: settings.locale.value == null,
-          onTap: () {
-            settings.setLocale(null);
-            Get.back();
-          },
-        ),
-        for (final locale in VitaSettingsController.supportedLocales)
-          _Option(
-            labelKey: _languageLabelKey(vitaLocaleTag(locale)),
-            selected: settings.locale.value != null &&
-                vitaLocaleTag(settings.locale.value!) == vitaLocaleTag(locale),
-            onTap: () {
-              settings.setLocale(locale);
-              Get.back();
-            },
-          ),
-      ],
-    );
+    return Obx(() => _OptionListPage(
+          title: 'lang.title',
+          options: [
+            _Option(
+              labelKey: 'lang.system',
+              selected: settings.locale.value == null,
+              onTap: () {
+                settings.setLocale(null);
+              },
+            ),
+            for (final locale in VitaSettingsController.supportedLocales)
+              _Option(
+                labelKey: _languageLabelKey(vitaLocaleTag(locale)),
+                selected: settings.locale.value != null &&
+                    vitaLocaleTag(settings.locale.value!) ==
+                        vitaLocaleTag(locale),
+                onTap: () {
+                  settings.setLocale(locale);
+                },
+              ),
+          ],
+        ));
   }
 }
 
@@ -492,35 +505,35 @@ class ThemePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = VitaSettingsController.to;
-    return _OptionListPage(
-      title: 'theme.title',
-      options: [
-        _Option(
-          labelKey: 'theme.system',
-          selected: settings.themeMode.value == null,
-          onTap: () {
-            settings.setThemeMode(null);
-            Get.back();
-          },
-        ),
-        _Option(
-          labelKey: 'theme.light',
-          selected: settings.themeMode.value == ThemeMode.light,
-          onTap: () {
-            settings.setThemeMode(ThemeMode.light);
-            Get.back();
-          },
-        ),
-        _Option(
-          labelKey: 'theme.dark',
-          selected: settings.themeMode.value == ThemeMode.dark,
-          onTap: () {
-            settings.setThemeMode(ThemeMode.dark);
-            Get.back();
-          },
-        ),
-      ],
-    );
+    return Obx(() => _OptionListPage(
+          title: 'theme.title',
+          options: [
+            _Option(
+              labelKey: 'theme.system',
+              selected: settings.themeMode.value == null,
+              icon: Icons.brightness_auto_outlined,
+              onTap: () {
+                settings.setThemeMode(null);
+              },
+            ),
+            _Option(
+              labelKey: 'theme.light',
+              selected: settings.themeMode.value == ThemeMode.light,
+              icon: Icons.light_mode_outlined,
+              onTap: () {
+                settings.setThemeMode(ThemeMode.light);
+              },
+            ),
+            _Option(
+              labelKey: 'theme.dark',
+              selected: settings.themeMode.value == ThemeMode.dark,
+              icon: Icons.dark_mode_outlined,
+              onTap: () {
+                settings.setThemeMode(ThemeMode.dark);
+              },
+            ),
+          ],
+        ));
   }
 }
 
@@ -553,12 +566,12 @@ class PalettePage extends StatelessWidget {
         shape: const Border(),
       ),
       body: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 24),
+        padding: const EdgeInsets.only(top: 16, bottom: 24),
         children: [
           VitaCard(
-            radius: 20,
+            radius: 12,
             margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.symmetric(vertical: 4),
+            padding: EdgeInsets.zero,
             child: Column(
               children: [
                 for (var i = 0; i < VitaPalette.values.length; i++) ...[
@@ -584,56 +597,62 @@ class _PaletteRow extends StatelessWidget {
     final settings = VitaSettingsController.to;
     final vita = context.vita;
     final light = VitaThemeData.lightFor(palette);
-    final selected = settings.currentPalette == palette;
-    return InkWell(
-      onTap: () {
-        settings.setPalette(palette);
-        Get.back();
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            // Swatch preview: accent + outgoing bubble.
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: light.green,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Align(
-                alignment: Alignment.bottomRight,
-                child: Container(
-                  width: 18,
-                  height: 18,
-                  margin: const EdgeInsets.only(right: 4, bottom: 4),
+    return Obx(() {
+      final selected = settings.currentPalette == palette;
+      return SizedBox(
+        height: 64,
+        child: InkWell(
+          onTap: () {
+            settings.setPalette(palette);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                // Swatch preview: accent + outgoing bubble.
+                Container(
+                  width: 32,
+                  height: 32,
                   decoration: BoxDecoration(
-                    color: light.bubbleGreen,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.white, width: 1.5),
+                    color: light.green,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Align(
+                    alignment: Alignment.bottomRight,
+                    child: Container(
+                      width: 13,
+                      height: 13,
+                      margin: const EdgeInsets.only(right: 1, bottom: 1),
+                      decoration: BoxDecoration(
+                        color: light.bubbleGreen,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: vita.surface, width: 1.5),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                _paletteLabel(context, palette),
-                style: TextStyle(
-                  fontSize: 15.5,
-                  fontWeight: FontWeight.w500,
-                  color: vita.text,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    _paletteLabel(context, palette),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                      color: vita.text,
+                    ),
+                  ),
                 ),
-              ),
+                if (selected)
+                  Icon(Icons.check_rounded, size: 20, color: vita.green)
+                else
+                  const SizedBox(width: 20),
+              ],
             ),
-            if (selected)
-              Icon(Icons.check_rounded, size: 20, color: vita.green)
-            else
-              const SizedBox(width: 20),
-          ],
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 }

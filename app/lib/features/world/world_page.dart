@@ -15,8 +15,7 @@ import '../chat/chat_page.dart';
 import '../companion/companion_create_method_page.dart';
 import '../shell/shell_page.dart';
 
-/// A relationship-first entrance: one companion's current context and a
-/// compact list of the other relationships.
+/// A relationship-first entrance with equal space for every companion.
 class WorldPage extends StatefulWidget {
   const WorldPage({super.key});
 
@@ -149,9 +148,6 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
               }
             });
           }
-          final others = companions
-              .where((item) => item['id'] != currentId)
-              .toList(growable: false);
           return RefreshIndicator(
             onRefresh: () async {
               await controller.load();
@@ -177,30 +173,19 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
                     children: [
                       if (current == null)
                         _EmptyRelationship(onCreate: _createCompanion)
-                      else ...[
-                        _CurrentRelationship(
-                          key: ValueKey(currentId),
-                          companion: current,
-                          scene: activeScene,
-                          onChat: () => _openChat(current),
-                          onVisit: () => _visit(currentId),
-                        ),
-                        if (others.isNotEmpty) ...[
-                          const SizedBox(height: 28),
-                          Text('world.otherCompanions'.tr,
-                              style: TextStyle(
-                                color: context.vita.text,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              )),
-                          const SizedBox(height: 10),
-                          for (final item in others)
-                            _OtherRelationship(
-                              companion: item,
-                              onTap: () => _openChat(item),
-                            ),
+                      else
+                        for (final item in companions) ...[
+                          _RelationshipCard(
+                            key: ValueKey(item['id']),
+                            companion: item,
+                            scene: item['id'] == currentId ? activeScene : null,
+                            onChat: () => _openChat(item),
+                            onVisit: item['id'] == currentId
+                                ? () => _visit(currentId)
+                                : null,
+                          ),
+                          const SizedBox(height: 12),
                         ],
-                      ],
                     ],
                   ),
                 ),
@@ -213,8 +198,8 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
   }
 }
 
-class _CurrentRelationship extends StatelessWidget {
-  const _CurrentRelationship({
+class _RelationshipCard extends StatelessWidget {
+  const _RelationshipCard({
     super.key,
     required this.companion,
     required this.scene,
@@ -225,7 +210,7 @@ class _CurrentRelationship extends StatelessWidget {
   final Map<String, dynamic> companion;
   final Map<String, dynamic>? scene;
   final VoidCallback onChat;
-  final VoidCallback onVisit;
+  final VoidCallback? onVisit;
 
   @override
   Widget build(BuildContext context) {
@@ -245,14 +230,17 @@ class _CurrentRelationship extends StatelessWidget {
                 photoLabel: 'chat.photoMessage'.tr,
               )
             : 'world.ready'.tr;
-    final canVisit =
-        !waiting && scene != null && scene!['visited_today'] != true;
+    final canVisit = !waiting &&
+        onVisit != null &&
+        scene != null &&
+        scene!['visited_today'] != true;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      height: 196,
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 15),
       decoration: BoxDecoration(
         color: context.vita.surface,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,7 +250,7 @@ class _CurrentRelationship extends StatelessWidget {
               VitaAvatar(
                 name: name,
                 imageUrl: companion['portrait_url'] as String?,
-                radius: 34,
+                radius: 27,
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -274,17 +262,19 @@ class _CurrentRelationship extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: context.vita.text,
-                          fontSize: 22,
+                          fontSize: 19,
                           fontWeight: FontWeight.w700,
                         )),
-                    if (placeTitle.isNotEmpty)
-                      Text(placeTitle.tr,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: context.vita.subText,
-                            fontSize: 12,
-                          )),
+                    Text(
+                        placeTitle.isNotEmpty
+                            ? placeTitle.tr
+                            : 'world.ready'.tr,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.vita.subText,
+                          fontSize: 12,
+                        )),
                   ],
                 ),
               ),
@@ -302,112 +292,36 @@ class _CurrentRelationship extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 22),
-          Text(preview,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: context.vita.text,
-                fontSize: 16,
-                height: 1.5,
-              )),
-          const SizedBox(height: 22),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: canVisit ? onVisit : onChat,
-              child: Text(canVisit ? 'world.visit'.tr : 'world.talk'.tr),
+          const SizedBox(height: 16),
+          Expanded(
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: Text(preview,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: context.vita.text,
+                    fontSize: 15,
+                    height: 1.4,
+                  )),
             ),
           ),
-          if (canVisit)
-            Align(
-              alignment: Alignment.center,
-              child: TextButton(
+          Row(children: [
+            Expanded(
+              child: FilledButton(
                 onPressed: onChat,
                 child: Text('world.talk'.tr),
               ),
             ),
+            if (canVisit) ...[
+              const SizedBox(width: 8),
+              OutlinedButton(
+                onPressed: onVisit,
+                child: Text('world.visit'.tr),
+              ),
+            ],
+          ]),
         ],
-      ),
-    );
-  }
-}
-
-class _OtherRelationship extends StatelessWidget {
-  const _OtherRelationship({required this.companion, required this.onTap});
-
-  final Map<String, dynamic> companion;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final name = '${companion['name'] ?? 'chat.companion'.tr}';
-    final presentation = ChatListPresentation.from(companion);
-    final preview = presentation.preview(
-      fallback: 'world.ready'.tr,
-      voiceLabel: 'chat.voiceMessage'.tr,
-      photoLabel: 'chat.photoMessage'.tr,
-    );
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: context.vita.surface,
-        borderRadius: BorderRadius.circular(18),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                VitaAvatar(
-                  name: name,
-                  imageUrl: companion['portrait_url'] as String?,
-                  radius: 24,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: context.vita.text,
-                            fontWeight: FontWeight.w700,
-                          )),
-                      Text(preview,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: context.vita.subText,
-                            fontSize: 12,
-                          )),
-                    ],
-                  ),
-                ),
-                if (presentation.unreadCount > 0)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: context.vita.greenTint,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      presentation.unreadCount > 99
-                          ? '99+'
-                          : '${presentation.unreadCount}',
-                      style: TextStyle(color: context.vita.green, fontSize: 12),
-                    ),
-                  )
-                else
-                  Icon(Icons.chevron_right, color: context.vita.subText),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
