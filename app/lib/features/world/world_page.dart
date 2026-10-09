@@ -199,10 +199,7 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
                           for (final item in others)
                             _OtherRelationship(
                               companion: item,
-                              onTap: () => ShellController
-                                  .to
-                                  .selectedCompanionId
-                                  .value = item['id'] as String?,
+                              onTap: () => _openChat(item),
                             ),
                         ],
                       ],

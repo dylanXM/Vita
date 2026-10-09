@@ -234,32 +234,25 @@ class _MemoriesPageState extends State<MemoriesPage> {
           else
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
-              sliver: SliverLayoutBuilder(
-                builder: (context, constraints) => SliverGrid(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: constraints.crossAxisExtent < 320 ? 1 : 2,
-                    mainAxisExtent: 248,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final companion = visible[index];
-                      return _JourneyCompanionTile(
-                        companion: companion,
-                        onTap: () {
-                          if (Get.isRegistered<ShellController>()) {
-                            ShellController.to.selectedCompanionId.value =
-                                companion['id'] as String?;
-                          }
-                          Get.to(() => MemoryDetailPage(companion: companion),
-                              transition: Transition.cupertino);
-                        },
-                      );
-                    },
-                    childCount: visible.length,
-                  ),
-                ),
+              sliver: SliverList.builder(
+                itemCount: visible.length,
+                itemBuilder: (context, index) {
+                  final companion = visible[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _JourneyCompanionTile(
+                      companion: companion,
+                      onTap: () {
+                        if (Get.isRegistered<ShellController>()) {
+                          ShellController.to.selectedCompanionId.value =
+                              companion['id'] as String?;
+                        }
+                        Get.to(() => MemoryDetailPage(companion: companion),
+                            transition: Transition.cupertino);
+                      },
+                    ),
+                  );
+                },
               ),
             ),
         ],
@@ -287,15 +280,17 @@ class _JourneyCompanionTile extends StatelessWidget {
         .join(' · ');
     return Material(
       color: context.vita.surface,
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(20),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: SizedBox.expand(
+        child: SizedBox(
+          height: 116,
+          child: Row(
+            children: [
+              SizedBox(
+                width: 104,
+                height: 116,
                 child: portraitUrl.isEmpty
                     ? _PortraitFallback(name: name)
                     : VitaMediaImage(
@@ -304,34 +299,40 @@ class _JourneyCompanionTile extends StatelessWidget {
                             _PortraitFallback(name: name),
                       ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 11, 14, 13),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: context.vita.text,
-                      )),
-                  if (details.isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      details,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          TextStyle(fontSize: 11, color: context.vita.subText),
-                    ),
-                  ],
-                ],
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: context.vita.text,
+                          )),
+                      if (details.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          details,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 12, color: context.vita.subText),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ],
+              Icon(Icons.arrow_forward_ios_rounded,
+                  size: 15, color: context.vita.subText),
+              const SizedBox(width: 16),
+            ],
+          ),
         ),
       ),
     );
@@ -381,12 +382,11 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final name = widget.companion['name'] as String? ?? 'memories.title'.tr;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
       appBar: AppBar(
         leading: const VitaBackButton(),
-        title: Text(name),
+        title: Text('tab.journey'.tr),
         actions: [
           IconButton(
             icon: const Icon(Icons.auto_stories_outlined),
@@ -408,9 +408,11 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
 
   Widget _buildBody(BuildContext context) {
     if (controller.memoriesLoading.value && controller.memories.isEmpty) {
-      return ListView.builder(
-        itemCount: 5,
-        itemBuilder: (_, __) => const VitaSkeletonCard(withAvatar: false),
+      return ListView(
+        children: [
+          _JourneyDetailHeader(companion: widget.companion),
+          for (var i = 0; i < 3; i++) const VitaSkeletonCard(withAvatar: false),
+        ],
       );
     }
 
@@ -419,32 +421,25 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
+          SliverToBoxAdapter(
+            child: _JourneyDetailHeader(companion: widget.companion),
+          ),
           if (controller.memories.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: VitaEmpty(
-                icon: Icons.star_border,
-                title: 'memories.empty'.tr,
-                subtitle: 'memories.emptySub'.tr,
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 260,
+                child: VitaEmpty(
+                  icon: Icons.star_border,
+                  title: 'memories.empty'.tr,
+                  subtitle: 'memories.emptySub'.tr,
+                ),
               ),
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.only(top: 8, bottom: 32),
+              padding: const EdgeInsets.only(top: 4, bottom: 32),
               sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),
-                    child: Text(
-                      'journey.subtitle'.tr,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: context.vita.subText,
-                      ),
-                    ),
-                  ),
-                  ..._buildGroupedTiles(context),
-                ]),
+                delegate: SliverChildListDelegate(_buildGroupedTiles(context)),
               ),
             ),
         ],
@@ -475,6 +470,78 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
   }
 }
 
+class _JourneyDetailHeader extends StatelessWidget {
+  const _JourneyDetailHeader({required this.companion});
+
+  final Map<String, dynamic> companion;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = '${companion['name'] ?? 'chat.companion'.tr}';
+    final portraitUrl = (companion['portrait_url'] as String?)?.trim() ?? '';
+    final details = [companion['city'], companion['occupation']]
+        .whereType<String>()
+        .where((value) => value.trim().isNotEmpty)
+        .join(' · ');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+      child: Container(
+        height: 148,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: context.vita.surface,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 116,
+              height: double.infinity,
+              child: portraitUrl.isEmpty
+                  ? _PortraitFallback(name: name)
+                  : VitaMediaImage(
+                      url: portraitUrl,
+                      errorBuilder: (_, __, ___) =>
+                          _PortraitFallback(name: name),
+                    ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: context.vita.text,
+                        )),
+                    const SizedBox(height: 8),
+                    Text(
+                      details.isEmpty ? 'journey.subtitle'.tr : details,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.4,
+                        color: context.vita.subText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _DateSectionHeader extends StatelessWidget {
   const _DateSectionHeader({required this.label});
   final String label;
@@ -484,15 +551,12 @@ class _DateSectionHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(24, 18, 24, 14),
       child: Row(
         children: [
-          Icon(Icons.auto_awesome, size: 15, color: context.vita.green),
-          const SizedBox(width: 12),
           Text(
             label,
             style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.4,
-              color: context.vita.text,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: context.vita.subText,
             ),
           ),
           const SizedBox(width: 14),
@@ -517,82 +581,51 @@ class _MemoryTile extends StatelessWidget {
     final readonly = memory['readonly'] == true;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-      child: Stack(
-        children: [
-          Positioned(
-            left: 6,
-            top: 0,
-            bottom: 0,
-            child: Container(
-              width: 1,
-              color: context.vita.green.withValues(alpha: 0.22),
-            ),
-          ),
-          Positioned(
-            left: 2,
-            top: 26,
-            child: Container(
-              width: 9,
-              height: 9,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: context.vita.green,
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 26),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 18, 12, 20),
-              decoration: BoxDecoration(
-                color: context.vita.surface,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: context.vita.divider),
-              ),
-              child: Row(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(18, 18, 10, 18),
+        decoration: BoxDecoration(
+          color: context.vita.surface,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (title.isNotEmpty) ...[
-                          Text(title,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: context.vita.green,
-                              )),
-                          const SizedBox(height: 10),
-                        ],
-                        Text(
-                          type == 'world_visit'
-                              ? 'world.visitMemory'.tr
-                              : content.tr,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: context.vita.text,
-                            height: 1.55,
-                          ),
-                        ),
-                      ],
+                  if (title.isNotEmpty) ...[
+                    Text(title,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: context.vita.green,
+                        )),
+                    const SizedBox(height: 8),
+                  ],
+                  Text(
+                    type == 'world_visit' ? 'world.visitMemory'.tr : content.tr,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: context.vita.text,
+                      height: 1.55,
                     ),
                   ),
-                  if (!readonly)
-                    IconButton(
-                      onPressed: () => _showActions(context),
-                      icon: const Icon(Icons.more_vert, size: 19),
-                      color: context.vita.subText,
-                      tooltip: 'memories.delete'.tr,
-                      visualDensity: VisualDensity.compact,
-                    ),
                 ],
               ),
             ),
-          ),
-        ],
+            if (!readonly)
+              IconButton(
+                onPressed: () => _showActions(context),
+                icon: const Icon(Icons.more_vert, size: 19),
+                color: context.vita.subText,
+                tooltip: 'memories.delete'.tr,
+                visualDensity: VisualDensity.compact,
+              ),
+          ],
+        ),
       ),
     );
   }
