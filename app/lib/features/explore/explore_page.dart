@@ -13,12 +13,44 @@ class ExploreController extends GetxController {
   static ExploreController get to => Get.find();
 
   final loading = false.obs;
+  final postsLoadFailed = false.obs;
   final posts = <Map<String, dynamic>>[].obs;
+  final storyChapter = RxnInt();
+  final petName = RxnString();
 
   @override
   void onInit() {
     super.onInit();
     loadPosts();
+    loadHighlights();
+  }
+
+  Future<void> loadHighlights() async {
+    try {
+      final data = await ApiClient.instance.get('/v1/stories/');
+      final items = data is Map ? data['items'] : null;
+      if (items is List) {
+        final stories = items.whereType<Map>().toList();
+        storyChapter.value = stories.isEmpty
+            ? null
+            : (stories.first['current_chapter_no'] as num?)?.toInt();
+      }
+    } catch (_) {
+      // The entry remains available when the optional preview cannot load.
+    }
+    try {
+      final data = await ApiClient.instance.get('/v1/ai-pets/breeds');
+      final items = data is Map ? data['items'] : null;
+      if (items is List) {
+        final adopted = items.whereType<Map>().where(
+            (breed) => '${breed['adopted_companion_id'] ?? ''}'.isNotEmpty);
+        petName.value = adopted.isEmpty
+            ? null
+            : '${adopted.first['adopted_companion_name'] ?? adopted.first['name'] ?? ''}';
+      }
+    } catch (_) {
+      // Keep the normal pet entry visible.
+    }
   }
 
   Future<void> loadPosts() async {
@@ -33,8 +65,12 @@ class ExploreController extends GetxController {
               .whereType<Map<String, dynamic>>()
               .map((item) => Map<String, dynamic>.from(item)),
         );
+        postsLoadFailed.value = false;
+      } else {
+        postsLoadFailed.value = true;
       }
     } catch (_) {
+      postsLoadFailed.value = true;
     } finally {
       loading.value = false;
     }
@@ -62,31 +98,44 @@ class ExplorePage extends StatelessWidget {
               child: Text('discover.subtitle'.tr,
                   style: TextStyle(color: vita.subText, fontSize: 13)),
             ),
-            _PlaceCard(
-              icon: Icons.auto_stories_outlined,
-              title: 'storyHub.title'.tr,
-              subtitle: 'discover.stories'.tr,
-              colors: const [Color(0xFF6654A4), Color(0xFFA487BE)],
-              onTap: () => Get.to(() => const StoriesPage(),
-                  transition: Transition.cupertino),
-            ),
-            _PlaceCard(
-              icon: Icons.pets_outlined,
-              title: 'aiPets.title'.tr,
-              subtitle: 'discover.pets'.tr,
-              colors: const [Color(0xFFB26C55), Color(0xFFE8AF85)],
-              onTap: () => Get.to(() => const AIPetsPage(),
-                  transition: Transition.cupertino),
-            ),
+            Obx(() => _PlaceCard(
+                  icon: Icons.auto_stories_outlined,
+                  title: 'storyHub.title'.tr,
+                  subtitle: ExploreController.to.storyChapter.value == null
+                      ? 'discover.stories'.tr
+                      : 'discover.continueStory'.trParams({
+                          'count': '${ExploreController.to.storyChapter.value}'
+                        }),
+                  onTap: () async {
+                    await Get.to(() => const StoriesPage(),
+                        transition: Transition.cupertino);
+                    ExploreController.to.loadHighlights();
+                  },
+                )),
+            Obx(() => _PlaceCard(
+                  icon: Icons.pets_outlined,
+                  title: 'aiPets.title'.tr,
+                  subtitle:
+                      ExploreController.to.petName.value?.isNotEmpty == true
+                          ? 'discover.myPet'.trParams(
+                              {'name': ExploreController.to.petName.value!})
+                          : 'discover.pets'.tr,
+                  onTap: () async {
+                    await Get.to(() => const AIPetsPage(),
+                        transition: Transition.cupertino);
+                    ExploreController.to.loadHighlights();
+                  },
+                )),
             Obx(() {
               final posts = ExploreController.to.posts;
-              final content =
-                  posts.isEmpty ? '' : '${posts.first['content'] ?? ''}'.trim();
+              final content = posts.isEmpty
+                  ? ''
+                  : 'discover.momentCount'
+                      .trParams({'count': '${posts.length}'});
               return _PlaceCard(
                 icon: Icons.camera_alt_outlined,
                 title: 'explore.moments'.tr,
                 subtitle: content.isEmpty ? 'discover.moments'.tr : content,
-                colors: const [Color(0xFF4D8293), Color(0xFF8CB9B6)],
                 onTap: () => Get.to(() => const MomentsPage(),
                     transition: Transition.cupertino),
               );
@@ -103,58 +152,51 @@ class _PlaceCard extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.colors,
     required this.onTap,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
-  final List<Color> colors;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
         child: Material(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(18),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onTap,
             child: Ink(
-              height: 168,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: colors),
-              ),
-              child: Stack(children: [
-                Positioned(
-                  right: -16,
-                  top: -28,
-                  child: Icon(icon,
-                      size: 188, color: Colors.white.withValues(alpha: 0.16)),
-                ),
-                Positioned(
-                  left: 22,
-                  right: 22,
-                  bottom: 22,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 23,
-                              fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 6),
-                      Text(subtitle,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: Color(0xFFF3EEF6), fontSize: 13)),
-                    ],
+              color: context.vita.surface,
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Row(children: [
+                  Icon(icon, size: 30, color: context.vita.text),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title,
+                            style: TextStyle(
+                                color: context.vita.text,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 5),
+                        Text(subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: context.vita.subText, fontSize: 13)),
+                      ],
+                    ),
                   ),
-                ),
-              ]),
+                  const SizedBox(width: 8),
+                  Icon(Icons.chevron_right, color: context.vita.subText),
+                ]),
+              ),
             ),
           ),
         ),
@@ -206,10 +248,26 @@ class _MomentsFeed extends StatelessWidget {
           children: [
             SizedBox(
               height: MediaQuery.sizeOf(context).height * 0.58,
-              child: VitaEmpty(
-                icon: Icons.photo_camera_back_outlined,
-                title: 'explore.empty'.tr,
-                subtitle: 'explore.emptySub'.tr,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  VitaEmpty(
+                    icon: controller.postsLoadFailed.value
+                        ? Icons.wifi_off_outlined
+                        : Icons.photo_camera_back_outlined,
+                    title: controller.postsLoadFailed.value
+                        ? 'common.loadFailed'.tr
+                        : 'explore.empty'.tr,
+                    subtitle: controller.postsLoadFailed.value
+                        ? 'common.pullToRetry'.tr
+                        : 'explore.emptySub'.tr,
+                  ),
+                  if (controller.postsLoadFailed.value)
+                    TextButton(
+                      onPressed: controller.loadPosts,
+                      child: Text('common.retry'.tr),
+                    ),
+                ],
               ),
             ),
           ],

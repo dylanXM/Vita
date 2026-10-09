@@ -243,8 +243,6 @@ class _AIPetHomePageState extends State<AIPetHomePage>
         children: [
           PetStage(
             name: widget.name,
-            species: widget.species,
-            level: level,
             imageUrl: _currentAvatarUrl,
             spriteSheetUrl: _currentSpriteSheetUrl,
             actionSheetUrl: _currentActionSheetUrl,

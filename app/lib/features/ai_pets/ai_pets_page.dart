@@ -6,6 +6,7 @@ import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
+import '../billing/subscription_page.dart';
 import 'ai_pet_avatar.dart';
 import 'ai_pet_desktop_controller.dart';
 import 'ai_pet_home_page.dart';
@@ -19,6 +20,7 @@ class AIPetsPage extends StatefulWidget {
 
 class _AIPetsPageState extends State<AIPetsPage> {
   bool _loading = true;
+  bool _loadFailed = false;
   List<Map<String, dynamic>> _breeds = const [];
 
   @override
@@ -28,11 +30,8 @@ class _AIPetsPageState extends State<AIPetsPage> {
     _load();
   }
 
-  bool _autoJumped = false;
-
   Future<void> _load() async {
     if (mounted) setState(() => _loading = true);
-    var navigatingToPet = false;
     try {
       final data = await ApiClient.instance.get('/v1/ai-pets/breeds');
       final items = data is Map ? data['items'] : null;
@@ -41,36 +40,17 @@ class _AIPetsPageState extends State<AIPetsPage> {
             .whereType<Map>()
             .map((item) => Map<String, dynamic>.from(item))
             .toList();
-        // Keep the loading view visible until the adopted pet replaces this
-        // route. Rendering the breed list first exposes it for one frame.
-        if (!_autoJumped) {
-          for (final breed in breeds) {
-            final adoptedId = '${breed['adopted_companion_id'] ?? ''}';
-            if (adoptedId.isNotEmpty) {
-              _autoJumped = true;
-              navigatingToPet = true;
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (!mounted) return;
-                Get.off(
-                    () => AIPetHomePage(
-                          companionId: adoptedId,
-                          name:
-                              '${breed['adopted_companion_name'] ?? breed['name'] ?? ''}',
-                          avatarUrl: '${breed['avatar_url'] ?? ''}',
-                          species: '${breed['species'] ?? ''}',
-                        ),
-                    transition: Transition.noTransition);
-              });
-              break;
-            }
-          }
-        }
-        if (!navigatingToPet) setState(() => _breeds = breeds);
+        setState(() {
+          _breeds = breeds;
+          _loadFailed = false;
+        });
+      } else if (mounted) {
+        setState(() => _loadFailed = true);
       }
     } catch (_) {
-      // Keep Explore usable when remote pet content is temporarily unavailable.
+      if (mounted) setState(() => _loadFailed = true);
     } finally {
-      if (mounted && !navigatingToPet) setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -87,9 +67,7 @@ class _AIPetsPageState extends State<AIPetsPage> {
       return;
     }
     if (breed['can_adopt'] != true) {
-      Get.snackbar(
-          'subscription.required.title'.tr, 'aiPets.subscriptionRequired'.tr);
-      Get.toNamed('/subscription');
+      await showSubscriptionPrompt('aiPets.subscriptionRequired'.tr);
       return;
     }
     final nameController =
@@ -155,9 +133,7 @@ class _AIPetsPageState extends State<AIPetsPage> {
       await _load();
     } on ApiException catch (error) {
       if (error.action == 'open_subscription') {
-        Get.snackbar(
-            'subscription.required.title'.tr, 'aiPets.subscriptionRequired'.tr);
-        Get.toNamed('/subscription');
+        await showSubscriptionPrompt('aiPets.subscriptionRequired'.tr);
       } else {
         Get.snackbar('aiPets.error'.tr, error.message);
       }
@@ -178,28 +154,96 @@ class _AIPetsPageState extends State<AIPetsPage> {
               itemBuilder: (_, __) => const VitaSkeletonCard(withAvatar: true))
           : RefreshIndicator(
               onRefresh: _load,
-              child: _breeds.isEmpty
-                  ? ListView(children: [
-                      SizedBox(
-                          height: MediaQuery.sizeOf(context).height * .6,
-                          child: VitaEmpty(
-                              icon: Icons.pets_outlined,
-                              title: 'aiPets.empty'.tr,
-                              subtitle: 'aiPets.emptySub'.tr))
-                    ])
-                  : ListView(
-                      padding: const EdgeInsets.only(bottom: 28),
+              child: _loadFailed && _breeds.isEmpty
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       children: [
-                        for (final breed in _breeds)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                            child: _BreedCard(
-                              breed: breed,
-                              onTap: () => _openBreed(breed),
-                            ),
+                        SizedBox(
+                          height: MediaQuery.sizeOf(context).height * .6,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              VitaEmpty(
+                                icon: Icons.wifi_off_outlined,
+                                title: 'common.loadFailed'.tr,
+                                subtitle: 'common.pullToRetry'.tr,
+                              ),
+                              TextButton(
+                                onPressed: _load,
+                                child: Text('common.retry'.tr),
+                              ),
+                            ],
                           ),
+                        ),
                       ],
-                    ),
+                    )
+                  : _breeds.isEmpty
+                      ? ListView(children: [
+                          SizedBox(
+                              height: MediaQuery.sizeOf(context).height * .6,
+                              child: VitaEmpty(
+                                  icon: Icons.pets_outlined,
+                                  title: 'aiPets.empty'.tr,
+                                  subtitle: 'aiPets.emptySub'.tr))
+                        ])
+                      : ListView(
+                          padding: const EdgeInsets.only(bottom: 28),
+                          children: [
+                            if (_loadFailed)
+                              Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: TextButton.icon(
+                                  onPressed: _load,
+                                  icon: const Icon(Icons.refresh),
+                                  label: Text('common.retry'.tr),
+                                ),
+                              ),
+                            if (_breeds.any((breed) =>
+                                '${breed['adopted_companion_id'] ?? ''}'
+                                    .isNotEmpty))
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                                child: Text('aiPets.myPets'.tr,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium),
+                              ),
+                            for (final breed in _breeds.where((breed) =>
+                                '${breed['adopted_companion_id'] ?? ''}'
+                                    .isNotEmpty))
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                                child: _BreedCard(
+                                  breed: breed,
+                                  onTap: () => _openBreed(breed),
+                                ),
+                              ),
+                            if (_breeds.any((breed) =>
+                                '${breed['adopted_companion_id'] ?? ''}'
+                                    .isEmpty))
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                                child: Text('aiPets.discoverPets'.tr,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium),
+                              ),
+                            for (final breed in _breeds.where((breed) =>
+                                '${breed['adopted_companion_id'] ?? ''}'
+                                    .isEmpty))
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                                child: _BreedCard(
+                                  breed: breed,
+                                  onTap: () => _openBreed(breed),
+                                ),
+                              ),
+                          ],
+                        ),
             ),
     );
   }

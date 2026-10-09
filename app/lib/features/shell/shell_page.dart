@@ -30,6 +30,7 @@ class ShellController extends GetxController {
       MemoriesController.to.loadCompanions();
     } else if (i == 2) {
       ExploreController.to.loadPosts();
+      ExploreController.to.loadHighlights();
     }
   }
 }

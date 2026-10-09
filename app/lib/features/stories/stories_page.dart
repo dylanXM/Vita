@@ -199,8 +199,18 @@ class StoriesPage extends StatelessWidget {
                                         fontSize: 12)),
                               ],
                             )),
-                            Icon(Icons.arrow_forward_rounded,
-                                color: context.vita.subText, size: 18),
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.arrow_forward_rounded,
+                                    color: context.vita.subText, size: 18),
+                                const SizedBox(height: 4),
+                                Text('storyHub.continue'.tr,
+                                    style: TextStyle(
+                                        color: context.vita.subText,
+                                        fontSize: 11)),
+                              ],
+                            ),
                           ]),
                         ),
                       ),

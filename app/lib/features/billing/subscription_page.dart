@@ -8,6 +8,26 @@ import '../../core/theme.dart';
 import 'billing_controller.dart';
 import 'billing_products.dart';
 
+Future<void> showSubscriptionPrompt(String reason) async {
+  final openPlans = await Get.dialog<bool>(
+    AlertDialog(
+      title: Text('subscription.required.title'.tr),
+      content: Text('$reason\n\n${'subscription.description'.tr}'),
+      actions: [
+        TextButton(
+          onPressed: () => Get.back(result: false),
+          child: Text('common.cancel'.tr),
+        ),
+        TextButton(
+          onPressed: () => Get.back(result: true),
+          child: Text('subscription.viewPlans'.tr),
+        ),
+      ],
+    ),
+  );
+  if (openPlans == true) await Get.toNamed('/subscription');
+}
+
 class SubscriptionPage extends StatefulWidget {
   const SubscriptionPage({super.key});
 

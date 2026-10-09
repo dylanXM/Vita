@@ -14,13 +14,11 @@ import 'sticker_layer.dart';
 import 'weather_particles.dart';
 
 /// 领养后整页动画舞台：全屏动态背景 + 贴纸层 + 宠物小屋 + 宠物 +
-/// 天气粒子 + 状态特效 + 动画标题栏。整页（含标题）都随世界时钟动起来。
+/// 天气粒子 + 状态特效 + 宠物名称。整页（含标题）都随世界时钟动起来。
 class PetStage extends StatelessWidget {
   const PetStage({
     super.key,
     required this.name,
-    required this.species,
-    required this.level,
     required this.imageUrl,
     required this.spriteSheetUrl,
     required this.actionSheetUrl,
@@ -33,8 +31,6 @@ class PetStage extends StatelessWidget {
   });
 
   final String name;
-  final String species;
-  final int level;
   final String imageUrl;
   final String spriteSheetUrl;
   final String actionSheetUrl;
@@ -145,9 +141,6 @@ class PetStage extends StatelessWidget {
                 top: safeTop + 10,
                 child: PetTitleBar(
                   name: name,
-                  level: level,
-                  species: species,
-                  machine: machine,
                   clock: clock,
                   onBack: onBack,
                 ),

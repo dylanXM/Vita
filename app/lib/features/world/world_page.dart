@@ -7,6 +7,7 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../billing/billing_controller.dart';
+import '../billing/subscription_page.dart';
 import '../chat/chat_list_controller.dart';
 import '../chat/chat_list_presentation.dart';
 import '../chat/chat_page.dart';
@@ -101,11 +102,7 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
 
   Future<void> _createCompanion() async {
     if (!BillingController.to.isSubscribed) {
-      Get.snackbar(
-        'subscription.required.title'.tr,
-        'subscription.required.create'.tr,
-      );
-      await Get.toNamed('/subscription');
+      await showSubscriptionPrompt('subscription.required.create'.tr);
       return;
     }
     await Get.to(() => const CompanionCreateMethodPage(),
