@@ -293,13 +293,17 @@ APP_API_URL         ?= $(APP_API_URL_IOS)
 # Override by exporting PUB_HOSTED_URL / FLUTTER_STORAGE_BASE_URL before make.
 PUB_HOSTED_URL ?= https://pub.flutter-io.cn
 FLUTTER_STORAGE_BASE_URL ?= https://storage.flutter-io.cn
-# GitHub clones (e.g. firebase-ios-sdk pulled by CocoaPods via a git source) go
-# through the machine's local proxy, configured globally in ~/.gitconfig as
-# http.https://github.com.proxy -- nothing project-specific needed here.
+# GitHub clones (e.g. purchases-hybrid-common / RevenueCat pulled by CocoaPods
+# via a git source) go through the machine's local proxy, configured globally in
+# ~/.gitconfig as http.https://github.com.proxy. Because the App recipes isolate
+# HOME to app/.home, that proxy is mirrored into app/.home/.gitconfig by
+# app/scripts/prepare_home.sh -- which skips it when the port is not reachable,
+# so a stopped VPN client no longer breaks `pod install`.
 FLUTTER_ENV = PUB_HOSTED_URL=$(PUB_HOSTED_URL) FLUTTER_STORAGE_BASE_URL=$(FLUTTER_STORAGE_BASE_URL)
 
 app-prepare-dirs:
 	mkdir -p app/build/ios/SourcePackages app/build/macos/SourcePackages app/.cocoapods-local app/.home
+	@app/scripts/prepare_home.sh
 
 app-run: app-prepare-dirs
 	@cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; }
