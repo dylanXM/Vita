@@ -215,9 +215,7 @@ class MomentsPage extends StatelessWidget {
       backgroundColor: context.vita.pageBg,
       appBar: AppBar(
         leading: const VitaBackButton(),
-        centerTitle: true,
-        title: Text('explore.moments'.tr,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+        title: Text('explore.moments'.tr),
       ),
       body: SafeArea(
         bottom: false,
@@ -498,9 +496,7 @@ class _MomentDetailPage extends StatelessWidget {
       backgroundColor: vita.pageBg,
       appBar: AppBar(
         leading: const VitaBackButton(),
-        centerTitle: true,
-        title: Text('explore.moments'.tr,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+        title: Text('explore.moments'.tr),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),

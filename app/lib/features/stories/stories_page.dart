@@ -91,7 +91,28 @@ class StoriesPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: context.vita.pageBg,
       appBar: AppBar(
-          leading: const VitaBackButton(), title: Text('storyHub.title'.tr)),
+        leading: const VitaBackButton(),
+        title: Text('storyHub.title'.tr),
+        actions: [
+          Obx(() {
+            if (activeController.catalog['subscribed'] != true) {
+              return const SizedBox.shrink();
+            }
+            final remaining = activeController
+                    .catalog['custom_backgrounds_remaining'] as int? ??
+                0;
+            return TextButton.icon(
+              onPressed: remaining > 0
+                  ? () => Get.to(() =>
+                      CustomStoryBackgroundPage(controller: activeController))
+                  : null,
+              icon: const Icon(Icons.add, size: 18),
+              label: Text('storyHub.custom'.tr),
+            );
+          }),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: Obx(() {
         final backgrounds = _maps(activeController.catalog['backgrounds']);
         final subscribed = activeController.catalog['subscribed'] == true;
@@ -109,17 +130,7 @@ class StoriesPage extends StatelessWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.only(top: 12, bottom: 32),
             children: [
-              _SectionHeader(
-                  title: 'storyHub.backgrounds'.tr,
-                  action: subscribed
-                      ? TextButton.icon(
-                          onPressed: remaining > 0
-                              ? () => Get.to(() => CustomStoryBackgroundPage(
-                                  controller: activeController))
-                              : null,
-                          icon: const Icon(Icons.add, size: 18),
-                          label: Text('storyHub.custom'.tr))
-                      : null),
+              _SectionHeader(title: 'storyHub.backgrounds'.tr),
               if (subscribed)
                 Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -273,9 +284,8 @@ class StoriesPage extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, this.action});
+  const _SectionHeader({required this.title});
   final String title;
-  final Widget? action;
   @override
   Widget build(BuildContext context) => Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 12, 8),
@@ -283,7 +293,6 @@ class _SectionHeader extends StatelessWidget {
         Expanded(
             child: Text(title,
                 style: TextStyle(color: context.vita.subText, fontSize: 14))),
-        if (action != null) action!
       ]));
 }
 
