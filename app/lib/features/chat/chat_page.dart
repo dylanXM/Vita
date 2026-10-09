@@ -3,11 +3,13 @@ import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants.dart';
 import '../../core/api_client.dart';
@@ -658,6 +660,12 @@ class _ChatMessageBody extends StatelessWidget {
   final String? avatarUrl;
   final ValueChanged<String> onPlayVoice;
 
+  void _openCompanionWorld() {
+    ShellController.to.selectedCompanionId.value = companionId;
+    ShellController.to.switchTo(0);
+    Get.back();
+  }
+
   @override
   Widget build(BuildContext context) {
     final parsed = ChatMessageContent.from(message);
@@ -763,19 +771,18 @@ class _ChatMessageBody extends StatelessWidget {
     }
     if (displayContent.isNotEmpty) {
       if (children.isNotEmpty) children.add(const SizedBox(height: 7));
-      children.add(Text(displayContent,
+      children.add(_LinkedMessageText(displayContent,
           style: TextStyle(
               fontSize: type == 'voice' ? 13 : 16,
               color: type == 'voice' ? context.vita.subText : context.vita.text,
               height: 1.4)));
     }
-    if (type == 'life_card') {
+    if (type == 'life_card' ||
+        (type == 'image_text' &&
+            (payload['event_location'] as String? ?? '').isNotEmpty)) {
       if (children.isNotEmpty) children.add(const SizedBox(height: 8));
       children.add(InkWell(
-        onTap: () {
-          Get.back();
-          ShellController.to.switchTo(1);
-        },
+        onTap: _openCompanionWorld,
         borderRadius: BorderRadius.circular(6),
         child: Container(
           padding: const EdgeInsets.all(10),
@@ -807,6 +814,72 @@ class _ChatMessageBody extends StatelessWidget {
     }
     return Column(
         crossAxisAlignment: CrossAxisAlignment.start, children: children);
+  }
+}
+
+class _LinkedMessageText extends StatefulWidget {
+  const _LinkedMessageText(this.text, {required this.style});
+
+  final String text;
+  final TextStyle style;
+
+  @override
+  State<_LinkedMessageText> createState() => _LinkedMessageTextState();
+}
+
+class _LinkedMessageTextState extends State<_LinkedMessageText> {
+  static final _urlPattern = RegExp(r'https?://[^\s<>]+', caseSensitive: false);
+  final _recognizers = <String, TapGestureRecognizer>{};
+
+  @override
+  void dispose() {
+    for (final recognizer in _recognizers.values) {
+      recognizer.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final spans = <InlineSpan>[];
+    var offset = 0;
+    for (final match in _urlPattern.allMatches(widget.text)) {
+      var end = match.end;
+      while (
+          end > match.start && '.,!?;:，。！？；：'.contains(widget.text[end - 1])) {
+        end--;
+      }
+      if (end == match.start) continue;
+      if (match.start > offset) {
+        spans.add(TextSpan(text: widget.text.substring(offset, match.start)));
+      }
+      final url = widget.text.substring(match.start, end);
+      final uri = Uri.tryParse(url);
+      if (uri != null && uri.host.isNotEmpty) {
+        final recognizer = _recognizers.putIfAbsent(
+            url,
+            () => TapGestureRecognizer()
+              ..onTap = () async {
+                if (!await launchUrl(uri,
+                    mode: LaunchMode.externalApplication)) {
+                  Get.snackbar('experience.failed'.tr, url);
+                }
+              });
+        spans.add(TextSpan(
+            text: url,
+            style: TextStyle(
+                color: context.vita.green,
+                decoration: TextDecoration.underline),
+            recognizer: recognizer));
+      } else {
+        spans.add(TextSpan(text: url));
+      }
+      offset = end;
+    }
+    if (offset < widget.text.length) {
+      spans.add(TextSpan(text: widget.text.substring(offset)));
+    }
+    return Text.rich(TextSpan(children: spans), style: widget.style);
   }
 }
 
