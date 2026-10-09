@@ -44,7 +44,7 @@ export function CompanionDetailPage() {
     if (!detail.data) return;
     const value = detail.data;
     setForm({
-      user_id: value.user_id, name: value.name, gender: value.gender, persona: value.persona,
+      user_id: value.user_id, avatar_url: value.avatar_url, name: value.name, gender: value.gender, persona: value.persona,
       city: value.city, occupation: value.occupation, interests: value.interests,
       relationship_stage: value.relationship_stage, personality_tags: value.personality_tags,
       speaking_style: value.speaking_style, likes: value.likes, dislikes: value.dislikes,
