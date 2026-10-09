@@ -20,12 +20,13 @@ class PetStage extends StatelessWidget {
     super.key,
     required this.name,
     required this.imageUrl,
-    required this.spriteSheetUrl,
-    required this.actionSheetUrl,
+    this.spriteSheetUrl = '',
+    this.actionSheetUrl = '',
     required this.machine,
     required this.clock,
     required this.weather,
     required this.onTap,
+    required this.onLook,
     required this.onBack,
     this.speech,
   });
@@ -38,6 +39,7 @@ class PetStage extends StatelessWidget {
   final WorldClock clock;
   final Weather weather;
   final VoidCallback onTap;
+  final ValueChanged<Offset> onLook;
   final VoidCallback onBack;
   final String? speech;
 
@@ -90,17 +92,29 @@ class PetStage extends StatelessWidget {
                 right: 0,
                 bottom: 56,
                 height: 360,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final size =
-                            math.min(constraints.maxWidth * .72, 280.0);
-                        return Center(
+                child: LayoutBuilder(builder: (context, constraints) {
+                  final size = math.min(constraints.maxWidth * .72, 280.0);
+                  final availableTravel =
+                      math.max(0.0, (constraints.maxWidth - size) / 2 - 12);
+                  final walking = machine.weightFor(PetState.walking);
+                  final travel = math.min(availableTravel, 62.0) *
+                      walking *
+                      math.sin(worldTime * math.pi * 2 * 10);
+                  return Transform.translate(
+                    offset: Offset(travel, 0),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Center(
                           child: GestureDetector(
                             behavior: HitTestBehavior.opaque,
                             onTap: onTap,
+                            onPanUpdate: (details) => onLook(Offset(
+                              (details.localPosition.dx / size - .5) * 2,
+                              (details.localPosition.dy / size - .5) * 2,
+                            )),
+                            onPanEnd: (_) => onLook(Offset.zero),
+                            onPanCancel: () => onLook(Offset.zero),
                             child: PetRenderer(
                               name: name,
                               imageUrl: imageUrl,
@@ -111,19 +125,18 @@ class PetStage extends StatelessWidget {
                               size: size,
                             ),
                           ),
-                        );
-                      },
+                        ),
+                        IgnorePointer(
+                          child: PetFxLayer(
+                            machine: machine,
+                            worldTime: worldTime,
+                            speech: speech,
+                          ),
+                        ),
+                      ],
                     ),
-                    IgnorePointer(
-                      child: PetFxLayer(
-                        machine: machine,
-                        worldTime: worldTime,
-                        poseSheet: spriteSheetUrl.isNotEmpty,
-                        speech: speech,
-                      ),
-                    ),
-                  ],
-                ),
+                  );
+                }),
               ),
               // 5. 天气粒子。
               Positioned.fill(

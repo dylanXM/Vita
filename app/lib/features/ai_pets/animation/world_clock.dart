@@ -12,6 +12,7 @@ class WorldClock extends ChangeNotifier {
   static const Duration _cycle = Duration(seconds: 60);
   late final Ticker _ticker;
   Duration _elapsed = Duration.zero;
+  Duration _elapsedBeforeResume = Duration.zero;
 
   /// 0..1 循环时间，驱动云漂移、星星闪烁、粒子等。
   double get worldTime =>
@@ -24,13 +25,20 @@ class WorldClock extends ChangeNotifier {
   }
 
   void _onTick(Duration elapsed) {
-    _elapsed = elapsed;
+    _elapsed = _elapsedBeforeResume + elapsed;
     notifyListeners();
   }
 
-  void pause() => _ticker.stop();
+  void pause() {
+    if (_ticker.isActive) {
+      _ticker.stop();
+      _elapsedBeforeResume = _elapsed;
+    }
+  }
 
-  void resume() => _ticker.start();
+  void resume() {
+    if (!_ticker.isActive) _ticker.start();
+  }
 
   @override
   void dispose() {

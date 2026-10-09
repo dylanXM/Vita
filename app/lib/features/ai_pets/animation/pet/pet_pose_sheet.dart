@@ -1,15 +1,17 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flame/components.dart' show Vector2;
+import 'package:flame/sprite.dart';
+import 'package:flame/widgets.dart';
 import 'package:flutter/material.dart';
 
 import '../../ai_pet_avatar.dart';
 import 'pet_motion_spec.dart';
 import 'pet_state_machine.dart';
 
-/// Six full-body poses in reading order: stand, sit, walk / eat, drink, sleep.
-/// A missing or invalid sheet falls back to the unwarped pet portrait.
+/// Flame displays authored pet poses; the portrait is never warped into a
+/// silhouette that the artwork does not contain.
 class PetPoseSheet extends StatefulWidget {
   const PetPoseSheet({
     super.key,
@@ -18,7 +20,6 @@ class PetPoseSheet extends StatefulWidget {
     required this.sheetUrl,
     required this.actionSheetUrl,
     required this.machine,
-    required this.worldTime,
   });
 
   final String name;
@@ -26,220 +27,145 @@ class PetPoseSheet extends StatefulWidget {
   final String sheetUrl;
   final String actionSheetUrl;
   final PetStateMachine machine;
-  final double worldTime;
 
   @override
   State<PetPoseSheet> createState() => _PetPoseSheetState();
 }
 
 class _PetPoseSheetState extends State<PetPoseSheet> {
-  ui.Image? _image;
-  ui.Image? _actions;
-  bool _failed = false;
+  Map<PetState, Sprite>? _poses;
+  Map<PetState, SpriteAnimation>? _actions;
+  Map<PetState, SpriteAnimationTicker>? _actionTickers;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
     super.initState();
     _load();
-    _loadActions();
   }
 
   @override
   void didUpdateWidget(PetPoseSheet oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.sheetUrl != widget.sheetUrl) _load();
-    if (oldWidget.actionSheetUrl != widget.actionSheetUrl) _loadActions();
+    if (oldWidget.sheetUrl != widget.sheetUrl ||
+        oldWidget.actionSheetUrl != widget.actionSheetUrl) {
+      _load();
+    }
   }
 
   Future<void> _load() async {
-    final url = widget.sheetUrl;
-    _image = null;
-    _failed = false;
+    final generation = ++_loadGeneration;
+    setState(() {
+      _poses = null;
+      _actions = null;
+      _actionTickers = null;
+    });
+    final image = await _loadImage(widget.sheetUrl);
+    if (!mounted || generation != _loadGeneration) return;
+    if (image == null || !_validSheet(image)) return;
+    final poses = <PetState, Sprite>{
+      PetState.standing: _cell(image, 0),
+      PetState.sitting: _cell(image, 1),
+      PetState.walking: _cell(image, 2),
+      PetState.feeding: _cell(image, 3),
+      PetState.drinking: _cell(image, 4),
+      PetState.sleeping: _cell(image, 5),
+    };
+    setState(() => _poses = poses);
+
+    final actionImage = await _loadImage(widget.actionSheetUrl);
+    if (!mounted || generation != _loadGeneration) return;
+    if (actionImage == null || !_validSheet(actionImage)) return;
+    final frames = List.generate(6, (index) => _cell(actionImage, index));
+    final animations = <PetState, SpriteAnimation>{
+      PetState.walking: SpriteAnimation.spriteList(
+        [frames[0], frames[1], frames[2], frames[1]],
+        stepTime: .24,
+      ),
+      PetState.feeding: SpriteAnimation.spriteList(
+        [frames[3], frames[4], frames[4], frames[3]],
+        stepTime: .34,
+      ),
+      PetState.drinking: SpriteAnimation.spriteList(
+        [poses[PetState.drinking]!, frames[5], frames[5]],
+        stepTime: .38,
+      ),
+    };
+    setState(() {
+      _actions = animations;
+      _actionTickers = animations.map(
+        (state, animation) => MapEntry(state, animation.createTicker()),
+      );
+    });
+  }
+
+  bool _validSheet(ui.Image image) =>
+      image.width >= 3 &&
+      image.height >= 2 &&
+      (image.width / image.height - 1.5).abs() < .02;
+
+  Sprite _cell(ui.Image image, int index) {
+    final width = image.width / 3.0;
+    final height = image.height / 2.0;
+    return Sprite(
+      image,
+      srcPosition: Vector2((index % 3) * width, (index ~/ 3) * height),
+      srcSize: Vector2(width, height),
+    );
+  }
+
+  Future<ui.Image?> _loadImage(String url) async {
     final ImageProvider provider;
     if (url.startsWith('asset://')) {
       provider = AssetImage(url.substring('asset://'.length));
     } else if (url.startsWith('https://') || url.startsWith('http://')) {
       provider = NetworkImage(url);
     } else {
-      _failed = true;
-      return;
+      return null;
     }
-    try {
-      final image = await _resolve(provider);
-      if (!mounted || url != widget.sheetUrl) return;
-      setState(() {
-        _image = image;
-        _failed = image.width < 3 ||
-            image.height < 2 ||
-            (image.width / image.height - 1.5).abs() > .02;
-      });
-    } catch (_) {
-      if (mounted && url == widget.sheetUrl) setState(() => _failed = true);
-    }
-  }
-
-  Future<void> _loadActions() async {
-    final url = widget.actionSheetUrl;
-    _actions = null;
-    if (url.isEmpty) return;
-    final ImageProvider provider;
-    if (url.startsWith('asset://')) {
-      provider = AssetImage(url.substring('asset://'.length));
-    } else if (url.startsWith('https://') || url.startsWith('http://')) {
-      provider = NetworkImage(url);
-    } else {
-      return;
-    }
-    try {
-      final image = await _resolve(provider);
-      if (!mounted || url != widget.actionSheetUrl) return;
-      if (image.width >= 3 &&
-          image.height >= 2 &&
-          (image.width / image.height - 1.5).abs() <= .02) {
-        setState(() => _actions = image);
-      }
-    } catch (_) {
-      // The six-pose sheet remains usable if the loop sheet cannot load.
-    }
-  }
-
-  Future<ui.Image> _resolve(ImageProvider provider) {
     final stream = provider.resolve(ImageConfiguration.empty);
-    final completer = Completer<ui.Image>();
+    final completer = Completer<ui.Image?>();
     late final ImageStreamListener listener;
     listener = ImageStreamListener((info, _) {
       if (!completer.isCompleted) completer.complete(info.image);
       stream.removeListener(listener);
-    }, onError: (error, stack) {
-      if (!completer.isCompleted) completer.completeError(error, stack);
+    }, onError: (_, __) {
+      if (!completer.isCompleted) completer.complete(null);
       stream.removeListener(listener);
     });
     stream.addListener(listener);
     return completer.future;
   }
 
+  PetState _displayState() {
+    // Two complete silhouettes cannot be blended without drawing two pets.
+    var state = PetState.standing;
+    var weight = -1.0;
+    for (final entry in widget.machine.stateWeights.entries) {
+      if (entry.value > weight) {
+        state = entry.key;
+        weight = entry.value;
+      }
+    }
+    return state;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final image = _image;
-    if (image == null || _failed) {
+    final poses = _poses;
+    if (poses == null) {
       return AIPetAvatar(name: widget.name, imageUrl: widget.avatarUrl);
     }
-    return CustomPaint(
-      painter: _PoseSheetPainter(
-        image: image,
-        actions: _actions,
-        weights: widget.machine.stateWeights,
-        worldTime: widget.worldTime,
-        actionSeconds: widget.machine.stateElapsed.inMilliseconds / 1000,
-      ),
-      child: const SizedBox.expand(),
-    );
-  }
-}
-
-class _PoseSheetPainter extends CustomPainter {
-  _PoseSheetPainter({
-    required this.image,
-    required this.actions,
-    required this.weights,
-    required this.worldTime,
-    required this.actionSeconds,
-  });
-
-  final ui.Image image;
-  final ui.Image? actions;
-  final Map<PetState, double> weights;
-  final double worldTime;
-  final double actionSeconds;
-
-  int _cellFor(PetState state) => switch (state) {
-        PetState.sitting => 1,
-        PetState.walking => 2,
-        PetState.feeding => 3,
-        PetState.drinking => 4,
-        PetState.sleeping => 5,
-        _ => 0,
-      };
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final edge = math.min(size.width, size.height);
-    final dest = Rect.fromLTWH(
-      (size.width - edge) / 2,
-      (size.height - edge) / 2,
-      edge,
-      edge,
-    );
-    // A pose sheet contains complete silhouettes, not layers of one rig.
-    // Blending two cells draws both bodies and makes a visible double image.
-    // Select one authored silhouette per frame; the state machine still blends
-    // position, effects and other scene motion independently.
-    var state = PetState.standing;
-    var strongest = -1.0;
-    for (final entry in weights.entries) {
-      if (entry.value > strongest) {
-        strongest = entry.value;
-        state = entry.key;
-      }
+    final state = _displayState();
+    final animation = _actions?[state];
+    if (animation != null) {
+      return SpriteAnimationWidget(
+        key: ValueKey('${widget.sheetUrl}:${widget.actionSheetUrl}:$state'),
+        animation: animation,
+        animationTicker: _actionTickers![state]!,
+        playing: !widget.machine.reducedMotion,
+      );
     }
-
-    final actionImage = actions;
-    if (actionImage != null) {
-      if (state == PetState.walking) {
-        // A return stroke prevents the third drawing from jumping straight
-        // back to the first drawing at the end of every stride.
-        const stride = [0, 1, 2, 1];
-        final frame = stride[(actionSeconds * 4).floor() % stride.length];
-        _drawCell(canvas, actionImage, frame, dest);
-        return;
-      }
-      if (state == PetState.feeding) {
-        // Spend more time at the bowl than in the head-lowered drawing.
-        const bites = [3, 4, 4, 3];
-        _drawCell(
-            canvas, actionImage, bites[(actionSeconds * 2).floor() % 4], dest);
-        return;
-      }
-      if (state == PetState.drinking) {
-        final lowered = (actionSeconds * 2).floor() % 4 >= 1;
-        _drawCell(canvas, lowered ? actionImage : image, lowered ? 5 : 4, dest);
-        return;
-      }
-    }
-    final breath = state == PetState.sleeping ? .007 : .004;
-    final rise = breath * edge * math.sin(worldTime * math.pi * 2 * 12);
-    _drawCell(canvas, image, _cellFor(state), dest.shift(Offset(0, rise)));
-  }
-
-  void _drawCell(Canvas canvas, ui.Image sheet, int index, Rect dest) {
-    final cellWidth = sheet.width / 3.0;
-    final cellHeight = sheet.height / 2.0;
-    canvas.drawImageRect(
-      sheet,
-      Rect.fromLTWH(
-        (index % 3) * cellWidth,
-        (index ~/ 3) * cellHeight,
-        cellWidth,
-        cellHeight,
-      ),
-      dest,
-      Paint()..filterQuality = FilterQuality.medium,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _PoseSheetPainter oldDelegate) =>
-      oldDelegate.image != image ||
-      oldDelegate.actions != actions ||
-      oldDelegate.worldTime != worldTime ||
-      oldDelegate.actionSeconds != actionSeconds ||
-      !_sameWeights(oldDelegate.weights, weights);
-
-  bool _sameWeights(Map<PetState, double> a, Map<PetState, double> b) {
-    if (a.length != b.length) return false;
-    for (final entry in a.entries) {
-      if (b[entry.key] != entry.value) return false;
-    }
-    return true;
+    return SpriteWidget(sprite: poses[state] ?? poses[PetState.standing]!);
   }
 }

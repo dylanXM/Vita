@@ -15,18 +15,27 @@ class PetStateMachine extends ChangeNotifier {
       : _blend = AnimationController(
           vsync: vsync,
           duration: transitionDuration,
+        ),
+        _lookBlend = AnimationController(
+          vsync: vsync,
+          duration: const Duration(milliseconds: 180),
         ) {
     _blend.addListener(notifyListeners);
+    _lookBlend.addListener(notifyListeners);
   }
 
   /// 状态过渡混合：0 → 1，驱动新旧姿态插值。
   final AnimationController _blend;
+  final AnimationController _lookBlend;
+  Offset _lookFrom = Offset.zero;
+  Offset _lookTo = Offset.zero;
 
   PetState _state = PetState.standing;
   DateTime _stateChangedAt = DateTime.now();
   Map<PetState, double> _fromWeights = {PetState.standing: 1};
   bool needsSleep = false;
   bool needsFood = false;
+  bool needsWater = false;
   bool needsRest = false;
   bool needsCare = false;
   bool _reducedMotion = false;
@@ -35,6 +44,26 @@ class PetStateMachine extends ChangeNotifier {
   PetState get state => _state;
   Duration get stateElapsed => DateTime.now().difference(_stateChangedAt);
   bool get isActionActive => _actionTimer?.isActive == true;
+  Offset get look => Offset.lerp(
+        _lookFrom,
+        _lookTo,
+        Curves.easeOutCubic.transform(_lookBlend.value),
+      )!;
+
+  void lookAt(Offset target) {
+    final clamped = Offset(
+      target.dx.clamp(-1.0, 1.0),
+      target.dy.clamp(-1.0, 1.0),
+    );
+    if (clamped == _lookTo) return;
+    _lookFrom = look;
+    _lookTo = clamped;
+    if (reducedMotion) {
+      _lookBlend.value = 1;
+    } else {
+      _lookBlend.forward(from: 0);
+    }
+  }
 
   bool get reducedMotion => _reducedMotion;
   set reducedMotion(bool value) {
@@ -42,6 +71,7 @@ class PetStateMachine extends ChangeNotifier {
     _reducedMotion = value;
     if (value) {
       _blend.value = 1;
+      _lookBlend.value = 1;
     }
     notifyListeners();
   }
@@ -64,15 +94,14 @@ class PetStateMachine extends ChangeNotifier {
 
   double weightFor(PetState state) => stateWeights[state] ?? 0;
 
-  PetState get _fallback => needsSleep
-      ? PetState.sleeping
-      : needsFood
-          ? PetState.hungry
-          : needsCare
-              ? PetState.sick
-              : needsRest
-                  ? PetState.tired
-                  : PetState.standing;
+  PetState get _fallback {
+    if (needsSleep) return PetState.sleeping;
+    if (needsFood) return PetState.hungry;
+    if (needsWater) return PetState.sick;
+    if (needsCare) return PetState.sick;
+    if (needsRest) return PetState.tired;
+    return PetState.standing;
+  }
 
   /// 依据服务器数值得出建议状态：
   /// energy<20 → sleeping；hunger<30 → hungry；happiness<30 → sick；
@@ -80,10 +109,16 @@ class PetStateMachine extends ChangeNotifier {
   PetState suggestFromState(Map<String, dynamic> state) {
     final energy = (state['energy'] as num?)?.toInt() ?? 100;
     final hunger = (state['hunger'] as num?)?.toInt() ?? 100;
+    final hydration = (state['hydration'] as num?)?.toInt() ?? 100;
     final happiness = (state['happiness'] as num?)?.toInt() ?? 100;
-    updateVitals(energy: energy, hunger: hunger, happiness: happiness);
+    updateVitals(
+        energy: energy,
+        hunger: hunger,
+        hydration: hydration,
+        happiness: happiness);
     if (needsSleep) return PetState.sleeping;
     if (needsFood) return PetState.hungry;
+    if (needsWater) return PetState.sick;
     if (happiness < 30) return PetState.sick;
     if (needsRest) return PetState.tired;
     return PetState.standing;
@@ -92,9 +127,13 @@ class PetStateMachine extends ChangeNotifier {
   /// 刷新生命数值：同步「困 / 饿 / 要睡觉」标志。
   /// 状态切换由调用方根据 [suggestFromState] 驱动。
   void updateVitals(
-      {required int energy, required int hunger, required int happiness}) {
+      {required int energy,
+      required int hunger,
+      required int hydration,
+      required int happiness}) {
     needsSleep = energy < 20;
     needsFood = hunger < 30;
+    needsWater = hydration < 30;
     needsRest = energy < 50;
     needsCare = happiness < 30;
   }
@@ -146,6 +185,7 @@ class PetStateMachine extends ChangeNotifier {
   void dispose() {
     _actionTimer?.cancel();
     _blend.dispose();
+    _lookBlend.dispose();
     super.dispose();
   }
 }

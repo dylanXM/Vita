@@ -176,6 +176,58 @@ const Map<PetState, MeshPose> kMeshPoseTable = {
 const int kMeshRows = 7; // v 方向控制点
 const int kMeshCols = 5; // u 方向控制点
 
+/// Landmarks for the artwork used by the continuous mesh animation.
+class PetRigProfile {
+  const PetRigProfile({
+    this.neckY = .34,
+    this.headFadeStart = .30,
+    this.headFadeEnd = .50,
+    this.tailOnLeft = false,
+    this.tailTop = .28,
+    this.tailBottom = .84,
+  });
+
+  final double neckY;
+  final double headFadeStart;
+  final double headFadeEnd;
+  final bool tailOnLeft;
+  final double tailTop;
+  final double tailBottom;
+
+  static PetRigProfile forArtwork(String imageUrl) {
+    if (imageUrl.contains('dog_corgi.png')) {
+      return const PetRigProfile(
+        neckY: .52,
+        headFadeStart: .44,
+        headFadeEnd: .65,
+        tailOnLeft: true,
+        tailTop: .35,
+        tailBottom: .72,
+      );
+    }
+    if (imageUrl.contains('dog_shiba.png')) {
+      return const PetRigProfile(
+        neckY: .44,
+        headFadeStart: .37,
+        headFadeEnd: .58,
+        tailOnLeft: true,
+        tailTop: .24,
+        tailBottom: .63,
+      );
+    }
+    if (imageUrl.contains('dog_retriever.png')) {
+      return const PetRigProfile(
+        neckY: .40,
+        headFadeStart: .34,
+        headFadeEnd: .54,
+        tailTop: .24,
+        tailBottom: .72,
+      );
+    }
+    return const PetRigProfile();
+  }
+}
+
 double _smoothstep(double a, double b, double x) {
   final t = ((x - a) / (b - a)).clamp(0.0, 1.0);
   return t * t * (3 - 2 * t);
@@ -192,12 +244,16 @@ class MeshBonePet extends StatefulWidget {
     super.key,
     required this.imageProvider,
     this.closedEyeProvider,
+    this.fallback,
+    this.rig = const PetRigProfile(),
     required this.machine,
     required this.worldTime,
   });
 
   final ImageProvider imageProvider;
   final ImageProvider? closedEyeProvider;
+  final Widget? fallback;
+  final PetRigProfile rig;
   final PetStateMachine machine;
   final double worldTime;
 
@@ -222,6 +278,8 @@ class _MeshBonePetState extends State<MeshBonePet> {
     if (oldWidget.imageProvider != widget.imageProvider ||
         oldWidget.closedEyeProvider != widget.closedEyeProvider) {
       _failed = false;
+      _image = null;
+      _closedEye = null;
       _load();
     }
   }
@@ -241,7 +299,9 @@ class _MeshBonePetState extends State<MeshBonePet> {
       }
       if (!mounted ||
           widget.imageProvider != imageProvider ||
-          widget.closedEyeProvider != closedEyeProvider) return;
+          widget.closedEyeProvider != closedEyeProvider) {
+        return;
+      }
       setState(() {
         _image = img;
         _closedEye = close;
@@ -308,7 +368,7 @@ class _MeshBonePetState extends State<MeshBonePet> {
     final image = _image;
     if (image == null) {
       return _failed
-          ? const SizedBox.shrink()
+          ? widget.fallback ?? const SizedBox.shrink()
           : Center(
               child: SizedBox(
                 width: 26,
@@ -334,6 +394,13 @@ class _MeshBonePetState extends State<MeshBonePet> {
       final cycle = (widget.worldTime * cyclesPerMinute) % 1;
       pose = pose + _poseFor(entry.key, cycle).scaled(entry.value);
     }
+    final look = widget.machine.look;
+    pose = pose +
+        MeshPose(
+          headDx: look.dx * .035,
+          headDy: look.dy * .02,
+          headRot: look.dx * .045,
+        );
     final sleepWeight = weights[PetState.sleeping] ?? 0;
     final feedWeight = weights[PetState.feeding] ?? 0;
     final blink = sleepWeight +
@@ -348,8 +415,8 @@ class _MeshBonePetState extends State<MeshBonePet> {
             image: image,
             closedEye: _closedEye,
             blink: blink,
-            sleepWeight: sleepWeight,
             pose: pose,
+            rig: widget.rig,
             phase: phase,
             width: cw,
             height: ch,
@@ -361,13 +428,14 @@ class _MeshBonePetState extends State<MeshBonePet> {
 }
 
 /// 网格顶点 (u, v) 在当前姿态下的位移（归一化，乘图尺寸得像素）。
-Offset offsetAt(MeshPose pose, double u, double v, double phase) {
+Offset offsetAt(MeshPose pose, double u, double v, double phase,
+    {PetRigProfile rig = const PetRigProfile()}) {
   double dx = 0, dy = 0;
 
   // ---- 头带：绕颈点 (0.5, 0.34) 旋转 + 平移 ----
-  final headW = 1 - _smoothstep(.30, .50, v);
+  final headW = 1 - _smoothstep(rig.headFadeStart, rig.headFadeEnd, v);
   if (headW > 0) {
-    final vv = (v - .34) * headW;
+    final vv = (v - rig.neckY) * headW;
     final uu = (u - .5) * headW;
     final ca = math.cos(pose.headRot);
     final sa = math.sin(pose.headRot);
@@ -398,11 +466,14 @@ Offset offsetAt(MeshPose pose, double u, double v, double phase) {
   }
 
   // ---- 尾巴：侧向摆动 ----
-  final tailW = _smoothstep(.60, .74, u) *
-      _smoothstep(.28, .44, v) *
-      (1 - _smoothstep(.70, .84, v));
+  final tailX =
+      rig.tailOnLeft ? 1 - _smoothstep(.26, .43, u) : _smoothstep(.60, .74, u);
+  final tailW = tailX *
+      _smoothstep(rig.tailTop, rig.tailTop + .14, v) *
+      (1 - _smoothstep(rig.tailBottom - .14, rig.tailBottom, v));
   if (tailW > 0) {
-    dx += tailW * pose.tailSwing * math.sin(phase * 2) * (u - .55) * 3;
+    final lever = rig.tailOnLeft ? (.45 - u) : (u - .55);
+    dx += tailW * pose.tailSwing * math.sin(phase * 2) * lever * 3;
     dy += tailW * pose.tailSwing * math.cos(phase * 2) * .06;
   }
 
@@ -415,8 +486,8 @@ class _MeshPainter extends CustomPainter {
     required this.image,
     required this.closedEye,
     required this.blink,
-    required this.sleepWeight,
     required this.pose,
+    required this.rig,
     required this.phase,
     required this.width,
     required this.height,
@@ -425,8 +496,8 @@ class _MeshPainter extends CustomPainter {
   final ui.Image image;
   final ui.Image? closedEye;
   final double blink;
-  final double sleepWeight;
   final MeshPose pose;
+  final PetRigProfile rig;
   final double phase;
   final double width;
   final double height;
@@ -442,29 +513,6 @@ class _MeshPainter extends CustomPainter {
     final ox = (width - iw * scale) / 2;
     final oy = (height - ih * scale) / 2;
 
-    // 睡眠时始终铺出完整轮廓；过渡期间与网格姿态交叉淡化。
-    // 原图和闭眼图尺寸相同，使用完整图避免四肢在蜷缩网格中消失。
-    if (sleepWeight > 0) {
-      final fullImage = closedEye ?? image;
-      final fullPaint = Paint()
-        ..color = const Color(0xFFFFFFFF)
-            .withValues(alpha: sleepWeight.clamp(0.0, 1.0));
-      final breath = 1 - .015 * (1 + math.sin(phase)) / 2;
-      canvas.save();
-      canvas.translate(0, oy + ih * scale);
-      canvas.scale(1, breath);
-      canvas.translate(0, -(oy + ih * scale));
-      canvas.drawImageRect(
-        fullImage,
-        Rect.fromLTWH(0, 0, iw, ih),
-        Rect.fromLTWH(ox, oy, iw * scale, ih * scale),
-        fullPaint,
-      );
-      canvas.restore();
-    }
-    final meshOpacity = (1 - sleepWeight).clamp(0.0, 1.0);
-    if (meshOpacity == 0) return;
-
     // 源网格顶点（图像像素坐标）与目标网格顶点（画布坐标）。
     final src = List.generate(
       kMeshRows * kMeshCols,
@@ -479,7 +527,7 @@ class _MeshPainter extends CustomPainter {
       for (var c = 0; c < kMeshCols; c++) {
         final u = c / (kMeshCols - 1);
         final v = r / (kMeshRows - 1);
-        final off = offsetAt(pose, u, v, phase);
+        final off = offsetAt(pose, u, v, phase, rig: rig);
         dst[r * kMeshCols + c] = Offset(
           ox + u * iw * scale + off.dx * iw * scale,
           oy + v * ih * scale + off.dy * ih * scale,
@@ -493,10 +541,10 @@ class _MeshPainter extends CustomPainter {
         final i1 = i0 + 1;
         final i2 = (r + 1) * kMeshCols + c;
         final i3 = i2 + 1;
-        _drawTri(canvas, src[i0], src[i1], src[i2], dst[i0], dst[i1], dst[i2],
-            meshOpacity);
-        _drawTri(canvas, src[i1], src[i3], src[i2], dst[i1], dst[i3], dst[i2],
-            meshOpacity);
+        _drawTri(
+            canvas, src[i0], src[i1], src[i2], dst[i0], dst[i1], dst[i2], 1);
+        _drawTri(
+            canvas, src[i1], src[i3], src[i2], dst[i1], dst[i3], dst[i2], 1);
       }
     }
   }

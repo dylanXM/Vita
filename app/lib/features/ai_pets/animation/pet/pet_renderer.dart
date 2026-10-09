@@ -4,8 +4,8 @@ import '../../ai_pet_avatar.dart';
 import 'pet_pose_sheet.dart';
 import 'pet_state_machine.dart';
 
-/// Full-body authored poses replace the generic whole-image mesh deformation.
-/// A legacy pet without a sheet keeps its original portrait intact.
+/// Flame renders authored poses and action frames when available. Pets without
+/// sheets keep their original portrait instead of receiving a distorted pose.
 class PetRenderer extends StatelessWidget {
   const PetRenderer({
     super.key,
@@ -27,18 +27,31 @@ class PetRenderer extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-        width: size,
-        height: size,
-        child: spriteSheetUrl.isEmpty
-            ? AIPetAvatar(name: name, imageUrl: imageUrl)
-            : PetPoseSheet(
+  Widget build(BuildContext context) {
+    final sheet = spriteSheetUrl.isNotEmpty
+        ? spriteSheetUrl
+        : (aiPetPoseSheetAssetPath(imageUrl) == null
+            ? ''
+            : 'asset://${aiPetPoseSheetAssetPath(imageUrl)}');
+    final actions = actionSheetUrl.isNotEmpty
+        ? actionSheetUrl
+        : (aiPetActionSheetAssetPath(imageUrl) == null
+            ? ''
+            : 'asset://${aiPetActionSheetAssetPath(imageUrl)}');
+    return SizedBox(
+      width: size,
+      height: size,
+      child: sheet.isEmpty
+          ? AIPetAvatar(name: name, imageUrl: imageUrl)
+          : RepaintBoundary(
+              child: PetPoseSheet(
                 name: name,
                 avatarUrl: imageUrl,
-                sheetUrl: spriteSheetUrl,
-                actionSheetUrl: actionSheetUrl,
+                sheetUrl: sheet,
+                actionSheetUrl: actions,
                 machine: machine,
-                worldTime: worldTime,
               ),
-      );
+            ),
+    );
+  }
 }

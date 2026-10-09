@@ -219,6 +219,7 @@ func main() {
 			aiPets.POST("/adopt", handler.AdoptAIPet)
 			aiPets.GET("/:id/state", handler.GetAIPetState)
 			aiPets.POST("/:id/feed", handler.FeedAIPet)
+			aiPets.POST("/:id/care", handler.CareForAIPet)
 		}
 		stories := api.Group("/stories", middleware.RequireAuth())
 		{

@@ -109,11 +109,11 @@ func saveAIPetBreed(c *gin.Context, id string, create bool) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "pet avatar must be an HTTP(S) image URL or bundled asset"})
 		return
 	}
-	if !validArtworkURL(input.SpriteSheetURL) {
+	if input.SpriteSheetURL != "" && !validArtworkURL(input.SpriteSheetURL) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "pet sprite sheet must be an HTTP(S) image URL or bundled asset"})
 		return
 	}
-	if !validArtworkURL(input.ActionSheetURL) {
+	if input.ActionSheetURL != "" && !validArtworkURL(input.ActionSheetURL) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "pet action sheet must be an HTTP(S) image URL or bundled asset"})
 		return
 	}
@@ -300,7 +300,7 @@ func AdoptAIPet(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "this pet has already been adopted or could not be created"})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"companion_id": companionID, "name": input.Name, "breed": breed, "state": petStateResponse{AvatarURL: breed.AvatarURL, SpriteSheetURL: breed.SpriteSheetURL, ActionSheetURL: breed.ActionSheetURL, Hunger: 80, Happiness: 70, Energy: 80, Health: 100, Experience: 0, Level: 1}})
+	c.JSON(http.StatusCreated, gin.H{"companion_id": companionID, "name": input.Name, "breed": breed, "state": petStateResponse{AvatarURL: breed.AvatarURL, SpriteSheetURL: breed.SpriteSheetURL, ActionSheetURL: breed.ActionSheetURL, Hunger: 80, Hydration: 80, Happiness: 70, Energy: 80, Health: 100, Experience: 0, Level: 1}})
 }
 
 type petStateResponse struct {
@@ -308,6 +308,7 @@ type petStateResponse struct {
 	SpriteSheetURL string     `json:"sprite_sheet_url"`
 	ActionSheetURL string     `json:"action_sheet_url"`
 	Hunger         int        `json:"hunger"`
+	Hydration      int        `json:"hydration"`
 	Happiness      int        `json:"happiness"`
 	Energy         int        `json:"energy"`
 	Health         int        `json:"health"`
@@ -381,8 +382,8 @@ func FeedAIPet(c *gin.Context) {
 	err = tx.QueryRowContext(ctx, `UPDATE ai_pet_states s SET hunger=LEAST(100,hunger+25),happiness=LEAST(100,happiness+8),energy=LEAST(100,energy+4),
 		experience=experience+20,level=1+((experience+20)/100),last_fed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
 		FROM companions c WHERE s.companion_id=c.id AND c.id=$1 AND c.user_id=$2 AND c.creation_source='ai_pet'
-		RETURNING s.hunger,s.happiness,s.energy,s.health,s.experience,s.level,s.last_fed_at`, companionID, userID).Scan(
-		&state.Hunger, &state.Happiness, &state.Energy, &state.Health, &state.Experience, &state.Level, &lastFed)
+		RETURNING s.hunger,s.hydration,s.happiness,s.energy,s.health,s.experience,s.level,s.last_fed_at`, companionID, userID).Scan(
+		&state.Hunger, &state.Hydration, &state.Happiness, &state.Energy, &state.Health, &state.Experience, &state.Level, &lastFed)
 	if err != nil {
 		settlementCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -431,24 +432,32 @@ func loadAndDecayPetState(ctx context.Context, userID, companionID string) (petS
 	var state petStateResponse
 	var lastDecay time.Time
 	var lastFed sql.NullTime
-	err := db.Get().QueryRowContext(ctx, `SELECT c.avatar_url,COALESCE(b.sprite_sheet_url,''),COALESCE(b.action_sheet_url,''),s.hunger,s.happiness,s.energy,s.health,s.experience,s.level,s.last_fed_at,s.last_decay_at,u.credits_balance,
+	tx, err := db.Get().BeginTx(ctx, nil)
+	if err != nil {
+		return state, err
+	}
+	defer tx.Rollback()
+	err = tx.QueryRowContext(ctx, `SELECT c.avatar_url,COALESCE(b.sprite_sheet_url,''),COALESCE(b.action_sheet_url,''),s.hunger,s.hydration,s.happiness,s.energy,s.health,s.experience,s.level,s.last_fed_at,s.last_decay_at,u.credits_balance,
 		COALESCE((SELECT p.coins FROM credit_products p WHERE p.environment=u.environment AND p.product_key='ai_pet_feed' AND p.enabled=true),5)
 		FROM ai_pet_states s JOIN companions c ON c.id=s.companion_id LEFT JOIN ai_pet_breeds b ON b.id=c.pet_breed_id JOIN users u ON u.id=c.user_id
-		WHERE c.id=$1 AND c.user_id=$2 AND c.active=true AND c.creation_source='ai_pet'`, companionID, userID).Scan(
-		&state.AvatarURL, &state.SpriteSheetURL, &state.ActionSheetURL, &state.Hunger, &state.Happiness, &state.Energy, &state.Health, &state.Experience, &state.Level, &lastFed, &lastDecay, &state.Coins, &state.FeedCoins)
+		WHERE c.id=$1 AND c.user_id=$2 AND c.active=true AND c.creation_source='ai_pet' FOR UPDATE OF s`, companionID, userID).Scan(
+		&state.AvatarURL, &state.SpriteSheetURL, &state.ActionSheetURL, &state.Hunger, &state.Hydration, &state.Happiness, &state.Energy, &state.Health, &state.Experience, &state.Level, &lastFed, &lastDecay, &state.Coins, &state.FeedCoins)
 	if err != nil {
 		return state, err
 	}
 	now := time.Now().UTC()
 	updated, hours := decayPetState(state, lastDecay, now)
 	if hours > 0 {
-		_, err = db.Get().ExecContext(ctx, `UPDATE ai_pet_states SET hunger=$2,happiness=$3,energy=$4,health=$5,last_decay_at=$6,updated_at=CURRENT_TIMESTAMP WHERE companion_id=$1`, companionID, updated.Hunger, updated.Happiness, updated.Energy, updated.Health, lastDecay.Add(time.Duration(hours)*time.Hour))
+		_, err = tx.ExecContext(ctx, `UPDATE ai_pet_states SET hunger=$2,hydration=$3,happiness=$4,energy=$5,health=$6,last_decay_at=$7,updated_at=CURRENT_TIMESTAMP WHERE companion_id=$1`, companionID, updated.Hunger, updated.Hydration, updated.Happiness, updated.Energy, updated.Health, lastDecay.Add(time.Duration(hours)*time.Hour))
 		if err != nil {
 			return state, err
 		}
 		state = updated
 	}
 	state.LastFedAt = nullTime(lastFed)
+	if err := tx.Commit(); err != nil {
+		return state, err
+	}
 	return state, nil
 }
 
@@ -461,9 +470,10 @@ func decayPetState(state petStateResponse, lastDecay, now time.Time) (petStateRe
 		hours = 72
 	}
 	state.Hunger = clampPetValue(state.Hunger - hours*2)
+	state.Hydration = clampPetValue(state.Hydration - hours*2)
 	state.Happiness = clampPetValue(state.Happiness - hours)
 	state.Energy = clampPetValue(state.Energy - hours/2)
-	if state.Hunger < 20 {
+	if state.Hunger < 20 || state.Hydration < 20 {
 		state.Health = clampPetValue(state.Health - hours/3)
 	}
 	return state, hours

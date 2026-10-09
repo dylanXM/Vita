@@ -16,12 +16,14 @@ class PetActionMenu extends StatefulWidget {
     required this.experience,
     required this.state,
     required this.feeding,
+    required this.busy,
     required this.feedCost,
     required this.onFeed,
     required this.onDrink,
     required this.onWalk,
     required this.onSit,
     required this.onRest,
+    required this.onTalk,
     required this.onRefresh,
   });
 
@@ -30,12 +32,14 @@ class PetActionMenu extends StatefulWidget {
   final int experience;
   final Map<String, dynamic> state;
   final bool feeding;
+  final bool busy;
   final int feedCost;
   final VoidCallback onFeed;
   final VoidCallback onDrink;
   final VoidCallback onWalk;
   final VoidCallback onSit;
   final VoidCallback onRest;
+  final VoidCallback onTalk;
   final VoidCallback onRefresh;
 
   @override
@@ -132,6 +136,8 @@ class _PetActionMenuState extends State<PetActionMenu>
     final level = widget.level;
     return Container(
       width: 268,
+      constraints: BoxConstraints(
+          maxHeight: math.max(180, MediaQuery.sizeOf(context).height * .65)),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
       decoration: BoxDecoration(
         color: vita.surface.withValues(alpha: .96),
@@ -144,91 +150,104 @@ class _PetActionMenuState extends State<PetActionMenu>
               offset: const Offset(0, 8)),
         ],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Expanded(
-              child: Text('aiPets.title'.tr,
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: vita.text)),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Expanded(
+                child: Text('aiPets.title'.tr,
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: vita.text)),
+              ),
+              Text('aiPets.level'.trParams({'level': '$level'}),
+                  style: TextStyle(fontSize: 12, color: vita.subText)),
+              const SizedBox(width: 10),
+              _IconButton(
+                icon: Icons.refresh,
+                tooltip: 'aiPets.refresh',
+                onTap: () => _run(widget.onRefresh),
+              ),
+              const SizedBox(width: 2),
+              _IconButton(
+                icon: Icons.close,
+                tooltip: 'common.cancel',
+                onTap: _toggle,
+              ),
+            ]),
+            const SizedBox(height: 10),
+            _StatusBar(
+                label: 'aiPets.hunger'.tr,
+                value: (state['hunger'] as num?)?.toInt() ?? 0,
+                color: Colors.orange),
+            _StatusBar(
+                label: 'aiPets.hydration'.tr,
+                value: (state['hydration'] as num?)?.toInt() ?? 0,
+                color: const Color(0xFF67B9DB)),
+            _StatusBar(
+                label: 'aiPets.happiness'.tr,
+                value: (state['happiness'] as num?)?.toInt() ?? 0,
+                color: Colors.pink),
+            _StatusBar(
+                label: 'aiPets.energy'.tr,
+                value: (state['energy'] as num?)?.toInt() ?? 0,
+                color: Colors.blue),
+            _StatusBar(
+                label: 'aiPets.health'.tr,
+                value: (state['health'] as num?)?.toInt() ?? 0,
+                color: vita.green),
+            const SizedBox(height: 4),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Text(
+                  'aiPets.experience'
+                      .trParams({'value': '${widget.experience}'}),
+                  style: TextStyle(fontSize: 11.5, color: vita.subText)),
+              Text('aiPets.coins'.trParams({'value': '${widget.coins}'}),
+                  style: TextStyle(fontSize: 11.5, color: vita.subText)),
+            ]),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 10),
+              child: Divider(height: 1),
             ),
-            Text('aiPets.level'.trParams({'level': '$level'}),
-                style: TextStyle(fontSize: 12, color: vita.subText)),
-            const SizedBox(width: 10),
-            _IconButton(
-              icon: Icons.refresh,
-              tooltip: 'aiPets.refresh',
-              onTap: () => _run(widget.onRefresh),
+            _ActionTile(
+              icon: Icons.restaurant,
+              iconColor: Colors.orange,
+              label: widget.feeding
+                  ? 'aiPets.feeding'.tr
+                  : 'aiPets.feed'.trParams({'coins': '${widget.feedCost}'}),
+              onTap: widget.busy ? null : () => _run(widget.onFeed),
             ),
-            const SizedBox(width: 2),
-            _IconButton(
-              icon: Icons.close,
-              tooltip: 'common.cancel',
-              onTap: _toggle,
+            _ActionTile(
+              icon: Icons.water_drop_outlined,
+              iconColor: const Color(0xFF67B9DB),
+              label: 'aiPets.drink'.tr,
+              onTap: widget.busy ? null : () => _run(widget.onDrink),
             ),
-          ]),
-          const SizedBox(height: 10),
-          _StatusBar(
-              label: 'aiPets.hunger'.tr,
-              value: (state['hunger'] as num?)?.toInt() ?? 0,
-              color: Colors.orange),
-          _StatusBar(
-              label: 'aiPets.happiness'.tr,
-              value: (state['happiness'] as num?)?.toInt() ?? 0,
-              color: Colors.pink),
-          _StatusBar(
-              label: 'aiPets.energy'.tr,
-              value: (state['energy'] as num?)?.toInt() ?? 0,
-              color: Colors.blue),
-          _StatusBar(
-              label: 'aiPets.health'.tr,
-              value: (state['health'] as num?)?.toInt() ?? 0,
-              color: vita.green),
-          const SizedBox(height: 4),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text(
-                'aiPets.experience'.trParams({'value': '${widget.experience}'}),
-                style: TextStyle(fontSize: 11.5, color: vita.subText)),
-            Text('aiPets.coins'.trParams({'value': '${widget.coins}'}),
-                style: TextStyle(fontSize: 11.5, color: vita.subText)),
-          ]),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
-            child: Divider(height: 1),
-          ),
-          _ActionTile(
-            icon: Icons.restaurant,
-            iconColor: Colors.orange,
-            label: widget.feeding
-                ? 'aiPets.feeding'.tr
-                : 'aiPets.feed'.trParams({'coins': '${widget.feedCost}'}),
-            onTap: widget.feeding ? null : () => _run(widget.onFeed),
-          ),
-          _ActionTile(
-            icon: Icons.water_drop_outlined,
-            iconColor: const Color(0xFF67B9DB),
-            label: 'aiPets.drink'.tr,
-            onTap: widget.feeding ? null : () => _run(widget.onDrink),
-          ),
-          Row(children: [
-            _QuickAction(
-                icon: Icons.directions_walk_rounded,
-                label: 'aiPets.walk'.tr,
-                onTap: widget.feeding ? null : () => _run(widget.onWalk)),
-            _QuickAction(
-                icon: Icons.chair_alt_rounded,
-                label: 'aiPets.sit'.tr,
-                onTap: widget.feeding ? null : () => _run(widget.onSit)),
-            _QuickAction(
-                icon: Icons.bedtime_outlined,
-                label: 'aiPets.rest'.tr,
-                onTap: widget.feeding ? null : () => _run(widget.onRest)),
-          ]),
-        ],
+            _ActionTile(
+              icon: Icons.chat_bubble_outline_rounded,
+              iconColor: vita.green,
+              label: 'world.talk'.tr,
+              onTap: widget.busy ? null : () => _run(widget.onTalk),
+            ),
+            Row(children: [
+              _QuickAction(
+                  icon: Icons.directions_walk_rounded,
+                  label: 'aiPets.walk'.tr,
+                  onTap: widget.busy ? null : () => _run(widget.onWalk)),
+              _QuickAction(
+                  icon: Icons.chair_alt_rounded,
+                  label: 'aiPets.sit'.tr,
+                  onTap: widget.busy ? null : () => _run(widget.onSit)),
+              _QuickAction(
+                  icon: Icons.bedtime_outlined,
+                  label: 'aiPets.rest'.tr,
+                  onTap: widget.busy ? null : () => _run(widget.onRest)),
+            ]),
+          ],
+        ),
       ),
     );
   }

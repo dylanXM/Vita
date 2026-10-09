@@ -14,6 +14,15 @@ void main() {
     expect(movingTail.dx, isNot(equals(neutralTail.dx)));
   });
 
+  test('left-tailed breeds animate the left tail region', () {
+    final rig =
+        PetRigProfile.forArtwork('asset://assets/ai_pets/dog_corgi.png');
+    final neutral = offsetAt(const MeshPose(), .125, .5, .25, rig: rig);
+    final wagging =
+        offsetAt(const MeshPose(tailSwing: .1), .125, .5, .25, rig: rig);
+    expect(wagging.dx, isNot(equals(neutral.dx)));
+  });
+
   testWidgets('an interrupted transition keeps the current blended pose',
       (tester) async {
     final machine = PetStateMachine(vsync: const TestVSync());

@@ -102,7 +102,7 @@ export function AIPetsPage() {
           <TableCell><div className="flex items-center gap-3">
             <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted">
               {breed.avatar_url && !breed.avatar_url.startsWith("asset://") ? <img src={breed.avatar_url} alt="" className="size-full object-cover" /> : <PawPrint className="size-5 text-muted-foreground" />}
-            </div><div><div className="flex items-center gap-2 font-medium">{breed.name}{(!breed.sprite_sheet_url || !breed.action_sheet_url) && <Badge variant="outline">{t("aiPets.missingMotion")}</Badge>}</div><div className="line-clamp-1 max-w-72 text-xs text-muted-foreground">{breed.description}</div></div>
+            </div><div><div className="flex items-center gap-2 font-medium">{breed.name}</div><div className="line-clamp-1 max-w-72 text-xs text-muted-foreground">{breed.description}</div></div>
           </div></TableCell>
           <TableCell>{breed.species}</TableCell>
           <TableCell>{breed.subscription_plan_ids.length ? t("aiPets.selectedPlans", { count: breed.subscription_plan_ids.length }) : t("aiPets.allPlans")}</TableCell>
@@ -114,8 +114,6 @@ export function AIPetsPage() {
               `${t("aiPets.personality")}: ${breed.personality || "—"}`,
               `${t("aiPets.description")}: ${breed.description || "—"}`,
               `${t("aiPets.avatarUrl")}: ${breed.avatar_url || "—"}`,
-              `${t("aiPets.spriteSheetUrl")}: ${breed.sprite_sheet_url || "—"}`,
-              `${t("aiPets.actionSheetUrl")}: ${breed.action_sheet_url || "—"}`,
               `${t("aiPets.subscriptionAccess")}: ${breed.subscription_plan_ids.length ? breed.subscription_plan_ids.map((id) => plans.data?.items.find((plan) => plan.id === id)?.name ?? id).join(", ") : t("aiPets.allPlans")}`,
               `${t("aiPets.sortOrder")}: ${breed.sort_order}`,
               `${t("content.enabled")}: ${t(breed.enabled ? "content.enabled" : "content.disabled")}`,
@@ -130,9 +128,7 @@ export function AIPetsPage() {
             <Field label={t("aiPets.name")}><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
             <Field label={t("aiPets.species")}><Input value={form.species} onChange={(e) => setForm({ ...form, species: e.target.value })} /></Field>
             <Field label={t("aiPets.personality")}><Input value={form.personality} onChange={(e) => setForm({ ...form, personality: e.target.value })} placeholder={t("aiPets.personalityHint")} /></Field>
-            <Field label={t("aiPets.avatarUrl")}><AdminImageInput value={form.avatar_url} onChange={(url) => setForm((current) => current.avatar_url === url ? current : ({ ...current, avatar_url: url, sprite_sheet_url: "", action_sheet_url: "" }))} onUploadingChange={setImageUploading} /></Field>
-            <Field wide label={t("aiPets.spriteSheetUrl")}><AdminImageInput value={form.sprite_sheet_url} onChange={(url) => setForm((current) => ({ ...current, sprite_sheet_url: url }))} onUploadingChange={setImageUploading} /><p className="text-xs text-muted-foreground">{t("aiPets.spriteSheetHint")}</p></Field>
-            <Field wide label={t("aiPets.actionSheetUrl")}><AdminImageInput value={form.action_sheet_url} onChange={(url) => setForm((current) => ({ ...current, action_sheet_url: url }))} onUploadingChange={setImageUploading} /><p className="text-xs text-muted-foreground">{t("aiPets.actionSheetHint")}</p></Field>
+            <Field label={t("aiPets.avatarUrl")}><AdminImageInput value={form.avatar_url} onChange={(url) => setForm((current) => current.avatar_url === url ? current : ({ ...current, avatar_url: url, sprite_sheet_url: "", action_sheet_url: "" }))} onUploadingChange={setImageUploading} /><p className="text-xs text-muted-foreground">{t("aiPets.avatarHint")}</p></Field>
             <Field wide label={t("aiPets.description")}><textarea className="min-h-24 w-full rounded-md border bg-background p-3 text-sm" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
             <Field label={t("aiPets.sortOrder")}><Input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) || 0 })} /></Field>
             <div className="flex items-end"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />{t("content.enabled")}</label></div>
@@ -143,7 +139,7 @@ export function AIPetsPage() {
             </div>
           </div>
         </div>
-        <DialogFooter><Button variant="outline" onClick={close}>{t("users.cancel")}</Button><Button disabled={!activeEnv || !form.name.trim() || !form.species.trim() || !isAdminImageURL(form.avatar_url.trim()) || !isAdminImageURL(form.sprite_sheet_url.trim()) || !isAdminImageURL(form.action_sheet_url.trim()) || imageUploading || save.isPending} onClick={() => save.mutate()}>{editing ? <Save /> : <Plus />}{editing ? t("aiPets.update") : t("aiPets.add")}</Button></DialogFooter>
+        <DialogFooter><Button variant="outline" onClick={close}>{t("users.cancel")}</Button><Button disabled={!activeEnv || !form.name.trim() || !form.species.trim() || !isAdminImageURL(form.avatar_url.trim()) || imageUploading || save.isPending} onClick={() => save.mutate()}>{editing ? <Save /> : <Plus />}{editing ? t("aiPets.update") : t("aiPets.add")}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
     <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(next) => { if (!next) setDeleteTarget(null); }}>
