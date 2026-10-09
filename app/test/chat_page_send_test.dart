@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -33,6 +34,35 @@ class _FailingAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+class _ChatHistoryAdapter implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final body = options.path.endsWith('/v1/conversations/')
+        ? {'conversation_id': 'conversation-1'}
+        : List.generate(
+            40,
+            (index) => {
+                  'id': 'message-$index',
+                  'sender_type': 'companion',
+                  'message_type': 'text',
+                  'content': 'message $index',
+                  'created_at': DateTime.utc(2026, 1, 1)
+                      .add(Duration(minutes: index))
+                      .toIso8601String(),
+                });
+    return ResponseBody.fromString(jsonEncode(body), 200, headers: {
+      Headers.contentTypeHeader: [Headers.jsonContentType],
+    });
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
 class _FakeAnalyticsService extends AnalyticsService {
   @override
   // Intentionally skip the production timer and persistence wiring in tests.
@@ -57,7 +87,8 @@ void main() {
 
   tearDown(Get.reset);
 
-  testWidgets('send stays enabled and keeps the draft when the conversation '
+  testWidgets(
+      'send stays enabled and keeps the draft when the conversation '
       'cannot be created', (tester) async {
     Get.put<AnalyticsService>(_FakeAnalyticsService());
 
@@ -91,5 +122,24 @@ void main() {
     // the widget tree is torn down.
     await tester.pump(const Duration(seconds: 4));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('opening an existing conversation shows the latest message',
+      (tester) async {
+    Get.put<AnalyticsService>(_FakeAnalyticsService());
+    ApiClient.instance.dio.httpClientAdapter = _ChatHistoryAdapter();
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        theme: VitaTheme.light,
+        translations: VitaTranslations(),
+        locale: const Locale('en'),
+        home: const ChatPage(companionId: 'companion-1', name: 'Ava'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('message 39'), findsOneWidget);
+    expect(find.text('message 0'), findsNothing);
   });
 }

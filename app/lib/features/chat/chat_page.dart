@@ -222,7 +222,7 @@ class _ChatPageState extends State<ChatPage> {
   void _scrollToBottom() {
     if (!_scroll.hasClients) return;
     _scroll.animateTo(
-      _scroll.position.maxScrollExtent,
+      _scroll.position.minScrollExtent,
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
     );
@@ -478,8 +478,9 @@ class _ChatPageState extends State<ChatPage> {
 
     return ListView(
       controller: _scroll,
+      reverse: true,
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      children: items,
+      children: items.reversed.toList(),
     );
   }
 
