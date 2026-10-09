@@ -23,7 +23,6 @@ class PetActionMenu extends StatefulWidget {
     required this.onWalk,
     required this.onSit,
     required this.onRest,
-    required this.onTalk,
     required this.onRefresh,
   });
 
@@ -39,7 +38,6 @@ class PetActionMenu extends StatefulWidget {
   final VoidCallback onWalk;
   final VoidCallback onSit;
   final VoidCallback onRest;
-  final VoidCallback onTalk;
   final VoidCallback onRefresh;
 
   @override
@@ -225,12 +223,6 @@ class _PetActionMenuState extends State<PetActionMenu>
               iconColor: const Color(0xFF67B9DB),
               label: 'aiPets.drink'.tr,
               onTap: widget.busy ? null : () => _run(widget.onDrink),
-            ),
-            _ActionTile(
-              icon: Icons.chat_bubble_outline_rounded,
-              iconColor: vita.green,
-              label: 'world.talk'.tr,
-              onTap: widget.busy ? null : () => _run(widget.onTalk),
             ),
             Row(children: [
               _QuickAction(

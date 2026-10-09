@@ -6,7 +6,6 @@ import 'package:get/get.dart';
 import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
-import '../chat/chat_page.dart';
 import 'animation/brain/pet_brain.dart';
 import 'animation/pet/pet_motion_spec.dart';
 import 'animation/pet/pet_state_machine.dart';
@@ -327,15 +326,6 @@ class _AIPetHomePageState extends State<AIPetHomePage>
     _care('rest', PetState.sleeping, const Duration(milliseconds: 6000));
   }
 
-  Future<void> _talk() async {
-    _lastInteractionAt = DateTime.now();
-    await Get.to(() => ChatPage(
-          companionId: widget.companionId,
-          name: widget.name,
-        ));
-    if (mounted) _refreshState();
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = _state ?? const <String, dynamic>{};
@@ -374,7 +364,6 @@ class _AIPetHomePageState extends State<AIPetHomePage>
                 onWalk: _walk,
                 onSit: _sit,
                 onRest: _rest,
-                onTalk: _talk,
                 onRefresh: _refreshState,
               ),
             ),
