@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/notice.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../chat/companion_moment_page.dart';
@@ -183,7 +184,7 @@ class _CompanionStorySectionState extends State<CompanionStorySection> {
                     if (sheetContext.mounted) Navigator.pop(sheetContext);
                     await _load();
                   } on ApiException catch (error) {
-                    Get.snackbar('story.memory'.tr, error.message);
+                    VitaNotice.error('story.memory'.tr, error.message);
                   }
                 },
               ),
@@ -216,7 +217,7 @@ class _CompanionStorySectionState extends State<CompanionStorySection> {
                     if (sheetContext.mounted) Navigator.pop(sheetContext);
                     await _load();
                   } on ApiException catch (error) {
-                    Get.snackbar('story.memory'.tr, error.message);
+                    VitaNotice.error('story.memory'.tr, error.message);
                   }
                 },
               ),
@@ -235,7 +236,7 @@ class _CompanionStorySectionState extends State<CompanionStorySection> {
                     if (sheetContext.mounted) Navigator.pop(sheetContext);
                     await _load();
                   } on ApiException catch (error) {
-                    Get.snackbar('story.memory'.tr, error.message);
+                    VitaNotice.error('story.memory'.tr, error.message);
                   }
                 },
                 child: Text('story.save'.tr),

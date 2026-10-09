@@ -13,6 +13,10 @@ class VitaTranslations extends Translations {
 
   static const Map<String, Map<String, String>> _keys = {
     'en': {
+      'notice.success': 'Success',
+      'notice.error': 'Error',
+      'notice.warning': 'Attention',
+      'notice.info': 'Information',
       // Shell tabs.
       'tab.chat': 'Chat',
       'tab.memories': 'Memories',
@@ -586,6 +590,10 @@ class VitaTranslations extends Translations {
       'stage.partner': 'Partner',
     },
     'zh_CN': {
+      'notice.success': '成功',
+      'notice.error': '错误',
+      'notice.warning': '请注意',
+      'notice.info': '提示',
       'tab.chat': '聊天',
       'tab.memories': '回忆',
       'tab.explore': '发现',

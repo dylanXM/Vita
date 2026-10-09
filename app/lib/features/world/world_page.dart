@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/notice.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
@@ -53,7 +54,7 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
       await ApiClient.instance.post('/v1/companions/$id/world/visit');
       await _loadScene(id);
     } on ApiException catch (error) {
-      Get.snackbar('world.visit'.tr, error.message);
+      VitaNotice.error('world.visit'.tr, error.message);
     }
   }
 

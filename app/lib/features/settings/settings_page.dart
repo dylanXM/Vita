@@ -26,8 +26,57 @@ class SettingsPage extends StatelessWidget {
       backgroundColor: vita.pageBg,
       appBar: AppBar(title: Text('settings.title'.tr)),
       body: ListView(
-        padding: const EdgeInsets.only(top: 10, bottom: 24),
+        padding: const EdgeInsets.only(top: 16, bottom: 24),
         children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text('settings.account'.tr, style: vita.sectionTitle),
+          ),
+          const SizedBox(height: 12),
+          // Account controls are grouped separately from the sign-out action.
+          VitaCard(
+            radius: 12,
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              children: [
+                Obx(() {
+                  final auth = AuthController.to;
+                  final nick = auth.nickname;
+                  return VitaListTile(
+                    customIcon: const VitaMenuIcon(
+                      icon: Icons.person_outline_rounded,
+                      color: Color(0xFF4A90E2),
+                    ),
+                    title: 'settings.profile'.tr,
+                    subtitle: nick.isEmpty ? auth.email : nick,
+                    borderRadius: BorderRadius.zero,
+                    onTap: () => Get.to(
+                      () => const ProfileEditPage(),
+                      transition: Transition.cupertino,
+                      duration: const Duration(milliseconds: 300),
+                    ),
+                  );
+                }),
+                const Divider(indent: 52, height: 0.5),
+                VitaListTile(
+                  customIcon: VitaMenuIcon(
+                    icon: Icons.restore_from_trash_outlined,
+                    color: vita.green,
+                  ),
+                  title: 'settings.deletedCompanions'.tr,
+                  subtitle: 'settings.deletedCompanions.subtitle'.tr,
+                  borderRadius: BorderRadius.zero,
+                  onTap: () => Get.to(
+                    () => const DeletedCompanionsPage(),
+                    transition: Transition.cupertino,
+                    duration: const Duration(milliseconds: 300),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text('settings.general'.tr, style: vita.sectionTitle),
@@ -35,7 +84,7 @@ class SettingsPage extends StatelessWidget {
           const SizedBox(height: 12),
           // General group: language + theme.
           VitaCard(
-            radius: 20,
+            radius: 12,
             margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Column(
@@ -141,7 +190,7 @@ class SettingsPage extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           VitaCard(
-            radius: 20,
+            radius: 12,
             margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Column(
@@ -183,63 +232,17 @@ class SettingsPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text('settings.account'.tr, style: vita.sectionTitle),
-          ),
-          const SizedBox(height: 12),
-          // Account group: profile, deleted companions, sign out.
           VitaCard(
-            radius: 20,
+            radius: 12,
             margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Column(
-              children: [
-                Obx(() {
-                  final auth = AuthController.to;
-                  final nick = auth.nickname;
-                  return VitaListTile(
-                    customIcon: const VitaMenuIcon(
-                      icon: Icons.person_outline_rounded,
-                      color: Color(0xFF4A90E2),
-                    ),
-                    title: 'settings.profile'.tr,
-                    subtitle: nick.isEmpty ? auth.email : nick,
-                    borderRadius: BorderRadius.zero,
-                    onTap: () => Get.to(
-                      () => const ProfileEditPage(),
-                      transition: Transition.cupertino,
-                      duration: const Duration(milliseconds: 300),
-                    ),
-                  );
-                }),
-                const Divider(indent: 52, height: 0.5),
-                VitaListTile(
-                  customIcon: VitaMenuIcon(
-                    icon: Icons.restore_from_trash_outlined,
-                    color: vita.green,
-                  ),
-                  title: 'settings.deletedCompanions'.tr,
-                  subtitle: 'settings.deletedCompanions.subtitle'.tr,
-                  borderRadius: BorderRadius.zero,
-                  onTap: () => Get.to(
-                    () => const DeletedCompanionsPage(),
-                    transition: Transition.cupertino,
-                    duration: const Duration(milliseconds: 300),
-                  ),
-                ),
-                const Divider(indent: 52, height: 0.5),
-                VitaListTile(
-                  customIcon: VitaMenuIcon(
-                    icon: Icons.logout_rounded,
-                    color: vita.red,
-                  ),
-                  title: 'common.signout'.tr,
-                  iconColor: vita.red,
-                  borderRadius: BorderRadius.zero,
-                  onTap: () => _confirmSignOut(context),
-                ),
-              ],
+            padding: EdgeInsets.zero,
+            child: VitaListTile(
+              customIcon:
+                  VitaMenuIcon(icon: Icons.logout_rounded, color: vita.red),
+              title: 'common.signout'.tr,
+              iconColor: vita.red,
+              borderRadius: BorderRadius.zero,
+              onTap: () => _confirmSignOut(context),
             ),
           ),
           const SizedBox(height: 24),

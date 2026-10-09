@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import '../../core/notice.dart';
 import '../../core/theme.dart';
 import '../../core/app_content_controller.dart';
 import '../../core/api_client.dart';
@@ -102,11 +103,11 @@ class _RegisterPageState extends State<RegisterPage> {
       );
       setState(() => _step = 2);
       _startCountdown();
-      Get.snackbar('auth.checkInbox'.tr,
+      VitaNotice.info('auth.checkInbox'.tr,
           'auth.codeSentTo'.trParams({'email': _email.text.trim()}));
     } catch (e) {
       await _refreshLegalAfterError(e);
-      Get.snackbar('auth.sendCodeFailed'.tr, '$e');
+      VitaNotice.error('auth.sendCodeFailed'.tr, '$e');
     }
   }
 
@@ -126,11 +127,11 @@ class _RegisterPageState extends State<RegisterPage> {
         termsVersion: terms.version,
       );
       _startCountdown();
-      Get.snackbar('auth.checkInbox'.tr,
+      VitaNotice.info('auth.checkInbox'.tr,
           'auth.codeSentTo'.trParams({'email': _email.text.trim()}));
     } catch (e) {
       await _refreshLegalAfterError(e);
-      Get.snackbar('auth.sendCodeFailed'.tr, '$e');
+      VitaNotice.error('auth.sendCodeFailed'.tr, '$e');
     }
   }
 
@@ -142,7 +143,7 @@ class _RegisterPageState extends State<RegisterPage> {
           .verifyRegistration(_email.text.trim(), _code.text.trim());
       Get.offAllNamed('/shell');
     } catch (e) {
-      Get.snackbar('auth.verificationFailed'.tr, '$e');
+      VitaNotice.error('auth.verificationFailed'.tr, '$e');
     }
   }
 
@@ -162,7 +163,7 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     } catch (e) {
       await _refreshLegalAfterError(e);
-      Get.snackbar('auth.googleFailed'.tr, '$e');
+      VitaNotice.error('auth.googleFailed'.tr, '$e');
     }
   }
 

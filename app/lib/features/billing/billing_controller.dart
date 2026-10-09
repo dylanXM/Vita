@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 
+import '../../core/notice.dart';
 import '../../core/api_client.dart';
 import '../../core/analytics_service.dart';
 import '../../core/constants.dart';
@@ -168,7 +169,7 @@ class BillingController extends GetxController {
             'package_id': pkg.identifier,
             'product_id': pkg.storeProduct.identifier
           });
-      Get.snackbar('Vita', 'billing.purchaseSuccess'.tr);
+      VitaNotice.success('Vita', 'billing.purchaseSuccess'.tr);
       if (Get.isRegistered<AdmobController>()) {
         Future.delayed(const Duration(seconds: 1),
             AdmobController.to.maybeShowInterstitial);
@@ -187,7 +188,7 @@ class BillingController extends GetxController {
             'product_id': pkg.storeProduct.identifier
           });
       if (!msg.toLowerCase().contains('cancel')) {
-        Get.snackbar('billing.purchaseFailed'.tr, msg);
+        VitaNotice.error('billing.purchaseFailed'.tr, msg);
       }
     } finally {
       busy.value = false;
@@ -204,10 +205,10 @@ class BillingController extends GetxController {
       await ChatListController.to.load();
       AnalyticsService.to
           .track('purchase_restore_succeeded', category: 'billing');
-      Get.snackbar('Vita', 'billing.restored'.tr);
+      VitaNotice.success('Vita', 'billing.restored'.tr);
     } catch (e) {
       AnalyticsService.to.track('purchase_restore_failed', category: 'billing');
-      Get.snackbar('billing.restoreFailed'.tr, '$e');
+      VitaNotice.error('billing.restoreFailed'.tr, '$e');
     } finally {
       busy.value = false;
     }

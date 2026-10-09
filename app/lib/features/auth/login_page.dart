@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/notice.dart';
 import '../../core/theme.dart';
 import 'auth_controller.dart';
 
@@ -52,7 +53,7 @@ class _LoginPageState extends State<LoginPage> {
       await AuthController.to.login(_email.text.trim(), _password.text);
       Get.offAllNamed('/shell');
     } catch (e) {
-      Get.snackbar('auth.loginFailed'.tr, '$e');
+      VitaNotice.error('auth.loginFailed'.tr, '$e');
     }
   }
 
@@ -62,7 +63,7 @@ class _LoginPageState extends State<LoginPage> {
         Get.offAllNamed('/shell');
       }
     } catch (e) {
-      Get.snackbar('auth.googleFailed'.tr, '$e');
+      VitaNotice.error('auth.googleFailed'.tr, '$e');
     }
   }
 

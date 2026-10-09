@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import '../../core/notice.dart';
 import '../../core/api_client.dart';
 import '../auth/auth_controller.dart';
 import '../billing/billing_controller.dart';
@@ -116,7 +117,7 @@ class AdmobController extends GetxController {
       );
       final ad = await loaded.future;
       if (ad == null) {
-        Get.snackbar('ads.title'.tr, 'ads.unavailable'.tr);
+        VitaNotice.error('ads.title'.tr, 'ads.unavailable'.tr);
         return;
       }
       await ad.setServerSideOptions(
@@ -135,7 +136,7 @@ class AdmobController extends GetxController {
         },
       );
       await ad.show(onUserEarnedReward: (_, __) {
-        Get.snackbar('ads.title'.tr, 'ads.rewardPending'.tr);
+        VitaNotice.info('ads.title'.tr, 'ads.rewardPending'.tr);
         for (final delay in [2, 5, 10, 20]) {
           Future.delayed(Duration(seconds: delay), () {
             BillingController.to.refreshCredits();
@@ -144,7 +145,7 @@ class AdmobController extends GetxController {
         }
       });
     } catch (_) {
-      Get.snackbar('ads.title'.tr, 'ads.unavailable'.tr);
+      VitaNotice.error('ads.title'.tr, 'ads.unavailable'.tr);
     } finally {
       loadingReward.value = false;
     }

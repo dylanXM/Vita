@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/notice.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
@@ -36,7 +37,7 @@ class _DeletedCompanionsPageState extends State<DeletedCompanionsPage> {
       });
     } on ApiException catch (error) {
       if (mounted) {
-        Get.snackbar('settings.deletedCompanions'.tr, error.message);
+        VitaNotice.error('settings.deletedCompanions'.tr, error.message);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -50,14 +51,14 @@ class _DeletedCompanionsPageState extends State<DeletedCompanionsPage> {
     try {
       await ApiClient.instance.post('/v1/companions/$id/restore');
       if (!mounted) return;
-      Get.snackbar(
+      VitaNotice.success(
         'settings.deletedCompanions'.tr,
         'deletedCompanions.restored'.tr,
       );
       await _load();
     } on ApiException catch (error) {
       if (mounted) {
-        Get.snackbar('settings.deletedCompanions'.tr, error.message);
+        VitaNotice.error('settings.deletedCompanions'.tr, error.message);
       }
     } finally {
       if (mounted) setState(() => _restoring = null);
@@ -76,7 +77,9 @@ class _DeletedCompanionsPageState extends State<DeletedCompanionsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(leading: const VitaBackButton(), title: Text('settings.deletedCompanions'.tr)),
+      appBar: AppBar(
+          leading: const VitaBackButton(),
+          title: Text('settings.deletedCompanions'.tr)),
       body: RefreshIndicator(
         onRefresh: _load,
         child: _loading && _items.isEmpty

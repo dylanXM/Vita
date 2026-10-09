@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/notice.dart';
 import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
@@ -167,7 +168,7 @@ class _AIPetHomePageState extends State<AIPetHomePage>
         _applyIntent(nextState);
       }
     } on ApiException catch (error) {
-      if (mounted) Get.snackbar('aiPets.error'.tr, error.message);
+      if (mounted) VitaNotice.error('aiPets.error'.tr, error.message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -228,15 +229,16 @@ class _AIPetHomePageState extends State<AIPetHomePage>
             nextLevel > previousLevel ? PetState.levelUp : PetState.happy,
             duration: const Duration(milliseconds: 1800));
       }
-      Get.snackbar('aiPets.fed'.tr, 'aiPets.fedSub'.tr);
+      VitaNotice.success('aiPets.fed'.tr, 'aiPets.fedSub'.tr);
     } on ApiException catch (error) {
       _machine.transition(
           _machine.needsSleep ? PetState.sleeping : PetState.standing);
       if (error.code == 'insufficient_credits') {
-        Get.snackbar('aiPets.notEnoughCoins'.tr, 'aiPets.notEnoughCoinsSub'.tr);
+        VitaNotice.warning(
+            'aiPets.notEnoughCoins'.tr, 'aiPets.notEnoughCoinsSub'.tr);
         Get.toNamed('/credits');
       } else {
-        Get.snackbar('aiPets.error'.tr, error.message);
+        VitaNotice.error('aiPets.error'.tr, error.message);
       }
     } finally {
       if (mounted) {
@@ -296,11 +298,11 @@ class _AIPetHomePageState extends State<AIPetHomePage>
           'pet_needs_rest' => 'aiPets.needsRest'.tr,
           _ => error.message,
         };
-        Get.snackbar('aiPets.error'.tr, message);
+        VitaNotice.error('aiPets.error'.tr, message);
       }
       _machine.transition(_machine.suggestFromState(_state ?? const {}));
     } catch (_) {
-      if (mounted) Get.snackbar('aiPets.error'.tr, 'common.loadFailed'.tr);
+      if (mounted) VitaNotice.error('aiPets.error'.tr, 'common.loadFailed'.tr);
       _machine.transition(_machine.suggestFromState(_state ?? const {}));
     } finally {
       if (mounted) setState(() => _caring = false);

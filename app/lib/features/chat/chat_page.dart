@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/notice.dart';
 import '../../core/constants.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
@@ -215,9 +216,9 @@ class _ChatPageState extends State<ChatPage> {
   void _reportSendResult(bool queued) {
     final reason = ctrl.sendError.value;
     if (!queued) {
-      Get.snackbar('chat.message'.tr, 'chat.sendFailed'.tr);
+      VitaNotice.error('chat.message'.tr, 'chat.sendFailed'.tr);
     } else if (reason != null && reason.isNotEmpty) {
-      Get.snackbar('chat.message'.tr, reason);
+      VitaNotice.error('chat.message'.tr, reason);
     }
   }
 
@@ -862,7 +863,7 @@ class _LinkedMessageTextState extends State<_LinkedMessageText> {
               ..onTap = () async {
                 if (!await launchUrl(uri,
                     mode: LaunchMode.externalApplication)) {
-                  Get.snackbar('experience.failed'.tr, url);
+                  VitaNotice.error('experience.failed'.tr, url);
                 }
               });
         spans.add(TextSpan(

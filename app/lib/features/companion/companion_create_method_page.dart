@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/notice.dart';
 import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
@@ -181,19 +182,19 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
 
   Future<void> _generate() async {
     if (_imagePath == null) {
-      Get.snackbar('companion.create.imageRequired'.tr,
+      VitaNotice.warning('companion.create.imageRequired'.tr,
           'companion.create.imageRequiredMessage'.tr);
       return;
     }
     if (widget.mode == AICompanionCreateMode.description &&
         _description.text.trim().isEmpty) {
-      Get.snackbar('companion.create.sourceRequired'.tr,
+      VitaNotice.warning('companion.create.sourceRequired'.tr,
           'companion.create.descriptionRequired'.tr);
       return;
     }
     if (widget.mode == AICompanionCreateMode.meet &&
         (_documentPath == null || _characterName.text.trim().isEmpty)) {
-      Get.snackbar('companion.create.sourceRequired'.tr,
+      VitaNotice.warning('companion.create.sourceRequired'.tr,
           'companion.create.documentRequired'.tr);
       return;
     }
@@ -232,7 +233,7 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
       AnalyticsService.to.track('companion_draft_generated',
           category: 'companion', properties: {'creation_source': mode});
     } on ApiException catch (error) {
-      Get.snackbar('companion.create.generateFailed'.tr, error.message);
+      VitaNotice.error('companion.create.generateFailed'.tr, error.message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -268,10 +269,10 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
       });
       Get.until((route) => route.settings.name == '/shell' || route.isFirst);
       await ChatListController.to.load();
-      Get.snackbar(
+      VitaNotice.success(
           'companion.create.success'.tr, 'companion.create.successMessage'.tr);
     } on ApiException catch (error) {
-      Get.snackbar('companion.create.failed'.tr, error.message);
+      VitaNotice.error('companion.create.failed'.tr, error.message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

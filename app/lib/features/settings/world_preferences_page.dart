@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/notice.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 
@@ -33,7 +34,7 @@ class _WorldPreferencesPageState extends State<WorldPreferencesPage> {
         _region.text = '${data['region_code'] ?? 'global'}';
       }
     } on ApiException catch (error) {
-      if (mounted) Get.snackbar('world.preferences'.tr, error.message);
+      if (mounted) VitaNotice.error('world.preferences'.tr, error.message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -44,7 +45,7 @@ class _WorldPreferencesPageState extends State<WorldPreferencesPage> {
     final region = _region.text.trim().toUpperCase();
     if (timezone.isEmpty ||
         (region != 'GLOBAL' && !RegExp(r'^[A-Z]{2}$').hasMatch(region))) {
-      Get.snackbar('world.preferences'.tr, 'world.preferencesInvalid'.tr);
+      VitaNotice.warning('world.preferences'.tr, 'world.preferencesInvalid'.tr);
       return;
     }
     setState(() => _saving = true);
@@ -54,11 +55,11 @@ class _WorldPreferencesPageState extends State<WorldPreferencesPage> {
         'region_code': region,
       });
       if (mounted) {
-        Get.snackbar('world.preferences'.tr, 'world.preferencesSaved'.tr);
+        VitaNotice.success('world.preferences'.tr, 'world.preferencesSaved'.tr);
         Get.back();
       }
     } on ApiException catch (error) {
-      if (mounted) Get.snackbar('world.preferences'.tr, error.message);
+      if (mounted) VitaNotice.error('world.preferences'.tr, error.message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }

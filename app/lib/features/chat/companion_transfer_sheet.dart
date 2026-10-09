@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/notice.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../billing/billing_controller.dart';
@@ -43,7 +44,7 @@ class _CompanionTransferSheetState extends State<CompanionTransferSheet> {
         Navigator.of(context).pop();
         Get.toNamed('/credits');
       } else {
-        Get.snackbar('chat.transfer'.tr, error.message);
+        VitaNotice.error('chat.transfer'.tr, error.message);
       }
     } finally {
       if (mounted) setState(() => _busy = false);

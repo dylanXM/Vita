@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/notice.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../companion/companion_create_method_page.dart';
@@ -30,7 +31,7 @@ class ChatListPage extends StatelessWidget {
               actions: IconButton(
                 onPressed: () {
                   if (!BillingController.to.isSubscribed) {
-                    Get.snackbar('subscription.required.title'.tr,
+                    VitaNotice.warning('subscription.required.title'.tr,
                         'subscription.required.create'.tr);
                     Get.toNamed('/subscription');
                     return;
@@ -41,7 +42,8 @@ class ChatListPage extends StatelessWidget {
                     duration: const Duration(milliseconds: 300),
                   );
                 },
-                icon: Icon(Icons.add_circle_outline, color: context.vita.text, size: 26),
+                icon: Icon(Icons.add_circle_outline,
+                    color: context.vita.text, size: 26),
               ),
             ),
             _ChatSearchBox(),
@@ -86,106 +88,108 @@ class ChatListPage extends StatelessWidget {
           indent: 82,
           color: context.vita.divider,
         ),
-      itemBuilder: (context, i) {
-        final c = list[i];
-        final id = c['id'] as String? ?? '';
-        final name = c['name'] as String? ?? 'chat.companion'.tr;
-        final profileSubtitle = [
-          c['city'] as String?,
-          c['occupation'] as String?,
-        ].where((e) => e != null && e.isNotEmpty).join(' · ');
-        final friendshipActive = c['friendship_active'] != false;
-        final presentation = ChatListPresentation.from(c);
-        final subtitle = !friendshipActive
-            ? 'chat.notFriends'.tr
-            : presentation.preview(
-                fallback: profileSubtitle.isEmpty
-                    ? 'chat.distant'.tr
-                    : profileSubtitle,
-                voiceLabel: 'chat.voiceMessage'.tr,
-                photoLabel: 'chat.photoMessage'.tr,
+        itemBuilder: (context, i) {
+          final c = list[i];
+          final id = c['id'] as String? ?? '';
+          final name = c['name'] as String? ?? 'chat.companion'.tr;
+          final profileSubtitle = [
+            c['city'] as String?,
+            c['occupation'] as String?,
+          ].where((e) => e != null && e.isNotEmpty).join(' · ');
+          final friendshipActive = c['friendship_active'] != false;
+          final presentation = ChatListPresentation.from(c);
+          final subtitle = !friendshipActive
+              ? 'chat.notFriends'.tr
+              : presentation.preview(
+                  fallback: profileSubtitle.isEmpty
+                      ? 'chat.distant'.tr
+                      : profileSubtitle,
+                  voiceLabel: 'chat.voiceMessage'.tr,
+                  photoLabel: 'chat.photoMessage'.tr,
+                );
+          final time =
+              presentation.timeLabel(DateTime.now(), 'common.yesterday'.tr);
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () async {
+              await Get.to(
+                () => ChatPage(companionId: id, name: name, companion: c),
+                transition: Transition.cupertino,
+                duration: const Duration(milliseconds: 300),
               );
-        final time =
-            presentation.timeLabel(DateTime.now(), 'common.yesterday'.tr);
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () async {
-            await Get.to(
-              () => ChatPage(companionId: id, name: name, companion: c),
-              transition: Transition.cupertino,
-              duration: const Duration(milliseconds: 300),
-            );
-            await ctrl.load();
-          },
-          child: Container(
-            color: context.vita.surface,
-            height: 72,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                VitaAvatar(
-                    name: name,
-                    radius: 22,
-                    imageUrl: c['portrait_url'] as String?,
-                    borderRadius: BorderRadius.circular(8)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(name,
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: context.vita.text)),
-                      const SizedBox(height: 3),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                            fontSize: 12.5, color: context.vita.subText),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                if (time.isNotEmpty || presentation.unreadCount > 0) ...[
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      if (time.isNotEmpty)
-                        Text(time,
+              await ctrl.load();
+            },
+            child: Container(
+              color: context.vita.surface,
+              height: 72,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  VitaAvatar(
+                      name: name,
+                      radius: 22,
+                      imageUrl: c['portrait_url'] as String?,
+                      borderRadius: BorderRadius.circular(8)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name,
                             style: TextStyle(
-                                fontSize: 11, color: context.vita.subText)),
-                      if (presentation.unreadCount > 0) ...[
-                        const SizedBox(height: 6),
-                        Container(
-                          constraints:
-                              const BoxConstraints(minWidth: 18, minHeight: 18),
-                          padding: const EdgeInsets.symmetric(horizontal: 5),
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: context.vita.red,
-                            borderRadius: BorderRadius.circular(9),
-                          ),
-                          child: Text(
-                            presentation.unreadCount > 99
-                                ? '99+'
-                                : '${presentation.unreadCount}',
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 10, height: 1.1),
-                          ),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: context.vita.text)),
+                        const SizedBox(height: 3),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                              fontSize: 12.5, color: context.vita.subText),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
-                    ],
+                    ),
                   ),
+                  if (time.isNotEmpty || presentation.unreadCount > 0) ...[
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (time.isNotEmpty)
+                          Text(time,
+                              style: TextStyle(
+                                  fontSize: 11, color: context.vita.subText)),
+                        if (presentation.unreadCount > 0) ...[
+                          const SizedBox(height: 6),
+                          Container(
+                            constraints: const BoxConstraints(
+                                minWidth: 18, minHeight: 18),
+                            padding: const EdgeInsets.symmetric(horizontal: 5),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: context.vita.red,
+                              borderRadius: BorderRadius.circular(9),
+                            ),
+                            child: Text(
+                              presentation.unreadCount > 99
+                                  ? '99+'
+                                  : '${presentation.unreadCount}',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  height: 1.1),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
       ),
     );
   }

@@ -8,6 +8,7 @@ import 'package:get/get.dart' hide Response;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/notice.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/media_image.dart';
@@ -75,8 +76,7 @@ class StoriesController extends GetxController {
 
 void _showError(Object error) {
   final message = error is ApiException ? error.message : error.toString();
-  Get.snackbar('storyHub.title'.tr, message,
-      snackPosition: SnackPosition.BOTTOM, margin: const EdgeInsets.all(12));
+  VitaNotice.error('storyHub.title'.tr, message);
 }
 
 class StoriesPage extends StatelessWidget {

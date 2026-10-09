@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/notice.dart';
 import '../../core/api_client.dart';
 import '../../core/analytics_service.dart';
 import '../../core/theme.dart';
@@ -83,7 +84,7 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
 
   Future<void> _submit() async {
     if (_name.text.trim().isEmpty) {
-      Get.snackbar('companion.create.nameRequired'.tr,
+      VitaNotice.warning('companion.create.nameRequired'.tr,
           'companion.create.nameRequiredMessage'.tr);
       return;
     }
@@ -108,22 +109,22 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
       });
       Get.back();
       ChatListController.to.load();
-      Get.snackbar(
+      VitaNotice.success(
           'companion.create.success'.tr, 'companion.create.successMessage'.tr);
     } on ApiException catch (e) {
       AnalyticsService.to.track('companion_create_failed',
           category: 'companion', properties: {'reason': e.code ?? e.message});
       if (e.action == 'open_subscription') {
-        Get.snackbar('subscription.required.title'.tr,
+        VitaNotice.warning('subscription.required.title'.tr,
             'subscription.required.create'.tr);
         Get.offNamed('/subscription');
       } else {
-        Get.snackbar('companion.create.failed'.tr, e.message);
+        VitaNotice.error('companion.create.failed'.tr, e.message);
       }
     } catch (e) {
       AnalyticsService.to.track('companion_create_failed',
           category: 'companion', properties: {'reason': 'unexpected'});
-      Get.snackbar('companion.create.failed'.tr, '$e');
+      VitaNotice.error('companion.create.failed'.tr, '$e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }

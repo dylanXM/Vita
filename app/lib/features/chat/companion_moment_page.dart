@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/notice.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
@@ -84,7 +85,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() => _loading = false);
-      Get.snackbar('experience.failed'.tr, error.message);
+      VitaNotice.error('experience.failed'.tr, error.message);
     }
   }
 
@@ -105,7 +106,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
       setState(() => _moment = Map<String, dynamic>.from(data));
       await _chat.poll();
     } on ApiException catch (error) {
-      Get.snackbar('experience.failed'.tr, error.message);
+      VitaNotice.error('experience.failed'.tr, error.message);
     } finally {
       if (mounted) setState(() => _starting = false);
     }
@@ -119,9 +120,10 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
     if (mounted) {
       if (queued) _message.clear();
       setState(() => _sending = false);
-      if (!queued)
-        Get.snackbar('experience.failed'.tr,
+      if (!queued) {
+        VitaNotice.error('experience.failed'.tr,
             _chat.sendError.value ?? 'experience.failed'.tr);
+      }
     }
   }
 
@@ -139,7 +141,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
         _artifactDirty = false;
       });
     } on ApiException catch (error) {
-      Get.snackbar('experience.failed'.tr, error.message);
+      VitaNotice.error('experience.failed'.tr, error.message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }

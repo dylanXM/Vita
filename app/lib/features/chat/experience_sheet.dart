@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/notice.dart';
 import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
@@ -71,7 +72,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
         Navigator.of(context).pop();
         Get.toNamed('/subscription');
       } else {
-        Get.snackbar('experience.failed'.tr, error.message);
+        VitaNotice.error('experience.failed'.tr, error.message);
       }
     }
   }
@@ -131,7 +132,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
               result['event_id'] is String)) {
         return;
       }
-      Get.snackbar('experience.done'.tr,
+      VitaNotice.success('experience.done'.tr,
           owned ? 'experience.equipped'.tr : 'experience.doneMessage'.tr);
       await _load();
     } on ApiException catch (error) {
@@ -144,7 +145,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
         Navigator.of(context).pop();
         Get.toNamed('/subscription');
       } else {
-        Get.snackbar('experience.failed'.tr, error.message);
+        VitaNotice.error('experience.failed'.tr, error.message);
       }
     } finally {
       if (mounted) setState(() => _buying = null);

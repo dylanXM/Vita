@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/notice.dart';
 import '../../core/constants.dart';
 import '../../core/app_content_controller.dart';
 import '../../core/analytics_service.dart';
@@ -29,7 +30,7 @@ class MePage extends StatelessWidget {
     if (url.isEmpty ||
         !await launchUrl(Uri.parse(url),
             mode: LaunchMode.externalApplication)) {
-      Get.snackbar('me.rate'.tr, 'me.storeUnavailable'.tr);
+      VitaNotice.error('me.rate'.tr, 'me.storeUnavailable'.tr);
     }
   }
 
@@ -41,7 +42,7 @@ class MePage extends StatelessWidget {
       queryParameters: {'subject': 'Vita App Support'},
     );
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      Get.snackbar('me.contact'.tr,
+      VitaNotice.error('me.contact'.tr,
           'me.emailUnavailable'.trParams({'email': supportEmail}));
     }
   }
@@ -67,38 +68,38 @@ class MePage extends StatelessWidget {
             children: [
               const VitaTabHeader(title: 'Vita', showDivider: false),
               Container(
-                margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                 decoration: BoxDecoration(
                   color: vita.surface,
                   border: Border.all(color: vita.divider),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                 child: Row(
                   children: [
                     ClipOval(
                       child: auth.avatarUrl.isEmpty
                           ? Image.asset(
                               'assets/icons/profile_default.png',
-                              width: 62,
-                              height: 62,
+                              width: 52,
+                              height: 52,
                               fit: BoxFit.cover,
                             )
                           : SizedBox(
-                              width: 62,
-                              height: 62,
+                              width: 52,
+                              height: 52,
                               child: VitaMediaImage(
                                 url: auth.avatarUrl,
                                 errorBuilder: (_, __, ___) => Image.asset(
                                   'assets/icons/profile_default.png',
-                                  width: 62,
-                                  height: 62,
+                                  width: 52,
+                                  height: 52,
                                   fit: BoxFit.cover,
                                 ),
                               ),
                             ),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -112,12 +113,12 @@ class MePage extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 18,
+                              fontSize: 17,
                               fontWeight: FontWeight.w700,
                               color: vita.text,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 4),
                           Text(
                             plan,
                             style: TextStyle(
@@ -131,11 +132,9 @@ class MePage extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 4),
-
               // Subscription group.
               VitaCard(
-                radius: 20,
+                radius: 12,
                 margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Column(
@@ -184,58 +183,49 @@ class MePage extends StatelessWidget {
                 ),
               ),
 
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              VitaCard(
+                radius: 12,
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Column(children: [
-                  Row(children: [
-                    Expanded(
-                        child: _MePortal(
-                      icon: Icons.card_giftcard_outlined,
-                      title: 'me.inviteCode'.tr,
-                      subtitle: inviteCode.isEmpty ? '—' : inviteCode,
-                      onTap: inviteCode.isEmpty
-                          ? null
-                          : () async {
-                              AnalyticsService.to.track(
-                                  'profile_invite_code_copied',
-                                  category: 'profile');
-                              await Clipboard.setData(
-                                  ClipboardData(text: inviteCode));
-                              Get.snackbar(
-                                  'me.inviteCode'.tr, 'me.inviteCopied'.tr);
-                            },
-                    )),
-                    const SizedBox(width: 12),
-                    Expanded(
-                        child: _MePortal(
-                      icon: Icons.star_outline_rounded,
-                      title: 'me.rate'.tr,
-                      onTap: _rateApp,
-                    )),
-                  ]),
-                  const SizedBox(height: 12),
-                  Row(children: [
-                    Expanded(
-                        child: _MePortal(
+                  _MeAction(
+                    icon: Icons.card_giftcard_outlined,
+                    title: 'me.inviteCode'.tr,
+                    value: inviteCode.isEmpty ? '—' : inviteCode,
+                    onTap: inviteCode.isEmpty
+                        ? null
+                        : () async {
+                            AnalyticsService.to.track(
+                                'profile_invite_code_copied',
+                                category: 'profile');
+                            await Clipboard.setData(
+                                ClipboardData(text: inviteCode));
+                            VitaNotice.success(
+                                'me.inviteCode'.tr, 'me.inviteCopied'.tr);
+                          },
+                  ),
+                  const Divider(indent: 52, height: 0.5),
+                  _MeAction(
+                    icon: Icons.settings_outlined,
+                    title: 'me.settings'.tr,
+                    onTap: () {
+                      AnalyticsService.to.track('profile_settings_opened',
+                          category: 'profile');
+                      Get.to(() => const SettingsPage(),
+                          transition: Transition.cupertino,
+                          duration: const Duration(milliseconds: 300));
+                    },
+                  ),
+                  const Divider(indent: 52, height: 0.5),
+                  _MeAction(
                       icon: Icons.mail_outline_rounded,
                       title: 'me.contact'.tr,
-                      subtitle: supportEmail,
-                      onTap: _contactUs,
-                    )),
-                    const SizedBox(width: 12),
-                    Expanded(
-                        child: _MePortal(
-                      icon: Icons.settings_outlined,
-                      title: 'me.settings'.tr,
-                      onTap: () {
-                        AnalyticsService.to.track('profile_settings_opened',
-                            category: 'profile');
-                        Get.to(() => const SettingsPage(),
-                            transition: Transition.cupertino,
-                            duration: const Duration(milliseconds: 300));
-                      },
-                    )),
-                  ]),
+                      onTap: _contactUs),
+                  const Divider(indent: 52, height: 0.5),
+                  _MeAction(
+                      icon: Icons.star_outline_rounded,
+                      title: 'me.rate'.tr,
+                      onTap: _rateApp),
                 ]),
               ),
 
@@ -260,49 +250,49 @@ class MePage extends StatelessWidget {
   }
 }
 
-class _MePortal extends StatelessWidget {
-  const _MePortal(
+class _MeAction extends StatelessWidget {
+  const _MeAction(
       {required this.icon,
       required this.title,
       required this.onTap,
-      this.subtitle});
+      this.value});
 
   final IconData icon;
   final String title;
-  final String? subtitle;
+  final String? value;
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => Material(
-        color: context.vita.surface,
-        borderRadius: BorderRadius.circular(22),
+  Widget build(BuildContext context) => SizedBox(
+        height: 56,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(22),
-          child: SizedBox(
-            height: 124,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(icon, color: context.vita.green, size: 28),
-                  const Spacer(),
-                  Text(title,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(children: [
+              Icon(icon, size: 20, color: context.vita.green),
+              const SizedBox(width: 16),
+              Expanded(
+                  child: Text(title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: context.vita.text,
-                          fontWeight: FontWeight.w700)),
-                  if (subtitle != null)
-                    Text(subtitle!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: context.vita.subText, fontSize: 11)),
-                ],
-              ),
-            ),
+                      style:
+                          TextStyle(color: context.vita.text, fontSize: 15))),
+              if (value != null)
+                Expanded(
+                    child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(value!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style:
+                          TextStyle(color: context.vita.subText, fontSize: 13)),
+                )),
+              const SizedBox(width: 6),
+              Icon(Icons.chevron_right_rounded,
+                  size: 20, color: context.vita.subText),
+            ]),
           ),
         ),
       );
@@ -372,11 +362,11 @@ class _SocialMediaButton extends StatelessWidget {
     if (uri == null ||
         (uri.scheme != 'http' && uri.scheme != 'https') ||
         uri.host.isEmpty) {
-      Get.snackbar('me.social.title'.tr, 'me.social.unavailable'.tr);
+      VitaNotice.error('me.social.title'.tr, 'me.social.unavailable'.tr);
       return;
     }
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      Get.snackbar('me.social.title'.tr, 'me.social.unavailable'.tr);
+      VitaNotice.error('me.social.title'.tr, 'me.social.unavailable'.tr);
     }
   }
 

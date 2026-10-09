@@ -63,7 +63,7 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
       padding: const EdgeInsets.only(bottom: 28),
       children: [
         _SubscriptionHero(active: ctrl.isSubscribed),
-        const SizedBox(height: 26),
+        const SizedBox(height: 18),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text('subscription.choosePlan'.tr,
@@ -195,38 +195,47 @@ class _SubscriptionHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final vita = context.vita;
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-      padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF3F315E), Color(0xFF253A58), Color(0xFF1D4C4D)],
-        ),
-        borderRadius: BorderRadius.circular(26),
+        color: vita.surface,
+        border: Border.all(color: vita.divider),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
+      child: Row(
         children: [
           Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.13),
-                shape: BoxShape.circle),
+            width: 44,
+            height: 44,
+            decoration:
+                BoxDecoration(color: vita.greenTint, shape: BoxShape.circle),
             child: Icon(
                 active ? Icons.verified_rounded : Icons.auto_awesome_rounded,
-                color: const Color(0xFFEADFFF),
-                size: 32),
+                color: vita.green,
+                size: 23),
           ),
-          const SizedBox(height: 14),
-          Text(active ? 'subscription.active'.tr : 'subscription.hero'.tr,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                  height: 1.25)),
+          const SizedBox(width: 14),
+          Expanded(
+              child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(active ? 'subscription.active'.tr : 'me.plus.title'.tr,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: vita.text)),
+              const SizedBox(height: 3),
+              Text('subscription.description'.tr,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 12, color: vita.subText, height: 1.3)),
+            ],
+          )),
         ],
       ),
     );
@@ -252,101 +261,89 @@ class _PlanCard extends StatelessWidget {
     final store = package.storeProduct;
     final premium = isPremiumProduct(package.identifier, store.identifier);
     final title = store.title.isNotEmpty ? store.title : package.identifier;
+    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       decoration: BoxDecoration(
         color: context.vita.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-            color: premium ? const Color(0xFF9C83D2) : context.vita.divider,
-            width: premium ? 1.5 : 1),
+            color: premium ? context.vita.green : context.vita.divider),
       ),
       child: InkWell(
         onTap: onDetails,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                Expanded(
-                  child: Text(title,
-                      style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          color: context.vita.text)),
-                ),
-                if (premium)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                    decoration: BoxDecoration(
-                        color: const Color(0xFF9C83D2).withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(20)),
-                    child: Text('subscription.recommended'.tr,
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          height: 144 * textScale,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Expanded(
+                    child: Text(title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF9C83D2))),
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: context.vita.text)),
                   ),
-              ]),
-              if (store.description.isNotEmpty) ...[
-                const SizedBox(height: 7),
-                Text(store.description,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontSize: 13,
-                        color: context.vita.subText,
-                        height: 1.4)),
-              ],
-              if (benefits.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                ...benefits.map((benefit) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(Icons.check_circle_outline,
-                                size: 17, color: Color(0xFF9C83D2)),
-                            const SizedBox(width: 9),
-                            Expanded(
-                                child: Text(benefit,
-                                    style: TextStyle(
-                                        fontSize: 13.5,
-                                        height: 1.4,
-                                        color: context.vita.text))),
-                          ]),
-                    )),
-              ],
-              const SizedBox(height: 15),
-              Row(children: [
-                Expanded(
-                  child: Text(
-                      store.priceString.isEmpty ? '—' : store.priceString,
-                      style: TextStyle(
-                          fontSize: 25,
-                          fontWeight: FontWeight.w700,
-                          color: context.vita.text)),
-                ),
+                  if (premium)
+                    Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(
+                            color: context.vita.greenTint,
+                            borderRadius: BorderRadius.circular(20)),
+                        child: Text('subscription.recommended'.tr,
+                            style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: context.vita.green))),
+                ]),
+                const SizedBox(height: 8),
                 SizedBox(
-                  height: 44,
-                  child: FilledButton(
-                    onPressed: busy ? null : onSubscribe,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: premium
-                          ? const Color(0xFF7860B8)
-                          : context.vita.green,
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: Text('subscription.subscribe'.tr),
+                    height: 34 * textScale,
+                    child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                            benefits.isNotEmpty
+                                ? benefits.first
+                                : store.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 13,
+                                color: context.vita.subText,
+                                height: 1.3)))),
+                const Spacer(),
+                Row(children: [
+                  Expanded(
+                    child: Text(
+                        store.priceString.isEmpty ? '—' : store.priceString,
+                        style: TextStyle(
+                            fontSize: 25,
+                            fontWeight: FontWeight.w700,
+                            color: context.vita.text)),
                   ),
-                ),
-              ]),
-            ],
+                  SizedBox(
+                    height: 44 * textScale,
+                    child: FilledButton(
+                      onPressed: busy ? null : onSubscribe,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: context.vita.green,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text('subscription.subscribe'.tr),
+                    ),
+                  ),
+                ]),
+              ],
+            ),
           ),
         ),
       ),

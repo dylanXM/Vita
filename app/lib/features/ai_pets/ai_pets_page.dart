@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/notice.dart';
 import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
@@ -135,7 +136,7 @@ class _AIPetsPageState extends State<AIPetsPage> {
       if (error.action == 'open_subscription') {
         await showSubscriptionPrompt('aiPets.subscriptionRequired'.tr);
       } else {
-        Get.snackbar('aiPets.error'.tr, error.message);
+        VitaNotice.error('aiPets.error'.tr, error.message);
       }
     } finally {
       nameController.dispose();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/notice.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/media_image.dart';
@@ -60,7 +61,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       );
     } catch (_) {
       if (!mounted) return;
-      Get.snackbar('profile.avatar'.tr, 'profile.pickFailed'.tr);
+      VitaNotice.error('profile.avatar'.tr, 'profile.pickFailed'.tr);
       return;
     }
     if (image == null || !mounted) return;
@@ -76,7 +77,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       setState(() => _avatarUrl = url);
     } catch (e) {
       if (!mounted) return;
-      Get.snackbar('profile.avatar'.tr,
+      VitaNotice.error('profile.avatar'.tr,
           e is ApiException ? e.message : 'profile.uploadFailed'.tr);
     } finally {
       if (mounted) setState(() => _uploadingAvatar = false);
@@ -87,7 +88,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     if (_saving) return;
     final nickname = _nicknameController.text.trim();
     if (nickname.runes.length > 30) {
-      Get.snackbar('profile.nickname'.tr, 'profile.nicknameTooLong'.tr);
+      VitaNotice.warning('profile.nickname'.tr, 'profile.nicknameTooLong'.tr);
       return;
     }
     setState(() => _saving = true);
@@ -100,7 +101,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       Get.back();
     } catch (e) {
       if (!mounted) return;
-      Get.snackbar('profile.saveFailed'.tr,
+      VitaNotice.error('profile.saveFailed'.tr,
           e is ApiException ? e.message : 'profile.saveFailed'.tr);
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -166,8 +167,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             height: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.4,
-                              valueColor:
-                                  AlwaysStoppedAnimation(Colors.white),
+                              valueColor: AlwaysStoppedAnimation(Colors.white),
                             ),
                           ),
                         ),
@@ -198,8 +198,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
                 filled: false,
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
               ),
               style: TextStyle(fontSize: 16, color: vita.text),
             ),

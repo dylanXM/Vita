@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/notice.dart';
 import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/constants.dart';
@@ -234,13 +235,13 @@ class ChatInfoPage extends StatelessWidget {
       );
       if (!context.mounted) return;
       final running = result is Map && result['life_engine_running'] == true;
-      Get.snackbar(
+      VitaNotice.success(
         'chatInfo.deleted'.tr,
         running ? 'chatInfo.deletedRunning'.tr : 'chatInfo.deletedPaused'.tr,
       );
       Get.back(result: true);
     } on ApiException catch (error) {
-      Get.snackbar('chatInfo.deleteFailed'.tr, error.message);
+      VitaNotice.error('chatInfo.deleteFailed'.tr, error.message);
     }
   }
 }
@@ -396,7 +397,7 @@ class _ChatMediaPageState extends State<ChatMediaPage> {
         if (_hasMore) _page++;
       });
     } on ApiException catch (error) {
-      if (mounted) Get.snackbar('chatInfo.media'.tr, error.message);
+      if (mounted) VitaNotice.error('chatInfo.media'.tr, error.message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
