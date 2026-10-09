@@ -5,6 +5,7 @@ import '../../core/api_client.dart';
 import '../../core/analytics_service.dart';
 import '../../core/constants.dart';
 import '../chat/chat_list_controller.dart';
+import '../ads/admob_controller.dart';
 
 /// Billing state: RevenueCat (mobile subscriptions + credit packs), Stripe
 /// (web/admin side) and the server-side credit balance / entitlement sync.
@@ -22,11 +23,19 @@ class BillingController extends GetxController {
   final offerings = Rxn<Offerings>();
   final planBenefits = <String, List<String>>{}.obs;
   String? _identifiedUserID;
+  bool _creditsLoaded = false;
 
   @override
   void onInit() {
     super.onInit();
+    ApiClient.onPaidActionSuccess = refreshCredits;
     init();
+  }
+
+  @override
+  void onClose() {
+    ApiClient.onPaidActionSuccess = null;
+    super.onClose();
   }
 
   Future<void> init() async {
@@ -81,6 +90,12 @@ class BillingController extends GetxController {
   }
 
   Future<void> clearUser() async {
+    _creditsLoaded = false;
+    balance.value = 0;
+    transactions.clear();
+    if (Get.isRegistered<AdmobController>()) {
+      AdmobController.to.config.value = null;
+    }
     if (!rcReady.value || _identifiedUserID == null) return;
     try {
       await Purchases.logOut();
@@ -93,6 +108,7 @@ class BillingController extends GetxController {
 
   Future<void> refreshCredits() async {
     try {
+      final oldIDs = transactions.map((tx) => tx['id']).toSet();
       final data = await ApiClient.instance.get('/v1/me/credits');
       balance.value = (data['balance'] as num?)?.toInt() ?? 0;
       transactions.assignAll(
@@ -100,6 +116,15 @@ class BillingController extends GetxController {
             .whereType<Map>()
             .map((e) => Map<String, dynamic>.from(e)),
       );
+      final newSpend = _creditsLoaded &&
+          transactions.any((tx) =>
+              !oldIDs.contains(tx['id']) &&
+              ((tx['amount'] as num?)?.toInt() ?? 0) < 0);
+      _creditsLoaded = true;
+      if (newSpend && Get.isRegistered<AdmobController>()) {
+        Future.delayed(const Duration(seconds: 1),
+            AdmobController.to.maybeShowInterstitial);
+      }
     } catch (_) {
       // server unreachable — keep last known values
     }
@@ -133,6 +158,9 @@ class BillingController extends GetxController {
       await Purchases.purchase(PurchaseParams.package(pkg));
       await refreshSubscription();
       await refreshCredits();
+      if (Get.isRegistered<AdmobController>()) {
+        await AdmobController.to.refreshConfig();
+      }
       await ChatListController.to.load();
       AnalyticsService.to.track('purchase_succeeded',
           category: 'billing',
@@ -141,6 +169,10 @@ class BillingController extends GetxController {
             'product_id': pkg.storeProduct.identifier
           });
       Get.snackbar('Vita', 'billing.purchaseSuccess'.tr);
+      if (Get.isRegistered<AdmobController>()) {
+        Future.delayed(const Duration(seconds: 1),
+            AdmobController.to.maybeShowInterstitial);
+      }
     } catch (e) {
       // RevenueCat errors include the user cancelling the sheet; only surface
       // real failures.

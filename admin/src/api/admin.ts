@@ -10,6 +10,7 @@ import type {
   AdminGrantOperation,
   AdminGrantResult,
   InvitationSettings,
+  AdmobSettings,
   HealthResponse,
   Profile,
   AgentConfig,
@@ -151,6 +152,13 @@ export const invitationApi = {
     http.get<InvitationSettings>("/admin/invitation-settings", { signal }),
   saveSettings: (rewardPercent: number) =>
     http.put<InvitationSettings>("/admin/invitation-settings", { reward_percent: rewardPercent }),
+};
+
+export const admobApi = {
+  settings: (signal?: AbortSignal) =>
+    http.get<AdmobSettings>("/admin/admob-settings", { signal }),
+  saveSettings: (body: AdmobSettings) =>
+    http.put<AdmobSettings>("/admin/admob-settings", body),
 };
 
 export const onboardingApi = {

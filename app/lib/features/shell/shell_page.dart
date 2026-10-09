@@ -13,6 +13,7 @@ import '../me/me_page.dart';
 import '../memories/memories_page.dart';
 import '../explore/explore_page.dart';
 import '../whats_new/whats_new_sheet.dart';
+import '../ads/admob_controller.dart';
 
 /// Main shell for the world, journey, discover and account destinations.
 class ShellController extends GetxController {
@@ -48,6 +49,7 @@ class _ShellPageState extends State<ShellPage> {
   @override
   void initState() {
     super.initState();
+    AdmobController.to.refreshConfig();
     PushNotificationService.instance.activateForSignedInUser();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final campaign = await AppContentController.to.campaignToShow();

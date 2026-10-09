@@ -6,6 +6,8 @@ plugins {
 
 val vitaApplicationId = System.getenv("VITA_ANDROID_APPLICATION_ID") ?: "com.example.vita"
 val vitaReleaseKeystore = System.getenv("VITA_ANDROID_KEYSTORE")
+val vitaAdmobAppId = System.getenv("VITA_ADMOB_ANDROID_APP_ID")
+    ?: "ca-app-pub-3940256099942544~3347511713"
 
 android {
     namespace = "com.example.vita"
@@ -19,6 +21,7 @@ android {
 
     defaultConfig {
         applicationId = vitaApplicationId
+        manifestPlaceholders["admobAppId"] = vitaAdmobAppId
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -65,6 +68,9 @@ gradle.taskGraph.whenReady {
     }
     if (buildsRelease && vitaApplicationId == "com.example.vita") {
         throw GradleException("Release builds require VITA_ANDROID_APPLICATION_ID")
+    }
+    if (buildsRelease && vitaAdmobAppId == "ca-app-pub-3940256099942544~3347511713") {
+        throw GradleException("Release builds require VITA_ADMOB_ANDROID_APP_ID")
     }
 }
 

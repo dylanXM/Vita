@@ -11,6 +11,7 @@ import { AgentPage } from "@/pages/AgentPage";
 import { CoinPacksPage, SubscriptionPlansPage } from "@/pages/BillingProductsPage";
 import { BillingActivityPage } from "@/pages/BillingActivityPage";
 import { InvitationSettingsPage } from "@/pages/InvitationSettingsPage";
+import { AdmobSettingsPage } from "@/pages/AdmobSettingsPage";
 import { CompanionsPage } from "@/pages/CompanionsPage";
 import { CompanionDetailPage } from "@/pages/CompanionDetailPage";
 import { OnboardingPage } from "@/pages/OnboardingPage";
@@ -73,6 +74,7 @@ const router = createBrowserRouter([
       { path: "billing-activity", element: <BillingActivityPage /> },
       { path: "credit-products", element: <CreditProductsPage /> },
       { path: "invitation-settings", element: <InvitationSettingsPage /> },
+      { path: "admob-settings", element: <AdmobSettingsPage /> },
       { path: "onboarding", element: <OnboardingPage /> },
       { path: "whats-new", element: <WhatsNewPage /> },
       { path: "social-links", element: <SocialLinksPage /> },

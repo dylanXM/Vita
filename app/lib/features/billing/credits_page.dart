@@ -6,11 +6,23 @@ import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import 'billing_controller.dart';
 import 'billing_products.dart';
+import '../ads/admob_controller.dart';
 
 /// WeChat-style wallet page: one quiet balance surface and continuous grouped
 /// rows for purchases and transactions.
-class CreditsPage extends StatelessWidget {
+class CreditsPage extends StatefulWidget {
   const CreditsPage({super.key});
+
+  @override
+  State<CreditsPage> createState() => _CreditsPageState();
+}
+
+class _CreditsPageState extends State<CreditsPage> {
+  @override
+  void initState() {
+    super.initState();
+    AdmobController.to.refreshConfig();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +32,10 @@ class CreditsPage extends StatelessWidget {
       appBar: AppBar(
           leading: const VitaBackButton(), title: Text('credits.title'.tr)),
       body: Obx(() => RefreshIndicator(
-            onRefresh: ctrl.refreshCredits,
+            onRefresh: () async {
+              await ctrl.refreshCredits();
+              await AdmobController.to.refreshConfig();
+            },
             child: _body(context, ctrl),
           )),
     );
@@ -76,6 +91,32 @@ class CreditsPage extends StatelessWidget {
             ],
           ),
         ),
+        const Padding(
+          padding: EdgeInsets.only(top: 12),
+          child: AdmobBanner(),
+        ),
+        Obx(() {
+          final ads = AdmobController.to;
+          if (!ads.canShowRewarded) return const SizedBox.shrink();
+          final reward =
+              (ads.config.value?['reward_credits'] as num?)?.toInt() ?? 0;
+          final remaining =
+              (ads.config.value?['remaining_today'] as num?)?.toInt() ?? 0;
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: SizedBox(
+              height: 48,
+              child: OutlinedButton.icon(
+                onPressed: ads.loadingReward.value ? null : ads.showRewarded,
+                icon: const Icon(Icons.play_circle_outline),
+                label: Text('ads.watchReward'.trParams({
+                  'credits': '$reward',
+                  'remaining': '$remaining',
+                })),
+              ),
+            ),
+          );
+        }),
         _SectionLabel('credits.buyMore'.tr),
         if (packs.isEmpty)
           const _PacksHint()
@@ -251,9 +292,11 @@ class _TxRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final amount = (tx['amount'] as num?)?.toInt() ?? 0;
     final description = tx['description'] as String? ?? '';
-    final displayDescription = description.startsWith('companion-transfer:')
-        ? 'chat.transfer'.tr
-        : description;
+    final displayDescription = tx['kind'] == 'ad_reward'
+        ? 'ads.rewardHistory'.tr
+        : description.startsWith('companion-transfer:')
+            ? 'chat.transfer'.tr
+            : description;
     final kind = tx['kind'] as String? ?? '';
     final createdAt = tx['created_at'] as String?;
     return ConstrainedBox(

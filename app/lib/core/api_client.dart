@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart' hide FormData, MultipartFile;
@@ -23,6 +25,7 @@ class ApiClient {
   ApiClient._();
 
   static final ApiClient instance = ApiClient._();
+  static Future<void> Function()? onPaidActionSuccess;
 
   late final Dio dio = _build();
   Future<bool>? _refreshing;
@@ -133,10 +136,27 @@ class ApiClient {
   Future<dynamic> post(String path, {Map<String, dynamic>? data}) async {
     try {
       final r = await dio.post(path, data: data);
+      final callback = onPaidActionSuccess;
+      if (callback != null && _isPaidAction(path)) unawaited(callback());
       return r.data;
     } on DioException catch (e) {
       throw _exception(e);
     }
+  }
+
+  bool _isPaidAction(String path) {
+    if (path == '/v1/credits/consume') {
+      return true;
+    }
+    if (RegExp(r'^/v1/companions/[^/]+/(experiences/[^/]+|transfers)$')
+        .hasMatch(path)) {
+      return true;
+    }
+    if (RegExp(r'^/v1/ai-pets/[^/]+/feed$').hasMatch(path)) {
+      return true;
+    }
+    return path == '/v1/stories/' ||
+        RegExp(r'^/v1/stories/[^/]+/(choices|storyboards)$').hasMatch(path);
   }
 
   Future<dynamic> upload(String path, String filePath,

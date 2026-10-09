@@ -8,6 +8,7 @@ import '../../core/supported_locales.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../auth/auth_controller.dart';
+import '../ads/admob_controller.dart';
 import 'deleted_companions_page.dart';
 import 'legal_document_page.dart';
 import 'profile_edit_page.dart';
@@ -164,6 +165,20 @@ class SettingsPage extends StatelessWidget {
                   borderRadius: BorderRadius.zero,
                   onTap: () => _openLegal(LegalDocumentType.terms),
                 ),
+                Obx(() => AdmobController.to.privacyOptionsRequired.value
+                    ? Column(children: [
+                        const Divider(indent: 52, height: 0.5),
+                        VitaListTile(
+                          customIcon: VitaMenuIcon(
+                            icon: Icons.tune_rounded,
+                            color: vita.green,
+                          ),
+                          title: 'ads.privacyOptions'.tr,
+                          borderRadius: BorderRadius.zero,
+                          onTap: AdmobController.to.showPrivacyOptions,
+                        ),
+                      ])
+                    : const SizedBox.shrink()),
               ],
             ),
           ),

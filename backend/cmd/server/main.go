@@ -187,12 +187,15 @@ func main() {
 
 		// Billing — credits, subscriptions and provider webhooks.
 		api.GET("/me/credits", middleware.RequireAuth(), handler.GetCredits)
+		api.GET("/ads/config", middleware.RequireAuth(), handler.GetAdmobConfig)
+		api.POST("/ads/reward-sessions", middleware.RequireAuth(), handler.CreateAdmobRewardSession)
 		api.POST("/credits/consume", middleware.RequireAuth(), handler.ConsumeCredits)
 		api.GET("/me/subscription", middleware.RequireAuth(), handler.GetMySubscription)
 		api.GET("/subscription-plans/benefits", middleware.RequireAuth(), handler.ListSubscriptionPlanBenefits)
 		api.POST("/stripe/checkout", middleware.RequireAuth(), handler.CreateStripeCheckout)
 		api.POST("/webhooks/revenuecat", handler.RevenueCatWebhook)
 		api.POST("/webhooks/stripe", handler.StripeWebhook)
+		api.GET("/webhooks/admob/reward", handler.AdmobRewardCallback)
 
 		life := api.Group("/companions/:id/life")
 		{
@@ -277,6 +280,8 @@ func main() {
 			admin.PUT("/credit-products/:product_key", handler.AdminUpdateCreditProduct)
 			admin.GET("/invitation-settings", handler.AdminGetInvitationSettings)
 			admin.PUT("/invitation-settings", handler.AdminUpdateInvitationSettings)
+			admin.GET("/admob-settings", handler.AdminGetAdmobSettings)
+			admin.PUT("/admob-settings", handler.AdminUpdateAdmobSettings)
 			admin.GET("/onboarding", handler.AdminGetOnboarding)
 			admin.PUT("/onboarding", handler.AdminUpdateOnboarding)
 			admin.GET("/whats-new", handler.AdminListWhatsNew)

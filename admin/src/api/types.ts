@@ -265,6 +265,21 @@ export interface InvitationSettings {
   rewarded_coins: number;
 }
 
+export interface AdmobSettings {
+  rewarded_enabled: boolean;
+  banner_enabled: boolean;
+  interstitial_enabled: boolean;
+  show_to_subscribers: boolean;
+  reward_credits: number;
+  daily_reward_limit: number;
+  android_rewarded_unit_id: string;
+  ios_rewarded_unit_id: string;
+  android_banner_unit_id: string;
+  ios_banner_unit_id: string;
+  android_interstitial_unit_id: string;
+  ios_interstitial_unit_id: string;
+}
+
 export type MobilePlatform = "ios" | "android";
 export type LocalizedCopy = Record<string, string>;
 

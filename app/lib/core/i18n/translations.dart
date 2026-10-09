@@ -265,6 +265,15 @@ class VitaTranslations extends Translations {
       'credits.empty': 'No transactions yet',
       'credits.buy': 'Buy',
       'credits.noPacks': 'No credit packs are configured yet.',
+      'ads.title': 'Ads',
+      'ads.unavailable':
+          'No ad is available right now. Please try again later.',
+      'ads.rewardPending':
+          'Ad completed. Credits will arrive after verification.',
+      'ads.watchReward':
+          'Watch an ad · +@credits credits (@remaining left today)',
+      'ads.privacyOptions': 'Ad privacy choices',
+      'ads.rewardHistory': 'Rewarded ad',
       'contacts.search': 'Search contacts',
       'contacts.noResults': 'No matches',
       'contacts.noResultsSub': 'Try a different name or keyword',
@@ -807,6 +816,12 @@ class VitaTranslations extends Translations {
       'credits.empty': '暂无流水',
       'credits.buy': '购买',
       'credits.noPacks': '暂未配置金币包。',
+      'ads.title': '广告',
+      'ads.unavailable': '当前没有可展示的广告，请稍后再试。',
+      'ads.rewardPending': '广告已看完，服务端验证后金币会到账。',
+      'ads.watchReward': '看广告领 @credits 金币（今日剩余 @remaining 次）',
+      'ads.privacyOptions': '广告隐私选项',
+      'ads.rewardHistory': '观看广告奖励',
       'contacts.search': '搜索联系人',
       'contacts.noResults': '没有找到',
       'contacts.noResultsSub': '换个名字或关键词试试',

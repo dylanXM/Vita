@@ -28,6 +28,7 @@ const en = {
     mediaModels: "Model routing",
     storage: "Media storage",
     invitationSettings: "Invitation settings",
+    admobSettings: "Google ads",
     billing: "Billing",
     subscriptionPlans: "Subscription plans",
     coinPacks: "Coin packs",
@@ -146,6 +147,16 @@ const en = {
   },
 
   invitation: { title: "Invitation settings", desc: "Configure inviter rewards for paid subscription and coin purchases.", invitedUsers: "Invited users", rewardedCoins: "Rewarded coins", rate: "Reward ratio", rateDesc: "The inviter receives this percentage of every paid coin increase. Admin grants are excluded.", percent: "Reward percentage (%)", example: "For 1,000 purchased coins, the inviter receives {{coins}} coins.", save: "Save settings", saved: "Invitation settings saved" },
+  admob: {
+    title: "Google ads", desc: "Control mobile ads and rewards. All formats start disabled.",
+    formats: "Formats", rewarded: "Rewarded ads for credits", banner: "Banner ads", interstitial: "Interstitial ads",
+    subscribers: "Show banner and interstitial ads to subscribers",
+    placements: "Banners appear only in the credits page. Interstitials appear after a completed credit spend or purchase.",
+    rewardRules: "Reward rules", credits: "Credits per completed ad", dailyLimit: "Daily reward limit per user (UTC)",
+    units: "Ad unit IDs", androidRewarded: "Android rewarded", iosRewarded: "iOS rewarded",
+    androidBanner: "Android banner", iosBanner: "iOS banner", androidInterstitial: "Android interstitial", iosInterstitial: "iOS interstitial",
+    appIdHint: "The AdMob app IDs must also be set in the Android and iOS builds before release.", saved: "Google ad settings saved",
+  },
 
   agent: {
     title: "AI companion agent",

@@ -5,6 +5,7 @@ import 'app_content_controller.dart';
 import 'analytics_service.dart';
 import '../features/auth/auth_controller.dart';
 import '../features/billing/billing_controller.dart';
+import '../features/ads/admob_controller.dart';
 import '../features/ai_pets/ai_pet_desktop_controller.dart';
 import '../features/chat/chat_list_controller.dart';
 import '../features/explore/explore_page.dart';
@@ -24,4 +25,5 @@ void initControllers() {
   Get.put(ExploreController(), permanent: true);
   Get.put(ShellController(), permanent: true);
   Get.put(BillingController(), permanent: true);
+  Get.put(AdmobController(), permanent: true);
 }

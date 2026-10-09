@@ -28,6 +28,7 @@ const zhHans = {
     mediaModels: "模型路由",
     storage: "媒体存储",
     invitationSettings: "邀请码配置",
+    admobSettings: "Google 广告",
     billing: "计费管理",
     subscriptionPlans: "订阅计划",
     coinPacks: "金币包",
@@ -146,6 +147,16 @@ const zhHans = {
   },
 
   invitation: { title: "邀请码配置", desc: "配置付费订阅和金币充值产生的邀请人奖励。", invitedUsers: "受邀用户数", rewardedCoins: "累计奖励金币", rate: "奖励比例", rateDesc: "受邀用户每次通过订阅或充值增加金币时，邀请人按此比例获得金币；管理员赠予不参与奖励。", percent: "奖励比例（%）", example: "受邀用户购买 1,000 金币时，邀请人获得 {{coins}} 金币。", save: "保存配置", saved: "邀请码配置已保存" },
+  admob: {
+    title: "Google 广告", desc: "配置移动端广告展示与奖励；所有广告默认关闭。",
+    formats: "广告形式", rewarded: "看激励广告领取金币", banner: "横幅广告", interstitial: "插屏广告",
+    subscribers: "向订阅用户展示横幅和插屏",
+    placements: "横幅仅在金币页展示；完成金币消费或购买后可展示插屏。",
+    rewardRules: "奖励规则", credits: "每条广告奖励金币", dailyLimit: "每人每日领取次数上限（UTC）",
+    units: "广告单元 ID", androidRewarded: "Android 激励广告", iosRewarded: "iOS 激励广告",
+    androidBanner: "Android 横幅", iosBanner: "iOS 横幅", androidInterstitial: "Android 插屏", iosInterstitial: "iOS 插屏",
+    appIdHint: "发布 App 前还需在 Android 和 iOS 构建中配置 AdMob 应用 ID。", saved: "Google 广告配置已保存",
+  },
 
   agent: {
     title: "AI 伴侣 Agent",
