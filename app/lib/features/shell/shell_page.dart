@@ -158,16 +158,22 @@ class VitaTabBar extends StatelessWidget {
         selectedLabelColor: vita.subText,
         unselectedIconColor: vita.subText,
         unselectedLabelColor: vita.subText,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
         unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
         settings: LiquidGlassSettings(
           glassColor: vita.surface.withValues(alpha: dark ? 0.44 : 0.58),
           blur: 8,
         ),
         tabs: [
-          for (final item in _kTabs)
+          for (var i = 0; i < _kTabs.length; i++)
             GlassTab(
-              icon: Icon(item.icon),
-              label: item.labelKey.tr,
+              // With the indicator hidden, the package renders every tab
+              // through its unselected layer. Color the active glyph here.
+              icon: Icon(
+                _kTabs[i].icon,
+                color: i == index ? vita.green : vita.subText,
+              ),
+              label: _kTabs[i].labelKey.tr,
             ),
         ],
       ),
