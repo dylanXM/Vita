@@ -28,11 +28,23 @@ type companionMoment struct {
 	CompanionText string    `json:"companion_text"`
 	Invitation    string    `json:"invitation"`
 	Opening       string    `json:"opening"`
+	MemoryID      string    `json:"-"`
+}
+
+func (moment companionMoment) duration() time.Duration {
+	duration := moment.EndsAt.Sub(moment.StartsAt)
+	if duration <= 0 {
+		return time.Hour
+	}
+	return duration
 }
 
 func loadCompanionMoment(ctx context.Context, userID, companionID, eventID string) (companionMoment, error) {
 	var moment companionMoment
 	err := db.Get().QueryRowContext(ctx, `SELECT e.id,COALESCE(e.payload->>'product_key',''),
+		COALESCE(e.payload->>'memory_id',(SELECT cs.result->>'memory_id' FROM credit_spends cs
+			WHERE cs.user_id=$1 AND cs.reference_id=e.id AND cs.reference_type='companion_experience'
+			AND cs.status='completed' ORDER BY cs.completed_at DESC LIMIT 1),''),
 		COALESCE(e.title,''),COALESCE(e.description,''),COALESCE(e.location,''),e.start_time,e.end_time,
 		COALESCE(s.artifact_text,''),COALESCE(s.artifact_user_text,''),COALESCE(s.artifact_companion_text,''),
 		COALESCE((SELECT invitation.content FROM messages invitation WHERE invitation.life_event_id=e.id AND invitation.source='moment_invitation' ORDER BY invitation.created_at DESC LIMIT 1),''),
@@ -42,7 +54,7 @@ func loadCompanionMoment(ctx context.Context, userID, companionID, eventID strin
 		LEFT JOIN messages m ON m.id=s.opening_message_id
 		WHERE e.id=$3 AND e.companion_id=$2 AND c.user_id=$1 AND c.active=true
 		AND e.event_type='shared_activity' AND e.generation_source='user_purchase'`,
-		userID, companionID, eventID).Scan(&moment.ID, &moment.ProductKey, &moment.TitleKey,
+		userID, companionID, eventID).Scan(&moment.ID, &moment.ProductKey, &moment.MemoryID, &moment.TitleKey,
 		&moment.Description, &moment.Location, &moment.StartsAt, &moment.EndsAt,
 		&moment.Artifact, &moment.UserText, &moment.CompanionText, &moment.Invitation, &moment.Opening)
 	return moment, err
@@ -57,6 +69,11 @@ func GetCompanionMoment(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load moment"})
 		return
+	}
+	// Older App builds use ends_at to decide whether the Enter button is shown.
+	// Keep unopened purchases enterable until the App status logic is updated.
+	if moment.Opening == "" && !time.Now().Before(moment.EndsAt) {
+		moment.EndsAt = time.Now().Add(moment.duration())
 	}
 	c.JSON(http.StatusOK, moment)
 }
@@ -79,7 +96,7 @@ func StartCompanionMoment(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "moment has not started", "code": "moment_scheduled", "starts_at": moment.StartsAt})
 		return
 	}
-	if !time.Now().Before(moment.EndsAt) {
+	if moment.Opening != "" && !time.Now().Before(moment.EndsAt) {
 		c.JSON(http.StatusConflict, gin.H{"error": "moment has ended", "code": "moment_ended"})
 		return
 	}
@@ -138,6 +155,14 @@ func StartCompanionMoment(c *gin.Context) {
 	}
 	messageID := uuid.New().String()
 	messagePayload, _ := json.Marshal(map[string]any{"event_id": eventID})
+	startedAt := time.Now().UTC()
+	endsAt := startedAt.Add(moment.duration())
+	var timezone string
+	_ = db.Get().QueryRowContext(ctx, `SELECT timezone FROM users WHERE id=$1`, userID).Scan(&timezone)
+	location, zoneErr := time.LoadLocation(timezone)
+	if zoneErr != nil {
+		location = time.UTC
+	}
 	tx, err := db.Get().BeginTx(ctx, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save opening"})
@@ -148,6 +173,26 @@ func StartCompanionMoment(c *gin.Context) {
 		VALUES($1,$2,'assistant','text',$3,$4,'moment_opening',$5,'delivered')`, messageID, conversationID, text, messagePayload, eventID); err == nil {
 		_, err = tx.ExecContext(ctx, `UPDATE companion_moment_sessions SET opening_message_id=$2 WHERE event_id=$1 AND user_id=$3`, eventID, messageID, userID)
 	}
+	if err == nil {
+		_, err = tx.ExecContext(ctx, `UPDATE life_events SET start_time=$2,end_time=$3,local_date=$4::date,
+			sequence=(SELECT COALESCE(MAX(sequence),-1)+1 FROM life_events WHERE companion_id=$5 AND local_date=$4::date AND id<>$1),
+			status='active' WHERE id=$1`,
+			eventID, startedAt, endsAt, startedAt.In(location).Format("2006-01-02"), companionID)
+	}
+	if err == nil && moment.MemoryID != "" {
+		metadata, _ := json.Marshal(map[string]any{"paid_experience": true, "product_key": moment.ProductKey, "with_user": true, "event_id": eventID})
+		_, err = tx.ExecContext(ctx, `INSERT INTO memories(id,companion_id,type,content,importance,event_time,metadata)
+			VALUES($1,$2,'shared_experience',$3,80,$4,$5) ON CONFLICT(id) DO NOTHING`,
+			moment.MemoryID, companionID, moment.Description, startedAt, string(metadata))
+		if err == nil {
+			_, err = tx.ExecContext(ctx, `UPDATE memories SET event_time=$2,metadata=$3
+				WHERE id=$1 AND companion_id=$4`, moment.MemoryID, startedAt, string(metadata), companionID)
+		}
+	}
+	if err == nil {
+		_, err = tx.ExecContext(ctx, `UPDATE messages SET payload=jsonb_set(jsonb_set(payload,'{scheduled_at}',to_jsonb($2::timestamptz)),'{ends_at}',to_jsonb($3::timestamptz))
+			WHERE life_event_id=$1 AND message_type='scene_card' AND source='paid_date'`, eventID, startedAt, endsAt)
+	}
 	if err != nil || tx.Commit() != nil {
 		_ = tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save opening"})
@@ -155,6 +200,8 @@ func StartCompanionMoment(c *gin.Context) {
 	}
 	completed = true
 	moment.Opening = text
+	moment.StartsAt = startedAt
+	moment.EndsAt = endsAt
 	c.JSON(http.StatusOK, moment)
 }
 
@@ -175,8 +222,8 @@ func SaveCompanionMomentArtifact(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "artifact must contain 1 to 500 characters"})
 		return
 	}
-	if time.Now().Before(moment.StartsAt) {
-		c.JSON(http.StatusConflict, gin.H{"error": "moment has not started"})
+	if moment.Opening == "" {
+		c.JSON(http.StatusConflict, gin.H{"error": "open the moment before saving"})
 		return
 	}
 	if !requireExperienceAccess(c, userID, companionID) {

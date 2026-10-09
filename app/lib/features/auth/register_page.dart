@@ -155,6 +155,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!_acceptedLegal || privacy == null || terms == null) return;
     try {
       if (await AuthController.to.loginWithGoogle(
+        inviteCode: _inviteCode.text,
         acceptedLegal: true,
         privacyPolicyVersion: privacy.version,
         termsVersion: terms.version,

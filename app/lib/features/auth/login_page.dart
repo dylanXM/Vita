@@ -3,7 +3,10 @@ import 'package:get/get.dart';
 
 import '../../core/notice.dart';
 import '../../core/theme.dart';
+import '../../core/app_content_controller.dart';
+import '../../core/legal_documents.dart';
 import 'auth_controller.dart';
+import 'registration_legal_consent.dart';
 
 /// Email + password login and Google sign-in. New users are directed to the
 /// two-step registration page (email + password, then a 6-digit code).
@@ -17,7 +20,9 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _inviteCode = TextEditingController();
   bool _obscurePassword = true;
+  bool _acceptedLegal = false;
 
   @override
   void initState() {
@@ -28,6 +33,9 @@ class _LoginPageState extends State<LoginPage> {
     // as the password-visibility toggle.
     _email.addListener(_onFieldChanged);
     _password.addListener(_onFieldChanged);
+    AppContentController.to.load().whenComplete(() {
+      if (mounted) setState(() {});
+    });
   }
 
   void _onFieldChanged() {
@@ -40,6 +48,7 @@ class _LoginPageState extends State<LoginPage> {
     _password.removeListener(_onFieldChanged);
     _email.dispose();
     _password.dispose();
+    _inviteCode.dispose();
     super.dispose();
   }
 
@@ -59,7 +68,16 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _googleLogin() async {
     try {
-      if (await AuthController.to.loginWithGoogle()) {
+      final privacy =
+          AppContentController.to.legalDocument(LegalDocumentType.privacy);
+      final terms =
+          AppContentController.to.legalDocument(LegalDocumentType.terms);
+      if (await AuthController.to.loginWithGoogle(
+        inviteCode: _inviteCode.text,
+        acceptedLegal: _acceptedLegal && privacy != null && terms != null,
+        privacyPolicyVersion: _acceptedLegal ? (privacy?.version ?? '') : '',
+        termsVersion: _acceptedLegal ? (terms?.version ?? '') : '',
+      )) {
         Get.offAllNamed('/shell');
       }
     } catch (e) {
@@ -159,6 +177,26 @@ class _LoginPageState extends State<LoginPage> {
                 ],
               ),
               const SizedBox(height: 24),
+              TextField(
+                controller: _inviteCode,
+                autocorrect: false,
+                textCapitalization: TextCapitalization.characters,
+                textInputAction: TextInputAction.done,
+                decoration: InputDecoration(
+                  hintText: 'auth.inviteCodeOptional'.tr,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'auth.inviteNewAccountsOnly'.tr,
+                style: TextStyle(fontSize: 12, color: context.vita.subText),
+              ),
+              const SizedBox(height: 8),
+              RegistrationLegalConsent(
+                accepted: _acceptedLegal,
+                onChanged: (value) => setState(() => _acceptedLegal = value),
+              ),
+              const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: _googleLogin,
                 icon: Icon(Icons.g_mobiledata,

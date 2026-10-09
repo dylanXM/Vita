@@ -81,13 +81,28 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     final key = product['key'] as String? ?? '';
     final coins = product['coins'] as int? ?? 0;
     final owned = _owned[key] == true;
+    final appointment =
+        product['category'] == 'date' ? await _chooseAppointment() : null;
+    if (product['category'] == 'date' && appointment == null) return;
+    if (!mounted) return;
+    final appointmentLabel = appointment == null
+        ? ''
+        : '${MaterialLocalizations.of(context).formatMediumDate(appointment)} '
+            '${TimeOfDay.fromDateTime(appointment).format(context)}';
+    final confirmation = owned
+        ? 'experience.equipConfirm'.tr
+        : product['category'] == 'gift'
+            ? 'experience.gift.confirm'.trParams({'coins': '$coins'})
+            : 'experience.confirm'.trParams({'coins': '$coins'});
     final confirmed = await showCupertinoDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text((product['name_key'] as String? ?? key).tr),
-        content: Text(owned
-            ? 'experience.equipConfirm'.tr
-            : 'experience.confirm'.trParams({'coins': '$coins'})),
+        content: Text(appointment == null
+            ? confirmation
+            : '${'moment.scheduled'.trParams({
+                    'time': appointmentLabel
+                  })}\n$confirmation'),
         actions: [
           CupertinoDialogAction(
               onPressed: () => Navigator.pop(dialogContext, false),
@@ -107,7 +122,10 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
         data: {
           'idempotency_key':
               '${widget.companionId}-$key-${DateTime.now().microsecondsSinceEpoch}',
-          'input': <String, dynamic>{}
+          'input': <String, dynamic>{
+            if (appointment != null)
+              'scheduled_at': appointment.toUtc().toIso8601String(),
+          }
         },
       );
       if (data is Map && data['balance'] is int) {
@@ -125,6 +143,10 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
         'product_key': key,
         'coins': owned ? 0 : coins,
       });
+      if (product['category'] == 'gift') {
+        if (mounted) Navigator.of(context).pop();
+        return;
+      }
       final result = data is Map ? data['result'] : null;
       if (!mounted ||
           (widget.onResult != null &&
@@ -144,6 +166,12 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
       } else if (error.action == 'open_subscription') {
         Navigator.of(context).pop();
         Get.toNamed('/subscription');
+      } else if (error.code == 'invalid_appointment') {
+        VitaNotice.error(
+            'experience.failed'.tr, 'experience.appointmentInvalid'.tr);
+      } else if (error.code == 'appointment_unavailable') {
+        VitaNotice.error(
+            'experience.failed'.tr, 'experience.appointmentBusy'.tr);
       } else {
         VitaNotice.error('experience.failed'.tr, error.message);
       }
@@ -152,8 +180,52 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     }
   }
 
+  Future<DateTime?> _chooseAppointment() async {
+    final now = DateTime.now();
+    final earliest = now.add(const Duration(minutes: 5));
+    final latest = now.add(const Duration(days: 30));
+    var selected = now.add(const Duration(hours: 1));
+    return showModalBottomSheet<DateTime>(
+      context: context,
+      backgroundColor: context.vita.surface,
+      builder: (sheetContext) => SafeArea(
+        child: SizedBox(
+          height: 330,
+          child: Column(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 12, 4),
+              child: Row(children: [
+                Expanded(
+                  child: Text('experience.chooseTime'.tr,
+                      style: TextStyle(
+                          color: sheetContext.vita.text,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700)),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(sheetContext, selected),
+                  child: Text('common.save'.tr),
+                ),
+              ]),
+            ),
+            Expanded(
+              child: CupertinoDatePicker(
+                mode: CupertinoDatePickerMode.dateAndTime,
+                initialDateTime: selected,
+                minimumDate: earliest,
+                maximumDate: latest,
+                onDateTimeChanged: (value) => selected = value,
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasGifts = _products.any((product) => product['category'] == 'gift');
     return SafeArea(
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.72,
@@ -190,14 +262,20 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
                         subtitle: '')
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-                        itemCount: _products.length,
+                        itemCount: _products.length + (hasGifts ? 1 : 0),
                         separatorBuilder: (_, __) => const SizedBox(height: 10),
                         itemBuilder: (context, index) {
-                          final product = _products[index];
+                          if (hasGifts && index == 0) {
+                            return _buildGiftIntro(context);
+                          }
+                          final product = _products[index - (hasGifts ? 1 : 0)];
                           final key = product['key'] as String? ?? '';
                           final owned = _owned[key] == true;
                           final equipped = _equipped == key;
                           final isDate = product['category'] == 'date';
+                          if (product['category'] == 'gift') {
+                            return _buildGiftCard(context, product);
+                          }
                           return Container(
                             decoration: BoxDecoration(
                               color: context.vita.surface,
@@ -274,8 +352,100 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     );
   }
 
+  Widget _buildGiftIntro(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 5, 4, 7),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('experience.gift.headline'.tr,
+            style: TextStyle(
+                color: context.vita.text,
+                fontSize: 21,
+                fontWeight: FontWeight.w700)),
+        const SizedBox(height: 5),
+        Text('experience.gift.intro'.tr,
+            style: TextStyle(
+                color: context.vita.subText, fontSize: 13, height: 1.4)),
+      ]),
+    );
+  }
+
+  Widget _buildGiftCard(BuildContext context, Map<String, dynamic> product) {
+    final emoji = product['emoji'] as String? ?? '🎁';
+    final key = product['key'] as String? ?? '';
+    return Container(
+      height: 190,
+      padding: const EdgeInsets.fromLTRB(18, 15, 18, 15),
+      decoration: BoxDecoration(
+        color: context.vita.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: context.vita.divider),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text((product['name_key'] as String? ?? key).tr,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: context.vita.text,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700)),
+              const SizedBox(height: 5),
+              Text((product['description_key'] as String? ?? '').tr,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: context.vita.subText,
+                      fontSize: 12.5,
+                      height: 1.35)),
+            ]),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            width: 62,
+            height: 62,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+                color: context.vita.greenTint,
+                borderRadius: BorderRadius.circular(18)),
+            child: Text(emoji, style: const TextStyle(fontSize: 34)),
+          ),
+        ]),
+        const Spacer(),
+        Row(children: [
+          Icon(Icons.chat_bubble_outline_rounded,
+              size: 15, color: context.vita.green),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text('experience.gift.chatResult'.tr,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: context.vita.subText, fontSize: 12)),
+          ),
+        ]),
+        const SizedBox(height: 7),
+        Row(children: [
+          Icon(Icons.favorite_border_rounded,
+              size: 15, color: context.vita.green),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text('experience.gift.bondResult'.tr,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: context.vita.subText, fontSize: 12)),
+          ),
+          const SizedBox(width: 8),
+          _buildActionButton(context, product,
+              owned: false, equipped: false, gift: true),
+        ]),
+      ]),
+    );
+  }
+
   Widget _buildActionButton(BuildContext context, Map<String, dynamic> product,
-      {required bool owned, required bool equipped}) {
+      {required bool owned, required bool equipped, bool gift = false}) {
     final key = product['key'] as String? ?? '';
     if (equipped) {
       return Text('experience.equipped'.tr,
@@ -296,7 +466,12 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
                 height: 16,
                 child: CircularProgressIndicator(strokeWidth: 2))
             : Text(
-                owned ? 'experience.equip'.tr : '${product['coins']}',
+                owned
+                    ? 'experience.equip'.tr
+                    : gift
+                        ? 'experience.gift.send'
+                            .trParams({'coins': '${product['coins']}'})
+                        : '${product['coins']}',
                 style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,

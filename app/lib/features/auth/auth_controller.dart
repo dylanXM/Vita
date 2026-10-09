@@ -96,6 +96,7 @@ class AuthController extends GetxController {
   }
 
   Future<bool> loginWithGoogle({
+    String inviteCode = '',
     bool acceptedLegal = false,
     String privacyPolicyVersion = '',
     String termsVersion = '',
@@ -116,6 +117,7 @@ class AuthController extends GetxController {
         '/v1/auth/google',
         data: {
           'id_token': idToken,
+          'invite_code': inviteCode.trim().toUpperCase(),
           'accepted_legal': acceptedLegal,
           'privacy_policy_version': privacyPolicyVersion,
           'terms_version': termsVersion,

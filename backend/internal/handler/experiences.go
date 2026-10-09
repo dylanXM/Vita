@@ -22,6 +22,11 @@ type experienceRequest struct {
 	Input          map[string]any `json:"input"`
 }
 
+var (
+	errInvalidAppointment = errors.New("choose a time from 5 minutes to 30 days ahead")
+	errAppointmentBusy    = errors.New("selected appointment time is unavailable")
+)
+
 func ListCompanionExperiences(c *gin.Context) {
 	userID := c.GetString("user_id")
 	companionID := c.Param("id")
@@ -92,7 +97,7 @@ func PurchaseCompanionExperience(c *gin.Context) {
 		return
 	}
 
-	result, referenceID, err := fulfillExperience(ctx, userID, companionID, reservation.Product)
+	result, referenceID, err := fulfillExperience(ctx, userID, companionID, reservation.Product, input.Input)
 	if err != nil {
 		settlementCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -100,7 +105,13 @@ func PurchaseCompanionExperience(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "experience failed and refund could not be confirmed", "code": "refund_unconfirmed"})
 			return
 		}
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "code": "experience_failed", "refunded": true})
+		code := "experience_failed"
+		if errors.Is(err, errInvalidAppointment) {
+			code = "invalid_appointment"
+		} else if errors.Is(err, errAppointmentBusy) {
+			code = "appointment_unavailable"
+		}
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "code": code, "refunded": true})
 		return
 	}
 	result["spend_id"] = reservation.ID
@@ -115,7 +126,7 @@ func PurchaseCompanionExperience(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"balance": reservation.Balance, "product": reservation.Product, "result": result})
 }
 
-func fulfillExperience(ctx context.Context, userID, companionID string, product credits.Product) (map[string]any, string, error) {
+func fulfillExperience(ctx context.Context, userID, companionID string, product credits.Product, input map[string]any) (map[string]any, string, error) {
 	switch product.Category {
 	case "gift":
 		return fulfillCatalogGift(ctx, userID, companionID, product)
@@ -138,7 +149,7 @@ func fulfillExperience(ctx context.Context, userID, companionID string, product 
 		}
 		return map[string]any{"message": message}, message.ID, nil
 	case "date":
-		return fulfillVirtualDate(ctx, userID, companionID, product)
+		return fulfillVirtualDate(ctx, userID, companionID, product, input)
 	case "keepsake":
 		return fulfillKeepsake(ctx, userID, companionID, product)
 	case "outfit":
@@ -204,7 +215,19 @@ func fulfillCatalogGift(ctx context.Context, userID, companionID string, product
 	}, id, nil
 }
 
-func fulfillVirtualDate(ctx context.Context, userID, companionID string, product credits.Product) (map[string]any, string, error) {
+func fulfillVirtualDate(ctx context.Context, userID, companionID string, product credits.Product, input map[string]any) (map[string]any, string, error) {
+	var requested time.Time
+	if raw, ok := input["scheduled_at"]; ok {
+		value, valid := raw.(string)
+		if !valid {
+			return nil, "", errInvalidAppointment
+		}
+		parsed, err := time.Parse(time.RFC3339, value)
+		if err != nil || parsed.Before(time.Now().Add(5*time.Minute)) || parsed.After(time.Now().Add(30*24*time.Hour)) {
+			return nil, "", errInvalidAppointment
+		}
+		requested = parsed.UTC()
+	}
 	if companionAgent == nil {
 		return nil, "", fmt.Errorf("agent service is unavailable")
 	}
@@ -213,7 +236,13 @@ func fulfillVirtualDate(ctx context.Context, userID, companionID string, product
 		return nil, "", err
 	}
 	start := time.Now().UTC()
+	if !requested.IsZero() {
+		start = requested
+	}
 	if status.Busy && status.AvailableAt != nil && status.AvailableAt.After(start) {
+		if !requested.IsZero() {
+			return nil, "", errAppointmentBusy
+		}
 		start = status.AvailableAt.Add(15 * time.Minute)
 	}
 	duration := time.Duration(metadataInt(product.Metadata, "duration_minutes", 60)) * time.Minute
@@ -221,10 +250,13 @@ func fulfillVirtualDate(ctx context.Context, userID, companionID string, product
 	if err != nil {
 		return nil, "", err
 	}
+	if !requested.IsZero() && !start.Equal(requested) {
+		return nil, "", errAppointmentBusy
+	}
 	location, _ := product.Metadata["location"].(string)
 	eventID := uuid.New().String()
 	memoryID := uuid.New().String()
-	payload, _ := json.Marshal(map[string]any{"paid_experience": true, "product_key": product.Key, "with_user": true})
+	payload, _ := json.Marshal(map[string]any{"paid_experience": true, "product_key": product.Key, "with_user": true, "event_id": eventID, "memory_id": memoryID})
 	title := product.NameKey
 	description := product.DescriptionKey
 	conversationID, err := experienceConversation(ctx, userID, companionID)
@@ -242,7 +274,7 @@ func fulfillVirtualDate(ctx context.Context, userID, companionID string, product
 	reactionID := uuid.New().String()
 	messageTime := time.Now().UTC()
 	messagePayload, _ := json.Marshal(map[string]any{"event_id": eventID, "product_key": product.Key,
-		"scheduled_at": start, "ends_at": start.Add(duration)})
+		"scheduled_at": start})
 	var timezone string
 	_ = db.Get().QueryRowContext(ctx, `SELECT timezone FROM users WHERE id=$1`, userID).Scan(&timezone)
 	locationZone, zoneErr := time.LoadLocation(timezone)
@@ -255,12 +287,10 @@ func fulfillVirtualDate(ctx context.Context, userID, companionID string, product
 		return nil, "", err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `INSERT INTO life_events(id,companion_id,event_type,title,description,location,start_time,end_time,emotion,importance,user_relevance,shareability,status,local_date,payload,generation_source)
-		VALUES($1,$2,'shared_activity',$3,$4,$5,$6,$7,'anticipating',85,100,false,'active',$8::date,$9,'user_purchase')`, eventID, companionID, title, description, location, start, start.Add(duration), localDate, payload); err != nil {
-		return nil, "", err
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO memories(id,companion_id,type,content,importance,event_time,metadata)
-		VALUES($1,$2,'shared_experience',$3,80,$4,$5)`, memoryID, companionID, description, start, string(payload)); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO life_events(id,companion_id,event_type,title,description,location,start_time,end_time,emotion,importance,user_relevance,shareability,status,local_date,sequence,payload,generation_source)
+		VALUES($1,$2,'shared_activity',$3,$4,$5,$6,$7,'anticipating',85,100,false,'scheduled',$8::date,
+			(SELECT COALESCE(MAX(sequence),-1)+1 FROM life_events WHERE companion_id=$2 AND local_date=$8::date),$9,'user_purchase')`,
+		eventID, companionID, title, description, location, start, start.Add(duration), localDate, payload); err != nil {
 		return nil, "", err
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO messages(id,conversation_id,sender_type,message_type,content,payload,source,life_event_id,delivery_status,created_at)
@@ -344,7 +374,7 @@ func experienceConversation(ctx context.Context, userID, companionID string) (st
 
 func nextAvailableExperienceTime(ctx context.Context, companionID string, candidate time.Time, duration time.Duration) (time.Time, error) {
 	rows, err := db.Get().QueryContext(ctx, `SELECT start_time,end_time FROM life_events
-		WHERE companion_id=$1 AND status='active' AND end_time>$2 AND start_time<$3
+		WHERE companion_id=$1 AND status IN ('active','scheduled') AND end_time>$2 AND start_time<$3
 		ORDER BY start_time`, companionID, candidate, candidate.Add(36*time.Hour))
 	if err != nil {
 		return time.Time{}, err

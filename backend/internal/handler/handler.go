@@ -1266,6 +1266,7 @@ type SendMessageRequest struct {
 	Content     string `json:"content"`
 	MessageType string `json:"message_type"`
 	MediaID     string `json:"media_id"`
+	LifeEventID string `json:"life_event_id"`
 }
 
 type SendMessageResponse struct {
@@ -1356,7 +1357,22 @@ func SendMessage(c *gin.Context) {
 	}
 	defer tx.Rollback()
 	var activeLifeID sql.NullString
-	if !isDefault {
+	if req.LifeEventID != "" {
+		lookupErr := tx.QueryRowContext(c.Request.Context(), `SELECT e.id FROM life_events e
+			JOIN companion_moment_sessions s ON s.event_id=e.id AND s.opening_message_id IS NOT NULL
+			WHERE e.id=$1 AND e.companion_id=$2 AND s.user_id=$3 AND e.status='active'
+			AND e.event_type='shared_activity' AND e.generation_source='user_purchase'
+			AND e.start_time<=CURRENT_TIMESTAMP AND e.end_time>CURRENT_TIMESTAMP`,
+			req.LifeEventID, companionID, userID).Scan(&activeLifeID)
+		if errors.Is(lookupErr, sql.ErrNoRows) {
+			c.JSON(http.StatusConflict, gin.H{"error": "shared moment is not active", "code": "moment_not_active"})
+			return
+		}
+		if lookupErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify shared moment"})
+			return
+		}
+	} else {
 		lookupErr := tx.QueryRowContext(c.Request.Context(), `SELECT id FROM life_events WHERE companion_id=$1 AND status='active' AND start_time<=CURRENT_TIMESTAMP AND end_time>CURRENT_TIMESTAMP
 			ORDER BY CASE WHEN event_type='shared_activity' AND generation_source='user_purchase' THEN 0 ELSE 1 END,
 			start_time DESC,id DESC LIMIT 1`, companionID).Scan(&activeLifeID)

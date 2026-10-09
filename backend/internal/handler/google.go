@@ -67,6 +67,7 @@ type GoogleClaims struct {
 
 type GoogleLoginRequest struct {
 	IDToken              string `json:"id_token" binding:"required"`
+	InviteCode           string `json:"invite_code"`
 	AcceptedLegal        *bool  `json:"accepted_legal"`
 	PrivacyPolicyVersion string `json:"privacy_policy_version"`
 	TermsVersion         string `json:"terms_version"`
@@ -117,13 +118,27 @@ func GoogleLogin(c *gin.Context) {
 			writeLegalAcceptanceError(c, consentErr)
 			return
 		}
+		var inviterID any
+		if inviteCode := strings.ToUpper(strings.TrimSpace(req.InviteCode)); inviteCode != "" {
+			var id string
+			err = db.Get().QueryRow(`SELECT id FROM users WHERE invite_code=$1 AND environment=$2`, inviteCode, currentEnvironment()).Scan(&id)
+			if errors.Is(err, sql.ErrNoRows) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid invitation code"})
+				return
+			}
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to validate invitation code"})
+				return
+			}
+			inviterID = id
+		}
 		userID = uuid.New().String()
 		role = "user"
 		if _, err := db.Get().Exec(
-			`INSERT INTO users (id,email,role_id,environment,legal_accepted_at,privacy_policy_version,terms_version,avatar_url)
-			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+			`INSERT INTO users (id,email,role_id,environment,legal_accepted_at,privacy_policy_version,terms_version,avatar_url,invited_by_user_id)
+			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
 			userID, claims.Email, role, currentEnvironment(), acceptedAt,
-			strings.TrimSpace(req.PrivacyPolicyVersion), strings.TrimSpace(req.TermsVersion), avatarURL); err != nil {
+			strings.TrimSpace(req.PrivacyPolicyVersion), strings.TrimSpace(req.TermsVersion), avatarURL, inviterID); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 			return
 		}

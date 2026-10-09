@@ -9,6 +9,8 @@ import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import 'chat_controller.dart';
 
+enum _MomentPhase { booked, ready, together, keepsake }
+
 /// The purchased date is a live conversation during its scheduled window.
 /// Both sides' lines and their shared keepsake remain available afterward.
 class CompanionMomentPage extends StatefulWidget {
@@ -35,6 +37,8 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
   final _artifact = TextEditingController();
   Map<String, dynamic>? _moment;
   Timer? _timer;
+  Timer? _countdownTimer;
+  final _clock = ValueNotifier<DateTime>(DateTime.now());
   bool _loading = true;
   bool _starting = false;
   bool _saving = false;
@@ -56,15 +60,32 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
             tag: _chatTag);
     _load();
     _timer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted && _started && !_ended) _chat.poll();
+    });
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      setState(() {});
-      _chat.poll();
+      final previous = _clock.value;
+      final now = DateTime.now();
+      _clock.value = now;
+      final startsAt = _time('starts_at');
+      final endsAt = _time('ends_at');
+      if ((startsAt != null &&
+              previous.isBefore(startsAt) &&
+              !now.isBefore(startsAt)) ||
+          (endsAt != null &&
+              _started &&
+              previous.isBefore(endsAt) &&
+              !now.isBefore(endsAt))) {
+        setState(() {});
+      }
     });
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _countdownTimer?.cancel();
+    _clock.dispose();
     _message.dispose();
     _artifact.dispose();
     if (_ownsChat) Get.delete<ChatController>(tag: _chatTag);
@@ -92,9 +113,106 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
   DateTime? _time(String key) =>
       DateTime.tryParse('${_moment?[key] ?? ''}')?.toLocal();
   bool get _scheduled => _time('starts_at')?.isAfter(DateTime.now()) ?? false;
-  bool get _ended => _time('ends_at')?.isBefore(DateTime.now()) ?? false;
+  bool get _ended =>
+      _started && (_time('ends_at')?.isBefore(DateTime.now()) ?? false);
   bool get _active => !_scheduled && !_ended && _moment != null;
   bool get _started => '${_moment?['opening'] ?? ''}'.isNotEmpty;
+  _MomentPhase get _phase {
+    if (_started) return _ended ? _MomentPhase.keepsake : _MomentPhase.together;
+    return _scheduled ? _MomentPhase.booked : _MomentPhase.ready;
+  }
+
+  String _remaining(DateTime? until, DateTime now) {
+    if (until == null) return '00:00:00';
+    final left = until.difference(now);
+    final seconds = left.inSeconds.clamp(0, 30 * 24 * 3600);
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    final last = seconds % 60;
+    return '${hours.toString().padLeft(2, '0')}:'
+        '${minutes.toString().padLeft(2, '0')}:'
+        '${last.toString().padLeft(2, '0')}';
+  }
+
+  Widget _journey(BuildContext context) {
+    final vita = context.vita;
+    final phase = _phase;
+    final labels = [
+      'moment.phase.booked'.tr,
+      'moment.phase.ready'.tr,
+      'moment.phase.together'.tr,
+      'moment.phase.keepsake'.tr,
+    ];
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 17, 16, 18),
+      decoration: BoxDecoration(
+        color: vita.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: vita.divider),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          for (var index = 0; index < labels.length; index++)
+            Expanded(
+              child: Column(children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  width: index == phase.index ? 13 : 9,
+                  height: index == phase.index ? 13 : 9,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: index <= phase.index ? vita.green : vita.divider,
+                  ),
+                ),
+                const SizedBox(height: 9),
+                Text(labels[index],
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: index == phase.index ? vita.text : vita.subText,
+                      fontSize: 11,
+                      fontWeight: index == phase.index
+                          ? FontWeight.w700
+                          : FontWeight.w400,
+                    )),
+              ]),
+            ),
+        ]),
+        const SizedBox(height: 15),
+        ValueListenableBuilder<DateTime>(
+          valueListenable: _clock,
+          builder: (context, now, _) {
+            final detail = switch (phase) {
+              _MomentPhase.booked => 'moment.waitingFor'.trParams({
+                  'time': _remaining(_time('starts_at'), now),
+                }),
+              _MomentPhase.ready => 'moment.readyHint'.tr,
+              _MomentPhase.together => 'moment.timeLeft'.trParams({
+                  'time': _remaining(_time('ends_at'), now),
+                }),
+              _MomentPhase.keepsake => '${_moment?['artifact'] ?? ''}'.isEmpty
+                  ? 'moment.endCreateHint'.tr
+                  : 'moment.endedHint'.tr,
+            };
+            return Text(detail,
+                style: TextStyle(color: vita.text, fontSize: 15, height: 1.4));
+          },
+        ),
+        if (phase == _MomentPhase.booked && _time('starts_at') != null) ...[
+          const SizedBox(height: 7),
+          Text(
+            'moment.scheduled'.trParams({
+              'time': '${MaterialLocalizations.of(context).formatMediumDate(_time('starts_at')!)} '
+                  '${TimeOfDay.fromDateTime(_time('starts_at')!).format(context)}',
+            }),
+            style: TextStyle(color: vita.subText, fontSize: 12),
+          ),
+        ],
+      ]),
+    );
+  }
 
   Future<void> _start() async {
     if (_starting) return;
@@ -149,11 +267,11 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
 
   Widget _scene(BuildContext context, String title, String location) {
     final vita = context.vita;
-    final accent = switch (location) {
-      'cafe' => const Color(0xFFD4A57B),
-      'cinema' => const Color(0xFF7772B8),
-      'restaurant' => const Color(0xFFC47F78),
-      _ => vita.green,
+    final colors = switch (location) {
+      'cafe' => [const Color(0xFF35241F), const Color(0xFFA26E50)],
+      'cinema' => [const Color(0xFF191B35), const Color(0xFF64579A)],
+      'restaurant' => [const Color(0xFF352128), const Color(0xFF9D5E66)],
+      _ => [vita.pageBg, vita.green],
     };
     final icon = switch (location) {
       'cafe' => Icons.local_cafe_outlined,
@@ -162,36 +280,78 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
       _ => Icons.auto_awesome_outlined,
     };
     return Container(
-      height: 166,
+      height: 212,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [accent.withValues(alpha: .83), accent],
+          colors: colors,
         ),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
         child: Stack(children: [
           Positioned(
-              right: -20,
-              top: -40,
+              right: -28,
+              top: -92,
               child: Container(
-                  width: 180,
-                  height: 180,
+                  width: 255,
+                  height: 255,
                   decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: .10)))),
+                      color: Colors.white.withValues(alpha: .07)))),
           Positioned(
-              right: 26,
-              top: 27,
+              right: 28,
+              top: 24,
               child: Icon(icon,
-                  size: 96, color: Colors.white.withValues(alpha: .24))),
+                  size: 116, color: Colors.white.withValues(alpha: .17))),
+          Positioned(
+            left: 20,
+            top: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: .20),
+                borderRadius: BorderRadius.circular(100),
+                border: Border.all(color: Colors.white.withValues(alpha: .16)),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(icon, size: 14, color: Colors.white),
+                const SizedBox(width: 6),
+                Text(
+                    switch (location) {
+                      'cafe' => 'world.place.cafe'.tr,
+                      'cinema' => 'moment.place.cinema'.tr,
+                      'restaurant' => 'moment.place.restaurant'.tr,
+                      _ => location,
+                    },
+                    style: const TextStyle(color: Colors.white, fontSize: 12)),
+              ]),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              height: 120,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: .28)
+                  ],
+                ),
+              ),
+            ),
+          ),
           Positioned(
             left: 20,
             right: 20,
-            bottom: 22,
+            bottom: 24,
             child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Expanded(
                   child: Column(
@@ -199,14 +359,14 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
                 children: [
                   Text(widget.name,
                       style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 14,
                           color: Colors.white.withValues(alpha: .85))),
                   const SizedBox(height: 5),
                   Text(title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          fontSize: 24,
+                          fontSize: 30,
                           fontWeight: FontWeight.w700,
                           color: Colors.white)),
                 ],
@@ -214,7 +374,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
               const SizedBox(width: 12),
               VitaAvatar(
                   name: widget.name,
-                  radius: 27,
+                  radius: 32,
                   imageUrl: widget.avatarUrl,
                   background: Colors.white.withValues(alpha: .22),
                   textColor: Colors.white),
@@ -230,12 +390,6 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
     final vita = context.vita;
     final title = '${_moment?['title_key'] ?? ''}'.tr;
     final location = '${_moment?['location'] ?? ''}';
-    final locationLabel = switch (location) {
-      'cafe' => 'world.place.cafe'.tr,
-      'cinema' => 'moment.place.cinema'.tr,
-      'restaurant' => 'moment.place.restaurant'.tr,
-      _ => location,
-    };
     return Scaffold(
       backgroundColor: vita.pageBg,
       appBar: AppBar(leading: const VitaBackButton(), title: Text(widget.name)),
@@ -251,14 +405,16 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
                     children: [
                       _scene(context, title, location),
                       const SizedBox(height: 12),
-                      if (!_started &&
-                          '${_moment?['invitation'] ?? ''}'.isNotEmpty) ...[
+                      _journey(context),
+                      const SizedBox(height: 12),
+                      if ('${_moment?['invitation'] ?? ''}'.isNotEmpty) ...[
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(18),
                           decoration: BoxDecoration(
-                            color: vita.greenTint,
+                            color: vita.surface,
                             borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: vita.divider),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -282,7 +438,8 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
                                     Text('${_moment?['invitation']}',
                                         style: TextStyle(
                                           color: vita.text,
-                                          height: 1.45,
+                                          fontSize: 15,
+                                          height: 1.5,
                                         )),
                                   ],
                                 ),
@@ -292,55 +449,57 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
                         ),
                         const SizedBox(height: 12),
                       ],
-                      Container(
-                        padding: const EdgeInsets.all(22),
-                        decoration: BoxDecoration(
-                          color: vita.surface,
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: vita.divider),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text('${_moment?['description_key'] ?? ''}'.tr,
+                            style:
+                                TextStyle(color: vita.subText, height: 1.45)),
+                      ),
+                      if (_phase == _MomentPhase.ready) ...[
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: _starting ? null : _start,
+                            icon: const Icon(Icons.auto_awesome_rounded),
+                            label: Text(_starting
+                                ? 'moment.starting'.tr
+                                : 'moment.start'.tr),
+                          ),
                         ),
-                        child: Column(
+                      ],
+                      if (_phase == _MomentPhase.keepsake &&
+                          '${_moment?['artifact'] ?? ''}'.isNotEmpty) ...[
+                        const SizedBox(height: 22),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: vita.greenTint,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('${_moment?['description_key'] ?? ''}'.tr,
+                              Row(children: [
+                                Icon(Icons.auto_awesome_rounded,
+                                    size: 18, color: vita.green),
+                                const SizedBox(width: 8),
+                                Text('moment.phase.keepsake'.tr,
+                                    style: TextStyle(
+                                        color: vita.text,
+                                        fontWeight: FontWeight.w700)),
+                              ]),
+                              const SizedBox(height: 12),
+                              Text('${_moment?['artifact']}',
                                   style: TextStyle(
-                                      color: vita.subText, height: 1.45)),
-                              if (location.isNotEmpty) ...[
-                                const SizedBox(height: 12),
-                                Text(locationLabel,
-                                    style: TextStyle(color: vita.green)),
-                              ],
-                              const SizedBox(height: 14),
-                              Text(
-                                  _scheduled
-                                      ? 'moment.scheduled'.trParams({
-                                          'time':
-                                              MaterialLocalizations.of(context)
-                                                      .formatMediumDate(
-                                                          _time('starts_at')!) +
-                                                  ' ' +
-                                                  TimeOfDay.fromDateTime(
-                                                          _time('starts_at')!)
-                                                      .format(context)
-                                        })
-                                      : _ended
-                                          ? 'moment.ended'.tr
-                                          : 'moment.live'.tr,
-                                  style: TextStyle(
-                                      color: vita.subText, fontSize: 13)),
-                              if (_active && !_started) ...[
-                                const SizedBox(height: 16),
-                                SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton(
-                                      onPressed: _starting ? null : _start,
-                                      child: Text(_starting
-                                          ? 'moment.starting'.tr
-                                          : 'moment.start'.tr),
-                                    )),
-                              ],
-                            ]),
-                      ),
+                                      color: vita.text,
+                                      fontSize: 16,
+                                      height: 1.55)),
+                            ],
+                          ),
+                        ),
+                      ],
                       if (_started) ...[
                         const SizedBox(height: 26),
                         Text('moment.together'.tr,

@@ -179,7 +179,11 @@ class ChatController extends GetxController {
     try {
       final data = await ApiClient.instance.post(
         '/v1/conversations/$conversationId/messages',
-        data: {'content': content, 'message_type': 'text'},
+        data: {
+          'content': content,
+          'message_type': 'text',
+          if (momentEventId != null) 'life_event_id': momentEventId,
+        },
       );
       if (data is Map) {
         final userMessage = data['user_message'];
@@ -194,6 +198,7 @@ class ChatController extends GetxController {
             'sender_type': 'user',
             'message_type': 'text',
             'source': 'user',
+            'life_event_id': momentEventId ?? '',
             'payload': <String, dynamic>{},
             'delivery_status': 'delivered',
             'created_at': data['created_at'],

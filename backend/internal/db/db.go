@@ -1070,6 +1070,14 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			artifact_updated_at TIMESTAMP,
 			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
+		`UPDATE messages m SET payload=m.payload-'ends_at'
+			WHERE m.message_type='scene_card' AND m.source='paid_date' AND m.payload ? 'ends_at'
+			AND NOT EXISTS (SELECT 1 FROM companion_moment_sessions s
+				WHERE s.event_id=m.life_event_id AND s.opening_message_id IS NOT NULL)`,
+		`UPDATE life_events e SET status='scheduled'
+			WHERE e.event_type='shared_activity' AND e.generation_source='user_purchase' AND e.status='active'
+			AND NOT EXISTS (SELECT 1 FROM companion_moment_sessions s
+				WHERE s.event_id=e.id AND s.opening_message_id IS NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS companion_transfers (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -716,15 +716,17 @@ class _ChatMessageBody extends StatelessWidget {
       final endsAt =
           DateTime.tryParse('${payload['ends_at'] ?? ''}')?.toLocal();
       final timeLabel = scheduled == null
-          ? ''
+          ? 'moment.open'.tr
           : endsAt != null && !DateTime.now().isBefore(endsAt)
               ? 'moment.ended'.tr
-              : !DateTime.now().isBefore(scheduled)
-                  ? 'moment.live'.tr
-                  : 'moment.scheduled'.trParams({
-                      'time': '${MaterialLocalizations.of(context).formatMediumDate(scheduled)} '
-                          '${TimeOfDay.fromDateTime(scheduled).format(context)}'
-                    });
+              : endsAt == null && !DateTime.now().isBefore(scheduled)
+                  ? 'moment.open'.tr
+                  : !DateTime.now().isBefore(scheduled)
+                      ? 'moment.live'.tr
+                      : 'moment.scheduled'.trParams({
+                          'time': '${MaterialLocalizations.of(context).formatMediumDate(scheduled)} '
+                              '${TimeOfDay.fromDateTime(scheduled).format(context)}'
+                        });
       return Material(
         color: context.vita.surface,
         borderRadius: BorderRadius.circular(18),

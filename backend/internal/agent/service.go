@@ -301,7 +301,7 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 	_ = s.db.QueryRowContext(ctx, `SELECT COALESCE(life_event_id,'') FROM messages
 		WHERE conversation_id=$1 AND sender_type='user' ORDER BY created_at DESC,id DESC LIMIT 1`, conversationID).Scan(&lifeEventID)
 	surpriseNow := false
-	if lifeEventID != "" && int(lifeEventID[len(lifeEventID)-1])%3 == 0 {
+	if lifeEventID != "" {
 		var exchanged int
 		_ = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM messages m JOIN life_events e ON e.id=m.life_event_id
 			WHERE m.conversation_id=$1 AND e.id=$2 AND m.sender_type='user'
