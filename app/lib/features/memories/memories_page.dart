@@ -138,12 +138,8 @@ class _MemoriesPageState extends State<MemoriesPage> {
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
             VitaTabHeader(title: 'tab.journey'.tr, showDivider: false),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 8, 20, 16),
-              child: _JourneyIntroCard(companions: []),
-            ),
             SizedBox(
-              height: MediaQuery.sizeOf(context).height * 0.42,
+              height: MediaQuery.sizeOf(context).height * 0.62,
               child: VitaEmpty(
                 icon: Icons.star_border,
                 title: 'memories.createFirst'.tr,
@@ -191,38 +187,29 @@ class _MemoriesPageState extends State<MemoriesPage> {
               ),
             ),
           ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _JourneyIntroCard(companions: companions),
-                  if (_showSearch) ...[
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _search,
-                      autofocus: true,
-                      onChanged: (_) => setState(() {}),
-                      textInputAction: TextInputAction.search,
-                      decoration: InputDecoration(
-                        hintText: 'contacts.search'.tr,
-                        prefixIcon:
-                            Icon(Icons.search, color: context.vita.subText),
-                        filled: true,
-                        fillColor: context.vita.surface,
-                        isDense: true,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(18),
-                          borderSide: BorderSide(color: context.vita.divider),
-                        ),
-                      ),
+          if (_showSearch)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                child: TextField(
+                  controller: _search,
+                  autofocus: true,
+                  onChanged: (_) => setState(() {}),
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    hintText: 'contacts.search'.tr,
+                    prefixIcon: Icon(Icons.search, color: context.vita.subText),
+                    filled: true,
+                    fillColor: context.vita.surface,
+                    isDense: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: BorderSide(color: context.vita.divider),
                     ),
-                  ],
-                ],
+                  ),
+                ),
               ),
             ),
-          ),
           if (visible.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
@@ -234,7 +221,7 @@ class _MemoriesPageState extends State<MemoriesPage> {
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
               sliver: SliverList.builder(
                 itemCount: visible.length,
                 itemBuilder: (context, index) {
@@ -243,7 +230,6 @@ class _MemoriesPageState extends State<MemoriesPage> {
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _JourneyCompanionTile(
                       companion: companion,
-                      ordinal: index + 1,
                       onTap: () {
                         if (Get.isRegistered<ShellController>()) {
                           ShellController.to.selectedCompanionId.value =
@@ -263,113 +249,13 @@ class _MemoriesPageState extends State<MemoriesPage> {
   }
 }
 
-class _JourneyIntroCard extends StatelessWidget {
-  const _JourneyIntroCard({required this.companions});
-
-  final List<Map<String, dynamic>> companions;
-
-  @override
-  Widget build(BuildContext context) {
-    final vita = context.vita;
-    return Container(
-      height: 180,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        gradient: vita.brandGradient,
-        borderRadius: BorderRadius.circular(28),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -28,
-            top: -74,
-            child: Container(
-              width: 220,
-              height: 220,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withValues(alpha: .16)),
-              ),
-            ),
-          ),
-          Positioned(
-            right: 32,
-            top: -28,
-            child: Container(
-              width: 136,
-              height: 136,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withValues(alpha: .12)),
-              ),
-            ),
-          ),
-          const Positioned(
-            right: 28,
-            bottom: 25,
-            child: Icon(Icons.auto_awesome_rounded,
-                size: 38, color: Color(0x66FFFFFF)),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.auto_stories_rounded,
-                    size: 23, color: Colors.white.withValues(alpha: .88)),
-                const Spacer(),
-                Text(
-                  'journey.subtitle'.tr,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 25,
-                    height: 1.18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Container(
-                      width: 28,
-                      height: 2,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: .82),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      companions.length.toString().padLeft(2, '0'),
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: .8),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _JourneyCompanionTile extends StatelessWidget {
   const _JourneyCompanionTile({
     required this.companion,
-    required this.ordinal,
     required this.onTap,
   });
 
   final Map<String, dynamic> companion;
-  final int ordinal;
   final VoidCallback onTap;
 
   @override
@@ -401,39 +287,13 @@ class _JourneyCompanionTile extends StatelessWidget {
                   child: SizedBox(
                     width: 104,
                     height: 112,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        portraitUrl.isEmpty
-                            ? _PortraitFallback(name: name)
-                            : VitaMediaImage(
-                                url: portraitUrl,
-                                errorBuilder: (_, __, ___) =>
-                                    _PortraitFallback(name: name),
-                              ),
-                        Positioned(
-                          left: 8,
-                          top: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: .36),
-                              borderRadius: BorderRadius.circular(7),
-                            ),
-                            child: Text(
-                              ordinal.toString().padLeft(2, '0'),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1,
-                              ),
-                            ),
+                    child: portraitUrl.isEmpty
+                        ? _PortraitFallback(name: name)
+                        : VitaMediaImage(
+                            url: portraitUrl,
+                            errorBuilder: (_, __, ___) =>
+                                _PortraitFallback(name: name),
                           ),
-                        ),
-                      ],
-                    ),
                   ),
                 ),
                 Expanded(
