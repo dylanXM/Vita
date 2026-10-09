@@ -100,33 +100,39 @@ class _ShellPageState extends State<ShellPage> {
   }
 }
 
-/// Tab definition: localized label and one icon for both selection states.
+/// Tab definition: localized label with outlined and filled icon states.
 class _NavItem {
   const _NavItem({
     required this.labelKey,
     required this.icon,
+    required this.selectedIcon,
   });
 
   final String labelKey;
   final IconData icon;
+  final IconData selectedIcon;
 }
 
 const List<_NavItem> _kTabs = [
   _NavItem(
     labelKey: 'tab.world',
     icon: Icons.auto_awesome_outlined,
+    selectedIcon: Icons.auto_awesome,
   ),
   _NavItem(
     labelKey: 'tab.journey',
     icon: Icons.route_outlined,
+    selectedIcon: Icons.route,
   ),
   _NavItem(
     labelKey: 'tab.discover',
     icon: Icons.explore_outlined,
+    selectedIcon: Icons.explore,
   ),
   _NavItem(
     labelKey: 'tab.me',
     icon: Icons.person_outline,
+    selectedIcon: Icons.person,
   ),
 ];
 
@@ -197,23 +203,36 @@ class _VitaTabBarState extends State<VitaTabBar>
         ),
         child: SizedBox(
           height: VitaTabBar.pillHeight,
-          child: DecoratedBox(
-            position: DecorationPosition.foreground,
-            decoration: ShapeDecoration(
-              shape: LiquidRoundedRectangle(
-                borderRadius: outerRadius,
-                side: BorderSide(color: rimColor, width: 1),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                child: AdaptiveGlass(
+                  shape: const LiquidRoundedRectangle(
+                    borderRadius: outerRadius,
+                  ),
+                  settings: LiquidGlassSettings(
+                    glassColor:
+                        vita.surface.withValues(alpha: dark ? .44 : .58),
+                    blur: 8,
+                  ),
+                  child: const SizedBox.expand(),
+                ),
               ),
-            ),
-            child: AdaptiveGlass(
-              shape: const LiquidRoundedRectangle(
-                borderRadius: outerRadius,
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: ShapeDecoration(
+                      shape: LiquidRoundedRectangle(
+                        borderRadius: outerRadius,
+                        side: BorderSide(color: rimColor, width: 1),
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              settings: LiquidGlassSettings(
-                glassColor: vita.surface.withValues(alpha: dark ? .44 : .58),
-                blur: 8,
-              ),
-              child: AnimatedBuilder(
+              Positioned.fill(
+                  child: AnimatedBuilder(
                 animation: _movement,
                 builder: (context, _) {
                   final progress =
@@ -227,6 +246,7 @@ class _VitaTabBarState extends State<VitaTabBar>
                       math.sin(math.pi * _movement.value).clamp(0.0, 1.0);
                   final restOpacity = (1 - thickness / .15).clamp(0.0, 1.0);
                   return Stack(
+                    clipBehavior: Clip.none,
                     children: [
                       AnimatedGlassIndicator(
                         velocity: 0,
@@ -289,7 +309,9 @@ class _VitaTabBarState extends State<VitaTabBar>
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Icon(
-                                            _kTabs[i].icon,
+                                            widget.index == i
+                                                ? _kTabs[i].selectedIcon
+                                                : _kTabs[i].icon,
                                             size: 24,
                                             color: widget.index == i
                                                 ? vita.green
@@ -318,8 +340,8 @@ class _VitaTabBarState extends State<VitaTabBar>
                     ],
                   );
                 },
-              ),
-            ),
+              )),
+            ],
           ),
         ),
       ),

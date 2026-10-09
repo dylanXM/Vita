@@ -206,18 +206,6 @@ class MePage extends StatelessWidget {
                   ),
                   const Divider(indent: 52, height: 0.5),
                   _MeAction(
-                    icon: Icons.settings_outlined,
-                    title: 'me.settings'.tr,
-                    onTap: () {
-                      AnalyticsService.to.track('profile_settings_opened',
-                          category: 'profile');
-                      Get.to(() => const SettingsPage(),
-                          transition: Transition.cupertino,
-                          duration: const Duration(milliseconds: 300));
-                    },
-                  ),
-                  const Divider(indent: 52, height: 0.5),
-                  _MeAction(
                       icon: Icons.mail_outline_rounded,
                       title: 'me.contact'.tr,
                       onTap: _contactUs),
@@ -227,6 +215,23 @@ class MePage extends StatelessWidget {
                       title: 'me.rate'.tr,
                       onTap: _rateApp),
                 ]),
+              ),
+
+              VitaCard(
+                radius: 12,
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: _MeAction(
+                  icon: Icons.settings_outlined,
+                  title: 'me.settings'.tr,
+                  onTap: () {
+                    AnalyticsService.to
+                        .track('profile_settings_opened', category: 'profile');
+                    Get.to(() => const SettingsPage(),
+                        transition: Transition.cupertino,
+                        duration: const Duration(milliseconds: 300));
+                  },
+                ),
               ),
 
               Obx(() {
