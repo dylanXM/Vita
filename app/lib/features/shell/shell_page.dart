@@ -95,39 +95,33 @@ class _ShellPageState extends State<ShellPage> {
   }
 }
 
-/// Tab definition: localized label key + outline/filled icon pair.
+/// Tab definition: localized label and one icon for both selection states.
 class _NavItem {
   const _NavItem({
     required this.labelKey,
     required this.icon,
-    required this.activeIcon,
   });
 
   final String labelKey;
   final IconData icon;
-  final IconData activeIcon;
 }
 
 const List<_NavItem> _kTabs = [
   _NavItem(
     labelKey: 'tab.world',
     icon: Icons.auto_awesome_outlined,
-    activeIcon: Icons.auto_awesome,
   ),
   _NavItem(
     labelKey: 'tab.journey',
     icon: Icons.route_outlined,
-    activeIcon: Icons.route,
   ),
   _NavItem(
     labelKey: 'tab.discover',
     icon: Icons.explore_outlined,
-    activeIcon: Icons.explore,
   ),
   _NavItem(
     labelKey: 'tab.me',
     icon: Icons.person_outline,
-    activeIcon: Icons.person,
   ),
 ];
 
@@ -159,12 +153,11 @@ class VitaTabBar extends StatelessWidget {
         iconSize: 24,
         labelFontSize: 10,
         iconLabelSpacing: 2,
-        indicatorColor: vita.green,
-        selectedIconColor: Colors.white,
-        selectedLabelColor: Colors.white,
+        showIndicator: false,
+        selectedIconColor: vita.green,
+        selectedLabelColor: vita.subText,
         unselectedIconColor: vita.subText,
         unselectedLabelColor: vita.subText,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
         unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
         settings: LiquidGlassSettings(
           glassColor: vita.surface.withValues(alpha: dark ? 0.44 : 0.58),
@@ -174,7 +167,6 @@ class VitaTabBar extends StatelessWidget {
           for (final item in _kTabs)
             GlassTab(
               icon: Icon(item.icon),
-              activeIcon: Icon(item.activeIcon),
               label: item.labelKey.tr,
             ),
         ],
