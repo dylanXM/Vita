@@ -1101,5 +1101,5 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 	if err := migrateSingleEnvironment(db); err != nil {
 		return err
 	}
-	return nil
+	return migrateFiles(db, verbose)
 }
