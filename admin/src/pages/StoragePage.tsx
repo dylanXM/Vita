@@ -137,8 +137,8 @@ function ProviderCard({ provider, title, description, value, saved, onChange, on
       <Field label={t("storage.accessKey")}><Input type="password" autoComplete="new-password" value={value.access_key} onChange={(event) => set("access_key", event.target.value)} /></Field>
       <Field label={t("storage.secretKey")}><Input type="password" autoComplete="new-password" value={value.secret_key} onChange={(event) => set("secret_key", event.target.value)} /></Field>
       <p className="text-xs text-muted-foreground">{t("storage.keepSecret")}</p>
-      <Button variant="outline" disabled={!value.enabled || !credentialsConfigured || hasUnsavedChanges || testing} onClick={onTest}>{t("storage.test")}</Button>
-      {value.enabled && (!credentialsConfigured || hasUnsavedChanges) ? <p className="text-xs text-muted-foreground">{t("storage.saveBeforeTest")}</p> : null}
+      <Button variant="outline" disabled={!credentialsConfigured || hasUnsavedChanges || testing} onClick={onTest}>{t("storage.test")}</Button>
+      {!credentialsConfigured || hasUnsavedChanges ? <p className="text-xs text-muted-foreground">{t("storage.saveBeforeTest")}</p> : null}
     </CardContent>
   </Card>;
 }
