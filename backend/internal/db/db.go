@@ -443,6 +443,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		`ALTER TABLE memories ADD COLUMN IF NOT EXISTS follow_up_at TIMESTAMP`,
 		`ALTER TABLE memories ADD COLUMN IF NOT EXISTS follow_up_claimed_at TIMESTAMP`,
 		`ALTER TABLE memories ADD COLUMN IF NOT EXISTS followed_up_at TIMESTAMP`,
+		`ALTER TABLE memories ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN NOT NULL DEFAULT false`,
 		`CREATE INDEX IF NOT EXISTS idx_memories_follow_up ON memories(follow_up_at) WHERE followed_up_at IS NULL`,
 		`CREATE TABLE IF NOT EXISTS life_events (
 			id TEXT PRIMARY KEY,

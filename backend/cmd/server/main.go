@@ -163,6 +163,7 @@ func main() {
 			companions.DELETE("/:id", handler.DeleteCompanion)
 			companions.POST("/:id/restore", handler.RestoreCompanion)
 			companions.GET("/:id/experiences", handler.ListCompanionExperiences)
+			companions.GET("/:id/story", handler.GetCompanionStory)
 			companions.POST("/:id/experiences/:product_key", handler.PurchaseCompanionExperience)
 			companions.GET("/:id/moments/:event_id", handler.GetCompanionMoment)
 			companions.POST("/:id/moments/:event_id/start", handler.StartCompanionMoment)
@@ -210,6 +211,7 @@ func main() {
 			memories.Use(middleware.RequireAuth())
 			memories.GET("/", handler.GetMemories)
 			memories.PUT("/:memory_id", handler.UpdateMemory)
+			memories.PUT("/:memory_id/favorite", handler.SetMemoryFavorite)
 			memories.DELETE("/:memory_id", handler.DeleteMemory)
 		}
 		api.GET("/explore/posts", middleware.RequireAuth(), handler.GetExplorePosts)

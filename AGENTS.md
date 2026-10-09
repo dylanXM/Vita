@@ -6,12 +6,12 @@ directory.
 
 ## Project index
 
-- [Flutter App](app/AGENT.md)
-- [Go Backend](backend/AGENT.md)
-- [Admin dashboard](admin/AGENT.md)
-- [Web application](webapp/AGENT.md)
-- [Marketing website](website/AGENT.md)
-- [Deployment configuration](deploy/AGENT.md)
+- [Flutter App](app/AGENTS.md)
+- [Go Backend](backend/AGENTS.md)
+- [Admin dashboard](admin/AGENTS.md)
+- [Web application](webapp/AGENTS.md)
+- [Marketing website](website/AGENTS.md)
+- [Deployment configuration](deploy/AGENTS.md)
 
 ## Repository-wide rules
 

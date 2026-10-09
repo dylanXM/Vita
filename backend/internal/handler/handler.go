@@ -1672,7 +1672,7 @@ func GetLifeEvents(c *gin.Context) {
 }
 
 func GetMemories(c *gin.Context) {
-	rows, err := db.Get().Query(`SELECT m.id,COALESCE(m.type,''),COALESCE(m.content,''),m.importance,m.event_time,COALESCE(m.metadata,''),m.created_at FROM memories m JOIN companions c ON c.id=m.companion_id WHERE m.companion_id=$1 AND c.user_id=$2 ORDER BY m.importance DESC,m.created_at DESC`, c.Param("id"), c.GetString("user_id"))
+	rows, err := db.Get().Query(`SELECT m.id,COALESCE(m.type,''),COALESCE(m.content,''),m.importance,m.event_time,COALESCE(m.metadata,''),m.created_at,m.is_favorite FROM memories m JOIN companions c ON c.id=m.companion_id WHERE m.companion_id=$1 AND c.user_id=$2 ORDER BY m.importance DESC,m.created_at DESC`, c.Param("id"), c.GetString("user_id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get memories"})
 		return
@@ -1684,10 +1684,11 @@ func GetMemories(c *gin.Context) {
 		var importance int
 		var eventTime sql.NullTime
 		var created time.Time
-		if rows.Scan(&id, &kind, &content, &importance, &eventTime, &metadata, &created) != nil {
+		var favorite bool
+		if rows.Scan(&id, &kind, &content, &importance, &eventTime, &metadata, &created, &favorite) != nil {
 			continue
 		}
-		memories = append(memories, gin.H{"id": id, "type": kind, "content": content, "importance": importance, "event_time": nullTime(eventTime), "metadata": metadata, "created_at": created})
+		memories = append(memories, gin.H{"id": id, "type": kind, "content": content, "importance": importance, "event_time": nullTime(eventTime), "metadata": metadata, "created_at": created, "is_favorite": favorite})
 	}
 	keepsakeRows, keepsakeErr := db.Get().Query(`SELECT k.id,k.title,k.content,k.payload::text,k.created_at
 		FROM companion_keepsakes k JOIN companions c ON c.id=k.companion_id

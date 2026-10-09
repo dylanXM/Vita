@@ -13,9 +13,11 @@ class ExperienceSheet extends StatefulWidget {
       {super.key,
       required this.companionId,
       required this.onCompleted,
+      this.recommendedProductKey,
       this.onResult});
 
   final String companionId;
+  final String? recommendedProductKey;
   final Future<void> Function() onCompleted;
   final Future<void> Function(Map<String, dynamic> response)? onResult;
 
@@ -42,12 +44,21 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
       final data = await ApiClient.instance
           .get('/v1/companions/${widget.companionId}/experiences');
       if (!mounted || data is! Map) return;
+      final products = (data['products'] as List? ?? const [])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+      final recommendedKey = widget.recommendedProductKey;
+      if (recommendedKey != null) {
+        final index =
+            products.indexWhere((item) => item['key'] == recommendedKey);
+        if (index > 0) {
+          products.insert(0, products.removeAt(index));
+        }
+      }
       setState(() {
         _balance = data['balance'] as int? ?? 0;
-        _products = (data['products'] as List? ?? const [])
-            .whereType<Map>()
-            .map((item) => Map<String, dynamic>.from(item))
-            .toList();
+        _products = products;
         _owned = (data['owned_outfits'] as Map? ?? const {})
             .map((key, value) => MapEntry('$key', value == true));
         _equipped = data['equipped_outfit'] as String? ?? '';
@@ -117,7 +128,9 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
       if (!mounted ||
           (widget.onResult != null &&
               result is Map &&
-              result['event_id'] is String)) return;
+              result['event_id'] is String)) {
+        return;
+      }
       Get.snackbar('experience.done'.tr,
           owned ? 'experience.equipped'.tr : 'experience.doneMessage'.tr);
       await _load();

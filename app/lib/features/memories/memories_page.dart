@@ -266,6 +266,11 @@ class _JourneyCompanionTile extends StatelessWidget {
         .whereType<String>()
         .where((value) => value.trim().isNotEmpty)
         .join(' · ');
+    final persona = (companion['persona'] as String?)?.trim() ?? '';
+    final interests = (companion['interests'] as String?)?.trim() ?? '';
+    final summary = details.isNotEmpty
+        ? details
+        : (persona.isNotEmpty ? persona : interests);
     final vita = context.vita;
     return Material(
       color: vita.surface,
@@ -276,17 +281,17 @@ class _JourneyCompanionTile extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: SizedBox(
-            height: 112,
+        child: SizedBox(
+          height: 92,
+          child: Padding(
+            padding: const EdgeInsets.all(10),
             child: Row(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(17),
+                  borderRadius: BorderRadius.circular(16),
                   child: SizedBox(
-                    width: 104,
-                    height: 112,
+                    width: 72,
+                    height: 72,
                     child: portraitUrl.isEmpty
                         ? _PortraitFallback(name: name)
                         : VitaMediaImage(
@@ -296,47 +301,45 @@ class _JourneyCompanionTile extends StatelessWidget {
                           ),
                   ),
                 ),
+                const SizedBox(width: 15),
                 Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 6, 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 19,
-                                  fontWeight: FontWeight.w700,
-                                  color: vita.text,
-                                )),
-                            if (details.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                details,
+                  child: ClipRect(
+                    child: SizedBox(
+                      height: 72,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 19,
+                                fontWeight: FontWeight.w700,
+                                color: vita.text,
+                              )),
+                          if (summary.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Flexible(
+                              child: Text(
+                                summary,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                     fontSize: 12,
-                                    height: 1.35,
+                                    height: 1.4,
                                     color: vita.subText),
                               ),
-                            ],
+                            ),
                           ],
-                        ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Icon(Icons.arrow_forward_rounded,
-                              size: 18, color: vita.green),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
+                const SizedBox(width: 8),
+                Icon(Icons.arrow_forward_rounded, size: 18, color: vita.green),
+                const SizedBox(width: 4),
               ],
             ),
           ),

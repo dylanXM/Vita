@@ -214,7 +214,11 @@ class MomentsPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: context.vita.pageBg,
       appBar: AppBar(
-          leading: const VitaBackButton(), title: Text('explore.moments'.tr)),
+        leading: const VitaBackButton(),
+        centerTitle: true,
+        title: Text('explore.moments'.tr,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+      ),
       body: SafeArea(
         bottom: false,
         child: _MomentsFeed(controller: controller),
@@ -244,32 +248,55 @@ class _MomentsFeed extends StatelessWidget {
         onRefresh: controller.loadPosts,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: 90),
+          padding: const EdgeInsets.fromLTRB(24, 70, 24, 90),
           children: [
-            SizedBox(
-              height: MediaQuery.sizeOf(context).height * 0.58,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  VitaEmpty(
-                    icon: controller.postsLoadFailed.value
-                        ? Icons.wifi_off_outlined
-                        : Icons.photo_camera_back_outlined,
-                    title: controller.postsLoadFailed.value
-                        ? 'common.loadFailed'.tr
-                        : 'explore.empty'.tr,
-                    subtitle: controller.postsLoadFailed.value
-                        ? 'common.pullToRetry'.tr
-                        : 'explore.emptySub'.tr,
-                  ),
-                  if (controller.postsLoadFailed.value)
-                    TextButton(
-                      onPressed: controller.loadPosts,
-                      child: Text('common.retry'.tr),
-                    ),
-                ],
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: context.vita.greenTint,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  controller.postsLoadFailed.value
+                      ? Icons.wifi_off_outlined
+                      : Icons.auto_awesome_outlined,
+                  color: context.vita.green,
+                  size: 30,
+                ),
               ),
             ),
+            const SizedBox(height: 22),
+            Text(
+              controller.postsLoadFailed.value
+                  ? 'common.loadFailed'.tr
+                  : 'explore.empty'.tr,
+              style: TextStyle(
+                  color: context.vita.text,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              controller.postsLoadFailed.value
+                  ? 'common.pullToRetry'.tr
+                  : 'explore.emptySub'.tr,
+              style: TextStyle(
+                  color: context.vita.subText, fontSize: 14, height: 1.5),
+            ),
+            if (controller.postsLoadFailed.value) ...[
+              const SizedBox(height: 14),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: controller.loadPosts,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: Text('common.retry'.tr),
+                ),
+              ),
+            ],
           ],
         ),
       );
@@ -277,15 +304,44 @@ class _MomentsFeed extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: controller.loadPosts,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 90),
-        itemCount: controller.posts.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 18),
-        itemBuilder: (context, index) =>
-            _MomentPost(post: controller.posts[index]),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 90),
+        itemCount: controller.posts.length + 1,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                      color: context.vita.green, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 9),
+                Text(
+                  'discover.momentCount'
+                      .trParams({'count': '${controller.posts.length}'}),
+                  style: TextStyle(
+                      color: context.vita.subText,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600),
+                ),
+              ]),
+            );
+          }
+          return _MomentPost(post: controller.posts[index - 1]);
+        },
       ),
     );
   }
 }
+
+List<String> _momentMediaUrls(Map<String, dynamic> post) =>
+    (post['media_urls'] as List? ?? const [])
+        .whereType<String>()
+        .where((url) => url.isNotEmpty)
+        .toList();
 
 class _MomentPost extends StatelessWidget {
   const _MomentPost({required this.post});
@@ -294,122 +350,203 @@ class _MomentPost extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final vita = context.vita;
     final author = Map<String, dynamic>.from(post['author'] as Map? ?? {});
     final related = post['related_companion'] is Map
         ? Map<String, dynamic>.from(post['related_companion'] as Map)
         : null;
     final name = author['name'] as String? ?? '';
-    final content = post['content'] as String? ?? '';
-    final media = (post['media_urls'] as List? ?? const [])
-        .whereType<String>()
-        .where((url) => url.isNotEmpty)
-        .toList();
+    final content = (post['content'] as String? ?? '').trim();
+    final media = _momentMediaUrls(post);
     final published = DateTime.tryParse(post['published_at'] as String? ?? '');
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF25213C), Color(0xFF181D31), Color(0xFF142830)],
-        ),
-        borderRadius: BorderRadius.circular(26),
-        border:
-            Border.all(color: const Color(0xFF9A91CB).withValues(alpha: 0.32)),
-      ),
+    return Material(
+      color: vita.surface,
+      borderRadius: BorderRadius.circular(8),
       clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          Positioned(
-            right: -28,
-            top: -65,
-            child: Container(
-              width: 180,
-              height: 180,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.07), width: 24),
-              ),
-            ),
+      child: InkWell(
+        onTap: () => Get.to(
+          () => _MomentDetailPage(post: post),
+          transition: Transition.cupertino,
+        ),
+        child: Container(
+          height: 190,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            border: Border.all(color: vita.divider.withValues(alpha: .75)),
+            borderRadius: BorderRadius.circular(8),
           ),
-          const Positioned(
-              right: 32,
-              top: 35,
-              child:
-                  Icon(Icons.auto_awesome, size: 13, color: Color(0xFFB9ADEE))),
-          const Positioned(
-              right: 84,
-              top: 82,
-              child: Icon(Icons.circle, size: 4, color: Color(0xFF8ACDD0))),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Column(children: [
+            Row(children: [
+              VitaAvatar(
+                name: name,
+                radius: 21,
+                imageUrl: author['portrait_url'] as String?,
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                            colors: [Color(0xFFB9ADEE), Color(0xFF77C7C3)]),
+                    Text(name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: vita.text,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700)),
+                    if (related != null)
+                      Text(
+                        'explore.with'.trParams({
+                          'name': related['name'] as String? ?? '',
+                        }),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: vita.subText, fontSize: 11),
                       ),
-                      child: VitaAvatar(
-                        name: name,
-                        radius: 20,
-                        imageUrl: author['portrait_url'] as String?,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                        child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(name,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700)),
-                        if (related != null) ...[
-                          const SizedBox(height: 3),
-                          Text(
-                              'explore.with'.trParams({
-                                'name': related['name'] as String? ?? '',
-                              }),
-                              style: const TextStyle(
-                                  fontSize: 12, color: Color(0xFFC2BCD9))),
-                        ],
-                      ],
-                    )),
                   ],
                 ),
-                if (content.isNotEmpty) ...[
-                  const SizedBox(height: 20),
-                  Text(
-                    content,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      height: 1.55,
+              ),
+              Icon(Icons.north_east_rounded, color: vita.green, size: 17),
+            ]),
+            const SizedBox(height: 13),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 3,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: vita.green,
+                      borderRadius: BorderRadius.circular(3),
                     ),
                   ),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Text(
+                      content.isEmpty ? 'chat.photoMessage'.tr : content,
+                      maxLines: media.isEmpty ? 4 : 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: vita.text,
+                        fontSize: media.isEmpty ? 16 : 14,
+                        fontWeight:
+                            media.isEmpty ? FontWeight.w500 : FontWeight.w400,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                  if (media.isNotEmpty) ...[
+                    const SizedBox(width: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: SizedBox(
+                        width: 70,
+                        height: 76,
+                        child: VitaMediaImage(
+                          url: media.first,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: vita.greenTint,
+                            child:
+                                Icon(Icons.image_outlined, color: vita.green),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-                if (media.isNotEmpty) ...[
-                  const SizedBox(height: 18),
-                  _MomentMedia(urls: media),
-                ],
-                const SizedBox(height: 18),
-                Container(
-                    height: 1, color: Colors.white.withValues(alpha: 0.10)),
-                const SizedBox(height: 12),
-                Text(
-                  published == null ? '' : formatDate(published.toLocal()),
-                  style:
-                      const TextStyle(fontSize: 12, color: Color(0xFFB3BED2)),
-                ),
-              ],
+              ),
             ),
+            Row(children: [
+              Icon(Icons.auto_awesome_rounded, color: vita.green, size: 13),
+              const SizedBox(width: 6),
+              Text(
+                published == null ? '' : formatDate(published.toLocal()),
+                style: TextStyle(color: vita.subText, fontSize: 11),
+              ),
+              const Spacer(),
+              if (media.length > 1)
+                Text(
+                  '+${media.length - 1}',
+                  style: TextStyle(color: vita.subText, fontSize: 11),
+                ),
+            ]),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _MomentDetailPage extends StatelessWidget {
+  const _MomentDetailPage({required this.post});
+
+  final Map<String, dynamic> post;
+
+  @override
+  Widget build(BuildContext context) {
+    final vita = context.vita;
+    final author = Map<String, dynamic>.from(post['author'] as Map? ?? {});
+    final related = post['related_companion'] is Map
+        ? Map<String, dynamic>.from(post['related_companion'] as Map)
+        : null;
+    final name = author['name'] as String? ?? '';
+    final content = (post['content'] as String? ?? '').trim();
+    final media = _momentMediaUrls(post);
+    final published = DateTime.tryParse(post['published_at'] as String? ?? '');
+    return Scaffold(
+      backgroundColor: vita.pageBg,
+      appBar: AppBar(
+        leading: const VitaBackButton(),
+        centerTitle: true,
+        title: Text('explore.moments'.tr,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+        children: [
+          Row(children: [
+            VitaAvatar(
+              name: name,
+              radius: 28,
+              imageUrl: author['portrait_url'] as String?,
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name,
+                      style: TextStyle(
+                          color: vita.text,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700)),
+                  if (related != null)
+                    Text(
+                      'explore.with'.trParams({
+                        'name': related['name'] as String? ?? '',
+                      }),
+                      style: TextStyle(color: vita.subText, fontSize: 12),
+                    ),
+                ],
+              ),
+            ),
+          ]),
+          const SizedBox(height: 22),
+          if (content.isNotEmpty) ...[
+            Text(content,
+                style: TextStyle(color: vita.text, fontSize: 18, height: 1.6)),
+            const SizedBox(height: 20),
+          ],
+          if (media.isNotEmpty) ...[
+            _MomentMedia(urls: media),
+            const SizedBox(height: 20),
+          ],
+          Divider(color: vita.divider),
+          const SizedBox(height: 8),
+          Text(
+            published == null ? '' : formatDate(published.toLocal()),
+            style: TextStyle(color: vita.subText, fontSize: 12),
           ),
         ],
       ),
@@ -424,8 +561,7 @@ class _MomentMedia extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visible = urls.take(9).toList();
-    final columns = visible.length == 1 ? 1 : (visible.length == 2 ? 2 : 3);
+    final columns = urls.length == 1 ? 1 : (urls.length == 2 ? 2 : 3);
     return SizedBox(
       width: double.infinity,
       child: GridView.builder(
@@ -435,13 +571,13 @@ class _MomentMedia extends StatelessWidget {
           crossAxisCount: columns,
           crossAxisSpacing: 6,
           mainAxisSpacing: 6,
-          childAspectRatio: visible.length == 1 ? 1.5 : 1,
+          childAspectRatio: urls.length == 1 ? 1.5 : 1,
         ),
-        itemCount: visible.length,
+        itemCount: urls.length,
         itemBuilder: (context, index) => ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: VitaMediaImage(
-            url: visible[index],
+            url: urls[index],
             errorBuilder: (_, __, ___) => Container(
               color: context.vita.pageBg,
               child: Icon(

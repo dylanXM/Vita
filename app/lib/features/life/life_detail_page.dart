@@ -6,6 +6,7 @@ import '../../shared/widgets.dart';
 import '../chat/chat_page.dart';
 import '../chat/companion_moment_page.dart';
 import '../chat/experience_sheet.dart';
+import 'companion_story_section.dart';
 
 class LifeDetailPage extends StatelessWidget {
   const LifeDetailPage({super.key, required this.companion});
@@ -140,6 +141,15 @@ class LifeDetailPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 _StoryCards(items: life),
               ],
+              if (_id.isNotEmpty)
+                CompanionStorySection(
+                  companionId: _id,
+                  companionName: _name,
+                  avatarUrl: companion['portrait_url'] as String?,
+                  onChat: _openChat,
+                  onExperience: (key) =>
+                      _showExperiences(context, recommendedKey: key),
+                ),
             ]),
           ),
         ],
@@ -155,14 +165,16 @@ class LifeDetailPage extends StatelessWidget {
     );
   }
 
-  void _showExperiences(BuildContext context) {
-    showModalBottomSheet<void>(
+  Future<void> _showExperiences(BuildContext context,
+      {String? recommendedKey}) async {
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: context.vita.surface,
       showDragHandle: true,
       builder: (_) => ExperienceSheet(
         companionId: _id,
+        recommendedProductKey: recommendedKey,
         onCompleted: () async {},
         onResult: (response) async {
           final result = response['result'];
