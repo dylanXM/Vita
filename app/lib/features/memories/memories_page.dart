@@ -138,8 +138,12 @@ class _MemoriesPageState extends State<MemoriesPage> {
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
             VitaTabHeader(title: 'tab.journey'.tr, showDivider: false),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: _JourneyIntroCard(companions: []),
+            ),
             SizedBox(
-              height: MediaQuery.sizeOf(context).height * 0.62,
+              height: MediaQuery.sizeOf(context).height * 0.42,
               child: VitaEmpty(
                 icon: Icons.star_border,
                 title: 'memories.createFirst'.tr,
@@ -189,16 +193,13 @@ class _MemoriesPageState extends State<MemoriesPage> {
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'journey.subtitle'.tr,
-                    style: TextStyle(fontSize: 13, color: context.vita.subText),
-                  ),
+                  _JourneyIntroCard(companions: companions),
                   if (_showSearch) ...[
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 16),
                     TextField(
                       controller: _search,
                       autofocus: true,
@@ -212,8 +213,8 @@ class _MemoriesPageState extends State<MemoriesPage> {
                         fillColor: context.vita.surface,
                         isDense: true,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: BorderSide(color: context.vita.divider),
                         ),
                       ),
                     ),
@@ -242,6 +243,7 @@ class _MemoriesPageState extends State<MemoriesPage> {
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _JourneyCompanionTile(
                       companion: companion,
+                      ordinal: index + 1,
                       onTap: () {
                         if (Get.isRegistered<ShellController>()) {
                           ShellController.to.selectedCompanionId.value =
@@ -261,13 +263,113 @@ class _MemoriesPageState extends State<MemoriesPage> {
   }
 }
 
+class _JourneyIntroCard extends StatelessWidget {
+  const _JourneyIntroCard({required this.companions});
+
+  final List<Map<String, dynamic>> companions;
+
+  @override
+  Widget build(BuildContext context) {
+    final vita = context.vita;
+    return Container(
+      height: 180,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        gradient: vita.brandGradient,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -28,
+            top: -74,
+            child: Container(
+              width: 220,
+              height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withValues(alpha: .16)),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 32,
+            top: -28,
+            child: Container(
+              width: 136,
+              height: 136,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withValues(alpha: .12)),
+              ),
+            ),
+          ),
+          const Positioned(
+            right: 28,
+            bottom: 25,
+            child: Icon(Icons.auto_awesome_rounded,
+                size: 38, color: Color(0x66FFFFFF)),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.auto_stories_rounded,
+                    size: 23, color: Colors.white.withValues(alpha: .88)),
+                const Spacer(),
+                Text(
+                  'journey.subtitle'.tr,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 25,
+                    height: 1.18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 2,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .82),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      companions.length.toString().padLeft(2, '0'),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: .8),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _JourneyCompanionTile extends StatelessWidget {
   const _JourneyCompanionTile({
     required this.companion,
+    required this.ordinal,
     required this.onTap,
   });
 
   final Map<String, dynamic> companion;
+  final int ordinal;
   final VoidCallback onTap;
 
   @override
@@ -278,60 +380,105 @@ class _JourneyCompanionTile extends StatelessWidget {
         .whereType<String>()
         .where((value) => value.trim().isNotEmpty)
         .join(' · ');
+    final vita = context.vita;
     return Material(
-      color: context.vita.surface,
-      borderRadius: BorderRadius.circular(20),
+      color: vita.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: vita.divider.withValues(alpha: .8)),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: SizedBox(
-          height: 116,
-          child: Row(
-            children: [
-              SizedBox(
-                width: 104,
-                height: 116,
-                child: portraitUrl.isEmpty
-                    ? _PortraitFallback(name: name)
-                    : VitaMediaImage(
-                        url: portraitUrl,
-                        errorBuilder: (_, __, ___) =>
-                            _PortraitFallback(name: name),
-                      ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: context.vita.text,
-                          )),
-                      if (details.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          details,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontSize: 12, color: context.vita.subText),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: SizedBox(
+            height: 112,
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(17),
+                  child: SizedBox(
+                    width: 104,
+                    height: 112,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        portraitUrl.isEmpty
+                            ? _PortraitFallback(name: name)
+                            : VitaMediaImage(
+                                url: portraitUrl,
+                                errorBuilder: (_, __, ___) =>
+                                    _PortraitFallback(name: name),
+                              ),
+                        Positioned(
+                          left: 8,
+                          top: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: .36),
+                              borderRadius: BorderRadius.circular(7),
+                            ),
+                            child: Text(
+                              ordinal.toString().padLeft(2, '0'),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ),
                         ),
                       ],
-                    ],
+                    ),
                   ),
                 ),
-              ),
-              Icon(Icons.arrow_forward_ios_rounded,
-                  size: 15, color: context.vita.subText),
-              const SizedBox(width: 16),
-            ],
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 6, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w700,
+                                  color: vita.text,
+                                )),
+                            if (details.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                details,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.35,
+                                    color: vita.subText),
+                              ),
+                            ],
+                          ],
+                        ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Icon(Icons.arrow_forward_rounded,
+                              size: 18, color: vita.green),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -345,15 +492,15 @@ class _PortraitFallback extends StatelessWidget {
   final String name;
 
   @override
-  Widget build(BuildContext context) => ColoredBox(
-        color: context.vita.greenTint,
+  Widget build(BuildContext context) => DecoratedBox(
+        decoration: BoxDecoration(gradient: context.vita.brandGradient),
         child: Center(
           child: Text(
             name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase(),
             style: TextStyle(
               fontSize: 56,
               fontWeight: FontWeight.w300,
-              color: context.vita.green,
+              color: Colors.white.withValues(alpha: .9),
             ),
           ),
         ),
@@ -390,7 +537,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.auto_stories_outlined),
-            color: context.vita.subText,
+            color: context.vita.green,
             tooltip: 'journey.life'.tr,
             onPressed: () => Get.to(
               () => LifeDetailPage(companion: widget.companion),
@@ -484,19 +631,17 @@ class _JourneyDetailHeader extends StatelessWidget {
         .where((value) => value.trim().isNotEmpty)
         .join(' · ');
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
       child: Container(
-        height: 148,
+        height: 228,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: context.vita.surface,
-          borderRadius: BorderRadius.circular(22),
+          gradient: context.vita.brandGradient,
+          borderRadius: BorderRadius.circular(28),
         ),
-        child: Row(
+        child: Stack(
           children: [
-            SizedBox(
-              width: 116,
-              height: double.infinity,
+            Positioned.fill(
               child: portraitUrl.isEmpty
                   ? _PortraitFallback(name: name)
                   : VitaMediaImage(
@@ -505,34 +650,60 @@ class _JourneyDetailHeader extends StatelessWidget {
                           _PortraitFallback(name: name),
                     ),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          color: context.vita.text,
-                        )),
-                    const SizedBox(height: 8),
-                    Text(
-                      details.isEmpty ? 'journey.subtitle'.tr : details,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1.4,
-                        color: context.vita.subText,
-                      ),
-                    ),
-                  ],
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: .06),
+                      Colors.black.withValues(alpha: .14),
+                      Colors.black.withValues(alpha: .75),
+                    ],
+                    stops: const [0, .42, 1],
+                  ),
                 ),
+              ),
+            ),
+            Positioned(
+              left: 22,
+              right: 22,
+              bottom: 22,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'tab.journey'.tr.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2,
+                      color: Colors.white.withValues(alpha: .8),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 31,
+                        height: 1.1,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      )),
+                  const SizedBox(height: 8),
+                  Text(
+                    details.isEmpty ? 'journey.subtitle'.tr : details,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.35,
+                      color: Colors.white.withValues(alpha: .86),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -548,15 +719,28 @@ class _DateSectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 14),
+      padding: const EdgeInsets.fromLTRB(26, 8, 24, 16),
       child: Row(
         children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: context.vita.green,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: context.vita.greenTint,
+                width: 3,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
           Text(
             label,
             style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: context.vita.subText,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: context.vita.text,
             ),
           ),
           const SizedBox(width: 14),
@@ -579,51 +763,90 @@ class _MemoryTile extends StatelessWidget {
     final title = (memory['title'] as String? ?? '').trim();
     final type = (memory['type'] as String? ?? 'memory').trim();
     final readonly = memory['readonly'] == true;
+    final eventTime = DateTime.tryParse(
+      memory['event_time'] as String? ?? memory['created_at'] as String? ?? '',
+    )?.toLocal();
+    final vita = context.vita;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+      padding: const EdgeInsets.fromLTRB(44, 0, 20, 12),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(18, 18, 10, 18),
+        padding: const EdgeInsets.fromLTRB(17, 14, 8, 18),
         decoration: BoxDecoration(
-          color: context.vita.surface,
-          borderRadius: BorderRadius.circular(18),
+          color: vita.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: vita.divider.withValues(alpha: .8)),
         ),
-        child: Row(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
+            Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: vita.greenTint,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    type == 'world_visit'
+                        ? Icons.travel_explore_rounded
+                        : Icons.auto_stories_rounded,
+                    size: 17,
+                    color: vita.green,
+                  ),
+                ),
+                if (eventTime != null) ...[
+                  const SizedBox(width: 10),
+                  Text(
+                    formatClock(eventTime),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: vita.subText,
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                if (!readonly)
+                  IconButton(
+                    onPressed: () => _showActions(context),
+                    icon: const Icon(Icons.more_horiz_rounded, size: 21),
+                    color: vita.subText,
+                    tooltip: 'memories.delete'.tr,
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(2, 12, 12, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (title.isNotEmpty) ...[
-                    Text(title,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: context.vita.green,
-                        )),
-                    const SizedBox(height: 8),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: vita.text,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
                   ],
                   Text(
                     type == 'world_visit' ? 'world.visitMemory'.tr : content.tr,
                     style: TextStyle(
-                      fontSize: 16,
-                      color: context.vita.text,
+                      fontSize: 15,
+                      color: title.isNotEmpty ? vita.subText : vita.text,
                       height: 1.55,
                     ),
                   ),
                 ],
               ),
             ),
-            if (!readonly)
-              IconButton(
-                onPressed: () => _showActions(context),
-                icon: const Icon(Icons.more_vert, size: 19),
-                color: context.vita.subText,
-                tooltip: 'memories.delete'.tr,
-                visualDensity: VisualDensity.compact,
-              ),
           ],
         ),
       ),

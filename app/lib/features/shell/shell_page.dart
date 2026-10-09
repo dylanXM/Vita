@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
@@ -127,7 +129,7 @@ const List<_NavItem> _kTabs = [
 ];
 
 /// The same liquid-glass dock used by ToVideo, with Vita's four destinations.
-class VitaTabBar extends StatelessWidget {
+class VitaTabBar extends StatefulWidget {
   const VitaTabBar({super.key, required this.index, required this.onTap});
 
   final int index;
@@ -138,37 +140,186 @@ class VitaTabBar extends StatelessWidget {
   static const double reservedHeight = pillHeight + edgeInset * 2;
 
   @override
+  State<VitaTabBar> createState() => _VitaTabBarState();
+}
+
+class _VitaTabBarState extends State<VitaTabBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _movement = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 320),
+    value: 1,
+  );
+  late double _animationStartIndex = widget.index.toDouble();
+
+  @override
+  void didUpdateWidget(VitaTabBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.index != widget.index) {
+      final progress = Curves.easeOutCubic.transform(_movement.value);
+      _animationStartIndex +=
+          (oldWidget.index - _animationStartIndex) * progress;
+      _movement.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _movement.dispose();
+    super.dispose();
+  }
+
+  Alignment _tabAlignment(double index, TextDirection direction) {
+    final visualIndex =
+        direction == TextDirection.rtl ? _kTabs.length - 1 - index : index;
+    return Alignment(-1 + 2 * visualIndex / (_kTabs.length - 1), 0);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final vita = context.vita;
     final dark = vita.brightness == Brightness.dark;
+    final direction = Directionality.of(context);
+    final rimColor =
+        dark ? Colors.white.withValues(alpha: .35) : vita.glassRing;
+    const outerRadius = 30.0;
+    const indicatorInset = 4.0;
+    const innerRadius = outerRadius - indicatorInset;
+
     return SafeArea(
       top: false,
-      child: GlassTabBar.bottom(
-        selectedIndex: index,
-        onTabSelected: onTap,
-        barHeight: pillHeight,
-        verticalPadding: edgeInset,
-        horizontalPadding: 14,
-        spacing: 2,
-        tabPadding: const EdgeInsets.symmetric(horizontal: 2),
-        iconSize: 24,
-        labelFontSize: 10,
-        iconLabelSpacing: 2,
-        indicatorColor: Colors.transparent,
-        selectedIconColor: vita.green,
-        selectedLabelColor: vita.green,
-        unselectedIconColor: vita.subText,
-        unselectedLabelColor: vita.subText,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-        settings: LiquidGlassSettings(
-          glassColor: vita.surface.withValues(alpha: dark ? 0.44 : 0.58),
-          blur: 8,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: VitaTabBar.edgeInset,
         ),
-        tabs: [
-          for (var i = 0; i < _kTabs.length; i++)
-            GlassTab(icon: Icon(_kTabs[i].icon), label: _kTabs[i].labelKey.tr),
-        ],
+        child: SizedBox(
+          height: VitaTabBar.pillHeight,
+          child: DecoratedBox(
+            position: DecorationPosition.foreground,
+            decoration: ShapeDecoration(
+              shape: LiquidRoundedRectangle(
+                borderRadius: outerRadius,
+                side: BorderSide(color: rimColor, width: 1),
+              ),
+            ),
+            child: AdaptiveGlass(
+              shape: const LiquidRoundedRectangle(
+                borderRadius: outerRadius,
+              ),
+              settings: LiquidGlassSettings(
+                glassColor: vita.surface.withValues(alpha: dark ? .44 : .58),
+                blur: 8,
+              ),
+              child: AnimatedBuilder(
+                animation: _movement,
+                builder: (context, _) {
+                  final progress =
+                      Curves.easeOutCubic.transform(_movement.value);
+                  final alignment = Alignment.lerp(
+                    _tabAlignment(_animationStartIndex, direction),
+                    _tabAlignment(widget.index.toDouble(), direction),
+                    progress,
+                  )!;
+                  final thickness =
+                      math.sin(math.pi * _movement.value).clamp(0.0, 1.0);
+                  final restOpacity = (1 - thickness / .15).clamp(0.0, 1.0);
+                  return Stack(
+                    children: [
+                      AnimatedGlassIndicator(
+                        velocity: 0,
+                        itemCount: _kTabs.length,
+                        alignment: alignment,
+                        thickness: thickness,
+                        quality: GlassQuality.standard,
+                        indicatorColor:
+                            vita.glass.withValues(alpha: dark ? .38 : .62),
+                        isBackgroundIndicator: false,
+                        padding: const EdgeInsets.all(indicatorInset),
+                        borderRadius: innerRadius,
+                        innerBlur: 1.5,
+                        settings: LiquidGlassSettings(
+                          glassColor:
+                              vita.glass.withValues(alpha: dark ? .18 : .28),
+                          ambientRim: .18,
+                        ),
+                      ),
+                      Positioned.fill(
+                        child: Padding(
+                          padding: const EdgeInsets.all(indicatorInset),
+                          child: FractionallySizedBox(
+                            widthFactor: 1 / _kTabs.length,
+                            alignment: alignment,
+                            child: IgnorePointer(
+                              child: Opacity(
+                                opacity: restOpacity,
+                                child: DecoratedBox(
+                                  decoration: ShapeDecoration(
+                                    shape: LiquidRoundedRectangle(
+                                      borderRadius: innerRadius,
+                                      side: BorderSide(
+                                        color: rimColor,
+                                        width: 1,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          for (var i = 0; i < _kTabs.length; i++)
+                            Expanded(
+                              child: Semantics(
+                                button: true,
+                                selected: widget.index == i,
+                                label: _kTabs[i].labelKey.tr,
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () => widget.onTap(i),
+                                  child: Center(
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            _kTabs[i].icon,
+                                            size: 24,
+                                            color: widget.index == i
+                                                ? vita.green
+                                                : vita.subText,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _kTabs[i].labelKey.tr,
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                              color: widget.index == i
+                                                  ? vita.green
+                                                  : vita.subText,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
