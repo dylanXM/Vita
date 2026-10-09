@@ -1,9 +1,5 @@
 const Map<String, Map<String, String>> additionalVitaTranslations = {
   'es': {
-    'notice.success': 'Correcto',
-    'notice.error': 'Error',
-    'notice.warning': 'Atención',
-    'notice.info': 'Información',
     'tab.chat': 'Chat',
     'tab.memories': 'Recuerdos',
     'tab.explore': 'Explorar',
@@ -558,10 +554,6 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'Sin configurar',
   },
   'pt': {
-    'notice.success': 'Sucesso',
-    'notice.error': 'Erro',
-    'notice.warning': 'Atenção',
-    'notice.info': 'Informação',
     'tab.chat': 'Conversa',
     'tab.memories': 'Memórias',
     'tab.explore': 'Explorar',
@@ -1119,10 +1111,6 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'Não definido',
   },
   'ja': {
-    'notice.success': '成功',
-    'notice.error': 'エラー',
-    'notice.warning': '注意',
-    'notice.info': 'お知らせ',
     'tab.chat': 'チャット',
     'tab.memories': '思い出',
     'tab.explore': '見つける',
@@ -1643,10 +1631,6 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': '未設定',
   },
   'ko': {
-    'notice.success': '성공',
-    'notice.error': '오류',
-    'notice.warning': '주의',
-    'notice.info': '안내',
     'tab.chat': '채팅',
     'tab.memories': '추억',
     'tab.explore': '탐색',
@@ -2166,10 +2150,6 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': '미설정',
   },
   'ar': {
-    'notice.success': 'نجاح',
-    'notice.error': 'خطأ',
-    'notice.warning': 'تنبيه',
-    'notice.info': 'معلومة',
     'tab.chat': 'الدردشة',
     'tab.memories': 'الذكريات',
     'tab.explore': 'استكشاف',
@@ -2701,10 +2681,6 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'غير محدد',
   },
   'zh_TW': {
-    'notice.success': '成功',
-    'notice.error': '錯誤',
-    'notice.warning': '請注意',
-    'notice.info': '提示',
     'tab.chat': '聊天',
     'tab.memories': '回憶',
     'tab.explore': '探索',
