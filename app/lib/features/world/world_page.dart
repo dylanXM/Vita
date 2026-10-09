@@ -25,11 +25,8 @@ class WorldPage extends StatefulWidget {
 }
 
 class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
-  static const _originPage = 10000;
-  late final PageController _pages =
-      PageController(initialPage: _originPage, viewportFraction: .84);
-  int _visiblePage = _originPage;
-  String? _originCompanionId;
+  PageController? _pages;
+  int _visiblePage = 0;
   Timer? _sceneTimer;
   String? _sceneCompanionId;
   Map<String, dynamic>? _scene;
@@ -79,10 +76,7 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
 
   Map<String, dynamic> _companionAt(
       List<Map<String, dynamic>> items, int page) {
-    final origin = items.indexWhere((item) => item['id'] == _originCompanionId);
-    final index =
-        ((origin < 0 ? 0 : origin) + page - _originPage) % items.length;
-    return items[index];
+    return items[page.clamp(0, items.length - 1)];
   }
 
   void _refreshVisibleScene() {
@@ -113,7 +107,7 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _sceneTimer?.cancel();
-    _pages.dispose();
+    _pages?.dispose();
     super.dispose();
   }
 
@@ -148,9 +142,15 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
         bottom: false,
         child: Obx(() {
           final companions = controller.companions.toList();
-          if (companions.isNotEmpty) {
-            _originCompanionId ??=
-                _selectedCompanion(companions)?['id'] as String?;
+          if (companions.isNotEmpty && _pages == null) {
+            final selectedId = _selectedCompanion(companions)?['id'];
+            _visiblePage =
+                companions.indexWhere((item) => item['id'] == selectedId);
+            if (_visiblePage < 0) _visiblePage = 0;
+            _pages = PageController(
+              initialPage: _visiblePage,
+              viewportFraction: .84,
+            );
           }
           final current = companions.isEmpty
               ? null
@@ -162,14 +162,11 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
               selectedId != currentId &&
               companions.any((item) => item['id'] == selectedId)) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted || !_pages.hasClients) return;
+              if (!mounted || _pages?.hasClients != true) return;
               final selectedIndex =
                   companions.indexWhere((item) => item['id'] == selectedId);
-              final currentIndex = companions.indexWhere(
-                (item) => item['id'] == currentId,
-              );
-              if (selectedIndex >= 0 && currentIndex >= 0) {
-                _pages.jumpToPage(_visiblePage + selectedIndex - currentIndex);
+              if (selectedIndex >= 0) {
+                _pages!.jumpToPage(selectedIndex);
               }
             });
           }
@@ -220,6 +217,7 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
                             )
                           : PageView.builder(
                               controller: _pages,
+                              itemCount: companions.length,
                               physics: const PageScrollPhysics(),
                               onPageChanged: (page) {
                                 final next = _companionAt(companions, page);
@@ -236,10 +234,10 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
                                 final item = _companionAt(companions, page);
                                 final id = item['id'] as String? ?? '';
                                 return AnimatedBuilder(
-                                  animation: _pages,
+                                  animation: _pages!,
                                   builder: (context, child) {
-                                    final position = _pages.hasClients
-                                        ? (_pages.page ??
+                                    final position = _pages!.hasClients
+                                        ? (_pages!.page ??
                                             _visiblePage.toDouble())
                                         : _visiblePage.toDouble();
                                     final distance =

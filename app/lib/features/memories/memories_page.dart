@@ -273,80 +273,96 @@ class _JourneyCompanionTile extends StatelessWidget {
         : (persona.isNotEmpty ? persona : interests);
     final vita = context.vita;
     return Material(
-      color: vita.surface,
+      color: const Color(0xFF222127),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: vita.divider.withValues(alpha: .8)),
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: vita.divider.withValues(alpha: .35)),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: SizedBox(
-          height: 92,
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: SizedBox(
-                    width: 72,
-                    height: 72,
-                    child: portraitUrl.isEmpty
-                        ? _PortraitFallback(name: name)
-                        : VitaMediaImage(
-                            url: portraitUrl,
-                            errorBuilder: (_, __, ___) =>
-                                _PortraitFallback(name: name),
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  child: ClipRect(
+          height: 132,
+          child: Column(children: [
+            const _FilmPerforations(),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 5, 13, 5),
+                child: Row(children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
                     child: SizedBox(
-                      height: 72,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 19,
-                                fontWeight: FontWeight.w700,
-                                color: vita.text,
-                              )),
-                          if (summary.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Flexible(
-                              child: Text(
-                                summary,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    height: 1.4,
-                                    color: vita.subText),
-                              ),
+                      width: 88,
+                      height: double.infinity,
+                      child: portraitUrl.isEmpty
+                          ? _PortraitFallback(name: name)
+                          : VitaMediaImage(
+                              url: portraitUrl,
+                              errorBuilder: (_, __, ___) =>
+                                  _PortraitFallback(name: name),
                             ),
-                          ],
-                        ],
-                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Icon(Icons.arrow_forward_rounded, size: 18, color: vita.green),
-                const SizedBox(width: 4),
-              ],
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            )),
+                        const SizedBox(height: 4),
+                        Text(summary.isEmpty ? 'journey.subtitle'.tr : summary,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                height: 1.35,
+                                color: Colors.white70)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  const Icon(Icons.arrow_forward_rounded,
+                      size: 18, color: Colors.white70),
+                ]),
+              ),
             ),
-          ),
+            const _FilmPerforations(),
+          ]),
         ),
       ),
     );
   }
+}
+
+class _FilmPerforations extends StatelessWidget {
+  const _FilmPerforations();
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: 13,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: List.generate(
+            12,
+            (_) => Container(
+              width: 13,
+              height: 5,
+              decoration: BoxDecoration(
+                color: context.vita.pageBg,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 class _PortraitFallback extends StatelessWidget {
@@ -459,25 +475,32 @@ class _MemoryDetailPageState extends State<MemoryDetailPage> {
 
   List<Widget> _buildGroupedTiles(BuildContext context) {
     final tiles = <Widget>[];
+    final ordered = controller.memories.toList()
+      ..sort((a, b) => (_memoryTime(b) ?? DateTime(1970))
+          .compareTo(_memoryTime(a) ?? DateTime(1970)));
     DateTime? prevDay;
-    for (var i = 0; i < controller.memories.length; i++) {
-      final m = controller.memories[i];
-      final t = DateTime.tryParse(
-              m['event_time'] as String? ?? m['created_at'] as String? ?? '') ??
-          DateTime.now();
-      final localTime = t.toLocal();
-      final day = DateTime(localTime.year, localTime.month, localTime.day);
-      if (prevDay == null || day != prevDay) {
-        tiles.add(_DateSectionHeader(label: formatDateSeparator(localTime)));
+    for (final m in ordered) {
+      final localTime = _memoryTime(m)?.toLocal();
+      if (localTime != null) {
+        final day = DateTime(localTime.year, localTime.month, localTime.day);
+        if (prevDay == null || day != prevDay) {
+          tiles.add(_DateSectionHeader(label: formatDateSeparator(localTime)));
+        }
+        prevDay = day;
       }
       tiles.add(_MemoryTile(
         companionId: companionId,
         memory: m,
       ));
-      prevDay = day;
     }
     return tiles;
   }
+
+  DateTime? _memoryTime(Map<String, dynamic> memory) => DateTime.tryParse(
+        memory['event_time'] as String? ??
+            memory['created_at'] as String? ??
+            '',
+      );
 }
 
 class _JourneyDetailHeader extends StatelessWidget {
@@ -494,13 +517,13 @@ class _JourneyDetailHeader extends StatelessWidget {
         .where((value) => value.trim().isNotEmpty)
         .join(' · ');
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
       child: Container(
-        height: 228,
+        height: 182,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          gradient: context.vita.brandGradient,
-          borderRadius: BorderRadius.circular(28),
+          color: const Color(0xFF222127),
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Stack(
           children: [
@@ -532,7 +555,7 @@ class _JourneyDetailHeader extends StatelessWidget {
             Positioned(
               left: 22,
               right: 22,
-              bottom: 22,
+              bottom: 24,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -550,7 +573,7 @@ class _JourneyDetailHeader extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 31,
+                        fontSize: 27,
                         height: 1.1,
                         fontWeight: FontWeight.w800,
                         color: Colors.white,
@@ -567,6 +590,24 @@ class _JourneyDetailHeader extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+            ),
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: ColoredBox(
+                color: Color(0xFF222127),
+                child: _FilmPerforations(),
+              ),
+            ),
+            const Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: ColoredBox(
+                color: Color(0xFF222127),
+                child: _FilmPerforations(),
               ),
             ),
           ],
@@ -615,7 +656,10 @@ class _DateSectionHeader extends StatelessWidget {
 }
 
 class _MemoryTile extends StatelessWidget {
-  const _MemoryTile({required this.companionId, required this.memory});
+  const _MemoryTile({
+    required this.companionId,
+    required this.memory,
+  });
 
   final String companionId;
   final Map<String, dynamic> memory;
@@ -629,87 +673,113 @@ class _MemoryTile extends StatelessWidget {
     final eventTime = DateTime.tryParse(
       memory['event_time'] as String? ?? memory['created_at'] as String? ?? '',
     )?.toLocal();
-    final vita = context.vita;
+    final visibleContent =
+        type == 'world_visit' ? 'world.visitMemory'.tr : content.tr;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(44, 0, 20, 12),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(17, 14, 8, 18),
-        decoration: BoxDecoration(
-          color: vita.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: vita.divider.withValues(alpha: .8)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: vita.greenTint,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    type == 'world_visit'
-                        ? Icons.travel_explore_rounded
-                        : Icons.auto_stories_rounded,
-                    size: 17,
-                    color: vita.green,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      child: Material(
+        color: const Color(0xFF222127),
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () =>
+              _showFullMemory(context, title, visibleContent, eventTime),
+          child: SizedBox(
+            height: 180,
+            child: Column(children: [
+              const _FilmPerforations(),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 10, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Icon(
+                          type == 'world_visit'
+                              ? Icons.travel_explore_rounded
+                              : Icons.auto_stories_rounded,
+                          size: 16,
+                          color: Colors.white70,
+                        ),
+                        const SizedBox(width: 8),
+                        if (eventTime != null)
+                          Text(formatClock(eventTime),
+                              style: const TextStyle(
+                                  color: Colors.white70, fontSize: 12)),
+                        const Spacer(),
+                        if (!readonly)
+                          IconButton(
+                            onPressed: () => _showActions(context),
+                            icon:
+                                const Icon(Icons.more_horiz_rounded, size: 21),
+                            color: Colors.white70,
+                            tooltip: 'memories.delete'.tr,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                      ]),
+                      if (title.isNotEmpty) ...[
+                        Text(title.tr,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            )),
+                        const SizedBox(height: 7),
+                      ],
+                      Text(visibleContent,
+                          maxLines: title.isEmpty ? 4 : 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: Colors.white70,
+                            height: 1.45,
+                          )),
+                    ],
                   ),
                 ),
-                if (eventTime != null) ...[
-                  const SizedBox(width: 10),
-                  Text(
-                    formatClock(eventTime),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: vita.subText,
-                    ),
-                  ),
-                ],
-                const Spacer(),
-                if (!readonly)
-                  IconButton(
-                    onPressed: () => _showActions(context),
-                    icon: const Icon(Icons.more_horiz_rounded, size: 21),
-                    color: vita.subText,
-                    tooltip: 'memories.delete'.tr,
-                    visualDensity: VisualDensity.compact,
-                  ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(2, 12, 12, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (title.isNotEmpty) ...[
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: vita.text,
-                      ),
-                    ),
-                    const SizedBox(height: 7),
-                  ],
-                  Text(
-                    type == 'world_visit' ? 'world.visitMemory'.tr : content.tr,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: title.isNotEmpty ? vita.subText : vita.text,
-                      height: 1.55,
-                    ),
-                  ),
-                ],
               ),
-            ),
+              const _FilmPerforations(),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showFullMemory(BuildContext context, String title,
+      String content, DateTime? eventTime) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: context.vita.surface,
+      builder: (sheetContext) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: .55,
+        maxChildSize: .9,
+        builder: (context, scrollController) => ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+          children: [
+            if (eventTime != null)
+              Text(formatDateSeparator(eventTime),
+                  style: TextStyle(color: context.vita.subText, fontSize: 13)),
+            if (title.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(title.tr,
+                  style: TextStyle(
+                      color: context.vita.text,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700)),
+            ],
+            const SizedBox(height: 18),
+            Text(content,
+                style: TextStyle(
+                    color: context.vita.text, fontSize: 16, height: 1.6)),
           ],
         ),
       ),
