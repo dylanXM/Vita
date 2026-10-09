@@ -375,7 +375,7 @@ class _ChatPageState extends State<ChatPage> {
         final prev = ctrl.messages[i - 1];
         final prevDt =
             DateTime.tryParse(prev['created_at'] as String? ?? '') ?? dt;
-        final sameSender = prev['sender_type'] == m['sender_type'];
+        final sameSender = _isUserMessage(prev) == _isUserMessage(m);
         final closeInTime = dt.difference(prevDt) < const Duration(minutes: 10);
         if (!sameSender || !closeInTime) {
           items.add(Center(
@@ -390,7 +390,7 @@ class _ChatPageState extends State<ChatPage> {
       }
       prevDate = dt;
 
-      final isUser = m['sender_type'] == 'user';
+      final isUser = _isUserMessage(m);
       final parsed = ChatMessageContent.from(m);
       final isGift = parsed.isGift;
       final deliveryStatus = m['delivery_status'] as String? ?? 'delivered';
@@ -482,6 +482,11 @@ class _ChatPageState extends State<ChatPage> {
       children: items,
     );
   }
+
+  bool _isUserMessage(Map<String, dynamic> message) =>
+      message['sender_type'] == 'user' ||
+      (message['source'] == 'paid_date' &&
+          message['message_type'] == 'scene_card');
 
   Widget _buildInputBar({required bool locked, required String? panel}) {
     return Container(

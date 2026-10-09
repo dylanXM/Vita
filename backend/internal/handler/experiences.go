@@ -231,7 +231,16 @@ func fulfillVirtualDate(ctx context.Context, userID, companionID string, product
 	if err != nil {
 		return nil, "", err
 	}
+	reaction, err := companionAgent.ComposeMomentInvitation(ctx, conversationID, userID, title, location, start)
+	if err != nil {
+		return nil, "", err
+	}
+	if strings.TrimSpace(reaction) == "" {
+		return nil, "", fmt.Errorf("companion could not respond to invitation")
+	}
 	messageID := uuid.New().String()
+	reactionID := uuid.New().String()
+	messageTime := time.Now().UTC()
 	messagePayload, _ := json.Marshal(map[string]any{"event_id": eventID, "product_key": product.Key,
 		"scheduled_at": start, "ends_at": start.Add(duration)})
 	var timezone string
@@ -254,14 +263,18 @@ func fulfillVirtualDate(ctx context.Context, userID, companionID string, product
 		VALUES($1,$2,'shared_experience',$3,80,$4,$5)`, memoryID, companionID, description, start, string(payload)); err != nil {
 		return nil, "", err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO messages(id,conversation_id,sender_type,message_type,content,payload,source,life_event_id,delivery_status)
-		VALUES($1,$2,'assistant','scene_card',$3,$4,'paid_date',$5,'delivered')`, messageID, conversationID, description, messagePayload, eventID); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO messages(id,conversation_id,sender_type,message_type,content,payload,source,life_event_id,delivery_status,created_at)
+		VALUES($1,$2,'user','scene_card',$3,$4,'paid_date',$5,'delivered',$6)`, messageID, conversationID, description, messagePayload, eventID, messageTime); err != nil {
+		return nil, "", err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO messages(id,conversation_id,sender_type,message_type,content,payload,source,life_event_id,delivery_status,created_at)
+		VALUES($1,$2,'assistant','text',$3,$4,'moment_invitation',$5,'delivered',$6)`, reactionID, conversationID, reaction, messagePayload, eventID, messageTime.Add(time.Millisecond)); err != nil {
 		return nil, "", err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, "", err
 	}
-	return map[string]any{"event_id": eventID, "memory_id": memoryID, "message_id": messageID, "scheduled_at": start}, eventID, nil
+	return map[string]any{"event_id": eventID, "memory_id": memoryID, "message_id": messageID, "reaction_message_id": reactionID, "scheduled_at": start}, eventID, nil
 }
 
 func fulfillKeepsake(ctx context.Context, userID, companionID string, product credits.Product) (map[string]any, string, error) {

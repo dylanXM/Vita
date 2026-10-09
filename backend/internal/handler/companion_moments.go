@@ -26,6 +26,7 @@ type companionMoment struct {
 	Artifact      string    `json:"artifact"`
 	UserText      string    `json:"user_text"`
 	CompanionText string    `json:"companion_text"`
+	Invitation    string    `json:"invitation"`
 	Opening       string    `json:"opening"`
 }
 
@@ -33,7 +34,9 @@ func loadCompanionMoment(ctx context.Context, userID, companionID, eventID strin
 	var moment companionMoment
 	err := db.Get().QueryRowContext(ctx, `SELECT e.id,COALESCE(e.payload->>'product_key',''),
 		COALESCE(e.title,''),COALESCE(e.description,''),COALESCE(e.location,''),e.start_time,e.end_time,
-		COALESCE(s.artifact_text,''),COALESCE(s.artifact_user_text,''),COALESCE(s.artifact_companion_text,''),COALESCE(m.content,'')
+		COALESCE(s.artifact_text,''),COALESCE(s.artifact_user_text,''),COALESCE(s.artifact_companion_text,''),
+		COALESCE((SELECT invitation.content FROM messages invitation WHERE invitation.life_event_id=e.id AND invitation.source='moment_invitation' ORDER BY invitation.created_at DESC LIMIT 1),''),
+		COALESCE(m.content,'')
 		FROM life_events e JOIN companions c ON c.id=e.companion_id
 		LEFT JOIN companion_moment_sessions s ON s.event_id=e.id AND s.user_id=$1
 		LEFT JOIN messages m ON m.id=s.opening_message_id
@@ -41,7 +44,7 @@ func loadCompanionMoment(ctx context.Context, userID, companionID, eventID strin
 		AND e.event_type='shared_activity' AND e.generation_source='user_purchase'`,
 		userID, companionID, eventID).Scan(&moment.ID, &moment.ProductKey, &moment.TitleKey,
 		&moment.Description, &moment.Location, &moment.StartsAt, &moment.EndsAt,
-		&moment.Artifact, &moment.UserText, &moment.CompanionText, &moment.Opening)
+		&moment.Artifact, &moment.UserText, &moment.CompanionText, &moment.Invitation, &moment.Opening)
 	return moment, err
 }
 

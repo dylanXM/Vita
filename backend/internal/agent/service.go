@@ -296,6 +296,7 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 	preferredLocale := s.preferredLocale(ctx, userID)
 	latestQuestion := latestUserMessage(recent)
 	system := s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy(latestQuestion, preferredLocale) + "\n\n" + emojiMessagePolicy
+	system += "\n\nFor a direct reply, answer the user's actual question, but do not merely mirror their last message. Let your own current activity, mood, personality, and world context shape your perspective. Mention those details only when they naturally belong in the reply; never invent a current event."
 	lifeEventID := ""
 	_ = s.db.QueryRowContext(ctx, `SELECT COALESCE(life_event_id,'') FROM messages
 		WHERE conversation_id=$1 AND sender_type='user' ORDER BY created_at DESC,id DESC LIMIT 1`, conversationID).Scan(&lifeEventID)
@@ -397,6 +398,47 @@ Be present and invite conversation; do not list options, claim a physical encoun
 	text, _, err := s.generateTextWithFallback(ctx, profile.ID, "moment_opening", models, GenerateRequest{
 		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy,
 		Messages: recent, Temperature: 0.85, MaxTokens: 140,
+	})
+	return strings.TrimSpace(text), err
+}
+
+// ComposeMomentInvitation gives the user an immediate, character-led response
+// to their invitation. It is generated before the purchase is committed so a
+// failed model call can still refund the reserved coins.
+func (s *Service) ComposeMomentInvitation(ctx context.Context, conversationID, userID, titleKey, location string, startsAt time.Time) (string, error) {
+	profile, err := s.loadCompanionForConversation(ctx, conversationID, userID)
+	if err != nil {
+		return "", err
+	}
+	locale := s.preferredLocale(ctx, userID)
+	if s.mock {
+		return localizedMock(map[string]string{
+			"zh-Hans": "我收到你的邀请了。到时候我们好好聊聊，也留下一点只属于我们的回忆。",
+			"zh-Hant": "我收到你的邀請了。到時候我們好好聊聊，也留下一點只屬於我們的回憶。",
+			"ja":      "招待、受け取ったよ。その時間はゆっくり話して、ふたりの思い出を残そう。",
+			"ko":      "초대 받았어. 그때 천천히 이야기하고 우리만의 추억도 남기자.",
+			"es":      "Recibí tu invitación. Cuando llegue el momento, hablemos con calma y guardemos un recuerdo nuestro.",
+			"pt":      "Recebi o teu convite. Quando chegar a hora, vamos conversar com calma e guardar uma recordação nossa.",
+			"ar":      "وصلتني دعوتك. عندما يحين الوقت، لنتحدث بهدوء ونحتفظ بذكرى تخصنا.",
+		}, locale, "I got your invitation. Let's take our time together and make something worth remembering."), nil
+	}
+	models, err := s.loadTextRouteModels(ctx, "text_chat", profile.ID, userID)
+	if err != nil {
+		return "", err
+	}
+	experienceName := map[string]string{
+		"experience.date.coffee": "a quiet coffee date",
+		"experience.date.movie":  "a movie night",
+		"experience.date.dinner": "dinner together",
+	}[titleKey]
+	if experienceName == "" {
+		experienceName = "a shared moment"
+	}
+	instruction := fmt.Sprintf(`The user has invited you to a scheduled shared experience: %s, setting: %s, starts at %s UTC.
+Reply now in one or two natural sentences from your own perspective. React to this specific invitation through your personality, current mood and life; make the user feel the invitation was received. The experience has not started yet. Do not quote the raw UTC time; the invitation card displays the user's local time. Do not claim to be there already, invent a physical meeting, mention coins or payment, or ask a generic question.`, experienceName, location, startsAt.UTC().Format(time.RFC3339))
+	text, _, err := s.generateTextWithFallback(ctx, profile.ID, "moment_invitation", models, GenerateRequest{
+		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy,
+		Messages: []ChatMessage{{Role: "user", Content: instruction}}, Temperature: 0.85, MaxTokens: 140,
 	})
 	return strings.TrimSpace(text), err
 }
@@ -1587,8 +1629,7 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 		return err
 	}
 	preferredLocale := s.preferredLocale(ctx, event.userID)
-	latestQuestion := s.latestUserMessage(ctx, conversationID)
-	targetLocale := detectSupportedLocale(latestQuestion, preferredLocale)
+	targetLocale := language.Normalize(preferredLocale)
 	text := mockProactiveMessage(targetLocale)
 	modelID := ""
 	if !s.mock {
@@ -1596,12 +1637,16 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 		if modelErr != nil {
 			return modelErr
 		}
+		profile, profileErr := s.loadCompanionForConversation(ctx, conversationID, event.userID)
+		if profileErr != nil {
+			return profileErr
+		}
 		var model Model
 		text, model, err = s.generateTextWithFallback(ctx, event.companionID, "proactive", models, GenerateRequest{
-			System: companionSystemBoundary + "\n\n" + responseLanguagePolicy(latestQuestion, preferredLocale) + "\n\n" + emojiMessagePolicy,
+			System: s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", preferredLocale) + "\n\n" + emojiMessagePolicy,
 			Messages: []ChatMessage{{Role: "user", Content: fmt.Sprintf(
-				"As %s living in %s, you just experienced: %s — %s, at %s. Send one natural message only if it feels worth sharing. Do not start with a greeting or ask a generic question.",
-				event.name, event.city, event.title, event.description, event.location)}},
+				"Write one unsolicited message from %s's own point of view. A shareable event in your world is: %s — %s, at %s. Ground the message in your current mood, activity, location, personality, or this event. Choose one concrete detail worth sharing. Do not respond to, quote, or continue the user's last message. Do not start with a greeting or ask a generic question. If this event has already ended, speak of it as something that happened, not as something happening now.",
+				event.name, event.title, event.description, event.location)}},
 			Temperature: 0.95, MaxTokens: 180,
 		})
 		modelID = model.ID
@@ -1826,6 +1871,7 @@ func (s *Service) loadCompanionForConversation(ctx context.Context, conversation
 func (s *Service) companionPrompt(ctx context.Context, profile companionContext) string {
 	var life, memories []string
 	petStatusLine := ""
+	worldNow := s.currentCompanionWorldContext(ctx, profile)
 	rows, err := s.db.QueryContext(ctx, `SELECT COALESCE(title, ''), COALESCE(description, '') FROM life_events WHERE companion_id = $1 AND start_time <= CURRENT_TIMESTAMP ORDER BY start_time DESC LIMIT 6`, profile.ID)
 	if err == nil {
 		defer rows.Close()
@@ -1889,10 +1935,42 @@ Identity:
 %s
 
 Recent life: %s
-Important memories: %s`, companionSystemBoundary, profile.Name, profile.Gender, profile.RelationshipStage,
+Important memories: %s
+Current self and world: %s`, companionSystemBoundary, profile.Name, profile.Gender, profile.RelationshipStage,
 		profile.City, profile.Occupation, profile.Interests, profile.PersonalityTags, profile.SpeakingStyle,
 		profile.Likes, profile.Dislikes, profile.LifeHabits, profile.LifeGoal, profile.Backstory, profile.Persona, profile.EquippedOutfit, petStatusLine,
-		strings.Join(life, " | "), strings.Join(memories, " | "))
+		strings.Join(life, " | "), strings.Join(memories, " | "), worldNow)
+}
+
+func (s *Service) currentCompanionWorldContext(ctx context.Context, profile companionContext) string {
+	parts := make([]string, 0, 3)
+	var mood, energy, stress, socialEnergy int
+	if err := s.db.QueryRowContext(ctx, `SELECT mood,energy,stress,social_energy FROM companion_states WHERE companion_id=$1`, profile.ID).
+		Scan(&mood, &energy, &stress, &socialEnergy); err == nil {
+		parts = append(parts, fmt.Sprintf("mood=%d/100, energy=%d/100, stress=%d/100, social energy=%d/100 (50 is neutral; do not dramatize these scores)", mood, energy, stress, socialEnergy))
+	}
+	var title, description, location, emotion string
+	if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(title,''),COALESCE(description,''),COALESCE(location,''),COALESCE(emotion,'')
+		FROM life_events WHERE companion_id=$1 AND status='active' AND start_time<=CURRENT_TIMESTAMP AND end_time>CURRENT_TIMESTAMP
+		ORDER BY start_time DESC,id DESC LIMIT 1`, profile.ID).Scan(&title, &description, &location, &emotion); err == nil {
+		parts = append(parts, fmt.Sprintf("Current activity: %s — %s; place: %s; feeling: %s", title, description, location, emotion))
+	}
+	var timezone string
+	if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(timezone,'UTC') FROM users WHERE id=$1`, profile.UserID).Scan(&timezone); err == nil {
+		localClock, zoneErr := time.LoadLocation(timezone)
+		if zoneErr != nil {
+			localClock = time.UTC
+		}
+		localNow := time.Now().In(localClock)
+		parts = append(parts, fmt.Sprintf("User's local time: %s", localNow.Format("2006-01-02 15:04")))
+		if campaign := s.activeWorldCampaignContext(ctx, profile.UserID, localNow.Format("2006-01-02")); campaign != "" {
+			parts = append(parts, "Current world occasion: "+campaign)
+		}
+	}
+	if len(parts) == 0 {
+		return "No verified current state is available; rely on identity and established life history without inventing present facts."
+	}
+	return strings.Join(parts, " | ")
 }
 
 func (s *Service) loadRecentMessages(ctx context.Context, conversationID string, limit int) ([]ChatMessage, error) {
@@ -2543,12 +2621,6 @@ func (s *Service) preferredLocale(ctx context.Context, userID string) string {
 		return language.English
 	}
 	return language.Normalize(locale)
-}
-
-func (s *Service) latestUserMessage(ctx context.Context, conversationID string) string {
-	var content string
-	_ = s.db.QueryRowContext(ctx, `SELECT COALESCE(content,'') FROM messages WHERE conversation_id=$1 AND sender_type='user' ORDER BY created_at DESC LIMIT 1`, conversationID).Scan(&content)
-	return content
 }
 
 func latestUserMessage(messages []ChatMessage) string {

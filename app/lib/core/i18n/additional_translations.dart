@@ -77,6 +77,8 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
         'Enviaste @coins monedas. Tu compañero se siente más cerca de ti.',
     'gift.failed': 'No se pudo enviar el regalo',
     'experience.title': 'Experiencias compartidas',
+    'experience.date.value':
+        'Respuesta personal ahora · conversación en vivo a la hora acordada · crear un recuerdo juntos',
     'chat.transfer': 'Transferir monedas',
     'transfer.description':
         'Envía monedas a @name. Responderá y recordará el gesto.',
@@ -588,6 +590,8 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
         '@coins moedas enviadas. Seu companheiro se sente mais próximo.',
     'gift.failed': 'Não foi possível enviar o presente',
     'experience.title': 'Experiências partilhadas',
+    'experience.date.value':
+        'Resposta pessoal agora · conversa ao vivo na hora marcada · criar uma recordação juntos',
     'chat.transfer': 'Transferir moedas',
     'transfer.description':
         'Envia moedas a @name. Vai responder e recordar o gesto.',
@@ -1099,6 +1103,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'gift.sent.message': '@coins コインを送りました。距離が少し縮まりました。',
     'gift.failed': 'ギフトを送れませんでした',
     'experience.title': 'ふたりの体験',
+    'experience.date.value': '今すぐ返事 · 予定時刻に会話 · ふたりで記念を作る',
     'chat.transfer': 'コインを贈る',
     'transfer.description': '@name にコインを贈ります。返事をして、この気持ちを覚えてくれます。',
     'transfer.sending': '送信中…',
@@ -1579,6 +1584,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'gift.sent.message': '@coins 코인을 보냈습니다. 컴패니언이 더 가까워졌어요.',
     'gift.failed': '선물을 보내지 못했습니다',
     'experience.title': '함께하는 경험',
+    'experience.date.value': '지금 답장 · 약속한 시간에 실시간 대화 · 함께 기념 만들기',
     'chat.transfer': '코인 보내기',
     'transfer.description': '@name에게 코인을 보냅니다. 답하고 이 마음을 기억해요.',
     'transfer.sending': '보내는 중…',
@@ -2058,6 +2064,8 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'gift.sent.message': 'تم إرسال @coins عملة. يشعر رفيقك بالقرب منك أكثر.',
     'gift.failed': 'تعذر إرسال الهدية',
     'experience.title': 'تجارب مشتركة',
+    'experience.date.value':
+        'رد شخصي الآن · محادثة مباشرة في الموعد المحدد · اصنعا ذكرى مشتركة',
     'chat.transfer': 'تحويل العملات',
     'transfer.description': 'أرسل عملات إلى @name. سيرد ويتذكر هذه اللفتة.',
     'transfer.sending': 'جارٍ الإرسال…',
@@ -2547,6 +2555,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'gift.sent.message': '已贈送 @coins 金幣，TA 對你的好感提升了。',
     'gift.failed': '贈送失敗',
     'experience.title': '共同體驗',
+    'experience.date.value': '現在收到 TA 的回應 · 到時即時聊天 · 共同創作紀念',
     'chat.transfer': '轉帳',
     'transfer.description': '轉給 @name，TA 會回應並記住這份心意。',
     'transfer.sending': '轉帳中…',

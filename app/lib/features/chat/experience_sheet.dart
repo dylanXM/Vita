@@ -175,53 +175,82 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
                         title: 'experience.empty'.tr,
                         subtitle: '')
                     : ListView.separated(
-                        padding: const EdgeInsets.only(bottom: 24),
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
                         itemCount: _products.length,
-                        separatorBuilder: (_, __) => Divider(
-                            height: 0.5,
-                            thickness: 0.5,
-                            indent: 16,
-                            color: context.vita.divider),
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
                         itemBuilder: (context, index) {
                           final product = _products[index];
                           final key = product['key'] as String? ?? '';
                           final owned = _owned[key] == true;
                           final equipped = _equipped == key;
+                          final isDate = product['category'] == 'date';
                           return Container(
-                            color: context.vita.surface,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            child: Row(children: [
-                              Text(product['emoji'] as String? ?? '✨',
-                                  style: const TextStyle(fontSize: 28)),
-                              const SizedBox(width: 13),
-                              Expanded(
-                                  child: Column(
+                            decoration: BoxDecoration(
+                              color: context.vita.surface,
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(children: [
+                                  Container(
+                                    width: 48,
+                                    height: 48,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: context.vita.greenTint,
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: Text(
+                                        product['emoji'] as String? ?? '✨',
+                                        style: const TextStyle(fontSize: 26)),
+                                  ),
+                                  const SizedBox(width: 13),
+                                  Expanded(
+                                    child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                    Text(
-                                        (product['name_key'] as String? ?? key)
-                                            .tr,
-                                        style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w600,
-                                            color: context.vita.text)),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                        (product['description_key']
-                                                    as String? ??
-                                                '')
-                                            .tr,
-                                        style: TextStyle(
-                                            fontSize: 12.5,
-                                            color: context.vita.subText,
-                                            height: 1.35)),
-                                  ])),
-                              const SizedBox(width: 10),
-                              _buildActionButton(context, product,
-                                  owned: owned, equipped: equipped),
-                            ]),
+                                        Text(
+                                            (product['name_key'] as String? ??
+                                                    key)
+                                                .tr,
+                                            style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w700,
+                                                color: context.vita.text)),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                            (product['description_key']
+                                                        as String? ??
+                                                    '')
+                                                .tr,
+                                            style: TextStyle(
+                                                fontSize: 12.5,
+                                                color: context.vita.subText,
+                                                height: 1.35)),
+                                      ],
+                                    ),
+                                  ),
+                                ]),
+                                if (isDate) ...[
+                                  const SizedBox(height: 12),
+                                  Text('experience.date.value'.tr,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        height: 1.4,
+                                        color: context.vita.green,
+                                      )),
+                                ],
+                                const SizedBox(height: 12),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: _buildActionButton(context, product,
+                                      owned: owned, equipped: equipped),
+                                ),
+                              ],
+                            ),
                           );
                         },
                       ),

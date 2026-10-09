@@ -126,6 +126,8 @@ class VitaTranslations extends Translations {
           '@coins coins sent. Your companion feels closer to you.',
       'gift.failed': 'Could not send gift',
       'experience.title': 'Shared experiences',
+      'experience.date.value':
+          'A personal reply now · live conversation at the scheduled time · create a shared keepsake',
       'chat.transfer': 'Transfer coins',
       'transfer.description':
           'Send coins to @name. They will reply and remember your gesture.',
@@ -646,6 +648,7 @@ class VitaTranslations extends Translations {
       'gift.sent.message': '已赠送 @coins 金币，TA 对你的好感提升了。',
       'gift.failed': '赠送失败',
       'experience.title': '共同体验',
+      'experience.date.value': '现在收到 TA 的回应 · 到时实时聊天 · 共同创作纪念',
       'chat.transfer': '转账',
       'transfer.description': '转给 @name，TA 会回应并记住这份心意。',
       'transfer.sending': '转账中…',

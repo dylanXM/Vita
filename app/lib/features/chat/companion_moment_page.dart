@@ -249,6 +249,47 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
                     children: [
                       _scene(context, title, location),
                       const SizedBox(height: 12),
+                      if (!_started &&
+                          '${_moment?['invitation'] ?? ''}'.isNotEmpty) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: vita.greenTint,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              VitaAvatar(
+                                name: widget.name,
+                                radius: 20,
+                                imageUrl: widget.avatarUrl,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(widget.name,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          color: vita.text,
+                                        )),
+                                    const SizedBox(height: 5),
+                                    Text('${_moment?['invitation']}',
+                                        style: TextStyle(
+                                          color: vita.text,
+                                          height: 1.45,
+                                        )),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       Container(
                         padding: const EdgeInsets.all(22),
                         decoration: BoxDecoration(

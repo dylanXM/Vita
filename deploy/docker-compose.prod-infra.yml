@@ -1,0 +1,58 @@
+name: vita-prod-infra
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vita
+      POSTGRES_DB: vita
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    networks:
+      vita-prod:
+        aliases: [vita-postgres]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U vita -d vita"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?set REDIS_PASSWORD}"
+      REDISCLI_AUTH: "${REDIS_PASSWORD:?set REDIS_PASSWORD}"
+    command:
+      - sh
+      - -c
+      - exec redis-server --appendonly yes --appendfsync everysec --requirepass "$$REDIS_PASSWORD"
+    volumes:
+      - redis_data:/data
+    networks:
+      vita-prod:
+        aliases: [vita-redis]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  vita-prod:
+    name: vita-prod
+    driver: bridge
