@@ -313,9 +313,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
                                 ),
                                 const SizedBox(height: 14),
                                 if (selected != null)
-                                  _buildPreview(context, selected,
-                                      index: visible.indexOf(selected) + 1,
-                                      total: visible.length),
+                                  _buildPreview(context, selected),
                               ],
                             ),
                           ),
@@ -440,13 +438,10 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     );
   }
 
-  Widget _buildPreview(BuildContext context, Map<String, dynamic> product,
-      {required int index, required int total}) {
+  Widget _buildPreview(BuildContext context, Map<String, dynamic> product) {
     final key = product['key'] as String? ?? '';
     final gift = _categoryFor(product) == 'gift';
     final date = _categoryFor(product) == 'date';
-    final indexLabel = index.toString().padLeft(2, '0');
-    final totalLabel = total.toString().padLeft(2, '0');
     return Container(
       height: 306,
       clipBehavior: Clip.antiAlias,
@@ -476,16 +471,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
           padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Text(
-                '$indexLabel / $totalLabel',
-                style: TextStyle(
-                    color: context.vita.green,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.5),
-              ),
-              const Spacer(),
+            Row(mainAxisAlignment: MainAxisAlignment.end, children: [
               Container(
                 width: 66,
                 height: 66,

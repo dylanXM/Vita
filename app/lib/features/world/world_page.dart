@@ -447,9 +447,12 @@ class _RelationshipCard extends StatelessWidget {
                   ),
                   if (canVisit) ...[
                     const SizedBox(width: 8),
-                    OutlinedButton(
-                      onPressed: onVisit,
-                      child: Text('world.visit'.tr),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: onVisit,
+                        child: Text('world.visit'.tr,
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
                     ),
                   ],
                 ]),

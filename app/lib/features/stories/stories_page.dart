@@ -80,15 +80,20 @@ void _showError(Object error) {
   VitaNotice.error('storyHub.title'.tr, message);
 }
 
-class StoriesPage extends StatelessWidget {
+class StoriesPage extends StatefulWidget {
   const StoriesPage({super.key, this.controller});
 
   final StoriesController? controller;
 
   @override
+  State<StoriesPage> createState() => _StoriesPageState();
+}
+
+class _StoriesPageState extends State<StoriesPage> {
+  @override
   Widget build(BuildContext context) {
     final StoriesController activeController =
-        controller ?? Get.put<StoriesController>(StoriesController());
+        widget.controller ?? Get.put<StoriesController>(StoriesController());
     return Scaffold(
       backgroundColor: context.vita.pageBg,
       appBar: AppBar(
@@ -96,6 +101,15 @@ class StoriesPage extends StatelessWidget {
         title: Text('storyHub.title'.tr),
         actions: [
           Obx(() {
+            final hasActive = activeController.stories
+                .any((story) => story['status'] == 'active');
+            if (hasActive) {
+              return IconButton(
+                tooltip: 'storyHub.create'.tr,
+                onPressed: () => _chooseNewScene(context, activeController),
+                icon: const Icon(Icons.add_rounded),
+              );
+            }
             if (activeController.catalog['subscribed'] != true) {
               return const SizedBox.shrink();
             }
@@ -116,6 +130,9 @@ class StoriesPage extends StatelessWidget {
       ),
       body: Obx(() {
         final backgrounds = _maps(activeController.catalog['backgrounds']);
+        final activeStories = activeController.stories
+            .where((story) => story['status'] == 'active')
+            .toList();
         final subscribed = activeController.catalog['subscribed'] == true;
         final remaining =
             activeController.catalog['custom_backgrounds_remaining'] as int? ??
@@ -129,230 +146,257 @@ class StoriesPage extends StatelessWidget {
           onRefresh: activeController.load,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(top: 18, bottom: 32),
-            children: [
-              if (activeController.stories.isNotEmpty) ...[
-                _SectionHeader(title: 'storyHub.myStories'.tr),
-                const SizedBox(height: 7),
-                for (final story in activeController.stories)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                    child: _StoryBookTile(
-                      story: story,
-                      onTap: () async {
-                        await Get.to(
-                            () => StoryDetailPage(storyId: '${story['id']}'),
-                            transition: Transition.cupertino);
-                        await activeController.load();
-                      },
-                    ),
-                  ),
-                const SizedBox(height: 16),
-              ],
-              _SectionHeader(title: 'storyHub.backgrounds'.tr),
-              if (activeController.stories.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: Text('storyHub.emptySub'.tr,
-                      style:
-                          TextStyle(color: context.vita.subText, fontSize: 13)),
-                ),
-              if (subscribed)
-                Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                    child: Text(
-                        'storyHub.quota'.trParams({'remaining': '$remaining'}),
-                        style: TextStyle(
-                            color: context.vita.subText, fontSize: 12))),
-              if (backgrounds.isNotEmpty)
-                for (final background in backgrounds)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                    child: _BackgroundTile(
-                      background: background,
-                      onTap: () => _previewBackground(
-                          context, activeController, background),
-                    ),
-                  ),
-            ],
+            padding: const EdgeInsets.only(top: 8, bottom: 32),
+            children: activeStories.isNotEmpty
+                ? [
+                    _SectionHeader(title: 'storyHub.productions'.tr),
+                    for (final story in activeStories)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: _StoryBookTile(
+                          story: story,
+                          onTap: () async {
+                            await Get.to(
+                                () =>
+                                    StoryDetailPage(storyId: '${story['id']}'),
+                                transition: Transition.cupertino);
+                            await activeController.load();
+                          },
+                        ),
+                      ),
+                  ]
+                : [
+                    _SectionHeader(title: 'storyHub.scenes'.tr),
+                    if (subscribed)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: Text(
+                          'storyHub.quota'
+                              .trParams({'remaining': '$remaining'}),
+                          style: TextStyle(
+                              color: context.vita.subText, fontSize: 12),
+                        ),
+                      ),
+                    if (backgrounds.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Text('storyHub.emptySub'.tr,
+                            style: TextStyle(
+                                color: context.vita.subText, fontSize: 13)),
+                      ),
+                    for (final background in backgrounds)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: _BackgroundTile(
+                          background: background,
+                          onTap: () => Get.to(
+                            () => _StoryCastPage(
+                              controller: activeController,
+                              background: background,
+                            ),
+                            transition: Transition.cupertino,
+                          ),
+                          onInfo: () => _showSceneInfo(context, background),
+                        ),
+                      ),
+                  ],
           ),
         );
       }),
     );
   }
 
-  Future<void> _previewBackground(BuildContext context,
-      StoriesController controller, Map<String, dynamic> background) async {
-    final cover = '${background['cover_url'] ?? ''}'.trim();
-    final description =
-        '${background['synopsis'] ?? background['world_setting'] ?? ''}'.trim();
-    final selected = await showModalBottomSheet<bool>(
+  void _showSceneInfo(BuildContext context, Map<String, dynamic> background) {
+    showModalBottomSheet<void>(
       context: context,
-      isScrollControlled: true,
       showDragHandle: true,
       backgroundColor: context.vita.surface,
       builder: (sheetContext) => SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 190,
-                  child: ColoredBox(
-                    color: const Color(0xFF51456E),
-                    child: cover.isEmpty
-                        ? const Center(
-                            child: Icon(Icons.auto_stories_outlined,
-                                size: 48, color: Colors.white70))
-                        : VitaMediaImage(
-                            url: cover,
-                            errorBuilder: (_, __, ___) =>
-                                const SizedBox.expand(),
-                          ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
               Text('${background['title'] ?? ''}',
                   style: TextStyle(
                       color: sheetContext.vita.text,
-                      fontSize: 23,
+                      fontSize: 22,
                       fontWeight: FontWeight.w700)),
-              if (description.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Text(description,
-                    style: TextStyle(
-                        color: sheetContext.vita.subText,
-                        fontSize: 15,
-                        height: 1.55)),
-              ],
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(sheetContext, true),
-                  child: Text('storyHub.chooseCompanion'.tr),
-                ),
-              ),
+              const SizedBox(height: 12),
+              Text(
+                  '${background['synopsis'] ?? background['world_setting'] ?? ''}',
+                  style: TextStyle(
+                      color: sheetContext.vita.subText,
+                      fontSize: 15,
+                      height: 1.5)),
             ],
           ),
         ),
       ),
     );
-    if (selected == true && context.mounted) {
-      await _chooseCompanion(context, controller, background);
-    }
   }
 
-  Future<void> _chooseCompanion(BuildContext context,
-      StoriesController controller, Map<String, dynamic> background) async {
-    final selection = await showModalBottomSheet<(bool, Map<String, dynamic>?)>(
+  void _chooseNewScene(BuildContext context, StoriesController controller) {
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: context.vita.surface,
-      builder: (sheetContext) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: .68,
-        minChildSize: .4,
-        maxChildSize: .9,
-        builder: (context, scrollController) => SafeArea(
-          top: false,
-          child: Column(children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 18),
-              child: Row(children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: SizedBox(
-                    width: 52,
-                    height: 58,
-                    child: ColoredBox(
-                      color: const Color(0xFF51456E),
-                      child: '${background['cover_url'] ?? ''}'.trim().isEmpty
-                          ? const Icon(Icons.auto_stories_outlined,
-                              color: Colors.white70)
-                          : VitaMediaImage(
-                              url: '${background['cover_url']}',
-                              errorBuilder: (_, __, ___) =>
-                                  const SizedBox.expand(),
-                            ),
+      backgroundColor: context.vita.pageBg,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * .72,
+          child: Obx(() {
+            final backgrounds = _maps(controller.catalog['backgrounds']);
+            final remaining =
+                controller.catalog['custom_backgrounds_remaining'] as int? ?? 0;
+            return Column(children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 16, 12),
+                child: Row(children: [
+                  Expanded(
+                      child: Text('storyHub.scenes'.tr,
+                          style: TextStyle(
+                              color: sheetContext.vita.text,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700))),
+                  if (controller.catalog['subscribed'] == true && remaining > 0)
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.pop(sheetContext);
+                        Get.to(() =>
+                            CustomStoryBackgroundPage(controller: controller));
+                      },
+                      icon: const Icon(Icons.add, size: 18),
+                      label: Text('storyHub.custom'.tr),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('storyHub.chooseCompanion'.tr,
-                          style: TextStyle(
-                            color: context.vita.text,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          )),
-                      const SizedBox(height: 4),
-                      Text('${background['title'] ?? ''}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: context.vita.subText, fontSize: 13)),
-                    ],
-                  ),
-                ),
-              ]),
-            ),
-            Expanded(
-              child: Obx(() {
-                final auth = AuthController.to;
-                final selfName = auth.nickname.isNotEmpty
-                    ? auth.nickname
-                    : (auth.email.isNotEmpty ? auth.email : 'storyHub.self'.tr);
-                final companions = controller.companions
-                    .where((item) => item['creation_source'] != 'ai_pet')
-                    .toList();
-                final enabled = !controller.loading.value;
-                return ListView.builder(
-                  controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                  itemCount: companions.length + 1,
-                  itemBuilder: (context, index) {
-                    if (index == 0) {
-                      return _ProtagonistOption(
-                        name: selfName,
-                        subtitle: 'storyHub.self'.tr,
-                        imageUrl: auth.avatarUrl,
-                        onTap: enabled
-                            ? () => Navigator.pop(sheetContext, (true, null))
-                            : null,
-                      );
-                    }
-                    final companion = companions[index - 1];
-                    return _ProtagonistOption(
-                      name: '${companion['name'] ?? ''}',
-                      subtitle: '',
-                      imageUrl: companion['portrait_url'] as String?,
-                      onTap: enabled
-                          ? () => Navigator.pop(sheetContext, (true, companion))
-                          : null,
-                    );
-                  },
-                );
-              }),
-            ),
-          ]),
+                ]),
+              ),
+              Expanded(
+                  child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                itemCount: backgrounds.length,
+                itemBuilder: (_, index) {
+                  final background = backgrounds[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _BackgroundTile(
+                      background: background,
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        Get.to(
+                            () => _StoryCastPage(
+                                  controller: controller,
+                                  background: background,
+                                ),
+                            transition: Transition.cupertino);
+                      },
+                      onInfo: () => _showSceneInfo(sheetContext, background),
+                    ),
+                  );
+                },
+              )),
+            ]);
+          }),
         ),
       ),
     );
-    if (selection != null && context.mounted) {
-      await controller.start(background, selection.$2);
-    }
   }
+}
+
+class _StoryCastPage extends StatefulWidget {
+  const _StoryCastPage({required this.controller, required this.background});
+
+  final StoriesController controller;
+  final Map<String, dynamic> background;
+
+  @override
+  State<_StoryCastPage> createState() => _StoryCastPageState();
+}
+
+class _StoryCastPageState extends State<_StoryCastPage> {
+  bool _chosen = false;
+  String? _actorId;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: context.vita.pageBg,
+        appBar: AppBar(
+          leading: const VitaBackButton(),
+          title: Text('storyHub.cast'.tr),
+        ),
+        body: Obx(() {
+          final actors = widget.controller.companions
+              .where((item) => item['creation_source'] != 'ai_pet')
+              .toList();
+          final selectedActor =
+              actors.firstWhereOrNull((item) => '${item['id']}' == _actorId);
+          return Column(children: [
+            Expanded(
+                child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              children: [
+                Text('${widget.background['title'] ?? ''}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: context.vita.text,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                Text('storyHub.chooseCompanion'.tr,
+                    style:
+                        TextStyle(color: context.vita.subText, fontSize: 13)),
+                const SizedBox(height: 20),
+                _ProtagonistOption(
+                  name: AuthController.to.nickname.isNotEmpty
+                      ? AuthController.to.nickname
+                      : 'storyHub.self'.tr,
+                  subtitle: 'storyHub.self'.tr,
+                  imageUrl: AuthController.to.avatarUrl,
+                  selected: _chosen && _actorId == null,
+                  onTap: () => setState(() {
+                    _chosen = true;
+                    _actorId = null;
+                  }),
+                ),
+                for (final actor in actors)
+                  _ProtagonistOption(
+                    name: '${actor['name'] ?? ''}',
+                    subtitle: '',
+                    imageUrl: actor['portrait_url'] as String?,
+                    selected: _chosen && _actorId == '${actor['id']}',
+                    onTap: () => setState(() {
+                      _chosen = true;
+                      _actorId = '${actor['id']}';
+                    }),
+                  ),
+              ],
+            )),
+            SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                  child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: !_chosen ||
+                                (_actorId != null && selectedActor == null) ||
+                                widget.controller.loading.value
+                            ? null
+                            : () {
+                                Get.back();
+                                widget.controller
+                                    .start(widget.background, selectedActor);
+                              },
+                        icon: const Icon(Icons.movie_creation_outlined),
+                        label: Text('storyHub.action'.tr),
+                      )),
+                )),
+          ]);
+        }),
+      );
 }
 
 class _ProtagonistOption extends StatelessWidget {
@@ -361,19 +405,26 @@ class _ProtagonistOption extends StatelessWidget {
     required this.subtitle,
     required this.imageUrl,
     required this.onTap,
+    this.selected = false,
   });
 
   final String name;
   final String subtitle;
   final String? imageUrl;
   final VoidCallback? onTap;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: Material(
-          color: context.vita.pageBg,
-          borderRadius: BorderRadius.circular(16),
+          color: selected ? context.vita.greenTint : context.vita.pageBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: selected
+                ? BorderSide(color: context.vita.green, width: 1.5)
+                : BorderSide.none,
+          ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onTap,
@@ -414,8 +465,10 @@ class _ProtagonistOption extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Icon(Icons.arrow_forward_rounded,
-                      size: 18, color: context.vita.green),
+                  Icon(
+                      selected ? Icons.check_circle_rounded : Icons.add_rounded,
+                      size: 18,
+                      color: context.vita.green),
                 ]),
               ),
             ),
@@ -527,14 +580,16 @@ class _StoryBookTile extends StatelessWidget {
 }
 
 class _BackgroundTile extends StatelessWidget {
-  const _BackgroundTile({required this.background, required this.onTap});
+  const _BackgroundTile(
+      {required this.background, required this.onTap, required this.onInfo});
   final Map<String, dynamic> background;
   final VoidCallback onTap;
+  final VoidCallback onInfo;
   @override
   Widget build(BuildContext context) {
     final cover = '${background['cover_url'] ?? ''}';
     return SizedBox(
-      height: 178,
+      height: 112,
       child: Material(
         color: const Color(0xFF51456E),
         borderRadius: BorderRadius.circular(16),
@@ -559,10 +614,19 @@ class _BackgroundTile extends StatelessWidget {
             ),
             if (background['custom'] == true)
               const Positioned(
-                top: 14,
-                right: 14,
+                top: 12,
+                left: 14,
                 child: Icon(Icons.lock_outline, size: 18, color: Colors.white),
               ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: IconButton(
+                onPressed: onInfo,
+                icon:
+                    const Icon(Icons.info_outline_rounded, color: Colors.white),
+              ),
+            ),
             Positioned(
               left: 16,
               right: 16,
@@ -572,24 +636,24 @@ class _BackgroundTile extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text('${background['title'] ?? ''}',
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          fontSize: 20,
+                          fontSize: 17,
                           height: 1.15,
                           fontWeight: FontWeight.w700,
                           color: Colors.white)),
                   const SizedBox(height: 8),
                   Text(
                       '${background['synopsis'] ?? background['world_setting'] ?? ''}',
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 12, height: 1.35, color: Colors.white70)),
-                  const SizedBox(height: 12),
-                  const Align(
+                  const SizedBox(height: 4),
+                  Align(
                     alignment: Alignment.centerRight,
-                    child: Icon(Icons.arrow_forward_rounded,
+                    child: Icon(Icons.add_circle_outline_rounded,
                         size: 20, color: Colors.white),
                   ),
                 ],

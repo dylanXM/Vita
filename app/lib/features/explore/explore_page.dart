@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../core/analytics_service.dart';
@@ -11,60 +10,6 @@ import '../../shared/widgets.dart';
 import '../../shared/media_image.dart';
 import '../ai_pets/ai_pets_page.dart';
 import '../stories/stories_page.dart';
-
-List<Map<String, dynamic>> _previewMoments() {
-  final now = DateTime.now();
-  String published(Duration ago) => now.subtract(ago).toUtc().toIso8601String();
-  return [
-    {
-      'id': 'preview-mia',
-      'post_type': 'text',
-      'content': '下班路过那家小咖啡馆，窗边的位置还空着。突然想起上次我们聊到很晚，今天的晚霞也刚刚好。',
-      'media_urls': <String>[],
-      'published_at': published(const Duration(minutes: 18)),
-      'author': {
-        'name': 'Mia',
-        'portrait_url': 'asset://assets/companions/mia.png',
-      },
-      'is_preview': true,
-    },
-    {
-      'id': 'preview-nora',
-      'post_type': 'image',
-      'content': '今天的心情，适合留一张照片。',
-      'media_urls': ['asset://assets/companions/nora.png'],
-      'published_at': published(const Duration(hours: 2)),
-      'author': {
-        'name': 'Nora',
-        'portrait_url': 'asset://assets/companions/nora.png',
-      },
-      'is_preview': true,
-    },
-    {
-      'id': 'preview-kai',
-      'post_type': 'text',
-      'content': '我们约好下次一起去看海。计划还没定下来，但已经开始期待了。',
-      'media_urls': <String>[],
-      'published_at': published(const Duration(days: 1, hours: 3)),
-      'author': {
-        'name': 'Kai',
-        'portrait_url': 'asset://assets/companions/kai.png',
-      },
-      'related_companion': {'name': 'Mia'},
-      'is_preview': true,
-    },
-    {
-      'id': 'preview-leo',
-      'post_type': 'text',
-      'content':
-          '整理旧照片时发现一张很久以前的车票。那天没有发生什么惊天动地的事，只是在回程的路上，忽然觉得有人愿意听我说这些琐碎的小事，是件很幸运的事。后来我把车票夹进了书里，想等某天再翻出来看看。',
-      'media_urls': <String>[],
-      'published_at': published(const Duration(days: 2)),
-      'author': {'name': 'Leo', 'portrait_url': ''},
-      'is_preview': true,
-    },
-  ];
-}
 
 class ExploreController extends GetxController {
   static ExploreController get to => Get.find();
@@ -120,16 +65,15 @@ class ExploreController extends GetxController {
         final fetched = list
             .whereType<Map<String, dynamic>>()
             .map((item) => Map<String, dynamic>.from(item));
-        posts.assignAll(
-            kDebugMode ? [..._previewMoments(), ...fetched] : fetched);
+        posts.assignAll(fetched);
         postsLoadFailed.value = false;
       } else {
         postsLoadFailed.value = true;
-        if (kDebugMode) posts.assignAll(_previewMoments());
+        posts.removeWhere((post) => post['is_preview'] == true);
       }
     } catch (_) {
       postsLoadFailed.value = true;
-      if (kDebugMode) posts.assignAll(_previewMoments());
+      posts.removeWhere((post) => post['is_preview'] == true);
     } finally {
       loading.value = false;
     }
@@ -279,31 +223,561 @@ class _MomentsPageState extends State<MomentsPage> {
     final controller = ExploreController.to;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
-      appBar: AppBar(
-        leading: const VitaBackButton(),
-        title: Text('explore.moments'.tr),
-        actions: [
-          IconButton(
-            tooltip: _showTimeline
-                ? 'explore.universeView'.tr
-                : 'explore.timelineView'.tr,
-            icon: Icon(_showTimeline
-                ? Icons.blur_on_rounded
-                : Icons.view_timeline_outlined),
-            onPressed: () => setState(() => _showTimeline = !_showTimeline),
-          ),
-          IconButton(
-            tooltip: 'common.retry'.tr,
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: controller.loadPosts,
-          ),
-        ],
+      body: SizedBox.expand(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: _showTimeline
+                  ? Padding(
+                      padding: EdgeInsets.only(
+                          top: MediaQuery.paddingOf(context).top + 56),
+                      child: _MomentsFeed(controller: controller),
+                    )
+                  : _MomentsUniverse(controller: controller),
+            ),
+            SafeArea(
+              bottom: false,
+              child: SizedBox(
+                height: 56,
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip:
+                          MaterialLocalizations.of(context).backButtonTooltip,
+                      icon: Icon(Icons.arrow_back_ios_new,
+                          size: 20,
+                          color:
+                              _showTimeline ? context.vita.text : Colors.white),
+                      onPressed: () => Get.back(),
+                    ),
+                    Expanded(
+                      child: Text(
+                        'explore.moments'.tr,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color:
+                              _showTimeline ? context.vita.text : Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: _showTimeline
+                          ? 'explore.universeView'.tr
+                          : 'explore.timelineView'.tr,
+                      icon: Icon(
+                          _showTimeline
+                              ? Icons.blur_on_rounded
+                              : Icons.view_timeline_outlined,
+                          color:
+                              _showTimeline ? context.vita.text : Colors.white),
+                      onPressed: () =>
+                          setState(() => _showTimeline = !_showTimeline),
+                    ),
+                    IconButton(
+                      tooltip: 'common.retry'.tr,
+                      icon: Icon(Icons.refresh_rounded,
+                          color:
+                              _showTimeline ? context.vita.text : Colors.white),
+                      onPressed: controller.loadPosts,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-      body: SafeArea(
-        bottom: false,
-        child: _showTimeline
-            ? _MomentsFeed(controller: controller)
-            : _MomentsUniverse(controller: controller),
+    );
+  }
+}
+
+class _UniverseSlice {
+  const _UniverseSlice(this.posts, this.date);
+
+  final List<Map<String, dynamic>> posts;
+  final DateTime? date;
+}
+
+List<_UniverseSlice> _universeSlices(List<Map<String, dynamic>> posts) {
+  final sorted = List<Map<String, dynamic>>.from(posts)
+    ..sort((a, b) {
+      final aTime = DateTime.tryParse('${a['published_at'] ?? ''}');
+      final bTime = DateTime.tryParse('${b['published_at'] ?? ''}');
+      return (bTime ?? DateTime(1970)).compareTo(aTime ?? DateTime(1970));
+    });
+  return [
+    for (var start = 0; start < sorted.length; start += 4)
+      _UniverseSlice(
+        sorted.sublist(start, math.min(start + 4, sorted.length)),
+        DateTime.tryParse('${sorted[start]['published_at'] ?? ''}')?.toLocal(),
+      ),
+  ];
+}
+
+class _MomentsUniverse extends StatefulWidget {
+  const _MomentsUniverse({required this.controller});
+
+  final ExploreController controller;
+
+  @override
+  State<_MomentsUniverse> createState() => _MomentsUniverseState();
+}
+
+class _MomentsUniverseState extends State<_MomentsUniverse>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _breathing = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 3),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _breathing.stop();
+      _breathing.value = .5;
+    } else if (!_breathing.isAnimating) {
+      _breathing.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _breathing.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Obx(() {
+        final posts = widget.controller.posts.toList();
+        if (posts.isEmpty) {
+          return Padding(
+            padding:
+                EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 56),
+            child: _MomentsFeed(controller: widget.controller),
+          );
+        }
+        final slices = _universeSlices(posts);
+        return PageView.builder(
+          scrollDirection: Axis.vertical,
+          itemCount: slices.length,
+          itemBuilder: (context, index) => _UniversePage(
+            slice: slices[index],
+            page: index,
+            pageCount: slices.length,
+            breathing: _breathing,
+          ),
+        );
+      });
+}
+
+const _signalPositions = <List<Offset>>[
+  [Offset(.5, .48)],
+  [Offset(.30, .38), Offset(.70, .64)],
+  [Offset(.28, .32), Offset(.72, .40), Offset(.50, .72)],
+  [
+    Offset(.28, .29),
+    Offset(.72, .29),
+    Offset(.28, .67),
+    Offset(.72, .67),
+  ],
+];
+
+class _UniversePage extends StatelessWidget {
+  const _UniversePage({
+    required this.slice,
+    required this.page,
+    required this.pageCount,
+    required this.breathing,
+  });
+
+  final _UniverseSlice slice;
+  final int page;
+  final int pageCount;
+  final Animation<double> breathing;
+
+  @override
+  Widget build(BuildContext context) {
+    final hour = slice.date?.hour ?? 12;
+    final night = hour < 6 || hour >= 19;
+    final colors = night
+        ? const [Color(0xFF0D1021), Color(0xFF26203C)]
+        : const [Color(0xFF171628), Color(0xFF46364D)];
+    final positions = _signalPositions[slice.posts.length - 1];
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: colors,
+        ),
+      ),
+      child: LayoutBuilder(builder: (context, constraints) {
+        final size = Size(constraints.maxWidth, constraints.maxHeight);
+        final centers = positions
+            .map((point) => Offset(
+                  size.width <= 136
+                      ? size.width / 2
+                      : (size.width * point.dx).clamp(68.0, size.width - 68),
+                  size.height <= 210
+                      ? size.height / 2
+                      : (size.height * point.dy)
+                          .clamp(105.0, size.height - 105),
+                ))
+            .toList();
+        return AnimatedBuilder(
+          animation: breathing,
+          builder: (context, _) => Stack(children: [
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _SignalSkyPainter(
+                  posts: slice.posts,
+                  centers: centers,
+                  accent: context.vita.green,
+                  phase: breathing.value,
+                ),
+              ),
+            ),
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + 70,
+              left: 24,
+              right: 24,
+              child: Text(
+                slice.date == null
+                    ? 'explore.moments'.tr
+                    : formatDateSeparator(slice.date!),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            for (var index = 0; index < slice.posts.length; index++)
+              Positioned(
+                left: centers[index].dx - 64,
+                top: centers[index].dy - 76,
+                width: 128,
+                height: 152,
+                child: _SignalNode(
+                  post: slice.posts[index],
+                  phase: breathing.value,
+                  onTap: () => _showSignal(context, slice.posts[index]),
+                ),
+              ),
+            if (slice.posts.length == 1 &&
+                '${slice.posts.first['content'] ?? ''}'.trim().isNotEmpty)
+              Positioned(
+                left: 32,
+                right: 32,
+                bottom: 76,
+                child: Text(
+                  '“${slice.posts.first['content']}”',
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 15,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            if (page + 1 < pageCount)
+              const Positioned(
+                left: 0,
+                right: 0,
+                bottom: 18,
+                child: Icon(Icons.keyboard_arrow_down_rounded,
+                    color: Colors.white54, size: 28),
+              ),
+          ]),
+        );
+      }),
+    );
+  }
+}
+
+class _SignalSkyPainter extends CustomPainter {
+  const _SignalSkyPainter({
+    required this.posts,
+    required this.centers,
+    required this.accent,
+    required this.phase,
+  });
+
+  final List<Map<String, dynamic>> posts;
+  final List<Offset> centers;
+  final Color accent;
+  final double phase;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final random = math.Random(42);
+    for (var i = 0; i < 38; i++) {
+      final point = Offset(
+          random.nextDouble() * size.width, random.nextDouble() * size.height);
+      canvas.drawCircle(
+        point,
+        i % 7 == 0 ? 1.5 : .75,
+        Paint()..color = Colors.white.withValues(alpha: .13 + phase * .13),
+      );
+    }
+    final orbitPaint = Paint()
+      ..color = Colors.white.withValues(alpha: .065)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(size.width / 2, size.height / 2),
+        width: size.width * .86,
+        height: size.height * .69,
+      ),
+      orbitPaint,
+    );
+    for (var i = 0; i < posts.length; i++) {
+      final related = posts[i]['related_companion'];
+      if (related is! Map) continue;
+      final relatedId = '${related['id'] ?? ''}';
+      final relatedName = '${related['name'] ?? ''}';
+      final target = posts.indexWhere((candidate) {
+        final author = candidate['author'];
+        if (author is! Map) return false;
+        return relatedId.isNotEmpty && author['id'] == relatedId ||
+            relatedName.isNotEmpty && author['name'] == relatedName;
+      });
+      if (target < 0 || target == i) continue;
+      final path = Path()
+        ..moveTo(centers[i].dx, centers[i].dy)
+        ..quadraticBezierTo(size.width / 2, size.height / 2 - 36,
+            centers[target].dx, centers[target].dy);
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = accent.withValues(alpha: .20 + phase * .22)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SignalSkyPainter oldDelegate) =>
+      oldDelegate.phase != phase ||
+      oldDelegate.posts != posts ||
+      oldDelegate.centers != centers;
+}
+
+class _SignalNode extends StatelessWidget {
+  const _SignalNode({
+    required this.post,
+    required this.phase,
+    required this.onTap,
+  });
+
+  final Map<String, dynamic> post;
+  final double phase;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final author = Map<String, dynamic>.from(post['author'] as Map? ?? {});
+    final name = '${author['name'] ?? ''}';
+    final content = '${post['content'] ?? ''}'.trim();
+    final media = _momentMediaUrls(post);
+    final related = post['related_companion'];
+    return Semantics(
+      button: true,
+      label: '$name: $content',
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Column(children: [
+          SizedBox(
+            width: 88,
+            height: 88,
+            child: Stack(alignment: Alignment.center, children: [
+              Transform.scale(
+                scale: 1 + phase * .08,
+                child: Container(
+                  width: 82,
+                  height: 82,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: context.vita.green
+                          .withValues(alpha: .27 + phase * .28),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: context.vita.green.withValues(alpha: .13),
+                        blurRadius: 22,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              VitaAvatar(
+                name: name,
+                radius: 29,
+                imageUrl: author['portrait_url'] as String?,
+              ),
+              if (media.isNotEmpty)
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: ClipOval(
+                    child: SizedBox(
+                      width: 27,
+                      height: 27,
+                      child: VitaMediaImage(
+                        url: media.first,
+                        errorBuilder: (_, __, ___) =>
+                            const Icon(Icons.image_outlined, size: 17),
+                      ),
+                    ),
+                  ),
+                ),
+            ]),
+          ),
+          const SizedBox(height: 4),
+          Text(name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(height: 2),
+          Text(content.isEmpty ? 'chat.photoMessage'.tr : content,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          if (related is Map && '${related['name'] ?? ''}'.isNotEmpty)
+            Text(
+              'explore.with'.trParams({'name': '${related['name']}'}),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white54, fontSize: 10),
+            ),
+        ]),
+      ),
+    );
+  }
+}
+
+Future<void> _showSignal(
+    BuildContext context, Map<String, dynamic> post) async {
+  await showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'common.cancel'.tr,
+    barrierColor: Colors.black.withValues(alpha: .75),
+    transitionDuration: const Duration(milliseconds: 260),
+    pageBuilder: (dialogContext, _, __) => _SignalFocusDialog(post: post),
+    transitionBuilder: (context, animation, _, child) => FadeTransition(
+      opacity: animation,
+      child: ScaleTransition(
+        scale: Tween<double>(begin: .9, end: 1).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+        ),
+        child: child,
+      ),
+    ),
+  );
+}
+
+class _SignalFocusDialog extends StatelessWidget {
+  const _SignalFocusDialog({required this.post});
+
+  final Map<String, dynamic> post;
+
+  @override
+  Widget build(BuildContext context) {
+    final author = Map<String, dynamic>.from(post['author'] as Map? ?? {});
+    final related = post['related_companion'];
+    final media = _momentMediaUrls(post);
+    final published = DateTime.tryParse('${post['published_at'] ?? ''}');
+    return SafeArea(
+      child: Center(
+        child: Container(
+          width: MediaQuery.sizeOf(context).width - 32,
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * .78,
+          ),
+          decoration: BoxDecoration(
+            color: context.vita.surface,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Material(
+            color: Colors.transparent,
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.all(22),
+              children: [
+                Row(children: [
+                  VitaAvatar(
+                    name: '${author['name'] ?? ''}',
+                    radius: 25,
+                    imageUrl: author['portrait_url'] as String?,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${author['name'] ?? ''}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: context.vita.text,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700)),
+                        if (related is Map &&
+                            '${related['name'] ?? ''}'.isNotEmpty)
+                          Text(
+                            'explore.with'
+                                .trParams({'name': '${related['name']}'}),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: context.vita.subText, fontSize: 12),
+                          ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'common.cancel'.tr,
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ]),
+                const SizedBox(height: 20),
+                if ('${post['content'] ?? ''}'.trim().isNotEmpty) ...[
+                  Text('${post['content']}',
+                      style: TextStyle(
+                          color: context.vita.text, fontSize: 17, height: 1.6)),
+                  const SizedBox(height: 18),
+                ],
+                if (media.isNotEmpty) ...[
+                  _MomentMedia(urls: media),
+                  const SizedBox(height: 18),
+                ],
+                if (published != null)
+                  Text(formatDate(published.toLocal()),
+                      style:
+                          TextStyle(color: context.vita.subText, fontSize: 12)),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -425,21 +899,6 @@ List<String> _momentMediaUrls(Map<String, dynamic> post) =>
         .where((url) => url.isNotEmpty)
         .toList();
 
-class _PreviewBadge extends StatelessWidget {
-  const _PreviewBadge();
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: context.vita.greenTint,
-          borderRadius: BorderRadius.circular(5),
-        ),
-        child: Text('explore.preview'.tr,
-            style: TextStyle(color: context.vita.green, fontSize: 10)),
-      );
-}
-
 class _MomentPost extends StatelessWidget {
   const _MomentPost({required this.post});
 
@@ -494,10 +953,6 @@ class _MomentPost extends StatelessWidget {
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700)),
                       ),
-                      if (post['is_preview'] == true) ...[
-                        const SizedBox(width: 7),
-                        const _PreviewBadge(),
-                      ],
                     ]),
                     if (related != null)
                       Text(
@@ -629,10 +1084,6 @@ class _MomentDetailPage extends StatelessWidget {
                               fontSize: 18,
                               fontWeight: FontWeight.w700)),
                     ),
-                    if (post['is_preview'] == true) ...[
-                      const SizedBox(width: 7),
-                      const _PreviewBadge(),
-                    ],
                   ]),
                   if (related != null)
                     Text(

@@ -45,101 +45,72 @@ class ChatInfoPage extends StatelessWidget {
       appBar: AppBar(
         leading: const VitaBackButton(),
         title: Text('chatInfo.title'.tr),
-        shape: const Border(),
       ),
       body: ListView(
-        padding: const EdgeInsets.only(top: 0, bottom: 28),
+        padding: const EdgeInsets.fromLTRB(18, 10, 18, 32),
         children: [
-          _group([
-            _ProfileRow(
-              companion: companion,
-              onTap: () => _openLifeDetail(),
+          _ChatSectionLabel('chatInfo.infoSection'.tr),
+          _CompanionPortraitCard(
+            companion: companion,
+            onTap: _openLifeDetail,
+          ),
+          const SizedBox(height: 10),
+          _ChatInfoLink(
+            icon: Icons.photo_library_outlined,
+            title: 'chatInfo.media'.tr,
+            onTap: () => Get.to(
+              () =>
+                  ChatMediaPage(companionId: companionId, companionName: name),
+              transition: Transition.cupertino,
             ),
-          ]),
-          _group([
-            _InfoRow(
-              icon: Icons.auto_awesome_outlined,
+          ),
+          const SizedBox(height: 22),
+          _ChatSectionLabel('chatInfo.actionsSection'.tr),
+          Row(children: [
+            Expanded(
+                child: _ChatActionTile(
+              icon: Icons.auto_awesome_rounded,
               title: 'experience.title'.tr,
               onTap: () => _showExperiences(context),
-            ),
-            _InfoRow(
-              icon: Icons.star_outline,
+            )),
+            const SizedBox(width: 10),
+            Expanded(
+                child: _ChatActionTile(
+              icon: Icons.auto_stories_rounded,
               title: 'memories.title'.tr,
               onTap: () => Get.to(
                 () => MemoryDetailPage(companion: companion),
                 transition: Transition.cupertino,
               ),
-            ),
+            )),
           ]),
-          _group([
-            _InfoRow(
-              icon: Icons.photo_library_outlined,
-              title: 'chatInfo.media'.tr,
-              onTap: () => Get.to(
-                () => ChatMediaPage(
-                  companionId: companionId,
-                  companionName: name,
-                ),
-                transition: Transition.cupertino,
-              ),
-            ),
-          ]),
-          _group([
-            _InfoRow(
+          const SizedBox(height: 22),
+          _ChatSectionLabel('chatInfo.servicesSection'.tr),
+          Row(children: [
+            Expanded(
+                child: _ChatServiceButton(
               icon: Icons.workspace_premium_outlined,
               title: 'chatInfo.subscription'.tr,
-              onTap: () => Get.to(
-                () => const SubscriptionPage(),
-                transition: Transition.cupertino,
-              ),
-            ),
-            _InfoRow(
+              onTap: () => Get.to(() => const SubscriptionPage(),
+                  transition: Transition.cupertino),
+            )),
+            const SizedBox(width: 10),
+            Expanded(
+                child: _ChatServiceButton(
               icon: Icons.toll_outlined,
               title: 'chatInfo.credits'.tr,
-              onTap: () => Get.to(
-                () => const CreditsPage(),
-                transition: Transition.cupertino,
-              ),
-            ),
+              onTap: () => Get.to(() => const CreditsPage(),
+                  transition: Transition.cupertino),
+            )),
           ]),
           if (companion['is_default'] != true) ...[
-            const SizedBox(height: 2),
-            Material(
-              color: vita.surface,
-              child: InkWell(
-                onTap: () => _confirmDelete(context),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 16,
-                  ),
-                  child: Center(
-                    child: Text(
-                      'chatInfo.delete'.tr,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: vita.red,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _group(List<Widget> rows) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        children: [
-          for (var index = 0; index < rows.length; index++) ...[
-            if (index > 0) const Divider(height: 0.5, indent: 56),
-            rows[index],
+            const SizedBox(height: 24),
+            Center(
+                child: TextButton(
+              onPressed: () => _confirmDelete(context),
+              child: Text('chatInfo.delete'.tr,
+                  style: TextStyle(color: vita.red, fontSize: 14)),
+            )),
           ],
         ],
       ),
@@ -246,85 +217,213 @@ class ChatInfoPage extends StatelessWidget {
   }
 }
 
-class _ProfileRow extends StatelessWidget {
-  const _ProfileRow({required this.companion, required this.onTap});
+class _CompanionPortraitCard extends StatelessWidget {
+  const _CompanionPortraitCard({required this.companion, required this.onTap});
 
   final Map<String, dynamic> companion;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final name = companion['name'] as String? ?? 'chat.companion'.tr;
-    return Material(
-      color: context.vita.surface,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-          child: Row(
-            children: [
-              VitaAvatar(
-                name: name,
-                radius: 28,
-                imageUrl: companion['portrait_url'] as String?,
-                borderRadius: BorderRadius.circular(12),
+    final name = '${companion['name'] ?? 'chat.companion'.tr}';
+    final portrait = '${companion['portrait_url'] ?? ''}'.trim();
+    return SizedBox(
+      height: 176,
+      child: Material(
+        color: context.vita.surface,
+        borderRadius: BorderRadius.circular(22),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Stack(fit: StackFit.expand, children: [
+            if (portrait.isNotEmpty)
+              VitaMediaImage(
+                url: portrait,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox.expand(),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  name,
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                    color: context.vita.text,
-                  ),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0x00110F19), Color(0xDF110F19)],
                 ),
               ),
-              Icon(Icons.chevron_right, color: context.vita.chevron),
-            ],
-          ),
+            ),
+            Positioned(
+              left: 18,
+              right: 18,
+              bottom: 17,
+              child: Row(children: [
+                Expanded(
+                    child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 25,
+                            fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    Text('chatInfo.life'.tr,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 12)),
+                  ],
+                )),
+                const Icon(Icons.arrow_outward_rounded, color: Colors.white),
+              ]),
+            ),
+          ]),
         ),
       ),
     );
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({
-    required this.icon,
-    required this.title,
-    required this.onTap,
-  });
+class _ChatSectionLabel extends StatelessWidget {
+  const _ChatSectionLabel(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: 29,
+        child: Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 8),
+          child: Text(title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  color: context.vita.subText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600)),
+        ),
+      );
+}
+
+class _ChatInfoLink extends StatelessWidget {
+  const _ChatInfoLink(
+      {required this.icon, required this.title, required this.onTap});
 
   final IconData icon;
   final String title;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: context.vita.surface,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-          child: Row(
-            children: [
-              Icon(icon, size: 21, color: context.vita.green),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(fontSize: 16, color: context.vita.text),
-                ),
-              ),
-              Icon(Icons.chevron_right, color: context.vita.chevron),
-            ],
+  Widget build(BuildContext context) => SizedBox(
+        height: 54,
+        child: Material(
+          color: context.vita.surface,
+          borderRadius: BorderRadius.circular(14),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 15),
+              child: Row(children: [
+                Icon(icon, size: 19, color: context.vita.subText),
+                const SizedBox(width: 11),
+                Expanded(
+                    child: Text(title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            TextStyle(color: context.vita.text, fontSize: 14))),
+                Icon(Icons.arrow_forward_ios_rounded,
+                    size: 13, color: context.vita.subText),
+              ]),
+            ),
           ),
         ),
-      ),
-    );
-  }
+      );
+}
+
+class _ChatActionTile extends StatelessWidget {
+  const _ChatActionTile(
+      {required this.icon, required this.title, required this.onTap});
+
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: 102,
+        child: Material(
+          color: context.vita.greenTint,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(color: context.vita.green.withValues(alpha: .24)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(15),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(icon, size: 24, color: context.vita.green),
+                    const Spacer(),
+                    Icon(Icons.arrow_outward_rounded,
+                        size: 17, color: context.vita.green),
+                  ]),
+                  const Spacer(),
+                  Text(title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: context.vita.text,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+class _ChatServiceButton extends StatelessWidget {
+  const _ChatServiceButton(
+      {required this.icon, required this.title, required this.onTap});
+
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: 50,
+        child: Material(
+          color: context.vita.surface,
+          borderRadius: BorderRadius.circular(14),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(children: [
+                Icon(icon, size: 19, color: context.vita.green),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Text(title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            TextStyle(color: context.vita.text, fontSize: 13))),
+              ]),
+            ),
+          ),
+        ),
+      );
 }
 
 class ChatMediaPage extends StatefulWidget {
