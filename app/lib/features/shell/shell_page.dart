@@ -122,7 +122,7 @@ class _ShellPageState extends State<ShellPage> {
         Positioned(
           left: 22,
           right: 22,
-          bottom: VitaTabBar.reservedHeight + 8,
+          top: MediaQuery.paddingOf(context).top + 8,
           child: Obx(() {
             if (!Get.isRegistered<ChatListController>()) {
               return const SizedBox.shrink();
@@ -150,7 +150,7 @@ class _ShellPageState extends State<ShellPage> {
                 opacity: animation,
                 child: SlideTransition(
                   position: Tween<Offset>(
-                    begin: const Offset(0, .15),
+                    begin: const Offset(0, -.15),
                     end: Offset.zero,
                   ).animate(animation),
                   child: child,
@@ -200,18 +200,21 @@ class _UnreadMessageEntry extends StatelessWidget {
     final name = '${companion['name'] ?? 'chat.companion'.tr}';
     return Material(
       color: context.vita.surface,
-      elevation: 10,
-      shadowColor: Colors.black.withValues(alpha: .28),
-      borderRadius: BorderRadius.circular(20),
+      elevation: 4,
+      shadowColor: Colors.black.withValues(alpha: .14),
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           height: 62,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: context.vita.green.withValues(alpha: .4)),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: context.vita.green.withValues(alpha: .16)),
           ),
           child: Row(children: [
             VitaAvatar(
@@ -246,25 +249,27 @@ class _UnreadMessageEntry extends StatelessWidget {
               ],
             )),
             const SizedBox(width: 8),
-            Container(
-              constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
-              padding: const EdgeInsets.symmetric(horizontal: 5),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                  color: context.vita.green,
-                  borderRadius: BorderRadius.circular(10)),
-              child: Text(
-                  presentation.unreadCount > 99
-                      ? '99+'
-                      : '${presentation.unreadCount}',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700)),
+            Center(
+              child: Container(
+                height: 24,
+                width: 24,
+                padding: const EdgeInsets.all(3),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                    color: context.vita.green, shape: BoxShape.circle),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                      presentation.unreadCount > 99
+                          ? '99+'
+                          : '${presentation.unreadCount}',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700)),
+                ),
+              ),
             ),
-            const SizedBox(width: 5),
-            Icon(Icons.chevron_right_rounded,
-                color: context.vita.subText, size: 19),
           ]),
         ),
       ),

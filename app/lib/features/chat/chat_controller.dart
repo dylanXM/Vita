@@ -34,6 +34,7 @@ class ChatController extends GetxController {
   Timer? _trialTimer;
   DateTime? _replyStartedAt;
   bool _polling = false;
+  final _deferredPollMessages = <Map<String, dynamic>>[];
 
   @override
   void onInit() {
@@ -130,7 +131,7 @@ class ChatController extends GetxController {
   }
 
   Future<void> poll() async {
-    if (_polling || _conversationId == null) return;
+    if (_polling || sending.value || _conversationId == null) return;
     _polling = true;
     try {
       String? latest;
@@ -146,6 +147,17 @@ class ChatController extends GetxController {
         '/v1/conversations/$_conversationId/messages',
         query: latest == null ? null : {'after': latest},
       );
+      // A send can start while this GET is in flight. Its committed row may
+      // already be in the response while POST still hasn't replaced the local
+      // placeholder. Retain these rows until POST settles so replies aren't
+      // lost when the newly delivered message advances the polling cursor.
+      if (sending.value) {
+        if (data is List) {
+          _deferredPollMessages.addAll(
+              data.whereType<Map>().map(Map<String, dynamic>.from));
+        }
+        return;
+      }
       if (data is List) {
         for (final raw in data.whereType<Map>()) {
           final message = Map<String, dynamic>.from(raw);
@@ -344,6 +356,7 @@ class ChatController extends GetxController {
       }
     } finally {
       sending.value = false;
+      _flushDeferredPollMessages();
     }
     return true;
   }
@@ -434,6 +447,7 @@ class ChatController extends GetxController {
       }
     } finally {
       sending.value = false;
+      _flushDeferredPollMessages();
     }
     return true;
   }
@@ -442,6 +456,16 @@ class ChatController extends GetxController {
     final id = message['id'];
     if (id != null && messages.any((item) => item['id'] == id)) return;
     messages.add(message);
+  }
+
+  void _flushDeferredPollMessages() {
+    for (final message in _deferredPollMessages) {
+      if (message['source'] == 'paid_gift') {
+        message['_animate_gift'] = true;
+      }
+      _addIfNew(message);
+    }
+    _deferredPollMessages.clear();
   }
 
   void _updateTrialFromMessage(Map data) {

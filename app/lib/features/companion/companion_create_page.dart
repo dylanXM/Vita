@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/notice.dart';
 import '../../core/api_client.dart';
@@ -42,6 +43,9 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
   ];
   List<Map<String, dynamic>> _portraits = const [];
   String? _portraitId;
+  String? _avatarMediaId;
+  String? _avatarUrl;
+  bool _uploadingAvatar = false;
 
   String? get _portraitGender {
     for (final portrait in _portraits) {
@@ -88,7 +92,87 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
     super.dispose();
   }
 
+  Future<void> _pickAvatar() async {
+    if (_busy || _uploadingAvatar) return;
+    setState(() => _uploadingAvatar = true);
+    try {
+      final image = await ImagePicker().pickImage(
+          source: ImageSource.gallery, imageQuality: 90, maxWidth: 1024);
+      if (image == null || !mounted) return;
+      final result = await ApiClient.instance
+          .upload('/v1/media/upload', image.path, kind: 'image');
+      final id = result is Map ? result['id'] : null;
+      if (id is! String || id.isEmpty) {
+        throw ApiException('profile.uploadFailed'.tr);
+      }
+      if (!mounted) return;
+      setState(() {
+        _avatarMediaId = id;
+        _avatarUrl = '/v1/media/$id';
+        _portraitId = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      VitaNotice.error('companion.create.chooseImage'.tr,
+          e is ApiException ? e.message : 'profile.uploadFailed'.tr);
+    } finally {
+      if (mounted) setState(() => _uploadingAvatar = false);
+    }
+  }
+
+  Widget _uploadAvatarTile() {
+    final selected = _avatarMediaId != null && _portraitId == null;
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _busy || _uploadingAvatar
+            ? null
+            : () {
+                if (_avatarMediaId != null && !selected) {
+                  setState(() => _portraitId = null);
+                } else {
+                  _pickAvatar();
+                }
+              },
+        child: Container(
+          width: 92,
+          height: 110,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: selected ? context.vita.greenTint : context.vita.pageBg,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+                color: selected ? context.vita.green : Colors.transparent,
+                width: 2),
+          ),
+          child: Column(children: [
+            SizedBox(
+              height: 76,
+              width: 76,
+              child: _uploadingAvatar
+                  ? const Center(child: CircularProgressIndicator())
+                  : _avatarUrl != null
+                      ? VitaAvatar(
+                          name: _name.text, radius: 38, imageUrl: _avatarUrl)
+                      : Icon(Icons.add_photo_alternate_outlined,
+                          size: 32, color: context.vita.green),
+            ),
+            const SizedBox(height: 6),
+            Flexible(
+                child: Text('companion.create.chooseImage'.tr,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: context.vita.text))),
+          ]),
+        ),
+      ),
+    );
+  }
+
   Future<void> _submit() async {
+    if (_busy || _uploadingAvatar) return;
     if (_name.text.trim().isEmpty) {
       VitaNotice.warning('companion.create.nameRequired'.tr,
           'companion.create.nameRequiredMessage'.tr);
@@ -105,13 +189,15 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
         'relationship_stage': _relationship,
         'personality_tags': _personalityTags.toList(),
         'portrait_id': _portraitId,
+        if (_portraitId == null && _avatarMediaId != null)
+          'avatar_media_id': _avatarMediaId,
       });
       AnalyticsService.to
           .track('companion_created', category: 'companion', properties: {
         'companion_id': result is Map ? '${result['id'] ?? ''}' : '',
         'relationship_stage': _relationship,
         'personality_tag_count': _personalityTags.length,
-        'has_portrait': _portraitId != null,
+        'has_portrait': _portraitId != null || _avatarMediaId != null,
       });
       Get.back();
       ChatListController.to.load();
@@ -265,79 +351,87 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
                         child: Padding(
                             padding: EdgeInsets.all(16),
                             child: CircularProgressIndicator()))
-                    : _portraits.isEmpty
-                        ? Text('companion.create.noPortraits'.tr,
-                            style: TextStyle(color: context.vita.subText))
-                        : Wrap(
-                            spacing: 12,
-                            runSpacing: 12,
-                            children: _portraits.map((portrait) {
-                              final id = portrait['id'] as String? ?? '';
-                              final selected = _portraitId == id;
-                              final imageUrl = portrait['image_url'] as String?;
-                              return GestureDetector(
-                                onTap: () => setState(() {
-                                  _portraitId = id;
-                                  final portraitGender =
-                                      '${portrait['gender'] ?? ''}';
-                                  final knownGender =
-                                      companionKnownGender(portraitGender);
-                                  _gender = !_roleEdited && knownGender != null
-                                      ? knownGender == 'male'
-                                          ? 'boyfriend'
-                                          : 'girlfriend'
-                                      : compatibleCompanionRole(
-                                          _gender, portraitGender);
-                                  _relationship = compatibleCompanionStage(
-                                      _relationship, _gender);
-                                  final suggested =
-                                      portrait['personality_tags'];
-                                  if (_personalityTags.isEmpty &&
-                                      suggested is List) {
-                                    _personalityTags.addAll(
-                                        suggested.whereType<String>().take(8));
-                                  }
-                                }),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 180),
-                                  width: 92,
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(18),
-                                    color: selected
-                                        ? context.vita.greenTint
-                                        : context.vita.pageBg,
-                                    border: Border.all(
-                                        color: selected
-                                            ? context.vita.green
-                                            : Colors.transparent,
-                                        width: 2),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      VitaAvatar(
-                                          name:
-                                              portrait['name'] as String? ?? '',
-                                          radius: 38,
-                                          imageUrl: imageUrl),
-                                      const SizedBox(height: 6),
-                                      Text(portrait['name'] as String? ?? '',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: selected
-                                                  ? FontWeight.w700
-                                                  : FontWeight.w500,
-                                              color: selected
-                                                  ? context.vita.green
-                                                  : context.vita.text)),
-                                    ],
-                                  ),
+                    : Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          ..._portraits.map((portrait) {
+                            final id = portrait['id'] as String? ?? '';
+                            final selected = _portraitId == id;
+                            final imageUrl = portrait['image_url'] as String?;
+                            return GestureDetector(
+                              onTap: _busy || _uploadingAvatar
+                                  ? null
+                                  : () => setState(() {
+                                        _portraitId = id;
+                                        final portraitGender =
+                                            '${portrait['gender'] ?? ''}';
+                                        final knownGender =
+                                            companionKnownGender(
+                                                portraitGender);
+                                        _gender =
+                                            !_roleEdited && knownGender != null
+                                                ? knownGender == 'male'
+                                                    ? 'boyfriend'
+                                                    : 'girlfriend'
+                                                : compatibleCompanionRole(
+                                                    _gender, portraitGender);
+                                        _relationship =
+                                            compatibleCompanionStage(
+                                                _relationship, _gender);
+                                        final suggested =
+                                            portrait['personality_tags'];
+                                        if (_personalityTags.isEmpty &&
+                                            suggested is List) {
+                                          _personalityTags.addAll(suggested
+                                              .whereType<String>()
+                                              .take(8));
+                                        }
+                                      }),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                width: 92,
+                                height: 110,
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(18),
+                                  color: selected
+                                      ? context.vita.greenTint
+                                      : context.vita.pageBg,
+                                  border: Border.all(
+                                      color: selected
+                                          ? context.vita.green
+                                          : Colors.transparent,
+                                      width: 2),
                                 ),
-                              );
-                            }).toList(),
-                          ),
+                                child: Column(
+                                  children: [
+                                    VitaAvatar(
+                                        name: portrait['name'] as String? ?? '',
+                                        radius: 38,
+                                        imageUrl: imageUrl),
+                                    const SizedBox(height: 6),
+                                    Flexible(
+                                        child: Text(
+                                            portrait['name'] as String? ?? '',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: selected
+                                                    ? FontWeight.w700
+                                                    : FontWeight.w500,
+                                                color: selected
+                                                    ? context.vita.green
+                                                    : context.vita.text))),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+                          _uploadAvatarTile(),
+                        ],
+                      ),
               ),
               _sectionTitle('companion.create.relationship'),
               VitaCard(
@@ -373,7 +467,7 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
               ),
               const SizedBox(height: 28),
               ElevatedButton(
-                onPressed: _busy ? null : _submit,
+                onPressed: _busy || _uploadingAvatar ? null : _submit,
                 child: _busy
                     ? const SizedBox(
                         width: 20,

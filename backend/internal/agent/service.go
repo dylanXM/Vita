@@ -1775,10 +1775,11 @@ func (s *Service) generateSocialEvent(ctx context.Context, a, b companionContext
 	return event, model.ID, nil
 }
 
-// PublishDueMoments turns selected life records into social posts. media_urls
+// PublishDueMoments turns human companions' selected life records into social posts.
+// Pets retain their life records but do not publish to the moments feed. media_urls
 // makes text, image-only and image-plus-text posts share one stable contract.
 func (s *Service) PublishDueMoments(ctx context.Context) error {
-	rows, err := s.db.QueryContext(ctx, `SELECT e.id,e.companion_id,e.social_event_id,COALESCE(e.title,''),COALESCE(e.description,''),e.start_time,e.payload::text FROM life_events e JOIN companions c ON c.id=e.companion_id WHERE e.status='active' AND e.start_time<=CURRENT_TIMESTAMP AND COALESCE((e.payload->>'moment_candidate')::boolean,false)=true AND (c.active=true OR c.deleted_at IS NOT NULL) AND c.life_enabled=true AND c.is_default=false AND COALESCE(c.admin_takeover,false)=false AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP)) AND NOT EXISTS(SELECT 1 FROM moment_posts p WHERE p.life_event_id=e.id) ORDER BY e.start_time LIMIT 50`)
+	rows, err := s.db.QueryContext(ctx, `SELECT e.id,e.companion_id,e.social_event_id,COALESCE(e.title,''),COALESCE(e.description,''),e.start_time,e.payload::text FROM life_events e JOIN companions c ON c.id=e.companion_id WHERE e.status='active' AND e.start_time<=CURRENT_TIMESTAMP AND COALESCE((e.payload->>'moment_candidate')::boolean,false)=true AND (c.active=true OR c.deleted_at IS NOT NULL) AND c.life_enabled=true AND c.is_default=false AND COALESCE(c.creation_source,'')<>'ai_pet' AND c.pet_breed_id IS NULL AND COALESCE(c.admin_takeover,false)=false AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP)) AND NOT EXISTS(SELECT 1 FROM moment_posts p WHERE p.life_event_id=e.id) ORDER BY e.start_time LIMIT 50`)
 	if err != nil {
 		return err
 	}

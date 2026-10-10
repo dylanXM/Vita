@@ -613,7 +613,7 @@ class MomentsPage extends StatefulWidget {
 }
 
 class _MomentsPageState extends State<MomentsPage> {
-  bool _showTimeline = false;
+  bool _showTimeline = true;
 
   @override
   Widget build(BuildContext context) {

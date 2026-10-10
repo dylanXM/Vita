@@ -2024,6 +2024,7 @@ func GetExplorePosts(c *gin.Context) {
 		FROM moment_posts p
 		JOIN visible v ON v.id=p.author_companion_id
 		JOIN companions author ON author.id=p.author_companion_id AND author.active=true
+		  AND COALESCE(author.creation_source,'')<>'ai_pet' AND author.pet_breed_id IS NULL
 		LEFT JOIN companion_portraits ap ON ap.id=author.portrait_id
 		LEFT JOIN ai_pet_breeds pet_breed ON pet_breed.id=author.pet_breed_id
 		LEFT JOIN life_events le ON le.id=p.life_event_id
