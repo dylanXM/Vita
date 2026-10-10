@@ -1277,6 +1277,7 @@ type SendMessageResponse struct {
 	UserMessage      *agent.SavedMessage `json:"user_message,omitempty"`
 	CompanionMessage *agent.SavedMessage `json:"companion_message"`
 	AgentError       string              `json:"agent_error,omitempty"`
+	TrialExpiresAt   *time.Time          `json:"trial_expires_at,omitempty"`
 }
 
 func SendMessage(c *gin.Context) {
@@ -1309,18 +1310,8 @@ func SendMessage(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
 		return
 	}
-	if isDefault {
-		allowed, expires, err := defaultChatAccess(userID, true)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check free chat access"})
-			return
-		}
-		if !allowed {
-			subscriptionRequired(c, "default_chat_trial_expired", "The free default-companion chat period has ended. Subscribe to continue")
-			return
-		}
-		_ = expires
-	} else {
+	var trialExpiresAt *time.Time
+	if !isDefault {
 		subscribed, err := userHasActiveSubscription(userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check subscription"})
@@ -1381,6 +1372,18 @@ func SendMessage(c *gin.Context) {
 			return
 		}
 	}
+	if isDefault {
+		allowed, expires, accessErr := defaultChatAccess(userID, true)
+		if accessErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check free chat access"})
+			return
+		}
+		if !allowed {
+			subscriptionRequired(c, "default_chat_trial_expired", "The free default-companion chat period has ended. Subscribe to continue")
+			return
+		}
+		trialExpiresAt = expires
+	}
 	_, err = tx.ExecContext(c.Request.Context(), query, msgID, conversationID, req.MessageType, req.Content, mediaURL, createdAt, activeLifeID.String)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send message"})
@@ -1404,7 +1407,7 @@ func SendMessage(c *gin.Context) {
 		return
 	}
 	userMessage := &agent.SavedMessage{ID: msgID, ConversationID: conversationID, SenderType: "user", MessageType: req.MessageType, Content: req.Content, MediaURL: mediaURL, Payload: map[string]any{}, Source: "user", LifeEventID: activeLifeID.String, DeliveryStatus: "delivered", CreatedAt: createdAt}
-	response := SendMessageResponse{ID: msgID, Content: req.Content, Sender: "user", Created: createdAt, UserMessage: userMessage}
+	response := SendMessageResponse{ID: msgID, Content: req.Content, Sender: "user", Created: createdAt, UserMessage: userMessage, TrialExpiresAt: trialExpiresAt}
 	if companionAgent == nil {
 		response.AgentError = "agent service is unavailable"
 		c.JSON(http.StatusCreated, response)
@@ -1551,11 +1554,29 @@ func GetOrCreateConversation(c *gin.Context) {
 	}
 	canSend := true
 	accessCode := ""
+	trialStatus := "none"
+	var trialExpiresAt *time.Time
 	if isDefault {
-		allowed, expires, err := defaultChatAccess(userID, true)
+		allowed, expires, err := defaultChatAccess(userID, false)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start free chat access"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check free chat access"})
 			return
+		}
+		trialExpiresAt = expires
+		if expires != nil {
+			trialStatus = "active"
+			if !allowed {
+				trialStatus = "expired"
+			}
+		} else {
+			subscribed, subErr := userHasActiveSubscription(userID)
+			if subErr != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check subscription"})
+				return
+			}
+			if !subscribed {
+				trialStatus = "not_started"
+			}
 		}
 		if !allowed {
 			canSend = false
@@ -1583,7 +1604,8 @@ func GetOrCreateConversation(c *gin.Context) {
 		`SELECT id FROM conversations WHERE user_id = $1 AND companion_id = $2 LIMIT 1`,
 		userID, req.CompanionID).Scan(&conversationID)
 	if err == nil {
-		response := gin.H{"conversation_id": conversationID, "can_send": canSend, "access_code": accessCode}
+		response := gin.H{"conversation_id": conversationID, "can_send": canSend, "access_code": accessCode,
+			"trial_status": trialStatus, "trial_expires_at": trialExpiresAt}
 		if companionAgent != nil {
 			if status, statusErr := companionAgent.CurrentStatus(c.Request.Context(), req.CompanionID, userID); statusErr == nil {
 				response["companion_status"] = status
@@ -1604,7 +1626,8 @@ func GetOrCreateConversation(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create conversation"})
 		return
 	}
-	response := gin.H{"conversation_id": conversationID, "can_send": canSend, "access_code": accessCode}
+	response := gin.H{"conversation_id": conversationID, "can_send": canSend, "access_code": accessCode,
+		"trial_status": trialStatus, "trial_expires_at": trialExpiresAt}
 	if companionAgent != nil {
 		if status, statusErr := companionAgent.CurrentStatus(c.Request.Context(), req.CompanionID, userID); statusErr == nil {
 			response["companion_status"] = status

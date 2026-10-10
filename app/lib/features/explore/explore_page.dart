@@ -9,6 +9,7 @@ import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../../shared/media_image.dart';
 import '../ai_pets/ai_pets_page.dart';
+import '../chat/chat_page.dart';
 import '../stories/stories_page.dart';
 
 class ExploreController extends GetxController {
@@ -19,6 +20,19 @@ class ExploreController extends GetxController {
   final posts = <Map<String, dynamic>>[].obs;
   final storyChapter = RxnInt();
   final petName = RxnString();
+
+  Map<String, dynamic>? get featuredPost {
+    final cutoff = DateTime.now().subtract(const Duration(hours: 48));
+    for (final post in posts) {
+      final published = DateTime.tryParse('${post['published_at'] ?? ''}');
+      if (post['is_own_companion'] == true &&
+          published != null &&
+          !published.isBefore(cutoff)) {
+        return post;
+      }
+    }
+    return null;
+  }
 
   @override
   void onInit() {
@@ -96,59 +110,95 @@ class ExplorePage extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 90),
           children: [
             VitaTabHeader(title: 'tab.discover'.tr, showDivider: false),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-              child: Text('discover.subtitle'.tr,
-                  style: TextStyle(color: vita.subText, fontSize: 13)),
-            ),
             Obx(() {
-              final posts = ExploreController.to.posts;
-              if (posts.isEmpty) return const SizedBox.shrink();
-              return _FeaturedMoment(
-                post: posts.first,
-                onTap: () {
-                  AnalyticsService.to
-                      .track('discover_moment_opened', category: 'life');
-                  Get.to(() => const MomentsPage(),
-                      transition: Transition.cupertino);
+              final ctrl = ExploreController.to;
+              final featured = ctrl.featuredPost;
+              if (featured != null) {
+                return _FeaturedMoment(
+                  post: featured,
+                  onTap: () {
+                    AnalyticsService.to
+                        .track('discover_moment_opened', category: 'life');
+                    _showSignal(context, featured);
+                  },
+                );
+              }
+              final hasStory = ctrl.storyChapter.value != null;
+              final petName = ctrl.petName.value;
+              return _DiscoveryLead(
+                icon: hasStory
+                    ? Icons.auto_stories_rounded
+                    : petName?.isNotEmpty == true
+                        ? Icons.pets_rounded
+                        : Icons.auto_stories_rounded,
+                title: hasStory
+                    ? 'storyHub.title'.tr
+                    : petName?.isNotEmpty == true
+                        ? petName!
+                        : 'storyHub.title'.tr,
+                subtitle: hasStory
+                    ? 'discover.continueStory'
+                        .trParams({'count': '${ctrl.storyChapter.value}'})
+                    : petName?.isNotEmpty == true
+                        ? 'discover.myPet'.trParams({'name': petName!})
+                        : 'discover.stories'.tr,
+                onTap: () async {
+                  if (!hasStory && petName?.isNotEmpty == true) {
+                    await Get.to(() => const AIPetsPage(),
+                        transition: Transition.cupertino);
+                  } else {
+                    await Get.to(() => const StoriesPage(),
+                        transition: Transition.cupertino);
+                  }
+                  ctrl.loadHighlights();
                 },
               );
             }),
-            Obx(() => _PlaceCard(
-                  icon: Icons.auto_stories_outlined,
-                  title: 'storyHub.title'.tr,
-                  subtitle: ExploreController.to.storyChapter.value == null
-                      ? 'discover.stories'.tr
-                      : 'discover.continueStory'.trParams({
-                          'count': '${ExploreController.to.storyChapter.value}'
-                        }),
-                  onTap: () async {
-                    AnalyticsService.to
-                        .track('discover_story_opened', category: 'life');
-                    await Get.to(() => const StoriesPage(),
-                        transition: Transition.cupertino);
-                    ExploreController.to.loadHighlights();
-                  },
-                )),
-            Obx(() => _PlaceCard(
-                  icon: Icons.pets_outlined,
-                  title: 'aiPets.title'.tr,
-                  subtitle:
-                      ExploreController.to.petName.value?.isNotEmpty == true
-                          ? 'discover.myPet'.trParams(
-                              {'name': ExploreController.to.petName.value!})
-                          : 'discover.pets'.tr,
-                  onTap: () async {
-                    AnalyticsService.to
-                        .track('discover_pet_opened', category: 'life');
-                    await Get.to(() => const AIPetsPage(),
-                        transition: Transition.cupertino);
-                    ExploreController.to.loadHighlights();
-                  },
-                )),
+            Obx(() => ExploreController.to.featuredPost == null &&
+                    (ExploreController.to.storyChapter.value != null ||
+                        ExploreController.to.petName.value?.isNotEmpty != true)
+                ? const SizedBox.shrink()
+                : _PlaceCard(
+                    icon: Icons.auto_stories_outlined,
+                    title: 'storyHub.title'.tr,
+                    subtitle: ExploreController.to.storyChapter.value == null
+                        ? 'discover.stories'.tr
+                        : 'discover.continueStory'.trParams({
+                            'count':
+                                '${ExploreController.to.storyChapter.value}'
+                          }),
+                    onTap: () async {
+                      AnalyticsService.to
+                          .track('discover_story_opened', category: 'life');
+                      await Get.to(() => const StoriesPage(),
+                          transition: Transition.cupertino);
+                      ExploreController.to.loadHighlights();
+                    },
+                  )),
+            Obx(() => ExploreController.to.featuredPost == null &&
+                    ExploreController.to.storyChapter.value == null &&
+                    ExploreController.to.petName.value?.isNotEmpty == true
+                ? const SizedBox.shrink()
+                : _PlaceCard(
+                    icon: Icons.pets_outlined,
+                    title: 'aiPets.title'.tr,
+                    subtitle:
+                        ExploreController.to.petName.value?.isNotEmpty == true
+                            ? 'discover.myPet'.trParams(
+                                {'name': ExploreController.to.petName.value!})
+                            : 'discover.pets'.tr,
+                    onTap: () async {
+                      AnalyticsService.to
+                          .track('discover_pet_opened', category: 'life');
+                      await Get.to(() => const AIPetsPage(),
+                          transition: Transition.cupertino);
+                      ExploreController.to.loadHighlights();
+                    },
+                  )),
             Obx(() {
-              final posts = ExploreController.to.posts;
-              if (posts.isNotEmpty) return const SizedBox.shrink();
+              if (ExploreController.to.featuredPost != null) {
+                return const SizedBox.shrink();
+              }
               return _PlaceCard(
                 icon: Icons.camera_alt_outlined,
                 title: 'explore.moments'.tr,
@@ -182,7 +232,7 @@ class _FeaturedMoment extends StatelessWidget {
     final media = _momentMediaUrls(post);
     final content = '${post['content'] ?? ''}'.trim();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
       child: Material(
         color: vita.surface,
         borderRadius: BorderRadius.circular(22),
@@ -190,7 +240,7 @@ class _FeaturedMoment extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: SizedBox(
-            height: 176,
+            height: 232,
             child: Stack(fit: StackFit.expand, children: [
               if (media.isNotEmpty)
                 VitaMediaImage(url: media.first, fit: BoxFit.cover),
@@ -215,7 +265,7 @@ class _FeaturedMoment extends StatelessWidget {
                       color: media.isEmpty ? vita.green : Colors.white),
                   const SizedBox(width: 7),
                   Expanded(
-                    child: Text('explore.moments'.tr,
+                    child: Text('discover.today'.tr,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -252,6 +302,12 @@ class _FeaturedMoment extends StatelessWidget {
                             fontSize: 16,
                             height: 1.3,
                             fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 12),
+                    Text('discover.enter'.tr,
+                        style: TextStyle(
+                            color: media.isEmpty ? vita.green : Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700)),
                   ],
                 ),
               ),
@@ -261,6 +317,76 @@ class _FeaturedMoment extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DiscoveryLead extends StatelessWidget {
+  const _DiscoveryLead(
+      {required this.icon,
+      required this.title,
+      required this.subtitle,
+      required this.onTap});
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+        child: Material(
+          borderRadius: BorderRadius.circular(22),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Ink(
+              height: 232,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF4D3D65), Color(0xFF1E1B28)],
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('discover.today'.tr,
+                        style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600)),
+                    const Spacer(),
+                    Icon(icon, color: Colors.white70, size: 34),
+                    const SizedBox(height: 12),
+                    Text(title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    Text(subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 13)),
+                    const SizedBox(height: 14),
+                    Text('discover.enter'.tr,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 class _PlaceCard extends StatelessWidget {
@@ -895,6 +1021,27 @@ class _SignalFocusDialog extends StatelessWidget {
                   Text(formatDate(published.toLocal()),
                       style:
                           TextStyle(color: context.vita.subText, fontSize: 12)),
+                if (post['is_own_companion'] == true &&
+                    '${author['id'] ?? ''}'.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Get.to(
+                            () => ChatPage(
+                                  companionId: '${author['id']}',
+                                  name: '${author['name'] ?? ''}',
+                                  companion: author,
+                                ),
+                            transition: Transition.cupertino);
+                      },
+                      icon: const Icon(Icons.chat_bubble_outline_rounded),
+                      label: Text('world.talk'.tr),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

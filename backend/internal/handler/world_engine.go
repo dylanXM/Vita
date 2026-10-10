@@ -292,7 +292,7 @@ func GetWorldScene(c *gin.Context) {
 // relationship and mood change are committed together, so retries are safe.
 func VisitWorld(c *gin.Context) {
 	companionID, userID := c.Param("id"), c.GetString("user_id")
-	if !requireWorldAccess(c, companionID, true) {
+	if !requireWorldAccess(c, companionID, false) {
 		return
 	}
 	var input struct {

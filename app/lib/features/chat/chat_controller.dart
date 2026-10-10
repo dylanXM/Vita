@@ -24,8 +24,11 @@ class ChatController extends GetxController {
   final sendError = RxnString();
   final companionStatus = ''.obs;
   final companionBusy = false.obs;
+  final trialStatus = 'none'.obs;
+  final trialExpiresAt = RxnString();
   String? _conversationId;
   Timer? _pollTimer;
+  Timer? _trialTimer;
   bool _polling = false;
 
   @override
@@ -39,6 +42,7 @@ class ChatController extends GetxController {
   @override
   void onClose() {
     _pollTimer?.cancel();
+    _trialTimer?.cancel();
     super.onClose();
   }
 
@@ -80,6 +84,11 @@ class ChatController extends GetxController {
     if (conv is Map && conv['can_send'] == false) {
       accessError.value =
           conv['access_code'] as String? ?? 'subscription_required';
+    }
+    if (conv is Map) {
+      trialStatus.value = '${conv['trial_status'] ?? 'none'}';
+      trialExpiresAt.value = conv['trial_expires_at'] as String?;
+      _scheduleTrialRefresh();
     }
   }
 
@@ -186,6 +195,7 @@ class ChatController extends GetxController {
         },
       );
       if (data is Map) {
+        _updateTrialFromMessage(data);
         final userMessage = data['user_message'];
         final companionMessage = data['companion_message'];
         if (userMessage is Map) {
@@ -295,6 +305,7 @@ class ChatController extends GetxController {
         data: {'message_type': 'voice', 'media_id': mediaID},
       );
       if (data is Map) {
+        _updateTrialFromMessage(data);
         final userMessage = data['user_message'];
         final companionMessage = data['companion_message'];
         if (userMessage is Map) {
@@ -324,6 +335,27 @@ class ChatController extends GetxController {
     final id = message['id'];
     if (id != null && messages.any((item) => item['id'] == id)) return;
     messages.add(message);
+  }
+
+  void _updateTrialFromMessage(Map data) {
+    final expiry = data['trial_expires_at'];
+    if (expiry is String && expiry.isNotEmpty) {
+      trialExpiresAt.value = expiry;
+      trialStatus.value = 'active';
+      _scheduleTrialRefresh();
+    }
+  }
+
+  void _scheduleTrialRefresh() {
+    _trialTimer?.cancel();
+    if (trialStatus.value != 'active') return;
+    final expiry = DateTime.tryParse(trialExpiresAt.value ?? '');
+    if (expiry == null) return;
+    final remaining = expiry.difference(DateTime.now());
+    if (remaining.isNegative) return;
+    _trialTimer = Timer(remaining + const Duration(seconds: 1), () {
+      load();
+    });
   }
 
   void _replaceOptimistic(String optimisticId, Map<String, dynamic> message) {

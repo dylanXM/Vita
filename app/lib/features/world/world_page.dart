@@ -507,7 +507,17 @@ class _RelationshipCard extends StatelessWidget {
         (savedVisit is Map ? Map<String, dynamic>.from(savedVisit) : null);
     final visited = scene?['visited_today'] == true || effectiveVisit != null;
     final selectedChoice = '${effectiveVisit?['choice'] ?? ''}';
-    final asking = selectedChoice == 'ask';
+    final gesture = '${effectiveVisit?['gesture'] ?? ''}';
+    final asking = gesture == 'turn_toward' || selectedChoice == 'ask';
+    final recentGift = scene?['recent_gift'] is Map
+        ? Map<String, dynamic>.from(scene!['recent_gift'] as Map)
+        : null;
+    final giftAt = DateTime.tryParse('${recentGift?['created_at'] ?? ''}');
+    final recentGiftEmoji = '${recentGift?['emoji'] ?? ''}'.trim();
+    final giftEmoji =
+        giftAt != null && DateTime.now().difference(giftAt).inHours < 48
+            ? (recentGiftEmoji.isEmpty ? '🎁' : recentGiftEmoji)
+            : '';
     final reaction = '${effectiveVisit?['reaction'] ?? ''}'.trim();
     final momentLine = visited
         ? reaction.isNotEmpty
@@ -526,12 +536,16 @@ class _RelationshipCard extends StatelessWidget {
           Expanded(
             child: ClipRect(
                 child: Stack(fit: StackFit.expand, children: [
-              DecoratedBox(
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 900),
+                curve: Curves.easeInOutCubic,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [sky, glow],
+                    colors: visited
+                        ? [glow.withValues(alpha: .85), sky]
+                        : [sky, glow],
                   ),
                 ),
               ),
@@ -545,17 +559,26 @@ class _RelationshipCard extends StatelessWidget {
                           ? const Offset(-.035, 0)
                           : const Offset(.025, 0),
                   child: AnimatedScale(
-                    duration: const Duration(milliseconds: 850),
+                    duration: const Duration(milliseconds: 1100),
                     curve: Curves.easeOutCubic,
                     scale: !visited
                         ? 1
                         : asking
-                            ? 1.14
-                            : 1.08,
-                    child: VitaMediaImage(
-                      url: imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox.expand(),
+                            ? 1.18
+                            : 1.10,
+                    child: AnimatedRotation(
+                      turns: !visited
+                          ? 0
+                          : asking
+                              ? -.006
+                              : .006,
+                      duration: const Duration(milliseconds: 1100),
+                      curve: Curves.easeOutCubic,
+                      child: VitaMediaImage(
+                        url: imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox.expand(),
+                      ),
                     ),
                   ),
                 ),
@@ -617,6 +640,26 @@ class _RelationshipCard extends StatelessWidget {
                   ),
                 ]),
               ),
+              if (giftEmoji.isNotEmpty)
+                Positioned(
+                  top: 56,
+                  right: 18,
+                  child: Semantics(
+                    label: '${recentGift?['name_key'] ?? 'world.giveGift'}'.tr,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: const Color(0xCC17141F),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child:
+                          Text(giftEmoji, style: const TextStyle(fontSize: 22)),
+                    ),
+                  ),
+                ),
               Positioned(
                 left: 20,
                 right: 20,
@@ -661,14 +704,17 @@ class _RelationshipCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     SizedBox(
                       height: 36,
-                      child: Text(momentLine,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              height: 1.3,
-                              fontWeight: FontWeight.w500)),
+                      child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 350),
+                          child: Text(momentLine,
+                              key: ValueKey(momentLine),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  height: 1.3,
+                                  fontWeight: FontWeight.w500))),
                     ),
                   ],
                 ),
@@ -754,12 +800,13 @@ class _RelationshipCard extends StatelessWidget {
                     ]),
                     const SizedBox(height: 8),
                     Row(children: [
-                      Expanded(
-                          child: _WorldUtilityAction(
-                        label: 'world.talk'.tr,
-                        icon: Icons.chat_bubble_outline_rounded,
-                        onTap: onChat,
-                      )),
+                      if (!visited)
+                        Expanded(
+                            child: _WorldUtilityAction(
+                          label: 'world.talk'.tr,
+                          icon: Icons.chat_bubble_outline_rounded,
+                          onTap: onChat,
+                        )),
                       Expanded(
                           child: _WorldUtilityAction(
                         label: 'world.giveGift'.tr,

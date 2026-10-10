@@ -54,14 +54,19 @@ class _GiftRevealPageState extends State<GiftRevealPage> {
         )),
         if (portrait.isNotEmpty)
           Positioned.fill(
-              child: AnimatedScale(
-            duration: const Duration(milliseconds: 850),
+              child: AnimatedSlide(
+            duration: const Duration(milliseconds: 950),
             curve: Curves.easeOutCubic,
-            scale: _opened ? 1.08 : 1,
-            child: VitaMediaImage(
-                url: portrait,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const SizedBox.expand()),
+            offset: _opened ? const Offset(-.035, 0) : Offset.zero,
+            child: AnimatedScale(
+              duration: const Duration(milliseconds: 950),
+              curve: Curves.easeOutCubic,
+              scale: _opened ? 1.14 : 1,
+              child: VitaMediaImage(
+                  url: portrait,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox.expand()),
+            ),
           )),
         Positioned.fill(
             child: AnimatedContainer(
@@ -121,7 +126,7 @@ class _GiftRevealPageState extends State<GiftRevealPage> {
                                 color: context.vita.green.withValues(alpha: .3),
                                 blurRadius: 40)
                           ]),
-                      child: Text(emoji, style: const TextStyle(fontSize: 72))),
+                      child: const SizedBox.shrink()),
                 ),
                 const SizedBox(height: 24),
                 Text('gift.reveal.open'.tr,
@@ -185,6 +190,23 @@ class _GiftRevealPageState extends State<GiftRevealPage> {
             ),
           ),
         ]),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: AnimatedAlign(
+              duration: const Duration(milliseconds: 1050),
+              curve: Curves.easeInOutCubic,
+              alignment: _opened
+                  ? const Alignment(.68, -.38)
+                  : const Alignment(0, .02),
+              child: AnimatedScale(
+                duration: const Duration(milliseconds: 1050),
+                curve: Curves.easeOutBack,
+                scale: _opened ? .63 : 1,
+                child: Text(emoji, style: const TextStyle(fontSize: 80)),
+              ),
+            ),
+          ),
+        ),
       ])),
     );
   }

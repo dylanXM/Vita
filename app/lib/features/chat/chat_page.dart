@@ -306,6 +306,33 @@ class _ChatPageState extends State<ChatPage> {
       ),
       body: Column(
         children: [
+          Obx(() {
+            final status = ctrl.trialStatus.value;
+            if (status != 'not_started' && status != 'active') {
+              return const SizedBox.shrink();
+            }
+            final expiry =
+                DateTime.tryParse(ctrl.trialExpiresAt.value ?? '')?.toLocal();
+            final message = status == 'not_started' || expiry == null
+                ? 'chat.trialNotStarted'.tr
+                : 'chat.trialUntil'.trParams({
+                    'time': '${formatDate(expiry)} ${formatClock(expiry)}',
+                  });
+            return Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+              color: context.vita.greenTint,
+              child: Row(children: [
+                Icon(Icons.schedule_rounded,
+                    size: 17, color: context.vita.green),
+                const SizedBox(width: 9),
+                Expanded(
+                    child: Text(message,
+                        style:
+                            TextStyle(fontSize: 12, color: context.vita.text))),
+              ]),
+            );
+          }),
           Obx(() => ctrl.accessError.value == null
               ? const SizedBox.shrink()
               : Container(
