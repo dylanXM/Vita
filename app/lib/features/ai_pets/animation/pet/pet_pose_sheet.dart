@@ -107,10 +107,14 @@ class _PetPoseSheetState extends State<PetPoseSheet> {
   Sprite _cell(ui.Image image, int index) {
     final width = image.width / 3.0;
     final height = image.height / 2.0;
+    // Authored top-row paws can cross the atlas midpoint. Keep the lower-row
+    // source inside its own artwork so feeding/drinking never show a stray paw.
+    final lowerRowInset = index >= 3 ? height * .06 : 0.0;
     return Sprite(
       image,
-      srcPosition: Vector2((index % 3) * width, (index ~/ 3) * height),
-      srcSize: Vector2(width, height),
+      srcPosition:
+          Vector2((index % 3) * width, (index ~/ 3) * height + lowerRowInset),
+      srcSize: Vector2(width, height - lowerRowInset),
     );
   }
 
