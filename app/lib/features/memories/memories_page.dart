@@ -676,25 +676,37 @@ class _JourneyVisitPageState extends State<_JourneyVisitPage> {
         : const <String, dynamic>{};
     final name = '${companion['name'] ?? ''}';
     final companionId = '${companion['id'] ?? ''}';
+    final visitId = '${widget.item['id'] ?? ''}';
     final imageUrl =
         '${metadata['portrait_url'] ?? companion['portrait_url'] ?? ''}';
     final eventTitle = '${metadata['event_title'] ?? ''}'.trim();
+    final reaction = '${metadata['reaction'] ?? ''}'.trim();
+    final followUp = '${metadata['follow_up'] ?? ''}'.trim();
     final date =
         DateTime.tryParse('${widget.item['event_time'] ?? ''}')?.toLocal();
     final asking = metadata['choice'] == 'ask';
+    final action = asking ? 'journey.visitAsk'.tr : 'journey.visitStay'.tr;
+    final draft =
+        asking ? 'journey.continueAskDraft'.tr : 'journey.continueStayDraft'.tr;
+    final contextLabel = eventTitle.isNotEmpty
+        ? eventTitle
+        : date == null
+            ? 'journey.visitMoment'.tr
+            : formatDateSeparator(date);
+
     return Scaffold(
       backgroundColor: vita.pageBg,
       body: SafeArea(
         child: Column(children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 18, 10),
+            padding: const EdgeInsets.fromLTRB(10, 2, 14, 4),
             child: Row(children: [
               IconButton(
                 onPressed: () => Get.back(),
                 icon: const Icon(Icons.arrow_back_ios_new_rounded),
               ),
               Expanded(
-                child: Text('journey.viewMoment'.tr,
+                child: Text('journey.thenAndNow'.tr,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -702,150 +714,209 @@ class _JourneyVisitPageState extends State<_JourneyVisitPage> {
                         fontSize: 17,
                         fontWeight: FontWeight.w700)),
               ),
+              TextButton(
+                onPressed: companionId.isEmpty
+                    ? null
+                    : () {
+                        Get.back();
+                        ShellController.to.selectedCompanionId.value =
+                            companionId;
+                        ShellController.to.switchTo(0);
+                      },
+                child: Text('journey.enterWorld'.tr),
+              ),
             ]),
           ),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: Stack(fit: StackFit.expand, children: [
-                  ColoredBox(color: vita.surface),
-                  if (imageUrl.isNotEmpty)
-                    TweenAnimationBuilder<double>(
-                      key: ValueKey(_replay),
-                      tween: Tween(begin: 1.06, end: 1),
-                      duration: const Duration(milliseconds: 700),
-                      curve: Curves.easeOutCubic,
-                      builder: (_, scale, child) =>
-                          Transform.scale(scale: scale, child: child),
-                      child: VitaMediaImage(url: imageUrl, fit: BoxFit.cover),
-                    ),
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color(0x66000000),
-                          Color(0x11000000),
-                          Color(0xE6000000)
-                        ],
-                        stops: [0, .42, 1],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 20,
-                    right: 20,
-                    top: 20,
-                    child: Text(
-                        date == null
-                            ? name
-                            : '$name  ·  ${formatDateSeparator(date)}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 13)),
-                  ),
-                  Positioned(
-                    top: 52,
-                    right: 18,
-                    child: IconButton.filledTonal(
-                      tooltip: 'journey.viewMoment'.tr,
-                      onPressed: () => setState(() => _replay++),
-                      icon: const Icon(Icons.replay_rounded),
-                    ),
-                  ),
-                  Positioned(
-                    left: 22,
-                    right: 22,
-                    bottom: 28,
-                    child: TweenAnimationBuilder<double>(
-                        key: ValueKey(_replay),
-                        tween: Tween(begin: 0, end: 1),
-                        duration: const Duration(milliseconds: 900),
-                        curve: Curves.easeOutCubic,
-                        builder: (_, progress, child) => Opacity(
-                              opacity: progress,
-                              child: Transform.translate(
-                                offset: Offset(0, 20 * (1 - progress)),
-                                child: child,
-                              ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 26),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    height: 270,
+                    width: double.infinity,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: Stack(fit: StackFit.expand, children: [
+                        ColoredBox(color: vita.surface),
+                        if (imageUrl.isNotEmpty)
+                          TweenAnimationBuilder<double>(
+                            key: ValueKey(_replay),
+                            tween: Tween(begin: 1.06, end: 1),
+                            duration: const Duration(milliseconds: 700),
+                            curve: Curves.easeOutCubic,
+                            builder: (_, scale, child) =>
+                                Transform.scale(scale: scale, child: child),
+                            child: VitaMediaImage(
+                                url: imageUrl, fit: BoxFit.cover),
+                          ),
+                        const DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Color(0x66000000),
+                                Color(0x11000000),
+                                Color(0xB8000000)
+                              ],
+                              stops: [0, .5, 1],
                             ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                                asking
-                                    ? Icons.record_voice_over_rounded
-                                    : Icons.favorite_rounded,
+                          ),
+                        ),
+                        Positioned(
+                          left: 18,
+                          top: 16,
+                          child: Text(
+                            date == null
+                                ? name
+                                : '$name  ·  ${formatDateSeparator(date)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 13),
+                          ),
+                        ),
+                        Positioned(
+                          top: 10,
+                          right: 10,
+                          child: IconButton(
+                            tooltip: 'journey.replayScene'.tr,
+                            onPressed: () => setState(() => _replay++),
+                            icon: const Icon(Icons.replay_rounded,
+                                color: Colors.white),
+                          ),
+                        ),
+                        Positioned(
+                          left: 18,
+                          right: 18,
+                          bottom: 18,
+                          child: Text(
+                            eventTitle.isEmpty ? action : eventTitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
                                 color: Colors.white,
-                                size: 24),
-                            const SizedBox(height: 10),
-                            Text(
-                                asking
-                                    ? 'world.sceneAsk'.tr
-                                    : 'world.sceneStay'.tr,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w700)),
-                            if (eventTitle.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              Text(eventTitle,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      color: Colors.white70, fontSize: 13)),
-                            ],
-                            const SizedBox(height: 12),
-                            Text(_journeyContent(widget.item),
-                                maxLines: 5,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 15,
-                                    height: 1.5)),
-                          ],
-                        )),
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700,
+                                height: 1.2),
+                          ),
+                        ),
+                      ]),
+                    ),
                   ),
-                ]),
+                  const SizedBox(height: 27),
+                  _VisitChapter(
+                    label: 'journey.thatDay'.tr,
+                    text: action,
+                    secondary: reaction.isEmpty ? null : reaction,
+                    isLast: false,
+                  ),
+                  _VisitChapter(
+                    label: 'journey.sinceThen'.tr,
+                    text: followUp.isEmpty
+                        ? 'journey.noFollowUpYet'.tr
+                        : followUp,
+                    isLast: true,
+                  ),
+                ],
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
-            child: Row(children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    Get.back();
-                    ShellController.to.selectedCompanionId.value = companionId;
-                    ShellController.to.switchTo(0);
-                  },
-                  child: Text('journey.enterWorld'.tr,
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
-                ),
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: companionId.isEmpty || visitId.isEmpty
+                    ? null
+                    : () => Get.to(
+                          () => ChatPage(
+                            companionId: companionId,
+                            name: name,
+                            companion: companion,
+                            journeyVisitId: visitId,
+                            journeyContext: contextLabel,
+                            journeyDraft: draft,
+                          ),
+                          transition: Transition.cupertino,
+                        ),
+                child: Text('journey.continueThatDay'.tr),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () => Get.to(
-                      () => ChatPage(
-                          companionId: companionId,
-                          name: name,
-                          companion: companion),
-                      transition: Transition.cupertino),
-                  child: Text('world.talk'.tr,
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
-                ),
-              ),
-            ]),
+            ),
           ),
         ]),
       ),
+    );
+  }
+}
+
+class _VisitChapter extends StatelessWidget {
+  const _VisitChapter({
+    required this.label,
+    required this.text,
+    required this.isLast,
+    this.secondary,
+  });
+
+  final String label;
+  final String text;
+  final String? secondary;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    final vita = context.vita;
+    return IntrinsicHeight(
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SizedBox(
+          width: 27,
+          child: Column(children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: vita.green,
+              ),
+            ),
+            if (!isLast)
+              Expanded(
+                child: Container(
+                  width: 1,
+                  margin: const EdgeInsets.symmetric(vertical: 7),
+                  color: vita.subText.withValues(alpha: .35),
+                ),
+              ),
+          ]),
+        ),
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: isLast ? 0 : 30),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: TextStyle(
+                        color: vita.subText,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(height: 9),
+                Text(text,
+                    style: TextStyle(
+                        color: vita.text, fontSize: 17, height: 1.45)),
+                if (secondary != null && secondary!.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(secondary!,
+                      style: TextStyle(
+                          color: vita.subText, fontSize: 14, height: 1.5)),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ]),
     );
   }
 }

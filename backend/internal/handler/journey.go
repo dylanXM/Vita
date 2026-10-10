@@ -56,8 +56,21 @@ func GetJourney(c *gin.Context) {
 				COALESCE(NULLIF(w.payload->>'reaction',''),
 					CASE WHEN w.payload->>'choice'='ask' THEN 'The user asked about my day during a visit.'
 					ELSE 'The user stayed with me during a visit.' END) AS content,
-				w.created_at AS occurred_at,true AS readonly,w.companion_id,w.payload AS metadata
+				w.created_at AS occurred_at,true AS readonly,w.companion_id,
+				w.payload || jsonb_build_object('follow_up',COALESCE((
+					SELECT msg.content FROM messages msg
+					WHERE msg.source='memory_followup' AND msg.payload->>'memory_id'=visit_memory.id
+					ORDER BY msg.created_at DESC LIMIT 1
+				),'')) AS metadata
 			FROM world_interactions w
+			LEFT JOIN LATERAL (
+				SELECT m.id FROM memories m
+				WHERE m.companion_id=w.companion_id AND m.type='world_visit'
+					AND m.event_time BETWEEN w.created_at-INTERVAL '2 minutes' AND w.created_at+INTERVAL '2 minutes'
+					AND COALESCE(NULLIF(m.metadata,''),'{}')::jsonb->>'choice'=w.payload->>'choice'
+					AND COALESCE(NULLIF(m.metadata,''),'{}')::jsonb->>'source_event_id'=w.payload->>'source_event_id'
+				ORDER BY ABS(EXTRACT(EPOCH FROM (m.event_time-w.created_at))) LIMIT 1
+			) visit_memory ON true
 			WHERE w.user_id=$1 AND w.kind='visit'
 			UNION ALL
 			SELECT k.id,'keepsake' AS kind,k.title,k.content,k.created_at AS occurred_at,

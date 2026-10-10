@@ -237,7 +237,8 @@ class ChatController extends GetxController {
   /// to deliver shows up as a failed bubble in the list. Returns `false` when
   /// nothing could be queued, so the caller keeps the draft, and records the
   /// reason in [sendError].
-  Future<bool> send(String text, {String? momentEventId}) async {
+  Future<bool> send(String text,
+      {String? momentEventId, String? journeyVisitId}) async {
     final content = text.trim();
     if (content.isEmpty) return false;
     if (sending.value) return false;
@@ -258,7 +259,9 @@ class ChatController extends GetxController {
       'message_type': 'text',
       'source': 'user',
       'life_event_id': momentEventId ?? '',
-      'payload': <String, dynamic>{},
+      'payload': <String, dynamic>{
+        if (journeyVisitId != null) 'journey_visit_id': journeyVisitId,
+      },
       'delivery_status': 'sending',
       'created_at': DateTime.now().toUtc().toIso8601String(),
     });
@@ -271,6 +274,7 @@ class ChatController extends GetxController {
           'content': content,
           'message_type': 'text',
           if (momentEventId != null) 'life_event_id': momentEventId,
+          if (journeyVisitId != null) 'journey_visit_id': journeyVisitId,
         },
       );
       if (data is Map) {
@@ -289,7 +293,9 @@ class ChatController extends GetxController {
             'message_type': 'text',
             'source': 'user',
             'life_event_id': momentEventId ?? '',
-            'payload': <String, dynamic>{},
+            'payload': <String, dynamic>{
+              if (journeyVisitId != null) 'journey_visit_id': journeyVisitId,
+            },
             'delivery_status': 'delivered',
             'created_at': data['created_at'],
           });

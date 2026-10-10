@@ -34,13 +34,19 @@ class ChatPage extends StatefulWidget {
       {super.key,
       required this.companionId,
       required this.name,
-      this.companion});
+      this.companion,
+      this.journeyVisitId,
+      this.journeyContext,
+      this.journeyDraft});
 
   final String companionId;
   final String name;
 
   /// Full companion profile map (from the list) — shown in the "more" sheet.
   final Map<String, dynamic>? companion;
+  final String? journeyVisitId;
+  final String? journeyContext;
+  final String? journeyDraft;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -98,12 +104,17 @@ class _ChatPageState extends State<ChatPage> {
   static final Set<String> _notifiedSlowReplies = <String>{};
   Timer? _recordingTimer;
   bool _recording = false;
+  bool _journeyContextSent = false;
   final ValueNotifier<String?> _panel = ValueNotifier(null);
   static const double _panelHeight = 210;
 
   @override
   void initState() {
     super.initState();
+    if (widget.journeyDraft case final draft?) {
+      _input.text = draft;
+      _input.selection = TextSelection.collapsed(offset: draft.length);
+    }
     _messageWorker = ever(ctrl.messages, (_) {
       if (!mounted) return;
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
@@ -196,12 +207,14 @@ class _ChatPageState extends State<ChatPage> {
     final text = _input.text.trim();
     if (text.isEmpty) return;
     _input.clear();
-    final send = ctrl.send(text);
+    final send = ctrl.send(text,
+        journeyVisitId: _journeyContextSent ? null : widget.journeyVisitId);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
     final queued = await send;
     if (!mounted) return;
     // Nothing reached the conversation: put the draft back so it is not lost.
     if (!queued) _restoreDraft(text);
+    if (queued && ctrl.sendError.value == null) _journeyContextSent = true;
     _reportSendResult(queued);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
@@ -394,6 +407,27 @@ class _ChatPageState extends State<ChatPage> {
                         child: Text('subscription.continue'.tr)),
                   ]),
                 )),
+          if (widget.journeyVisitId != null)
+            SizedBox(
+              height: 42,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Row(children: [
+                  Icon(Icons.history_rounded,
+                      size: 16, color: context.vita.subText),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.journeyContext ?? 'journey.visitMoment'.tr,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          TextStyle(color: context.vita.subText, fontSize: 12),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
           Expanded(
             child: Obx(
               () => _buildMessages(ctrl),
@@ -476,6 +510,7 @@ class _ChatPageState extends State<ChatPage> {
           payload['interaction_stage'] == 'chat';
       final parsed = ChatMessageContent.from(m);
       final isGift = parsed.isGift;
+      final isTransfer = parsed.type == 'transfer';
       final isSceneCard =
           parsed.type == 'scene_card' && parsed.payload['event_id'] is String;
       final deliveryStatus = m['delivery_status'] as String? ?? 'delivered';
@@ -515,13 +550,13 @@ class _ChatPageState extends State<ChatPage> {
                       duration: const Duration(milliseconds: 400),
                       constraints: BoxConstraints(
                         maxWidth: MediaQuery.of(context).size.width *
-                            (isSceneCard ? 0.75 : 0.66),
+                            (isGift || isTransfer || isSceneCard ? 0.75 : 0.66),
                       ),
-                      padding: isGift || isSceneCard
+                      padding: isGift || isTransfer || isSceneCard
                           ? EdgeInsets.zero
                           : const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 10),
-                      decoration: isGift || isSceneCard
+                      decoration: isGift || isTransfer || isSceneCard
                           ? null
                           : BoxDecoration(
                               color: bubbleColor,
@@ -857,18 +892,7 @@ class _ChatMessageBody extends StatelessWidget {
       );
     }
     if (type == 'transfer') {
-      final coins = payload['coins'];
-      return Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.north_east_rounded, color: context.vita.green, size: 20),
-        const SizedBox(width: 8),
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('chat.transfer'.tr,
-              style: TextStyle(
-                  fontWeight: FontWeight.w700, color: context.vita.text)),
-          Text('gift.coins'.trParams({'coins': '$coins'}),
-              style: TextStyle(fontSize: 12, color: context.vita.subText)),
-        ]),
-      ]);
+      return _TransferCard(coins: payload['coins']);
     }
     if (type == 'scene_card' && payload['event_id'] is String) {
       final scheduled =
@@ -1088,6 +1112,121 @@ class _LinkedMessageTextState extends State<_LinkedMessageText> {
       spans.add(TextSpan(text: widget.text.substring(offset)));
     }
     return Text.rich(TextSpan(children: spans), style: widget.style);
+  }
+}
+
+class _TransferCard extends StatelessWidget {
+  const _TransferCard({required this.coins});
+
+  final Object? coins;
+
+  @override
+  Widget build(BuildContext context) {
+    final amount = coins is num ? (coins as num).toInt().toString() : '—';
+    return Semantics(
+      label:
+          '${'chat.transfer'.tr}, $amount ${'transfer.coinUnit'.tr}, ${'transfer.sent'.tr}',
+      child: Container(
+        width: 250,
+        height: 132,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              context.vita.green,
+              Color.lerp(context.vita.greenDark, const Color(0xFF17152F), .64)!,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: context.vita.green.withValues(alpha: .28),
+              blurRadius: 18,
+              offset: Offset(0, 7),
+            ),
+          ],
+        ),
+        child: Stack(children: [
+          Positioned(
+            right: -28,
+            top: -37,
+            child: Container(
+              width: 138,
+              height: 138,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0x45FFFFFF)),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(17, 14, 17, 13),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  const Icon(Icons.north_east_rounded,
+                      size: 17, color: Color(0xFFFFD989)),
+                  const SizedBox(width: 6),
+                  Text('chat.transfer'.tr,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xE6FFFFFF))),
+                ]),
+                const Spacer(),
+                Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Flexible(
+                    child: SizedBox(
+                      height: 42,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.bottomLeft,
+                        child: Text(amount,
+                            maxLines: 1,
+                            style: const TextStyle(
+                                fontSize: 37,
+                                height: 1,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text('transfer.coinUnit'.tr,
+                        maxLines: 1,
+                        style: const TextStyle(
+                            fontSize: 13, color: Color(0xD9FFFFFF))),
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.toll_rounded,
+                      size: 34, color: Color(0xFFFFD989)),
+                ]),
+                const SizedBox(height: 8),
+                Container(height: 1, color: const Color(0x42FFFFFF)),
+                const SizedBox(height: 8),
+                Row(children: [
+                  const Icon(Icons.check_circle_rounded,
+                      size: 13, color: Color(0xFFFFD989)),
+                  const SizedBox(width: 5),
+                  Text('transfer.sent'.tr,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xE6FFFFFF))),
+                ]),
+              ],
+            ),
+          ),
+        ]),
+      ),
+    );
   }
 }
 

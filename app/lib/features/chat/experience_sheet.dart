@@ -107,14 +107,16 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
         ? 'experience.equipConfirm'.tr
         : product['category'] == 'gift'
             ? 'experience.gift.confirm'.trParams({'coins': '$coins'})
-            : 'experience.confirm'.trParams({'coins': '$coins'});
+            : product['category'] == 'date'
+                ? 'experience.date.requestConfirm'.trParams({'coins': '$coins'})
+                : 'experience.confirm'.trParams({'coins': '$coins'});
     final confirmed = await showCupertinoDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text((product['name_key'] as String? ?? key).tr),
         content: Text(appointment == null
             ? confirmation
-            : '${'moment.scheduled'.trParams({
+            : '${'experience.date.requestTime'.trParams({
                     'time': appointmentLabel
                   })}\n$confirmation'),
         actions: [
@@ -124,7 +126,11 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
                   style: const TextStyle(color: CupertinoColors.systemGrey))),
           CupertinoDialogAction(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text(owned ? 'experience.equip'.tr : 'experience.use'.tr)),
+              child: Text(owned
+                  ? 'experience.equip'.tr
+                  : product['category'] == 'date'
+                      ? 'experience.date.request'.tr
+                      : 'experience.use'.tr)),
         ],
       ),
     );
@@ -145,6 +151,19 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
       if (data is Map && data['balance'] is int) {
         _balance = data['balance'] as int;
       }
+      final result = data is Map ? data['result'] : null;
+      if (product['category'] == 'date' && result is Map) {
+        if (result['status'] == 'declined') {
+          VitaNotice.info('experience.date.declined'.tr,
+              'experience.date.declinedSchedule'.tr);
+          return;
+        }
+        if (result['status'] != 'accepted') {
+          VitaNotice.info('experience.date.requested'.tr,
+              'experience.date.requestedHint'.tr);
+          return;
+        }
+      }
       await BillingController.to.refreshCredits();
       if (data is Map && widget.onResult != null) {
         await widget.onResult!(Map<String, dynamic>.from(data));
@@ -161,7 +180,6 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
         if (mounted) Navigator.of(context).pop();
         return;
       }
-      final result = data is Map ? data['result'] : null;
       if (!mounted ||
           (widget.onResult != null &&
               result is Map &&
@@ -183,9 +201,15 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
       } else if (error.code == 'invalid_appointment') {
         VitaNotice.error(
             'experience.failed'.tr, 'experience.appointmentInvalid'.tr);
-      } else if (error.code == 'appointment_unavailable') {
+      } else if (error.code == 'date_declined') {
+        VitaNotice.info('experience.date.declined'.tr,
+            'experience.date.declinedSchedule'.tr);
+      } else if (error.code == 'date_request_pending') {
+        VitaNotice.info(
+            'experience.date.requested'.tr, 'experience.date.requestedHint'.tr);
+      } else if (error.code == 'date_decision_failed') {
         VitaNotice.error(
-            'experience.failed'.tr, 'experience.appointmentBusy'.tr);
+            'experience.failed'.tr, 'experience.date.requestFailed'.tr);
       } else {
         VitaNotice.error('experience.failed'.tr, error.message);
       }
@@ -639,6 +663,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     final owned = _owned[key] == true;
     final equipped = _equipped == key;
     final gift = _categoryFor(product) == 'gift';
+    final date = _categoryFor(product) == 'date';
     final price = 'gift.coins'.trParams({'coins': "${product['coins']}"});
     final label = equipped
         ? 'experience.equipped'.tr
@@ -647,7 +672,9 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
             : gift
                 ? 'experience.gift.send'
                     .trParams({'coins': "${product['coins']}"})
-                : "${'experience.use'.tr} · $price";
+                : date
+                    ? 'experience.date.request'.tr
+                    : "${'experience.use'.tr} · $price";
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
       decoration: BoxDecoration(

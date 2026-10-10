@@ -1276,10 +1276,11 @@ func DeleteCompanion(c *gin.Context) {
 }
 
 type SendMessageRequest struct {
-	Content     string `json:"content"`
-	MessageType string `json:"message_type"`
-	MediaID     string `json:"media_id"`
-	LifeEventID string `json:"life_event_id"`
+	Content        string `json:"content"`
+	MessageType    string `json:"message_type"`
+	MediaID        string `json:"media_id"`
+	LifeEventID    string `json:"life_event_id"`
+	JourneyVisitID string `json:"journey_visit_id"`
 }
 
 type SendMessageResponse struct {
@@ -1354,7 +1355,7 @@ func SendMessage(c *gin.Context) {
 		req.Content = transcript
 		mediaURL = "/v1/media/" + strings.TrimSpace(req.MediaID)
 	}
-	query := `INSERT INTO messages (id,conversation_id,sender_type,message_type,content,media_url,payload,source,delivery_status,created_at,life_event_id) VALUES ($1,$2,'user',$3,$4,NULLIF($5,''),'{}'::jsonb,'user','delivered',$6,NULLIF($7,''))`
+	query := `INSERT INTO messages (id,conversation_id,sender_type,message_type,content,media_url,payload,source,delivery_status,created_at,life_event_id) VALUES ($1,$2,'user',$3,$4,NULLIF($5,''),$8::jsonb,'user','delivered',$6,NULLIF($7,''))`
 	tx, err := db.Get().BeginTx(c.Request.Context(), nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to begin message"})
@@ -1398,7 +1399,18 @@ func SendMessage(c *gin.Context) {
 		}
 		trialExpiresAt = expires
 	}
-	_, err = tx.ExecContext(c.Request.Context(), query, msgID, conversationID, req.MessageType, req.Content, mediaURL, createdAt, activeLifeID.String)
+	messagePayload := map[string]any{}
+	if req.JourneyVisitID != "" {
+		var visitID string
+		if err := tx.QueryRowContext(c.Request.Context(), `SELECT id FROM world_interactions
+			WHERE id=$1 AND user_id=$2 AND companion_id=$3 AND kind='visit'`, req.JourneyVisitID, userID, companionID).Scan(&visitID); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "visit not found"})
+			return
+		}
+		messagePayload["journey_visit_id"] = visitID
+	}
+	payloadJSON, _ := json.Marshal(messagePayload)
+	_, err = tx.ExecContext(c.Request.Context(), query, msgID, conversationID, req.MessageType, req.Content, mediaURL, createdAt, activeLifeID.String, string(payloadJSON))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send message"})
 		return
@@ -1420,7 +1432,7 @@ func SendMessage(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save message"})
 		return
 	}
-	userMessage := &agent.SavedMessage{ID: msgID, ConversationID: conversationID, SenderType: "user", MessageType: req.MessageType, Content: req.Content, MediaURL: mediaURL, Payload: map[string]any{}, Source: "user", LifeEventID: activeLifeID.String, DeliveryStatus: "delivered", CreatedAt: createdAt}
+	userMessage := &agent.SavedMessage{ID: msgID, ConversationID: conversationID, SenderType: "user", MessageType: req.MessageType, Content: req.Content, MediaURL: mediaURL, Payload: messagePayload, Source: "user", LifeEventID: activeLifeID.String, DeliveryStatus: "delivered", CreatedAt: createdAt}
 	response := SendMessageResponse{ID: msgID, Content: req.Content, Sender: "user", Created: createdAt, UserMessage: userMessage, TrialExpiresAt: trialExpiresAt}
 	// The user message is committed. Keep reply generation and recovery queue
 	// writes alive even if the client leaves the chat or its request is canceled.

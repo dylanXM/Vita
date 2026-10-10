@@ -24,7 +24,6 @@ type experienceRequest struct {
 
 var (
 	errInvalidAppointment = errors.New("choose a time from 5 minutes to 30 days ahead")
-	errAppointmentBusy    = errors.New("selected appointment time is unavailable")
 )
 
 func ListCompanionExperiences(c *gin.Context) {
@@ -83,6 +82,20 @@ func PurchaseCompanionExperience(c *gin.Context) {
 			return
 		}
 	}
+	if strings.TrimSpace(input.IdempotencyKey) == "" || len(input.IdempotencyKey) > 128 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid idempotency key", "code": "invalid_request"})
+		return
+	}
+	var productCategory string
+	if err := db.Get().QueryRowContext(ctx, `SELECT category FROM credit_products WHERE environment=$1 AND product_key=$2 AND enabled=true`,
+		currentEnvironment(), productKey).Scan(&productCategory); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load experience"})
+		return
+	}
+	if productCategory == "date" {
+		requestCompanionDate(c, userID, companionID, productKey, input)
+		return
+	}
 
 	reservation, err := credits.Reserve(ctx, db.Get(), credits.ReserveParams{
 		UserID: userID, CompanionID: companionID, Environment: currentEnvironment(), Platform: requestPlatform(c),
@@ -108,8 +121,6 @@ func PurchaseCompanionExperience(c *gin.Context) {
 		code := "experience_failed"
 		if errors.Is(err, errInvalidAppointment) {
 			code = "invalid_appointment"
-		} else if errors.Is(err, errAppointmentBusy) {
-			code = "appointment_unavailable"
 		}
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "code": code, "refunded": true})
 		return
@@ -148,8 +159,6 @@ func fulfillExperience(ctx context.Context, userID, companionID string, product 
 			return nil, "", err
 		}
 		return map[string]any{"message": message}, message.ID, nil
-	case "date":
-		return fulfillVirtualDate(ctx, userID, companionID, product, input)
 	case "keepsake":
 		return fulfillKeepsake(ctx, userID, companionID, product)
 	case "outfit":
@@ -244,44 +253,8 @@ func fulfillCatalogGift(ctx context.Context, userID, companionID string, product
 	}, id, nil
 }
 
-func fulfillVirtualDate(ctx context.Context, userID, companionID string, product credits.Product, input map[string]any) (map[string]any, string, error) {
-	var requested time.Time
-	if raw, ok := input["scheduled_at"]; ok {
-		value, valid := raw.(string)
-		if !valid {
-			return nil, "", errInvalidAppointment
-		}
-		parsed, err := time.Parse(time.RFC3339, value)
-		if err != nil || parsed.Before(time.Now().Add(5*time.Minute)) || parsed.After(time.Now().Add(30*24*time.Hour)) {
-			return nil, "", errInvalidAppointment
-		}
-		requested = parsed.UTC()
-	}
-	if companionAgent == nil {
-		return nil, "", fmt.Errorf("agent service is unavailable")
-	}
-	status, err := companionAgent.CurrentStatus(ctx, companionID, userID)
-	if err != nil {
-		return nil, "", err
-	}
-	start := time.Now().UTC()
-	if !requested.IsZero() {
-		start = requested
-	}
-	if status.Busy && status.AvailableAt != nil && status.AvailableAt.After(start) {
-		if !requested.IsZero() {
-			return nil, "", errAppointmentBusy
-		}
-		start = status.AvailableAt.Add(15 * time.Minute)
-	}
+func fulfillVirtualDate(ctx context.Context, userID, companionID string, product credits.Product, start time.Time, reaction string) (map[string]any, string, error) {
 	duration := time.Duration(metadataInt(product.Metadata, "duration_minutes", 60)) * time.Minute
-	start, err = nextAvailableExperienceTime(ctx, companionID, start, duration)
-	if err != nil {
-		return nil, "", err
-	}
-	if !requested.IsZero() && !start.Equal(requested) {
-		return nil, "", errAppointmentBusy
-	}
 	location, _ := product.Metadata["location"].(string)
 	eventID := uuid.New().String()
 	memoryID := uuid.New().String()
@@ -289,10 +262,6 @@ func fulfillVirtualDate(ctx context.Context, userID, companionID string, product
 	title := product.NameKey
 	description := product.DescriptionKey
 	conversationID, err := experienceConversation(ctx, userID, companionID)
-	if err != nil {
-		return nil, "", err
-	}
-	reaction, err := companionAgent.ComposeMomentInvitation(ctx, conversationID, userID, title, location, start)
 	if err != nil {
 		return nil, "", err
 	}
