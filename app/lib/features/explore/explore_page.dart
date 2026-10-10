@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
@@ -12,6 +13,7 @@ import '../ai_pets/ai_pet_avatar.dart';
 import '../ai_pets/ai_pets_page.dart';
 import '../ai_pets/ai_pet_home_page.dart';
 import '../chat/chat_page.dart';
+import '../auth/auth_controller.dart';
 import '../stories/stories_page.dart';
 
 class ExploreController extends GetxController {
@@ -20,6 +22,7 @@ class ExploreController extends GetxController {
   final loading = false.obs;
   final postsLoadFailed = false.obs;
   final posts = <Map<String, dynamic>>[].obs;
+  final viewedFeaturedIds = <String>[].obs;
   final storyChapter = RxnInt();
   final storyCoverUrl = RxnString();
   final petName = RxnString();
@@ -31,7 +34,8 @@ class ExploreController extends GetxController {
       final published = DateTime.tryParse('${post['published_at'] ?? ''}');
       if (post['is_own_companion'] == true &&
           published != null &&
-          !published.isBefore(cutoff)) {
+          !published.isBefore(cutoff) &&
+          !viewedFeaturedIds.contains('${post['id'] ?? ''}')) {
         return post;
       }
     }
@@ -41,8 +45,34 @@ class ExploreController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    loadPosts();
+    _initializePosts();
     loadHighlights();
+  }
+
+  String get _viewedFeaturedKey =>
+      'explore_viewed_featured_${AuthController.to.profile.value?['user_id'] ?? ''}';
+
+  Future<void> _initializePosts() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      viewedFeaturedIds
+          .assignAll(prefs.getStringList(_viewedFeaturedKey) ?? []);
+    } catch (_) {
+      // Posts remain available if local read state cannot be loaded.
+    }
+    await loadPosts();
+  }
+
+  Future<void> markFeaturedViewed(Map<String, dynamic> post) async {
+    final id = '${post['id'] ?? ''}'.trim();
+    if (id.isEmpty || viewedFeaturedIds.contains(id)) return;
+    viewedFeaturedIds.add(id);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_viewedFeaturedKey, viewedFeaturedIds.toList());
+    } catch (_) {
+      // The card still closes for this session if local persistence fails.
+    }
   }
 
   Future<void> loadHighlights() async {
@@ -126,12 +156,18 @@ class ExplorePage extends StatelessWidget {
               if (featured != null) {
                 return _FeaturedMoment(
                   post: featured,
-                  onTap: () {
+                  onTap: () async {
                     AnalyticsService.to
                         .track('discover_moment_opened', category: 'life');
-                    _showSignal(context, featured);
+                    await _showSignal(context, featured);
+                    await ctrl.markFeaturedViewed(featured);
                   },
                 );
+              }
+              // Once a moment has been viewed, keep this large entry closed.
+              // The compact destinations below remain available.
+              if (ctrl.viewedFeaturedIds.isNotEmpty) {
+                return const SizedBox.shrink();
               }
               final hasStory = ctrl.storyChapter.value != null;
               final petName = ctrl.petName.value;
@@ -171,7 +207,8 @@ class ExplorePage extends StatelessWidget {
                 },
               );
             }),
-            Obx(() => ExploreController.to.featuredPost == null &&
+            Obx(() => ExploreController.to.viewedFeaturedIds.isEmpty &&
+                    ExploreController.to.featuredPost == null &&
                     (ExploreController.to.storyChapter.value != null ||
                         ExploreController.to.petName.value?.isNotEmpty != true)
                 ? const SizedBox.shrink()
@@ -192,7 +229,8 @@ class ExplorePage extends StatelessWidget {
                       ExploreController.to.loadHighlights();
                     },
                   )),
-            Obx(() => ExploreController.to.featuredPost == null &&
+            Obx(() => ExploreController.to.viewedFeaturedIds.isEmpty &&
+                    ExploreController.to.featuredPost == null &&
                     ExploreController.to.storyChapter.value == null &&
                     ExploreController.to.petName.value?.isNotEmpty == true
                 ? const SizedBox.shrink()
