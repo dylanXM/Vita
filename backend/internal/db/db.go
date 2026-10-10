@@ -1070,6 +1070,8 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			artifact_updated_at TIMESTAMP,
 			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
+		`ALTER TABLE companion_moment_sessions ADD COLUMN IF NOT EXISTS closing_text TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE companion_moment_sessions ADD COLUMN IF NOT EXISTS next_topic TEXT NOT NULL DEFAULT ''`,
 		`UPDATE messages m SET payload=m.payload-'ends_at'
 			WHERE m.message_type='scene_card' AND m.source='paid_date' AND m.payload ? 'ends_at'
 			AND NOT EXISTS (SELECT 1 FROM companion_moment_sessions s

@@ -163,6 +163,20 @@ class MemoriesController extends GetxController {
   }
 }
 
+String _journeyContent(Map<String, dynamic> item) {
+  final raw = '${item['content'] ?? ''}';
+  if (item['type'] == 'world_visit') {
+    if (raw == 'The user visited me today.') return 'world.visitMemory'.tr;
+    if (raw == 'The user stayed with me during a visit.') {
+      return 'world.choiceStayResult'.tr;
+    }
+    if (raw == 'The user asked about my day during a visit.') {
+      return 'world.choiceAskResult'.tr;
+    }
+  }
+  return raw.tr;
+}
+
 /// A searchable collection of companion journeys.
 class MemoriesPage extends StatefulWidget {
   const MemoriesPage({super.key});
@@ -422,9 +436,7 @@ class _MemoriesPageState extends State<MemoriesPage> {
     final companion =
         Map<String, dynamic>.from(item['companion'] as Map? ?? {});
     final time = DateTime.tryParse('${item['event_time'] ?? ''}')?.toLocal();
-    final content = item['type'] == 'world_visit'
-        ? 'world.visitMemory'.tr
-        : '${item['content'] ?? ''}'.tr;
+    final content = _journeyContent(item);
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -531,9 +543,7 @@ class _JourneyEventTile extends StatelessWidget {
     final imageUrl = '${companion['portrait_url'] ?? ''}';
     final time = DateTime.tryParse('${item['event_time'] ?? ''}')?.toLocal();
     final title = '${item['title'] ?? ''}'.trim();
-    final content = item['type'] == 'world_visit'
-        ? 'world.visitMemory'.tr
-        : '${item['content'] ?? ''}'.tr;
+    final content = _journeyContent(item);
     final isKeepsake = item['type'] == 'keepsake';
     final accent = context.vita.green;
     return SizedBox(
@@ -1018,15 +1028,13 @@ class _MemoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final content = memory['content'] as String? ?? '';
     final title = (memory['title'] as String? ?? '').trim();
     final type = (memory['type'] as String? ?? 'memory').trim();
     final readonly = memory['readonly'] == true;
     final eventTime = DateTime.tryParse(
       memory['event_time'] as String? ?? memory['created_at'] as String? ?? '',
     )?.toLocal();
-    final visibleContent =
-        type == 'world_visit' ? 'world.visitMemory'.tr : content.tr;
+    final visibleContent = _journeyContent(memory);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),

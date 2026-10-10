@@ -27,7 +27,11 @@ type companionMoment struct {
 	UserText      string    `json:"user_text"`
 	CompanionText string    `json:"companion_text"`
 	Invitation    string    `json:"invitation"`
+	Preparation   string    `json:"preparation"`
+	PrepReaction  string    `json:"preparation_reaction"`
 	Opening       string    `json:"opening"`
+	Closing       string    `json:"closing"`
+	NextTopic     string    `json:"next_topic"`
 	MemoryID      string    `json:"-"`
 }
 
@@ -48,7 +52,9 @@ func loadCompanionMoment(ctx context.Context, userID, companionID, eventID strin
 		COALESCE(e.title,''),COALESCE(e.description,''),COALESCE(e.location,''),e.start_time,e.end_time,
 		COALESCE(s.artifact_text,''),COALESCE(s.artifact_user_text,''),COALESCE(s.artifact_companion_text,''),
 		COALESCE((SELECT invitation.content FROM messages invitation WHERE invitation.life_event_id=e.id AND invitation.source='moment_invitation' ORDER BY invitation.created_at DESC LIMIT 1),''),
-		COALESCE(m.content,'')
+		COALESCE(m.content,''),COALESCE(s.closing_text,''),COALESCE(s.next_topic,''),
+		COALESCE(e.payload->>'preparation_choice',''),
+		COALESCE((SELECT preparation.content FROM messages preparation WHERE preparation.life_event_id=e.id AND preparation.source='moment_preparation' ORDER BY preparation.created_at DESC LIMIT 1),'')
 		FROM life_events e JOIN companions c ON c.id=e.companion_id
 		LEFT JOIN companion_moment_sessions s ON s.event_id=e.id AND s.user_id=$1
 		LEFT JOIN messages m ON m.id=s.opening_message_id
@@ -56,7 +62,8 @@ func loadCompanionMoment(ctx context.Context, userID, companionID, eventID strin
 		AND e.event_type='shared_activity' AND e.generation_source='user_purchase'`,
 		userID, companionID, eventID).Scan(&moment.ID, &moment.ProductKey, &moment.MemoryID, &moment.TitleKey,
 		&moment.Description, &moment.Location, &moment.StartsAt, &moment.EndsAt,
-		&moment.Artifact, &moment.UserText, &moment.CompanionText, &moment.Invitation, &moment.Opening)
+		&moment.Artifact, &moment.UserText, &moment.CompanionText, &moment.Invitation, &moment.Opening,
+		&moment.Closing, &moment.NextTopic, &moment.Preparation, &moment.PrepReaction)
 	return moment, err
 }
 
@@ -74,6 +81,188 @@ func GetCompanionMoment(c *gin.Context) {
 	// Keep unopened purchases enterable until the App status logic is updated.
 	if moment.Opening == "" && !time.Now().Before(moment.EndsAt) {
 		moment.EndsAt = time.Now().Add(moment.duration())
+	}
+	c.JSON(http.StatusOK, moment)
+}
+
+func PrepareCompanionMoment(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID, companionID, eventID := c.GetString("user_id"), c.Param("id"), c.Param("event_id")
+	var input struct {
+		Choice string `json:"choice" binding:"required"`
+	}
+	if c.ShouldBindJSON(&input) != nil || (input.Choice != "talk" && input.Choice != "surprise") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid preparation choice"})
+		return
+	}
+	moment, err := loadCompanionMoment(ctx, userID, companionID, eventID)
+	if errors.Is(err, sql.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "moment not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load moment"})
+		return
+	}
+	if moment.Preparation != "" {
+		c.JSON(http.StatusOK, moment)
+		return
+	}
+	if !time.Now().Before(moment.StartsAt) {
+		c.JSON(http.StatusConflict, gin.H{"error": "preparation time has ended"})
+		return
+	}
+	reaction := ""
+	if companionAgent != nil {
+		reaction = companionAgent.ComposeInteractionReaction(ctx, userID, companionID, "prepare", moment.TitleKey, input.Choice)
+	}
+	conversationID := ""
+	if reaction != "" {
+		conversationID, err = experienceConversation(ctx, userID, companionID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to open conversation"})
+			return
+		}
+	}
+	tx, err := db.Get().BeginTx(ctx, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to prepare moment"})
+		return
+	}
+	defer tx.Rollback()
+	updated, err := tx.ExecContext(ctx, `UPDATE life_events SET payload=jsonb_set(payload,'{preparation_choice}',to_jsonb($2::text))
+		WHERE id=$1 AND companion_id=$3 AND NOT payload ? 'preparation_choice'`, eventID, input.Choice, companionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to prepare moment"})
+		return
+	}
+	count, _ := updated.RowsAffected()
+	if count > 0 && reaction != "" {
+		payload, _ := json.Marshal(map[string]any{"event_id": eventID, "choice": input.Choice, "gesture": "anticipating"})
+		if _, err := tx.ExecContext(ctx, `INSERT INTO messages(id,conversation_id,sender_type,message_type,content,payload,source,life_event_id,delivery_status)
+			VALUES($1,$2,'assistant','text',$3,$4,'moment_preparation',$5,'delivered')`, uuid.New().String(), conversationID, reaction, payload, eventID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save preparation"})
+			return
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to prepare moment"})
+		return
+	}
+	moment, err = loadCompanionMoment(ctx, userID, companionID, eventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load preparation"})
+		return
+	}
+	c.JSON(http.StatusOK, moment)
+}
+
+// FinishCompanionMoment preserves an actual exchange as the ending of the
+// experience. Repeated requests return the same ending without duplicating it.
+func FinishCompanionMoment(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID, companionID, eventID := c.GetString("user_id"), c.Param("id"), c.Param("event_id")
+	moment, err := loadCompanionMoment(ctx, userID, companionID, eventID)
+	if errors.Is(err, sql.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "moment not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load moment"})
+		return
+	}
+	if moment.Opening == "" || time.Now().Before(moment.EndsAt) {
+		c.JSON(http.StatusConflict, gin.H{"error": "moment has not ended"})
+		return
+	}
+	if moment.Closing != "" {
+		c.JSON(http.StatusOK, moment)
+		return
+	}
+	conversationID, err := experienceConversation(ctx, userID, companionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load conversation"})
+		return
+	}
+	rows, err := db.Get().QueryContext(ctx, `SELECT sender_type,COALESCE(content,'') FROM messages
+		WHERE conversation_id=$1 AND life_event_id=$2 AND message_type IN ('text','voice')
+		ORDER BY created_at,id LIMIT 40`, conversationID, eventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load moment conversation"})
+		return
+	}
+	var transcript strings.Builder
+	for rows.Next() {
+		var sender, content string
+		if err := rows.Scan(&sender, &content); err != nil {
+			rows.Close()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read moment conversation"})
+			return
+		}
+		if strings.TrimSpace(content) != "" {
+			transcript.WriteString(sender + ": " + strings.TrimSpace(content) + "\n")
+		}
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read moment conversation"})
+		return
+	}
+	rows.Close()
+	closing, nextTopic := moment.Opening, ""
+	if companionAgent != nil {
+		closing, nextTopic = companionAgent.ComposeMomentClosing(ctx, conversationID, userID, moment.TitleKey, transcript.String())
+	}
+	if strings.TrimSpace(closing) == "" {
+		closing = moment.Opening
+	}
+	tx, err := db.Get().BeginTx(ctx, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to finish moment"})
+		return
+	}
+	defer tx.Rollback()
+	updated, err := tx.ExecContext(ctx, `UPDATE companion_moment_sessions
+		SET closing_text=$3,next_topic=$4 WHERE event_id=$1 AND user_id=$2 AND closing_text=''`,
+		eventID, userID, closing, nextTopic)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to finish moment"})
+		return
+	}
+	count, _ := updated.RowsAffected()
+	if count > 0 {
+		if moment.MemoryID == "" {
+			moment.MemoryID = uuid.New().String()
+			if _, err := tx.ExecContext(ctx, `UPDATE life_events SET payload=jsonb_set(payload,'{memory_id}',to_jsonb($2::text)) WHERE id=$1`, eventID, moment.MemoryID); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link moment memory"})
+				return
+			}
+		}
+		metadata, _ := json.Marshal(map[string]any{"event_id": eventID, "paid_experience": true, "next_topic": nextTopic, "completed": true})
+		var followUp any
+		if nextTopic != "" {
+			followUp = moment.EndsAt.Add(18 * time.Hour)
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO memories(id,companion_id,type,content,importance,event_time,metadata,follow_up_at)
+			VALUES($1,$2,'shared_experience',$3,85,$4,$5,$6)
+			ON CONFLICT(id) DO UPDATE SET content=EXCLUDED.content,importance=EXCLUDED.importance,metadata=EXCLUDED.metadata,follow_up_at=EXCLUDED.follow_up_at`,
+			moment.MemoryID, companionID, closing, moment.EndsAt, string(metadata), followUp); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save moment memory"})
+			return
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to finish moment"})
+		return
+	}
+	if count == 0 {
+		moment, err = loadCompanionMoment(ctx, userID, companionID, eventID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load finished moment"})
+			return
+		}
+	} else {
+		moment.Closing, moment.NextTopic = closing, nextTopic
 	}
 	c.JSON(http.StatusOK, moment)
 }
@@ -147,7 +336,7 @@ func StartCompanionMoment(c *gin.Context) {
 	}
 	openingCtx, cancel := context.WithTimeout(ctx, 50*time.Second)
 	defer cancel()
-	text, err := companionAgent.ComposeMomentOpening(openingCtx, conversationID, userID, moment.TitleKey, moment.Location)
+	text, err := companionAgent.ComposeMomentOpening(openingCtx, conversationID, userID, moment.TitleKey, moment.Location, moment.Preparation)
 	if err != nil || strings.TrimSpace(text) == "" {
 		_, _ = db.Get().ExecContext(context.Background(), `DELETE FROM companion_moment_sessions WHERE event_id=$1 AND opening_message_id IS NULL`, eventID)
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "companion could not start the moment"})

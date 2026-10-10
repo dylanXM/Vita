@@ -166,7 +166,9 @@ func main() {
 			companions.GET("/:id/story", handler.GetCompanionStory)
 			companions.POST("/:id/experiences/:product_key", handler.PurchaseCompanionExperience)
 			companions.GET("/:id/moments/:event_id", handler.GetCompanionMoment)
+			companions.POST("/:id/moments/:event_id/prepare", handler.PrepareCompanionMoment)
 			companions.POST("/:id/moments/:event_id/start", handler.StartCompanionMoment)
+			companions.POST("/:id/moments/:event_id/finish", handler.FinishCompanionMoment)
 			companions.PUT("/:id/moments/:event_id/artifact", handler.SaveCompanionMomentArtifact)
 			companions.POST("/:id/transfers", middleware.RateLimit(10, time.Minute), handler.TransferToCompanion)
 		}

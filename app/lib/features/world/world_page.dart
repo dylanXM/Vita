@@ -14,8 +14,9 @@ import '../chat/chat_list_controller.dart';
 import '../chat/chat_list_presentation.dart';
 import '../chat/chat_page.dart';
 import '../chat/experience_sheet.dart';
+import '../chat/gift_reveal_page.dart';
 import '../companion/companion_create_method_page.dart';
-import '../memories/memories_page.dart';
+import 'world_visit_page.dart';
 import '../shell/shell_page.dart';
 
 /// A relationship-first entrance with equal space for every companion.
@@ -33,7 +34,6 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
   String? _sceneCompanionId;
   Map<String, dynamic>? _scene;
   int _sceneRequestId = 0;
-  bool _visiting = false;
 
   Future<void> _loadScene(String id) async {
     if (id.isEmpty) return;
@@ -52,83 +52,6 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
         setState(() => _scene = null);
       }
     }
-  }
-
-  Future<void> _visit(
-      Map<String, dynamic> companion, Map<String, dynamic> scene) async {
-    if (_visiting) return;
-    final id = '${companion['id'] ?? ''}';
-    setState(() => _visiting = true);
-    try {
-      final result =
-          await ApiClient.instance.post('/v1/companions/$id/world/visit');
-      await _loadScene(id);
-      if (mounted && result is Map) {
-        await _showVisitReceipt(
-            companion, scene, Map<String, dynamic>.from(result));
-      }
-    } on ApiException catch (error) {
-      VitaNotice.error('world.visit'.tr, error.message);
-    } catch (_) {
-      VitaNotice.error('world.visit'.tr, 'world.actionFailed'.tr);
-    } finally {
-      if (mounted) setState(() => _visiting = false);
-    }
-  }
-
-  Future<void> _showVisitReceipt(Map<String, dynamic> companion,
-      Map<String, dynamic> scene, Map<String, dynamic> result) async {
-    final isNew = result['new_visit'] == true;
-    final place = scene['place'] is Map ? scene['place'] as Map : const {};
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      backgroundColor: context.vita.surface,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(isNew ? 'world.visitReceipt'.tr : 'world.alreadyVisited'.tr,
-                  style: TextStyle(
-                      color: context.vita.text,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700)),
-              const SizedBox(height: 10),
-              Text(
-                  (isNew ? 'world.visitReceiptBody' : 'world.alreadyVisited')
-                      .trParams({
-                    'name': '${companion['name'] ?? ''}',
-                    'place': '${place['title'] ?? 'world.place.home'}'.tr,
-                  }),
-                  style: TextStyle(
-                      color: context.vita.subText, fontSize: 15, height: 1.5)),
-              if (isNew) ...[
-                const SizedBox(height: 14),
-                Text('world.visitEffects'.tr,
-                    style: TextStyle(
-                        color: context.vita.green,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600)),
-              ],
-              const SizedBox(height: 20),
-              SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(sheetContext);
-                      Get.to(() => MemoryDetailPage(companion: companion),
-                          transition: Transition.cupertino);
-                    },
-                    child: Text('world.openJourney'.tr),
-                  )),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   Future<void> _leaveNote(Map<String, dynamic> companion) async {
@@ -200,7 +123,8 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _openGift(String id) async {
+  Future<void> _openGift(Map<String, dynamic> companion) async {
+    final id = '${companion['id'] ?? ''}';
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -212,101 +136,44 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
           await ChatListController.to.load();
           if (mounted && _sceneCompanionId == id) await _loadScene(id);
         },
+        onResult: (response) async {
+          await ChatListController.to.load();
+          if (mounted && _sceneCompanionId == id) await _loadScene(id);
+          if (!mounted) return;
+          final product = response['product'];
+          if (product is Map && product['category'] == 'gift') {
+            Navigator.of(context).pop();
+            final action = await Get.to<String>(
+                () => GiftRevealPage(
+                      name: '${companion['name'] ?? ''}',
+                      portraitUrl: companion['portrait_url'] as String?,
+                      response: response,
+                    ),
+                transition: Transition.cupertino);
+            if (mounted && action == 'chat') await _openChat(companion);
+          }
+        },
       ),
     );
   }
 
   Future<void> _openScene(
       Map<String, dynamic> companion, Map<String, dynamic> scene) async {
-    final place = scene['place'] is Map ? scene['place'] as Map : const {};
-    final event = scene['event'] is Map ? scene['event'] as Map : null;
-    final next = scene['next_event'] is Map ? scene['next_event'] as Map : null;
-    final nextAt = next == null
-        ? null
-        : DateTime.tryParse('${next['start_time'] ?? ''}')?.toLocal();
-    final visited = scene['visited_today'] == true;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: context.vita.surface,
-      builder: (sheetContext) => SafeArea(
-          child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(22, 2, 22, 28),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('${place['title'] ?? 'world.place.home'}'.tr,
-                style: TextStyle(
-                    color: context.vita.text,
-                    fontSize: 23,
-                    fontWeight: FontWeight.w700)),
-            if ('${event?['title'] ?? ''}'.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text('${event!['title']}'.tr,
-                  style: TextStyle(color: context.vita.text, fontSize: 16)),
-            ] else if ('${place['description'] ?? ''}'.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text('${place['description']}'.tr,
-                  style: TextStyle(
-                      color: context.vita.subText, fontSize: 14, height: 1.45)),
-            ],
-            if (nextAt != null) ...[
-              const SizedBox(height: 16),
-              Text(
-                  'world.nextMeeting'.trParams({
-                    'time':
-                        '${formatDateSeparator(nextAt)} ${formatClock(nextAt)}',
-                    'event': '${next!['title'] ?? next['location'] ?? ''}'.tr,
-                  }),
-                  style: TextStyle(color: context.vita.subText, fontSize: 13)),
-            ],
-            const SizedBox(height: 22),
-            if (!visited)
-              SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      Navigator.pop(sheetContext);
-                      _visit(companion, scene);
-                    },
-                    icon: const Icon(Icons.waving_hand_rounded),
-                    label: Text('world.visitAt'.trParams({
-                      'place': '${place['title'] ?? 'world.place.home'}'.tr,
-                    })),
-                  ))
-            else
-              Text('world.alreadyVisited'.tr,
-                  style: TextStyle(color: context.vita.green, fontSize: 13)),
-            const SizedBox(height: 10),
-            Row(children: [
-              Expanded(
-                  child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pop(sheetContext);
-                  _leaveNote(companion);
-                },
-                icon: const Icon(Icons.edit_outlined, size: 17),
-                label: Text('world.leaveNote'.tr,
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-              )),
-              const SizedBox(width: 8),
-              Expanded(
-                  child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pop(sheetContext);
-                  _openGift('${companion['id'] ?? ''}');
-                },
-                icon: const Icon(Icons.card_giftcard_rounded, size: 17),
-                label: Text('world.giveGift'.tr,
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-              )),
-            ]),
-          ],
-        ),
-      )),
-    );
+    final action = await Get.to<String>(
+        () => WorldVisitPage(
+              companion: companion,
+              scene: scene,
+              onVisited: () => _loadScene('${companion['id'] ?? ''}'),
+            ),
+        transition: Transition.cupertino);
+    if (!mounted) return;
+    if (action == 'chat') {
+      await _openChat(companion);
+    } else if (action == 'gift') {
+      await _openGift(companion);
+    } else if (action == 'note') {
+      await _leaveNote(companion);
+    }
   }
 
   Map<String, dynamic>? _selectedCompanion(List<Map<String, dynamic>> items) {

@@ -249,6 +249,10 @@ class ChatController extends GetxController {
         message['_animate_gift'] = true;
       }
       _addIfNew(message);
+      final rawReaction = result['reaction_message'];
+      if (rawReaction is Map) {
+        _addIfNew(Map<String, dynamic>.from(rawReaction));
+      }
       return;
     }
     await poll();

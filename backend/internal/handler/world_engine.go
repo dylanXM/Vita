@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -145,9 +146,23 @@ func GetWorldScene(c *gin.Context) {
 		nextEvent = gin.H{"id": nextID, "event_type": nextType, "title": nextTitle,
 			"description": nextDescription, "location": nextLocation, "start_time": nextStart}
 	}
+	var giftKey, giftName, giftEmoji string
+	var giftAt time.Time
+	giftErr := db.Get().QueryRowContext(c.Request.Context(), `SELECT g.product_key,COALESCE(p.name_key,''),COALESCE(p.emoji,''),g.created_at
+		FROM companion_gifts g LEFT JOIN credit_products p ON p.product_key=g.product_key AND p.environment=$3
+		WHERE g.user_id=$1 AND g.companion_id=$2 ORDER BY g.created_at DESC,g.id DESC LIMIT 1`, userID, companionID, currentEnvironment()).Scan(&giftKey, &giftName, &giftEmoji, &giftAt)
+	if giftErr != nil && !errors.Is(giftErr, sql.ErrNoRows) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load world gift"})
+		return
+	}
+	var recentGift any
+	if giftErr == nil {
+		recentGift = gin.H{"product_key": giftKey, "name_key": giftName, "emoji": giftEmoji, "created_at": giftAt}
+	}
 	var lastActionKind sql.NullString
 	var lastActionAt sql.NullTime
-	if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT kind,created_at FROM world_interactions WHERE companion_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1`, companionID).Scan(&lastActionKind, &lastActionAt); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	var lastActionPayload string
+	if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT kind,created_at,payload::text FROM world_interactions WHERE companion_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1`, companionID).Scan(&lastActionKind, &lastActionAt, &lastActionPayload); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load world activity"})
 		return
 	}
@@ -223,14 +238,16 @@ func GetWorldScene(c *gin.Context) {
 	}
 	var lastAction any
 	if lastActionAt.Valid {
-		lastAction = gin.H{"kind": lastActionKind.String, "at": lastActionAt.Time}
+		var detail map[string]any
+		_ = json.Unmarshal([]byte(lastActionPayload), &detail)
+		lastAction = gin.H{"kind": lastActionKind.String, "at": lastActionAt.Time, "detail": detail}
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"companion_id": companionID, "local_date": localNow.Format("2006-01-02"), "region_code": region,
 		"local_hour": localNow.Hour(),
 		"phase":      phase, "place": gin.H{"kind": kind, "title": placeTitle, "description": placeDescription},
 		"event": event, "next_event": nextEvent, "campaign": campaign, "mood": mood, "visited_today": visitsToday > 0,
-		"memories": memories, "connections": connections, "last_action": lastAction,
+		"memories": memories, "connections": connections, "last_action": lastAction, "recent_gift": recentGift,
 	})
 }
 
@@ -239,6 +256,20 @@ func GetWorldScene(c *gin.Context) {
 func VisitWorld(c *gin.Context) {
 	companionID, userID := c.Param("id"), c.GetString("user_id")
 	if !requireCompanionLifeAccess(c, companionID) {
+		return
+	}
+	var input struct {
+		Choice string `json:"choice"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil && !errors.Is(err, io.EOF) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid visit choice"})
+		return
+	}
+	if input.Choice == "" {
+		input.Choice = "stay"
+	}
+	if input.Choice != "stay" && input.Choice != "ask" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid visit choice"})
 		return
 	}
 	_, _, localNow, err := worldUserSettings(userID)
@@ -253,12 +284,13 @@ func VisitWorld(c *gin.Context) {
 	}
 	defer tx.Rollback()
 	var eventID sql.NullString
-	err = tx.QueryRowContext(c.Request.Context(), `SELECT id FROM life_events WHERE companion_id=$1 AND status='active' AND start_time<=CURRENT_TIMESTAMP AND end_time>CURRENT_TIMESTAMP ORDER BY start_time DESC,id DESC LIMIT 1`, companionID).Scan(&eventID)
+	var eventTitle string
+	err = tx.QueryRowContext(c.Request.Context(), `SELECT id,COALESCE(title,'') FROM life_events WHERE companion_id=$1 AND status='active' AND start_time<=CURRENT_TIMESTAMP AND end_time>CURRENT_TIMESTAMP ORDER BY start_time DESC,id DESC LIMIT 1`, companionID).Scan(&eventID, &eventTitle)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load visit event"})
 		return
 	}
-	payload, _ := json.Marshal(map[string]any{"source": "world_scene", "source_event_id": eventID.String})
+	payload, _ := json.Marshal(map[string]any{"source": "world_scene", "source_event_id": eventID.String, "choice": input.Choice})
 	result, err := tx.ExecContext(c.Request.Context(), `INSERT INTO world_interactions(id,user_id,companion_id,life_event_id,kind,request_key,local_date,payload)
 		VALUES($1,$2,$3,$4,'visit',$5,$6,$7) ON CONFLICT DO NOTHING`, uuid.New().String(), userID, companionID, eventID, "visit:"+companionID+":"+localNow.Format("2006-01-02"), localNow.Format("2006-01-02"), payload)
 	if err != nil {
@@ -271,9 +303,13 @@ func VisitWorld(c *gin.Context) {
 		return
 	}
 	memoryID := ""
+	trustDelta, enthusiasmDelta := 1, 2
+	if input.Choice == "ask" {
+		trustDelta, enthusiasmDelta = 2, 1
+	}
 	if changed > 0 {
-		if _, err := tx.ExecContext(c.Request.Context(), `INSERT INTO relationship_states(companion_id,familiarity,trust,enthusiasm,updated_at) VALUES($1,1,1,2,CURRENT_TIMESTAMP)
-			ON CONFLICT(companion_id) DO UPDATE SET familiarity=LEAST(100,relationship_states.familiarity+1),trust=LEAST(100,relationship_states.trust+1),enthusiasm=LEAST(100,relationship_states.enthusiasm+2),updated_at=CURRENT_TIMESTAMP`, companionID); err != nil {
+		if _, err := tx.ExecContext(c.Request.Context(), `INSERT INTO relationship_states(companion_id,familiarity,trust,enthusiasm,updated_at) VALUES($1,1,$2,$3,CURRENT_TIMESTAMP)
+			ON CONFLICT(companion_id) DO UPDATE SET familiarity=LEAST(100,relationship_states.familiarity+1),trust=LEAST(100,relationship_states.trust+$2),enthusiasm=LEAST(100,relationship_states.enthusiasm+$3),updated_at=CURRENT_TIMESTAMP`, companionID, trustDelta, enthusiasmDelta); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update world relationship"})
 			return
 		}
@@ -283,8 +319,12 @@ func VisitWorld(c *gin.Context) {
 			return
 		}
 		memoryID = uuid.New().String()
+		memoryContent := "The user stayed with me during a visit."
+		if input.Choice == "ask" {
+			memoryContent = "The user asked about my day during a visit."
+		}
 		if _, err := tx.ExecContext(c.Request.Context(), `INSERT INTO memories(id,companion_id,type,content,importance,event_time,metadata)
-			VALUES($1,$2,'world_visit',$3,40,CURRENT_TIMESTAMP,$4)`, memoryID, companionID, "The user visited me today.", string(payload)); err != nil {
+			VALUES($1,$2,'world_visit',$3,40,CURRENT_TIMESTAMP,$4)`, memoryID, companionID, memoryContent, string(payload)); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record visit memory"})
 			return
 		}
@@ -293,12 +333,35 @@ func VisitWorld(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save world visit"})
 		return
 	}
+	reaction := ""
+	gesture := "settle"
+	if input.Choice == "ask" {
+		gesture = "turn_toward"
+	}
+	if changed > 0 && companionAgent != nil {
+		reaction = companionAgent.ComposeInteractionReaction(c.Request.Context(), userID, companionID, "visit", eventTitle, input.Choice)
+		if reaction != "" {
+			_, _ = db.Get().ExecContext(c.Request.Context(), `UPDATE memories SET content=$2 WHERE id=$1`, memoryID, reaction)
+			_, _ = db.Get().ExecContext(c.Request.Context(), `UPDATE world_interactions SET payload=payload||jsonb_build_object('reaction',$2::text,'gesture',$3::text) WHERE user_id=$1 AND request_key=$4`, userID, reaction, gesture, "visit:"+companionID+":"+localNow.Format("2006-01-02"))
+		}
+	}
+	if changed == 0 {
+		var previousChoice, previousReaction, previousGesture string
+		_ = db.Get().QueryRowContext(c.Request.Context(), `SELECT COALESCE(payload->>'choice','stay'),COALESCE(payload->>'reaction',''),COALESCE(payload->>'gesture','settle')
+			FROM world_interactions WHERE user_id=$1 AND companion_id=$2 AND kind='visit' AND local_date=$3
+			ORDER BY created_at DESC LIMIT 1`, userID, companionID, localNow.Format("2006-01-02")).Scan(&previousChoice, &previousReaction, &previousGesture)
+		if previousChoice != "" {
+			input.Choice = previousChoice
+			reaction = previousReaction
+			gesture = previousGesture
+		}
+	}
 	effects := gin.H{"familiarity": 0, "trust": 0, "enthusiasm": 0, "mood": 0}
 	if changed > 0 {
-		effects = gin.H{"familiarity": 1, "trust": 1, "enthusiasm": 2, "mood": 2}
+		effects = gin.H{"familiarity": 1, "trust": trustDelta, "enthusiasm": enthusiasmDelta, "mood": 2}
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"visited_today": true, "new_visit": changed > 0, "memory_id": memoryID,
-		"effects": effects,
+		"effects": effects, "choice": input.Choice, "gesture": gesture, "reaction": reaction,
 	})
 }

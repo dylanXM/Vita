@@ -25,6 +25,7 @@ import 'chat_message_content.dart';
 import 'companion_moment_page.dart';
 import 'companion_transfer_sheet.dart';
 import 'experience_sheet.dart';
+import 'gift_reveal_page.dart';
 
 /// Conversation within a companion's world.
 class ChatPage extends StatefulWidget {
@@ -367,6 +368,14 @@ class _ChatPageState extends State<ChatPage> {
 
     // Flatten messages with date separators and per-group timestamps.
     final items = <Widget>[];
+    Map<String, dynamic>? latestCompanionReply;
+    for (final message in ctrl.messages.reversed) {
+      if (message['sender_type'] == 'assistant' &&
+          message['source'] == 'reply') {
+        latestCompanionReply = message;
+        break;
+      }
+    }
     DateTime? prevDate;
     for (var i = 0; i < ctrl.messages.length; i++) {
       final m = ctrl.messages[i];
@@ -394,6 +403,9 @@ class _ChatPageState extends State<ChatPage> {
       prevDate = dt;
 
       final isUser = _isUserMessage(m);
+      final payload = m['payload'] is Map ? m['payload'] as Map : const {};
+      final liveReply = m['id'] == latestCompanionReply?['id'] &&
+          payload['interaction_stage'] == 'chat';
       final parsed = ChatMessageContent.from(m);
       final isGift = parsed.isGift;
       final isSceneCard =
@@ -403,7 +415,9 @@ class _ChatPageState extends State<ChatPage> {
           ? Colors.transparent
           : isUser
               ? context.vita.greenTint
-              : context.vita.surface;
+              : liveReply
+                  ? context.vita.greenTint
+                  : context.vita.surface;
       items.add(
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
@@ -413,18 +427,24 @@ class _ChatPageState extends State<ChatPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (!isUser) ...[
-                VitaAvatar(
-                    name: widget.name,
-                    radius: 22,
-                    imageUrl: widget.companion?['portrait_url'] as String?,
-                    borderRadius: BorderRadius.circular(10)),
+                liveReply
+                    ? _CompanionGestureAvatar(
+                        name: widget.name,
+                        imageUrl: widget.companion?['portrait_url'] as String?,
+                        gesture: '${payload['gesture'] ?? 'smile'}')
+                    : VitaAvatar(
+                        name: widget.name,
+                        radius: 22,
+                        imageUrl: widget.companion?['portrait_url'] as String?,
+                        borderRadius: BorderRadius.circular(10)),
                 const SizedBox(width: 8),
               ],
               Flexible(
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    Container(
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 400),
                       constraints: BoxConstraints(
                         maxWidth: MediaQuery.of(context).size.width *
                             (isSceneCard ? 0.75 : 0.66),
@@ -438,9 +458,13 @@ class _ChatPageState extends State<ChatPage> {
                           : BoxDecoration(
                               color: bubbleColor,
                               border: Border.all(
-                                color: isUser
-                                    ? context.vita.green.withValues(alpha: .18)
-                                    : context.vita.text.withValues(alpha: .06),
+                                color: liveReply
+                                    ? context.vita.green.withValues(alpha: .32)
+                                    : isUser
+                                        ? context.vita.green
+                                            .withValues(alpha: .18)
+                                        : context.vita.text
+                                            .withValues(alpha: .06),
                               ),
                               borderRadius: BorderRadius.only(
                                 topLeft: const Radius.circular(20),
@@ -640,6 +664,26 @@ class _ChatPageState extends State<ChatPage> {
                             result is Map ? result['event_id'] : null;
                         if (mounted &&
                             product is Map &&
+                            product['category'] == 'gift') {
+                          Navigator.of(context).pop();
+                          final action = await Get.to<String>(
+                              () => GiftRevealPage(
+                                    name: widget.name,
+                                    portraitUrl: widget
+                                        .companion?['portrait_url'] as String?,
+                                    response: response,
+                                  ),
+                              transition: Transition.cupertino);
+                          if (mounted && action == 'world') {
+                            ShellController.to.selectedCompanionId.value =
+                                widget.companionId;
+                            ShellController.to.switchTo(0);
+                            Get.back();
+                          }
+                          return;
+                        }
+                        if (mounted &&
+                            product is Map &&
                             product['category'] == 'date' &&
                             eventId is String) {
                           Navigator.of(context).pop();
@@ -656,6 +700,54 @@ class _ChatPageState extends State<ChatPage> {
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CompanionGestureAvatar extends StatelessWidget {
+  const _CompanionGestureAvatar(
+      {required this.name, required this.imageUrl, required this.gesture});
+
+  final String name;
+  final String? imageUrl;
+  final String gesture;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (gesture) {
+      'curious' => Icons.question_mark_rounded,
+      'thoughtful' => Icons.auto_awesome_rounded,
+      _ => Icons.favorite_rounded,
+    };
+    return Semantics(
+      label: 'chat.gesture.$gesture'.tr,
+      child: SizedBox.square(
+        dimension: 44,
+        child: Stack(clipBehavior: Clip.none, children: [
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: .87, end: 1),
+            duration: const Duration(milliseconds: 650),
+            curve: Curves.easeOutBack,
+            builder: (context, scale, child) =>
+                Transform.scale(scale: scale, child: child),
+            child: VitaAvatar(
+                name: name,
+                radius: 22,
+                imageUrl: imageUrl,
+                borderRadius: BorderRadius.circular(10)),
+          ),
+          Positioned(
+              right: -3,
+              bottom: -3,
+              child: Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                      color: context.vita.green,
+                      borderRadius: BorderRadius.circular(6)),
+                  child: Icon(icon, color: Colors.white, size: 12))),
+        ]),
       ),
     );
   }

@@ -296,7 +296,7 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 	preferredLocale := s.preferredLocale(ctx, userID)
 	latestQuestion := latestUserMessage(recent)
 	system := s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy(latestQuestion, preferredLocale) + "\n\n" + emojiMessagePolicy
-	system += "\n\nFor a direct reply, answer the user's actual question, but do not merely mirror their last message. Let your own current activity, mood, personality, and world context shape your perspective. Mention those details only when they naturally belong in the reply; never invent a current event."
+	system += "\n\nFor a direct reply, answer the user's actual question, but do not merely mirror their last message. Let your own current activity, mood, personality, and world context shape your perspective. Mention those details only when they naturally belong in the reply; never invent a current event. When the user shares an unresolved personal matter, acknowledge how it feels and ask one specific question grounded in their words. Leave room for the user to shape what happens next instead of closing every topic with a complete speech."
 	lifeEventID := ""
 	_ = s.db.QueryRowContext(ctx, `SELECT COALESCE(life_event_id,'') FROM messages
 		WHERE conversation_id=$1 AND sender_type='user' ORDER BY created_at DESC,id DESC LIMIT 1`, conversationID).Scan(&lifeEventID)
@@ -331,7 +331,13 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 			return nil, err
 		}
 	}
-	reply, err := s.insertMessage(ctx, conversationID, "assistant", "text", text, "reply", lifeEventID, map[string]any{})
+	gesture := "smile"
+	if strings.ContainsAny(text, "?？") {
+		gesture = "curious"
+	} else if len([]rune(latestQuestion)) > 60 {
+		gesture = "thoughtful"
+	}
+	reply, err := s.insertMessage(ctx, conversationID, "assistant", "text", text, "reply", lifeEventID, map[string]any{"gesture": gesture, "interaction_stage": "chat"})
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +369,7 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 
 // ComposeMomentOpening prepares a character-led opening without writing a
 // message. The handler persists it only after the purchased moment is active.
-func (s *Service) ComposeMomentOpening(ctx context.Context, conversationID, userID, titleKey, location string) (string, error) {
+func (s *Service) ComposeMomentOpening(ctx context.Context, conversationID, userID, titleKey, location, preparation string) (string, error) {
 	profile, err := s.loadCompanionForConversation(ctx, conversationID, userID)
 	if err != nil {
 		return "", err
@@ -392,8 +398,9 @@ func (s *Service) ComposeMomentOpening(ctx context.Context, conversationID, user
 		experienceName = "a shared moment"
 	}
 	openingInstruction := fmt.Sprintf(`The user has arrived for your scheduled shared experience (%s, location: %s).
+Their preparation choice was %s. Honor it naturally in your opening.
 Open the moment naturally in one or two sentences, in the user's language. Refer to your personality and recent conversation.
-Be present and invite conversation; do not list options, claim a physical encounter, or ask for payment.`, experienceName, location)
+Be present and invite conversation; do not list options, claim a physical encounter, or ask for payment.`, experienceName, location, preparation)
 	recent = append(recent, ChatMessage{Role: "user", Content: openingInstruction})
 	text, _, err := s.generateTextWithFallback(ctx, profile.ID, "moment_opening", models, GenerateRequest{
 		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy,
@@ -473,6 +480,88 @@ func (s *Service) ComposeTransferReply(ctx context.Context, conversationID, user
 	return strings.TrimSpace(text), err
 }
 
+// ComposeInteractionReaction lets a visit or gift have a character-led response
+// while keeping the action itself independent of model availability.
+func (s *Service) ComposeInteractionReaction(ctx context.Context, userID, companionID, kind, subject, choice string) string {
+	conversationID, err := s.getOrCreateConversation(ctx, userID, companionID)
+	if err != nil {
+		return ""
+	}
+	profile, err := s.loadCompanionForConversation(ctx, conversationID, userID)
+	if err != nil {
+		return ""
+	}
+	locale := s.preferredLocale(ctx, userID)
+	fallback := localizedMock(map[string]string{
+		"zh-Hans": "你来了，我正想和你分享这一刻。",
+		"zh-Hant": "你來了，我正想和你分享這一刻。",
+		"ja":      "来てくれたんだ。この瞬間を一緒に過ごしたかった。",
+		"ko":      "와 줬구나. 이 순간을 함께하고 싶었어.",
+		"es":      "Has venido. Quería compartir este momento contigo.",
+		"pt":      "Vieste. Queria partilhar este momento contigo.",
+		"ar":      "لقد أتيت. أردت أن أشاركك هذه اللحظة.",
+	}, locale, "You're here. I wanted to share this moment with you.")
+	if kind == "visit" && choice == "ask" {
+		fallback = localizedMock(map[string]string{
+			"zh-Hans": "你问起我的今天，我放下手里的事，想慢慢和你说。",
+			"zh-Hant": "你問起我的今天，我放下手裡的事，想慢慢和你說。",
+			"ja":      "今日のことを聞いてくれたね。手を止めて、ゆっくり話したい。",
+			"ko":      "오늘 어땠는지 물어봐 줬네. 하던 일을 멈추고 천천히 얘기할게.",
+			"es":      "Me preguntas por mi día. Dejo lo que hacía y quiero contártelo con calma.",
+			"pt":      "Perguntaste pelo meu dia. Paro o que fazia para te contar com calma.",
+			"ar":      "سألت عن يومي. تركت ما كنت أفعله لأخبرك بهدوء.",
+		}, locale, "You asked about my day. I put down what I was doing so I can tell you properly.")
+	}
+	if kind == "gift" {
+		fallback = localizedMock(map[string]string{
+			"zh-Hans": "你挑的这份礼物我很喜欢。我想把它放在每天都能看见的地方。",
+			"zh-Hant": "你挑的這份禮物我很喜歡。我想把它放在每天都能看見的地方。",
+			"ja":      "この贈り物、嬉しい。毎日見えるところに置いておきたいな。",
+			"ko":      "네가 고른 선물, 정말 마음에 들어. 매일 볼 수 있는 곳에 둘게.",
+			"es":      "Me encanta lo que elegiste. Quiero dejarlo donde pueda verlo cada día.",
+			"pt":      "Adorei o que escolheste. Quero deixá-lo onde o possa ver todos os dias.",
+			"ar":      "أعجبتني هديتك. أريد أن أضعها حيث أراها كل يوم.",
+		}, locale, "I love what you chose. I'd like to keep it where I can see it every day.")
+	}
+	if kind == "prepare" {
+		fallback = localizedMock(map[string]string{
+			"zh-Hans": "我已经开始期待了。等你来，我们就从你选的那个话题开始。",
+			"zh-Hant": "我已經開始期待了。等你來，我們就從你選的那個話題開始。",
+			"ja":      "もう楽しみにしているよ。来たら、君が選んだ話から始めよう。",
+			"ko":      "벌써 기대돼. 네가 고른 이야기부터 시작하자.",
+			"es":      "Ya tengo ganas. Empezaremos por lo que elegiste cuando llegues.",
+			"pt":      "Já estou à espera. Quando chegares, começamos pelo que escolheste.",
+			"ar":      "أتطلع إلى ذلك. عندما تأتي، سنبدأ بما اخترته.",
+		}, locale, "I'm looking forward to it. We'll start with what you chose when you arrive.")
+	}
+	if s.mock {
+		return fallback
+	}
+	models, err := s.loadTextRouteModels(ctx, "text_chat", companionID, userID)
+	if err != nil {
+		return fallback
+	}
+	recent, err := s.loadRecentMessages(ctx, conversationID, 8)
+	if err != nil {
+		return fallback
+	}
+	instruction := fmt.Sprintf("The user is visiting you in your current world scene (%s). They chose to %s. React to this specific choice in one or two natural sentences; include a small action or change in attention that fits your personality. Do not claim physical contact with the user.", subject, choice)
+	if kind == "gift" {
+		instruction = fmt.Sprintf("The user just gave you a virtual gift (%s). React to this specific gift in one or two natural sentences. Show how you receive or place it in your world and what it means to you. Do not ask for another purchase or claim a real-world delivery.", subject)
+	} else if kind == "prepare" {
+		instruction = fmt.Sprintf("The user is preparing for your scheduled shared experience (%s) and chose %s as the focus. React in one or two natural sentences from your personality and current mood. Show anticipation through a small action in your world. Do not say the meeting has begun yet.", subject, choice)
+	}
+	recent = append(recent, ChatMessage{Role: "user", Content: instruction})
+	response, _, err := s.generateTextWithFallback(ctx, companionID, kind+"_reaction", models, GenerateRequest{
+		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy,
+		Messages: recent, Temperature: 0.85, MaxTokens: 120,
+	})
+	if err != nil || strings.TrimSpace(response) == "" {
+		return fallback
+	}
+	return strings.TrimSpace(response)
+}
+
 // ComposeMomentArtifact adds the companion's own line to a persistent shared
 // memento. The user-provided text remains separately editable.
 func (s *Service) ComposeMomentArtifact(ctx context.Context, conversationID, userID, titleKey, userText string) (string, error) {
@@ -497,6 +586,90 @@ func (s *Service) ComposeMomentArtifact(ctx context.Context, conversationID, use
 		Messages: []ChatMessage{{Role: "user", Content: message}}, Temperature: 0.85, MaxTokens: 100,
 	})
 	return strings.TrimSpace(text), err
+}
+
+// ComposeMomentClosing turns only the actual exchanges of one purchased moment
+// into a memory and a concrete thread the companion can return to later.
+func (s *Service) ComposeMomentClosing(ctx context.Context, conversationID, userID, titleKey, transcript string) (string, string) {
+	profile, err := s.loadCompanionForConversation(ctx, conversationID, userID)
+	if err != nil {
+		return "", ""
+	}
+	locale := s.preferredLocale(ctx, userID)
+	fallback := localizedMock(map[string]string{
+		"zh-Hans": "我们在这一刻一起待过，聊过的话我会记得。",
+		"zh-Hant": "我們在這一刻一起待過，聊過的話我會記得。",
+		"ja":      "この時間を一緒に過ごしたこと、話したことを覚えているよ。",
+		"ko":      "함께했던 이 순간과 나눈 이야기를 기억할게.",
+		"es":      "Recordaré este momento y lo que compartimos.",
+		"pt":      "Vou lembrar-me deste momento e do que partilhámos.",
+		"ar":      "سأتذكر هذه اللحظة وما تحدثنا عنه.",
+	}, locale, "I'll remember this moment and what we shared.")
+	next := localizedMock(map[string]string{
+		"zh-Hans": "下次我们接着聊刚才说到的事。",
+		"zh-Hant": "下次我們接著聊剛才說到的事。",
+		"ja":      "次はさっきの話の続きをしよう。",
+		"ko":      "다음에 아까 이야기하던 것부터 이어가자.",
+		"es":      "La próxima vez seguimos con lo que hablamos.",
+		"pt":      "Da próxima vez continuamos a conversa.",
+		"ar":      "في المرة القادمة نكمل ما تحدثنا عنه.",
+	}, locale, "Next time, let's pick up where we left off.")
+	hasUserLine := false
+	// Keep the offline ending tied to a real user line too. A generic claim that
+	// we talked would otherwise create a memory that never happened.
+	for _, line := range strings.Split(transcript, "\n") {
+		if !strings.HasPrefix(line, "user: ") {
+			continue
+		}
+		quoted := truncate(strings.TrimSpace(strings.TrimPrefix(line, "user: ")), 90)
+		if quoted != "" {
+			hasUserLine = true
+			fallback += " 「" + quoted + "」"
+			next += " 「" + quoted + "」"
+			break
+		}
+	}
+	if !hasUserLine {
+		fallback = localizedMock(map[string]string{
+			"zh-Hans": "这段相约的时间结束了。我还想等你说说此刻的心情。",
+			"zh-Hant": "這段相約的時間結束了。我還想等你說說此刻的心情。",
+			"ja":      "約束の時間が終わったね。今の気持ちをいつか聞かせて。",
+			"ko":      "약속했던 시간이 끝났어. 지금 기분이 어떤지 언젠가 들려줘.",
+			"es":      "Terminó nuestro tiempo reservado. Me gustaría saber cómo te sientes.",
+			"pt":      "O nosso tempo marcado terminou. Gostava de saber como te sentes.",
+			"ar":      "انتهى وقت موعدنا. أود أن أعرف كيف تشعر الآن.",
+		}, locale, "Our scheduled time has ended. I'd like to hear how you feel about it.")
+		next = ""
+	}
+	if !hasUserLine || s.mock {
+		return fallback, next
+	}
+	models, err := s.loadTextRouteModels(ctx, "text_chat", profile.ID, userID)
+	if err != nil {
+		return fallback, next
+	}
+	instruction := fmt.Sprintf(`A scheduled shared experience (%s) has ended. Here are only the exchanges from that experience:
+%s
+Return a JSON object with "memory" (one vivid sentence about what actually happened, not invented events) and "next_topic" (one specific unfinished thread or question grounded in these exchanges). Write both in the user's language. Do not mention coins, the app, or pretend a physical meeting occurred.`, titleKey, truncate(transcript, 1800))
+	raw, _, err := s.generateTextWithFallback(ctx, profile.ID, "moment_closing", models, GenerateRequest{
+		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale),
+		Messages: []ChatMessage{{Role: "user", Content: instruction}}, Temperature: 0.8, MaxTokens: 200,
+	})
+	if err != nil {
+		return fallback, next
+	}
+	start, end := strings.Index(raw, "{"), strings.LastIndex(raw, "}")
+	if start < 0 || end <= start {
+		return fallback, next
+	}
+	var parsed struct {
+		Memory    string `json:"memory"`
+		NextTopic string `json:"next_topic"`
+	}
+	if json.Unmarshal([]byte(raw[start:end+1]), &parsed) != nil || strings.TrimSpace(parsed.Memory) == "" || strings.TrimSpace(parsed.NextTopic) == "" {
+		return fallback, next
+	}
+	return truncate(strings.TrimSpace(parsed.Memory), 500), truncate(strings.TrimSpace(parsed.NextTopic), 250)
 }
 
 func (s *Service) TranscribeMedia(ctx context.Context, mediaID, userID, companionID string) (string, error) {
@@ -735,10 +908,10 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT m.id,m.companion_id,c.user_id,cv.id,COALESCE(m.content,''),c.name,COALESCE(u.timezone,'UTC')
+	rows, err := s.db.QueryContext(ctx, `SELECT m.id,m.companion_id,c.user_id,cv.id,COALESCE(m.content,''),c.name,COALESCE(u.timezone,'UTC'),COALESCE(m.type,''),COALESCE(m.metadata,'')
 		FROM memories m JOIN companions c ON c.id=m.companion_id JOIN users u ON u.id=c.user_id
 		JOIN conversations cv ON cv.companion_id=c.id AND cv.user_id=c.user_id
-		WHERE m.type IN ('user_plan','shared_commitment') AND m.follow_up_at<=CURRENT_TIMESTAMP AND m.followed_up_at IS NULL
+		WHERE m.type IN ('user_plan','shared_commitment','shared_experience') AND m.follow_up_at<=CURRENT_TIMESTAMP AND m.followed_up_at IS NULL
 		  AND (m.follow_up_claimed_at IS NULL OR m.follow_up_claimed_at<CURRENT_TIMESTAMP-INTERVAL '10 minutes')
 		  AND c.active=true AND c.proactive_enabled=true AND c.friendship_active=true
 		  AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active'
@@ -747,11 +920,11 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	type followup struct{ id, companionID, userID, conversationID, content, name, timezone string }
+	type followup struct{ id, companionID, userID, conversationID, content, name, timezone, kind, metadata string }
 	var items []followup
 	for rows.Next() {
 		var item followup
-		if err := rows.Scan(&item.id, &item.companionID, &item.userID, &item.conversationID, &item.content, &item.name, &item.timezone); err != nil {
+		if err := rows.Scan(&item.id, &item.companionID, &item.userID, &item.conversationID, &item.content, &item.name, &item.timezone, &item.kind, &item.metadata); err != nil {
 			rows.Close()
 			return err
 		}
@@ -795,6 +968,17 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 			"pt":      "Como correu aquilo que você me contou?",
 			"ar":      "كيف سار الأمر الذي أخبرتني عنه؟",
 		}, preferredLocale, "How did the thing you told me about go?")
+		instruction := fmt.Sprintf("The user previously said: %q. Follow up naturally now without assuming or inventing the outcome. Ask one concise, specific question.", item.content)
+		if item.kind == "shared_experience" {
+			var detail struct {
+				NextTopic string `json:"next_topic"`
+			}
+			_ = json.Unmarshal([]byte(item.metadata), &detail)
+			instruction = fmt.Sprintf("You shared this experience with the user: %q. An unfinished thread from it is: %q. Bring it up naturally now, referring to a real detail, and ask one concise question. Do not invent further events.", item.content, detail.NextTopic)
+			if detail.NextTopic != "" {
+				text = detail.NextTopic
+			}
+		}
 		modelID := ""
 		if !s.mock {
 			proactiveModels, modelErr := s.loadTextRouteModels(ctx, "text_proactive", "", item.userID)
@@ -805,7 +989,7 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 			var model Model
 			text, model, modelErr = s.generateTextWithFallback(ctx, item.companionID, "memory_followup", proactiveModels, GenerateRequest{
 				System:      companionSystemBoundary + "\n\n" + responseLanguagePolicy("", preferredLocale) + "\n\n" + emojiMessagePolicy,
-				Messages:    []ChatMessage{{Role: "user", Content: fmt.Sprintf("The user previously said: %q. Follow up naturally now without assuming or inventing the outcome. Ask one concise, specific question.", item.content)}},
+				Messages:    []ChatMessage{{Role: "user", Content: instruction}},
 				Temperature: 0.8, MaxTokens: 120,
 			})
 			modelID = model.ID
@@ -1893,6 +2077,11 @@ func (s *Service) companionPrompt(ctx context.Context, profile companionContext)
 			}
 		}
 	}
+	var recentGift string
+	if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(content,'') FROM memories
+		WHERE companion_id=$1 AND type='gift_received' ORDER BY created_at DESC LIMIT 1`, profile.ID).Scan(&recentGift); err == nil && recentGift != "" {
+		memories = append(memories, "The latest gift from the user and your reaction: "+recentGift+". Mention it only when the conversation naturally connects to it; do not ask for another gift.")
+	}
 	rows, err = s.db.QueryContext(ctx, `SELECT COALESCE(content, '') FROM memories
 		WHERE companion_id = $1 AND (event_time IS NULL OR event_time <= CURRENT_TIMESTAMP)
 		ORDER BY importance DESC, created_at DESC LIMIT 8`, profile.ID)
@@ -1913,6 +2102,11 @@ func (s *Service) companionPrompt(ctx context.Context, profile companionContext)
 				}
 			}
 		}
+	}
+	var unfinishedTopic string
+	if s.db.QueryRowContext(ctx, `SELECT next_topic FROM companion_moment_sessions
+		WHERE companion_id=$1 AND next_topic<>'' ORDER BY created_at DESC LIMIT 1`, profile.ID).Scan(&unfinishedTopic) == nil {
+		memories = append(memories, "An unfinished shared-experience thread to revisit naturally when relevant: "+unfinishedTopic)
 	}
 	if profile.Gender == "pet" {
 		var hunger, happiness, energy, health, level int

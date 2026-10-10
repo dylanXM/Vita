@@ -442,6 +442,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     final key = product['key'] as String? ?? '';
     final gift = _categoryFor(product) == 'gift';
     final date = _categoryFor(product) == 'date';
+    if (gift) return _buildGiftPreview(context, product);
     return Container(
       height: 306,
       clipBehavior: Clip.antiAlias,
@@ -500,16 +501,9 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
             const SizedBox(height: 16),
             Divider(height: 1, color: context.vita.divider),
             const SizedBox(height: 13),
-            if (gift) ...[
-              _previewResult(context, Icons.chat_bubble_outline_rounded,
-                  'experience.gift.chatResult'.tr),
-              const SizedBox(height: 9),
-              _previewResult(context, Icons.favorite_border_rounded,
-                  'experience.gift.bondResult'.tr),
-            ] else if (date)
+            if (date)
               _previewResult(context, Icons.event_available_rounded,
-                  'experience.date.value'.tr,
-                  maxLines: 2)
+                  'experience.date.value'.tr, maxLines: 2)
             else
               Text(_categoryLabel('other'),
                   style: TextStyle(
@@ -517,6 +511,98 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
                       fontSize: 12,
                       fontWeight: FontWeight.w600)),
           ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildGiftPreview(BuildContext context, Map<String, dynamic> product) {
+    final key = '${product['key'] ?? ''}';
+    final emoji = '${product['emoji'] ?? '🎁'}';
+    final sceneKey = switch (key) {
+      'gift_coffee' => 'gift.preview.coffee',
+      'gift_flowers' => 'gift.preview.flowers',
+      'gift_cake' => 'gift.preview.cake',
+      _ => 'gift.preview.keepsake',
+    };
+    return Container(
+      height: 306,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF7B4F62), Color(0xFF29202C)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Stack(children: [
+        Positioned(
+            right: -10,
+            top: -14,
+            child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: Text(emoji,
+                    key: ValueKey(key),
+                    style: const TextStyle(fontSize: 130)))),
+        Positioned.fill(
+            child: DecoratedBox(
+                decoration: BoxDecoration(
+          gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.transparent,
+                const Color(0xFF29202C).withValues(alpha: .98)
+              ],
+              stops: const [
+                .1,
+                .78
+              ]),
+        ))),
+        Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('gift.preview.sceneTitle'.tr,
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: .75),
+                      fontSize: 12,
+                      letterSpacing: 1.3)),
+              const Spacer(),
+              Text((product['name_key'] as String? ?? key).tr,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 27,
+                      fontWeight: FontWeight.w700)),
+              const SizedBox(height: 7),
+              Text(sceneKey.tr,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: .9),
+                      fontSize: 14,
+                      height: 1.4)),
+              const SizedBox(height: 16),
+              Container(height: 1, color: Colors.white.withValues(alpha: .22)),
+              const SizedBox(height: 12),
+              Row(children: [
+                const Icon(Icons.auto_awesome_rounded,
+                    color: Colors.white, size: 17),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Text('gift.preview.outcome'.tr,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: Colors.white.withValues(alpha: .83),
+                            fontSize: 12.5))),
+              ]),
+            ],
+          ),
         ),
       ]),
     );

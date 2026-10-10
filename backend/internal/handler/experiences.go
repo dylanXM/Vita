@@ -169,7 +169,12 @@ func fulfillCatalogGift(ctx context.Context, userID, companionID string, product
 	if err != nil {
 		return nil, "", err
 	}
+	reaction := ""
+	if companionAgent != nil {
+		reaction = companionAgent.ComposeInteractionReaction(ctx, userID, companionID, "gift", product.NameKey, "")
+	}
 	messageID := uuid.New().String()
+	reactionID := uuid.New().String()
 	createdAt := time.Now().UTC()
 	messageData := map[string]any{
 		"product_key": product.Key,
@@ -198,6 +203,18 @@ func fulfillCatalogGift(ctx context.Context, userID, companionID string, product
 		VALUES($1,$2,'user','gift',$3,$4,'paid_gift','delivered',$5)`, messageID, conversationID, product.Emoji, messagePayload, createdAt); err != nil {
 		return nil, "", err
 	}
+	if reaction != "" {
+		reactionPayload, _ := json.Marshal(map[string]any{"gift_id": id, "product_key": product.Key, "gesture": "receive_gift"})
+		if _, err := tx.ExecContext(ctx, `INSERT INTO messages(id,conversation_id,sender_type,message_type,content,payload,source,delivery_status,created_at)
+			VALUES($1,$2,'assistant','text',$3,$4,'gift_reaction','delivered',$5)`, reactionID, conversationID, reaction, reactionPayload, createdAt.Add(time.Millisecond)); err != nil {
+			return nil, "", err
+		}
+		memoryMetadata, _ := json.Marshal(map[string]any{"gift_id": id, "product_key": product.Key, "source": "gift_reaction"})
+		if _, err := tx.ExecContext(ctx, `INSERT INTO memories(id,companion_id,type,content,importance,event_time,metadata)
+			VALUES($1,$2,'gift_received',$3,60,$4,$5)`, uuid.New().String(), companionID, reaction, createdAt, string(memoryMetadata)); err != nil {
+			return nil, "", err
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, "", err
 	}
@@ -208,10 +225,22 @@ func fulfillCatalogGift(ctx context.Context, userID, companionID string, product
 		"source": "paid_gift", "life_event_id": "",
 		"delivery_status": "delivered", "created_at": createdAt,
 	}
+	var reactionMessage any
+	if reaction != "" {
+		reactionMessage = map[string]any{
+			"id": reactionID, "conversation_id": conversationID,
+			"sender_type": "assistant", "message_type": "text",
+			"content": reaction, "media_url": "",
+			"payload": map[string]any{"gift_id": id, "product_key": product.Key, "gesture": "receive_gift"},
+			"source":  "gift_reaction", "life_event_id": "",
+			"delivery_status": "delivered", "created_at": createdAt.Add(time.Millisecond),
+		}
+	}
 	return map[string]any{
 		"gift_id": id, "message_id": messageID, "emoji": product.Emoji,
+		"reaction": reaction, "reaction_message_id": reactionID, "gesture": "receive_gift",
 		"intimacy_delta": intimacy, "enthusiasm_delta": enthusiasm,
-		"message": message,
+		"message": message, "reaction_message": reactionMessage,
 	}, id, nil
 }
 

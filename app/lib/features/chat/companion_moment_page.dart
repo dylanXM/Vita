@@ -6,8 +6,10 @@ import 'package:get/get.dart';
 import '../../core/notice.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
 import 'chat_controller.dart';
+import 'chat_page.dart';
 
 enum _MomentPhase { booked, ready, together, keepsake }
 
@@ -44,6 +46,9 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
   bool _saving = false;
   bool _sending = false;
   bool _artifactDirty = false;
+  bool _preparing = false;
+  bool _finishing = false;
+  bool _finishFailed = false;
   late final ChatController _chat;
   bool _ownsChat = false;
   late final String _chatTag;
@@ -77,6 +82,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
               previous.isBefore(endsAt) &&
               !now.isBefore(endsAt))) {
         setState(() {});
+        if (_ended) _finish();
       }
     });
   }
@@ -103,6 +109,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
         _moment = moment;
         _loading = false;
       });
+      if (_ended && '${moment['closing'] ?? ''}'.isEmpty) _finish();
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -230,6 +237,47 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
     }
   }
 
+  Future<void> _prepare(String choice) async {
+    if (_preparing ||
+        !_scheduled ||
+        '${_moment?['preparation'] ?? ''}'.isNotEmpty) {
+      return;
+    }
+    setState(() => _preparing = true);
+    try {
+      final data = await ApiClient.instance.post(
+          '/v1/companions/${widget.companionId}/moments/${widget.eventId}/prepare',
+          data: {'choice': choice});
+      if (!mounted || data is! Map) return;
+      setState(() => _moment = Map<String, dynamic>.from(data));
+      await _chat.poll();
+    } on ApiException catch (error) {
+      VitaNotice.error('experience.failed'.tr, error.message);
+    } finally {
+      if (mounted) setState(() => _preparing = false);
+    }
+  }
+
+  Future<void> _finish() async {
+    if (_finishing || !_ended || '${_moment?['closing'] ?? ''}'.isNotEmpty) {
+      return;
+    }
+    setState(() {
+      _finishing = true;
+      _finishFailed = false;
+    });
+    try {
+      final data = await ApiClient.instance.post(
+          '/v1/companions/${widget.companionId}/moments/${widget.eventId}/finish');
+      if (!mounted || data is! Map) return;
+      setState(() => _moment = Map<String, dynamic>.from(data));
+    } on ApiException {
+      if (mounted) setState(() => _finishFailed = true);
+    } finally {
+      if (mounted) setState(() => _finishing = false);
+    }
+  }
+
   Future<void> _send() async {
     final text = _message.text.trim();
     if (text.isEmpty || _sending || !_active || !_started) return;
@@ -243,6 +291,12 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
             _chat.sendError.value ?? 'experience.failed'.tr);
       }
     }
+  }
+
+  Future<void> _sendChoice(String text) async {
+    if (_sending || text.trim().isEmpty) return;
+    _message.text = text;
+    await _send();
   }
 
   Future<void> _saveArtifact() async {
@@ -279,33 +333,55 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
       'restaurant' => Icons.restaurant_outlined,
       _ => Icons.auto_awesome_outlined,
     };
-    return Container(
+    final phase = _phase;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 650),
       height: 212,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: colors,
+          colors: phase == _MomentPhase.together
+              ? [colors.first, vita.green.withValues(alpha: .72)]
+              : phase == _MomentPhase.keepsake
+                  ? [colors.last, colors.first]
+                  : colors,
         ),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
         child: Stack(children: [
-          Positioned(
-              right: -28,
-              top: -92,
-              child: Container(
-                  width: 255,
-                  height: 255,
+          if (widget.avatarUrl?.isNotEmpty == true)
+            Positioned.fill(
+                child: AnimatedScale(
+              duration: const Duration(milliseconds: 700),
+              scale: phase == _MomentPhase.together ? 1.08 : 1,
+              alignment: Alignment.center,
+              child: VitaMediaImage(
+                  url: widget.avatarUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox.expand()),
+            ))
+          else
+            Positioned(
+                right: 28,
+                top: 24,
+                child: Icon(icon,
+                    size: 116, color: Colors.white.withValues(alpha: .17))),
+          Positioned.fill(
+              child: DecoratedBox(
                   decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: .07)))),
-          Positioned(
-              right: 28,
-              top: 24,
-              child: Icon(icon,
-                  size: 116, color: Colors.white.withValues(alpha: .17))),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: .48),
+                Colors.black.withValues(alpha: .12),
+                Colors.black.withValues(alpha: .65)
+              ],
+            ),
+          ))),
           Positioned(
             left: 20,
             top: 20,
@@ -372,12 +448,18 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
                 ],
               )),
               const SizedBox(width: 12),
-              VitaAvatar(
-                  name: widget.name,
-                  radius: 32,
-                  imageUrl: widget.avatarUrl,
-                  background: Colors.white.withValues(alpha: .22),
-                  textColor: Colors.white),
+              AnimatedSlide(
+                  duration: const Duration(milliseconds: 650),
+                  curve: Curves.easeOutCubic,
+                  offset: phase == _MomentPhase.together
+                      ? const Offset(-.12, -.08)
+                      : Offset.zero,
+                  child: VitaAvatar(
+                      name: widget.name,
+                      radius: 32,
+                      imageUrl: widget.avatarUrl,
+                      background: Colors.white.withValues(alpha: .22),
+                      textColor: Colors.white)),
             ]),
           ),
         ]),
@@ -407,6 +489,55 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
                       const SizedBox(height: 12),
                       _journey(context),
                       const SizedBox(height: 12),
+                      if (_phase == _MomentPhase.booked) ...[
+                        Text('moment.prepareTitle'.tr,
+                            style: TextStyle(
+                                color: vita.text,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 10),
+                        if ('${_moment?['preparation'] ?? ''}'.isEmpty) ...[
+                          _MomentChoice(
+                              icon: Icons.chat_bubble_outline_rounded,
+                              label: 'moment.prepareTalk'.tr,
+                              detail: 'moment.prepareTalkHint'.tr,
+                              onTap:
+                                  _preparing ? null : () => _prepare('talk')),
+                          const SizedBox(height: 8),
+                          _MomentChoice(
+                              icon: Icons.auto_awesome_rounded,
+                              label: 'moment.prepareSurprise'.tr,
+                              detail: 'moment.prepareSurpriseHint'.tr,
+                              onTap: _preparing
+                                  ? null
+                                  : () => _prepare('surprise')),
+                        ] else
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 450),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                                color: vita.greenTint,
+                                borderRadius: BorderRadius.circular(18)),
+                            child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.favorite_rounded,
+                                      color: vita.green, size: 21),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                      child: Text(
+                                          '${_moment?['preparation_reaction'] ?? ''}'
+                                                  .isEmpty
+                                              ? 'moment.prepareReceived'.tr
+                                              : '${_moment?['preparation_reaction']}',
+                                          style: TextStyle(
+                                              color: vita.text,
+                                              fontSize: 14,
+                                              height: 1.45))),
+                                ]),
+                          ),
+                        const SizedBox(height: 14),
+                      ],
                       if ('${_moment?['invitation'] ?? ''}'.isNotEmpty) ...[
                         Container(
                           width: double.infinity,
@@ -500,6 +631,79 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
                           ),
                         ),
                       ],
+                      if (_phase == _MomentPhase.keepsake) ...[
+                        const SizedBox(height: 16),
+                        if ('${_moment?['closing'] ?? ''}'.isNotEmpty)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                    colors: [vita.greenTint, vita.surface]),
+                                borderRadius: BorderRadius.circular(20)),
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('moment.closingTitle'.tr,
+                                      style: TextStyle(
+                                          color: vita.green,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700)),
+                                  const SizedBox(height: 10),
+                                  Text('${_moment?['closing']}',
+                                      style: TextStyle(
+                                          color: vita.text,
+                                          fontSize: 16,
+                                          height: 1.5)),
+                                  if ('${_moment?['next_topic'] ?? ''}'
+                                      .isNotEmpty) ...[
+                                    const SizedBox(height: 18),
+                                    Text('moment.nextTopic'.tr,
+                                        style: TextStyle(
+                                            color: vita.subText, fontSize: 12)),
+                                    const SizedBox(height: 5),
+                                    Text('${_moment?['next_topic']}',
+                                        style: TextStyle(
+                                            color: vita.text,
+                                            fontSize: 14,
+                                            height: 1.4)),
+                                    const SizedBox(height: 14),
+                                    TextButton.icon(
+                                        onPressed: () {
+                                          if (widget.controller != null) {
+                                            Get.back();
+                                            return;
+                                          }
+                                          Get.to(
+                                              () => ChatPage(
+                                                    companionId:
+                                                        widget.companionId,
+                                                    name: widget.name,
+                                                    companion: {
+                                                      'id': widget.companionId,
+                                                      'name': widget.name,
+                                                      'portrait_url':
+                                                          widget.avatarUrl,
+                                                    },
+                                                  ),
+                                              transition: Transition.cupertino);
+                                        },
+                                        icon: const Icon(
+                                            Icons.arrow_forward_rounded),
+                                        label: Text('moment.continueChat'.tr)),
+                                  ],
+                                ]),
+                          )
+                        else if (_finishing)
+                          Center(
+                              child: Text('moment.finishing'.tr,
+                                  style: TextStyle(color: vita.subText)))
+                        else if (_finishFailed)
+                          TextButton.icon(
+                              onPressed: _finish,
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: Text('moment.finishRetry'.tr)),
+                      ],
                       if (_started) ...[
                         const SizedBox(height: 26),
                         Text('moment.together'.tr,
@@ -547,6 +751,40 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
                             );
                           }).toList());
                         }),
+                        if (_phase == _MomentPhase.together)
+                          Obx(() {
+                            final alreadyChose = _chat.messages.any((m) =>
+                                m['life_event_id'] == widget.eventId &&
+                                m['sender_type'] == 'user' &&
+                                m['message_type'] == 'text');
+                            if (alreadyChose) return const SizedBox.shrink();
+                            final scene = switch (location) {
+                              'cafe' || 'cinema' || 'restaurant' => location,
+                              _ => 'general',
+                            };
+                            return Column(children: [
+                              const SizedBox(height: 10),
+                              _MomentChoice(
+                                  icon: Icons.question_answer_rounded,
+                                  label: 'moment.choice.$scene.first'.tr,
+                                  detail: 'moment.choiceTalkHint'.tr,
+                                  onTap: _sending
+                                      ? null
+                                      : () => _sendChoice(
+                                          'moment.choice.$scene.firstMessage'
+                                              .tr)),
+                              const SizedBox(height: 8),
+                              _MomentChoice(
+                                  icon: Icons.auto_awesome_rounded,
+                                  label: 'moment.choice.$scene.second'.tr,
+                                  detail: 'moment.choiceNoticeHint'.tr,
+                                  onTap: _sending
+                                      ? null
+                                      : () => _sendChoice(
+                                          'moment.choice.$scene.secondMessage'
+                                              .tr)),
+                            ]);
+                          }),
                         const SizedBox(height: 20),
                         Text('moment.create'.tr,
                             style: TextStyle(
@@ -615,4 +853,59 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
                 ])),
     );
   }
+}
+
+class _MomentChoice extends StatelessWidget {
+  const _MomentChoice(
+      {required this.icon,
+      required this.label,
+      required this.detail,
+      required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final String detail;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: context.vita.surface,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            height: 72,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: context.vita.divider)),
+            child: Row(children: [
+              Icon(icon, color: context.vita.green, size: 21),
+              const SizedBox(width: 13),
+              Expanded(
+                  child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: context.vita.text,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    Text(detail,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: context.vita.subText, fontSize: 12)),
+                  ])),
+              Icon(Icons.arrow_outward_rounded,
+                  color: context.vita.green, size: 17),
+            ]),
+          ),
+        ),
+      );
 }
