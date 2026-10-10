@@ -1882,6 +1882,15 @@ func GetMemories(c *gin.Context) {
 		if rows.Scan(&id, &kind, &content, &importance, &eventTime, &metadata, &created, &favorite) != nil {
 			continue
 		}
+		memoryMetadata := map[string]any{}
+		_ = json.Unmarshal([]byte(metadata), &memoryMetadata)
+		content = publicTransferMemoryContent(kind, content, memoryMetadata)
+		if kind == "kind_gesture" && memoryMetadata["transfer_id"] != nil && content != "" {
+			memoryMetadata["reply"] = content
+			if encoded, encodeErr := json.Marshal(memoryMetadata); encodeErr == nil {
+				metadata = string(encoded)
+			}
+		}
 		memories = append(memories, gin.H{"id": id, "type": kind, "content": content, "importance": importance, "event_time": nullTime(eventTime), "metadata": metadata, "created_at": created, "is_favorite": favorite})
 	}
 	keepsakeRows, keepsakeErr := db.Get().Query(`SELECT k.id,k.title,k.content,k.payload::text,k.created_at

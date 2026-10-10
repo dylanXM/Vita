@@ -130,6 +130,10 @@ func GetJourney(c *gin.Context) {
 				return
 			}
 		}
+		content = publicTransferMemoryContent(kind, content, metadata)
+		if kind == "kind_gesture" && metadata["transfer_id"] != nil && content != "" {
+			metadata["reply"] = content
+		}
 		items = append(items, gin.H{
 			"id": id, "type": kind, "title": title, "content": content,
 			"event_time": occurredAt, "readonly": readonly, "metadata": metadata,

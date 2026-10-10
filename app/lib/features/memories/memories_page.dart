@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -194,6 +196,35 @@ class MemoriesController extends GetxController {
 
 String _journeyContent(Map<String, dynamic> item) {
   final raw = '${item['content'] ?? ''}';
+  if (item['type'] == 'kind_gesture') {
+    final metadataValue = item['metadata'];
+    Map? metadata;
+    if (metadataValue is Map) {
+      metadata = metadataValue;
+    } else if (metadataValue is String) {
+      try {
+        final decoded = jsonDecode(metadataValue);
+        if (decoded is Map) metadata = decoded;
+      } on FormatException {
+        // Older memories can have non-JSON metadata.
+      }
+    }
+    if ('${metadata?['transfer_id'] ?? ''}'.isNotEmpty) {
+      final coins = '${metadata?['coins'] ?? ''}';
+      var reply = '${metadata?['reply'] ?? ''}'.trim();
+      if (reply.isEmpty) {
+        const marker = 'You responded: ';
+        final markerIndex = raw.indexOf(marker);
+        reply = markerIndex < 0
+            ? ''
+            : raw.substring(markerIndex + marker.length).trim();
+      }
+      final sent = 'journey.transferSent'.trParams({'coins': coins});
+      return reply.isEmpty
+          ? sent
+          : '$sent\n${'journey.transferReply'.trParams({'reply': reply})}';
+    }
+  }
   if (item['type'] == 'shared_experience' ||
       item['type'] == 'experience_appointment') {
     final stage = _journeyExperienceStage(item);

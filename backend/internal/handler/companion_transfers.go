@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"vita/internal/db"
+	"vita/internal/language"
 )
 
 type companionTransferRequest struct {
@@ -36,6 +37,13 @@ func TransferToCompanion(c *gin.Context) {
 	input.RequestKey = strings.TrimSpace(input.RequestKey)
 	if !requireExperienceAccess(c, userID, companionID) {
 		return
+	}
+	if requestedLocale := strings.TrimSpace(c.GetHeader("Accept-Language")); requestedLocale != "" {
+		if _, err := db.Get().ExecContext(ctx, `UPDATE users SET preferred_locale=$1,updated_at=CURRENT_TIMESTAMP WHERE id=$2`,
+			language.Normalize(requestedLocale), userID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save language preference"})
+			return
+		}
 	}
 	var priorCompanion, priorMessageID string
 	var priorCoins int
@@ -134,7 +142,8 @@ func TransferToCompanion(c *gin.Context) {
 			RETURNING gifted_coins_balance`, input.Coins, companionID, userID).Scan(&companionBalance)
 	}
 	if err == nil {
-		metadata, _ := json.Marshal(map[string]any{"transfer_id": transferID, "coins": input.Coins})
+		metadata, _ := json.Marshal(map[string]any{"transfer_id": transferID, "coins": input.Coins,
+			"reply": reply, "reply_message_id": replyID})
 		_, err = tx.ExecContext(ctx, `INSERT INTO memories(id,companion_id,type,content,importance,event_time,metadata)
 			VALUES($1,$2,'kind_gesture',$3,50,CURRENT_TIMESTAMP,$4)`, uuid.New().String(), companionID,
 			"The user sent "+strconv.Itoa(input.Coins)+" virtual coins. You responded: "+reply, string(metadata))
@@ -149,4 +158,20 @@ func TransferToCompanion(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"balance": balance, "companion_balance": companionBalance,
 		"transfer_id": transferID, "message_id": userMessageID, "reply_id": replyID})
+}
+
+// The full memory sentence is useful to the companion but is not user-facing
+// copy. Older transfer memories only stored the reply inside that sentence.
+func publicTransferMemoryContent(kind, content string, metadata map[string]any) string {
+	transferID, _ := metadata["transfer_id"].(string)
+	if kind != "kind_gesture" || strings.TrimSpace(transferID) == "" {
+		return content
+	}
+	if reply, ok := metadata["reply"].(string); ok && strings.TrimSpace(reply) != "" {
+		return strings.TrimSpace(reply)
+	}
+	if _, reply, found := strings.Cut(content, "You responded: "); found {
+		return strings.TrimSpace(reply)
+	}
+	return ""
 }

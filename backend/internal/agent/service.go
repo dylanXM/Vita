@@ -497,9 +497,9 @@ func (s *Service) ComposeTransferReply(ctx context.Context, conversationID, user
 	if err != nil {
 		return "", err
 	}
-	recent = append(recent, ChatMessage{Role: "user", Content: fmt.Sprintf("I sent you %d virtual Vita coins as a gesture. Please respond naturally, without asking for more coins or implying you need money.", coins)})
+	instruction := fmt.Sprintf("The user sent you %d virtual Vita coins as a gesture. Respond naturally in the selected App language, without asking for more coins or implying you need money.", coins)
 	text, _, err := s.generateTextWithFallback(ctx, profile.ID, "transfer_reply", models, GenerateRequest{
-		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy,
+		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy + "\n\n" + instruction,
 		Messages: recent, Temperature: 0.8, MaxTokens: 140,
 	})
 	return strings.TrimSpace(text), err
