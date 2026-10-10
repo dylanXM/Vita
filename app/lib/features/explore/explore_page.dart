@@ -254,15 +254,20 @@ class _FeaturedMoment extends StatelessWidget {
           child: SizedBox(
             height: 380,
             child: Stack(fit: StackFit.expand, children: [
+              _FeaturedMomentArtwork(author: author),
               if (media.isNotEmpty)
-                VitaMediaImage(url: media.first, fit: BoxFit.cover),
+                VitaMediaImage(
+                  url: media.first,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox.expand(),
+                ),
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: media.isEmpty
-                        ? [vita.surface, vita.surface]
+                        ? const [Color(0x11000000), Color(0xBB000000)]
                         : const [Color(0x33000000), Color(0xDD000000)],
                   ),
                 ),
@@ -272,22 +277,20 @@ class _FeaturedMoment extends StatelessWidget {
                 right: 18,
                 top: 16,
                 child: Row(children: [
-                  Icon(Icons.blur_on_rounded,
-                      size: 19,
-                      color: media.isEmpty ? vita.green : Colors.white),
+                  const Icon(Icons.blur_on_rounded,
+                      size: 19, color: Colors.white),
                   const SizedBox(width: 7),
                   Expanded(
                     child: Text('discover.today'.tr,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: media.isEmpty ? vita.text : Colors.white,
+                        style: const TextStyle(
+                            color: Colors.white,
                             fontSize: 14,
                             fontWeight: FontWeight.w700)),
                   ),
-                  Icon(Icons.arrow_outward_rounded,
-                      size: 18,
-                      color: media.isEmpty ? vita.subText : Colors.white),
+                  const Icon(Icons.arrow_outward_rounded,
+                      size: 18, color: Colors.white),
                 ]),
               ),
               Positioned(
@@ -301,23 +304,21 @@ class _FeaturedMoment extends StatelessWidget {
                     Text('${author['name'] ?? ''}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color:
-                                media.isEmpty ? vita.subText : Colors.white70,
-                            fontSize: 12)),
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 12)),
                     const SizedBox(height: 5),
                     Text(content.isEmpty ? 'discover.moments'.tr : content,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: media.isEmpty ? vita.text : Colors.white,
+                        style: const TextStyle(
+                            color: Colors.white,
                             fontSize: 16,
                             height: 1.3,
                             fontWeight: FontWeight.w600)),
                     const SizedBox(height: 12),
                     Text('discover.enter'.tr,
-                        style: TextStyle(
-                            color: media.isEmpty ? vita.green : Colors.white,
+                        style: const TextStyle(
+                            color: Colors.white,
                             fontSize: 12,
                             fontWeight: FontWeight.w700)),
                   ],
@@ -327,6 +328,58 @@ class _FeaturedMoment extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _FeaturedMomentArtwork extends StatelessWidget {
+  const _FeaturedMomentArtwork({required this.author});
+
+  final Map<String, dynamic> author;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = '${author['name'] ?? ''}';
+    final portrait = '${author['portrait_url'] ?? ''}';
+    final isPet = author['creation_source'] == 'ai_pet';
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF302945), Color(0xFF18171F)],
+        ),
+      ),
+      child: Stack(alignment: Alignment.center, children: [
+        Container(
+          width: 245,
+          height: 245,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: const Color(0x30AC8BFF)),
+          ),
+        ),
+        Container(
+          width: 185,
+          height: 185,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0x224D3A70),
+            border: Border.all(color: const Color(0x45AC8BFF)),
+            boxShadow: const [
+              BoxShadow(color: Color(0x553F2A6D), blurRadius: 55),
+            ],
+          ),
+        ),
+        if (isPet)
+          SizedBox(
+            width: 165,
+            height: 165,
+            child: AIPetAvatar(name: name, imageUrl: portrait),
+          )
+        else
+          VitaAvatar(name: name, radius: 75, imageUrl: portrait),
+      ]),
     );
   }
 }
