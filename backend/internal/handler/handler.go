@@ -1500,14 +1500,28 @@ func RetryReply(c *gin.Context) {
 	conversationID, userID := c.Param("id"), c.GetString("user_id")
 	result, err := db.Get().ExecContext(c.Request.Context(), `UPDATE pending_agent_replies p SET status='pending',attempts=0,
 		scheduled_at=CURRENT_TIMESTAMP,last_error='',created_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
-		WHERE p.conversation_id=$1 AND p.status='failed' AND EXISTS(SELECT 1 FROM conversations cv WHERE cv.id=p.conversation_id AND cv.user_id=$2)`, conversationID, userID)
+		WHERE p.conversation_id=$1 AND p.status='failed' AND EXISTS(SELECT 1 FROM conversations cv WHERE cv.id=p.conversation_id AND cv.user_id=$2)
+		AND NOT EXISTS(SELECT 1 FROM messages r JOIN messages trg ON trg.id=p.trigger_message_id
+			WHERE r.conversation_id=p.conversation_id AND r.sender_type='assistant' AND r.source='reply' AND r.created_at>=trg.created_at)`, conversationID, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retry reply"})
 		return
 	}
 	if changed, _ := result.RowsAffected(); changed == 0 {
-		c.JSON(http.StatusConflict, gin.H{"error": "no failed reply to retry"})
-		return
+		result, err = db.Get().ExecContext(c.Request.Context(), `INSERT INTO pending_agent_replies(conversation_id,user_id,companion_id,trigger_message_id,scheduled_at)
+			SELECT cv.id,cv.user_id,cv.companion_id,m.id,CURRENT_TIMESTAMP FROM conversations cv
+			JOIN LATERAL (SELECT id,created_at FROM messages WHERE conversation_id=cv.id AND sender_type='user' ORDER BY created_at DESC,id DESC LIMIT 1) m ON TRUE
+			WHERE cv.id=$1 AND cv.user_id=$2 AND NOT EXISTS(SELECT 1 FROM messages r WHERE r.conversation_id=cv.id
+				AND r.sender_type='assistant' AND r.source='reply' AND r.created_at>=m.created_at)
+			ON CONFLICT(conversation_id) DO NOTHING`, conversationID, userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retry reply"})
+			return
+		}
+		if changed, _ := result.RowsAffected(); changed == 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "no failed reply to retry"})
+			return
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "pending"})
 }

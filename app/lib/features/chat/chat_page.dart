@@ -91,6 +91,8 @@ class _ChatPageState extends State<ChatPage> {
   final _recorder = AudioRecorder();
   final _player = AudioPlayer();
   late final Worker _messageWorker;
+  late final Worker _replyStatusWorker;
+  late final Worker _replyWorkingWorker;
   Timer? _recordingTimer;
   bool _recording = false;
   final ValueNotifier<String?> _panel = ValueNotifier(null);
@@ -100,6 +102,14 @@ class _ChatPageState extends State<ChatPage> {
   void initState() {
     super.initState();
     _messageWorker = ever(ctrl.messages, (_) {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    });
+    _replyStatusWorker = ever(ctrl.replyStatus, (_) {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    });
+    _replyWorkingWorker = ever(ctrl.replyWorking, (_) {
       if (!mounted) return;
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
     });
@@ -113,6 +123,8 @@ class _ChatPageState extends State<ChatPage> {
     _recorder.dispose();
     _player.dispose();
     _messageWorker.dispose();
+    _replyStatusWorker.dispose();
+    _replyWorkingWorker.dispose();
     _recordingTimer?.cancel();
     _input.dispose();
     _scroll.dispose();
@@ -359,40 +371,6 @@ class _ChatPageState extends State<ChatPage> {
               () => _buildMessages(ctrl),
             ),
           ),
-          Obx(() {
-            final status = ctrl.replyStatus.value;
-            final working = ctrl.replyWorking.value;
-            if (status == 'none' && !working) return const SizedBox.shrink();
-            final failed = status == 'failed';
-            return Container(
-              height: 62,
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              alignment: Alignment.center,
-              color: context.vita.surface,
-              child: Row(children: [
-                Icon(failed ? Icons.error_outline : Icons.hourglass_empty,
-                    size: 17, color: context.vita.subText),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    failed
-                        ? 'chat.replyFailed'.tr
-                        : status == 'pending' || status == 'processing'
-                            ? 'chat.replyPending'.tr
-                            : 'chat.replyWorking'.tr,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: context.vita.text),
-                  ),
-                ),
-                if (failed)
-                  TextButton(
-                    onPressed: ctrl.retryReply,
-                    child: Text('chat.replyRetry'.tr),
-                  ),
-              ]),
-            );
-          }),
           SafeArea(
             top: false,
             child: ValueListenableBuilder<String?>(
@@ -576,6 +554,36 @@ class _ChatPageState extends State<ChatPage> {
           ),
         ),
       );
+    }
+
+    final replyStatus = ctrl.replyStatus.value;
+    if (replyStatus != 'none' || ctrl.replyWorking.value) {
+      final failed = replyStatus == 'failed';
+      items.add(SizedBox(
+        height: 62,
+        child: Row(children: [
+          Icon(failed ? Icons.error_outline : Icons.hourglass_empty,
+              size: 17, color: context.vita.subText),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              failed
+                  ? 'chat.replyFailed'.tr
+                  : replyStatus == 'pending' || replyStatus == 'processing'
+                      ? 'chat.replyPending'.tr
+                      : 'chat.replyWorking'.tr,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, color: context.vita.text),
+            ),
+          ),
+          if (failed)
+            TextButton(
+              onPressed: ctrl.retryReply,
+              child: Text('chat.replyRetry'.tr),
+            ),
+        ]),
+      ));
     }
 
     return ListView(

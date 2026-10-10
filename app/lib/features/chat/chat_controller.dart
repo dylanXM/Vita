@@ -281,11 +281,11 @@ class ChatController extends GetxController {
           'character_count': content.length,
         });
       } else {
-        replyStatus.value = 'failed';
+        replyStatus.value = 'none';
         _markFailed(optimisticId);
       }
     } on ApiException catch (e) {
-      replyStatus.value = 'failed';
+      replyStatus.value = 'none';
       _markFailed(optimisticId);
       AnalyticsService.to
           .track('message_send_failed', category: 'chat', properties: {
@@ -380,11 +380,11 @@ class ChatController extends GetxController {
           _addIfNew(Map<String, dynamic>.from(companionMessage));
         }
       } else if (optimisticId != null) {
-        replyStatus.value = 'failed';
+        replyStatus.value = 'none';
         _markFailed(optimisticId);
       }
     } on ApiException catch (e) {
-      replyStatus.value = 'failed';
+      replyStatus.value = 'none';
       if (optimisticId != null) _markFailed(optimisticId);
       if (e.action == 'open_subscription') {
         accessError.value = e.code ?? 'subscription_required';
