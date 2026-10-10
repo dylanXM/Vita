@@ -367,8 +367,9 @@ func VisitWorld(c *gin.Context) {
 		if input.Choice == "ask" {
 			memoryContent = "The user asked about my day during a visit."
 		}
-		if _, err := tx.ExecContext(c.Request.Context(), `INSERT INTO memories(id,companion_id,type,content,importance,event_time,metadata)
-			VALUES($1,$2,'world_visit',$3,40,CURRENT_TIMESTAMP,$4)`, memoryID, companionID, memoryContent, string(payload)); err != nil {
+		followUpLocal := time.Date(localNow.Year(), localNow.Month(), localNow.Day()+1, 18, 0, 0, 0, localNow.Location())
+		if _, err := tx.ExecContext(c.Request.Context(), `INSERT INTO memories(id,companion_id,type,content,importance,event_time,metadata,follow_up_at)
+			VALUES($1,$2,'world_visit',$3,40,CURRENT_TIMESTAMP,$4,$5)`, memoryID, companionID, memoryContent, string(payload), followUpLocal.UTC()); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record visit memory"})
 			return
 		}

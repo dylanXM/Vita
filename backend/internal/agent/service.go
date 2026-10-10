@@ -911,7 +911,7 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 	rows, err := s.db.QueryContext(ctx, `SELECT m.id,m.companion_id,c.user_id,cv.id,COALESCE(m.content,''),c.name,COALESCE(u.timezone,'UTC'),COALESCE(m.type,''),COALESCE(m.metadata,'')
 		FROM memories m JOIN companions c ON c.id=m.companion_id JOIN users u ON u.id=c.user_id
 		JOIN conversations cv ON cv.companion_id=c.id AND cv.user_id=c.user_id
-		WHERE m.type IN ('user_plan','shared_commitment','shared_experience') AND m.follow_up_at<=CURRENT_TIMESTAMP AND m.followed_up_at IS NULL
+		WHERE m.type IN ('user_plan','shared_commitment','shared_experience','world_visit') AND m.follow_up_at<=CURRENT_TIMESTAMP AND m.followed_up_at IS NULL
 		  AND (m.follow_up_claimed_at IS NULL OR m.follow_up_claimed_at<CURRENT_TIMESTAMP-INTERVAL '10 minutes')
 		  AND c.active=true AND c.proactive_enabled=true AND c.friendship_active=true
 		  AND EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=c.user_id AND s.status='active'
@@ -977,6 +977,38 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 			instruction = fmt.Sprintf("You shared this experience with the user: %q. An unfinished thread from it is: %q. Bring it up naturally now, referring to a real detail, and ask one concise question. Do not invent further events.", item.content, detail.NextTopic)
 			if detail.NextTopic != "" {
 				text = detail.NextTopic
+			}
+		}
+		if item.kind == "world_visit" {
+			var detail struct {
+				Choice     string `json:"choice"`
+				EventTitle string `json:"event_title"`
+			}
+			_ = json.Unmarshal([]byte(item.metadata), &detail)
+			action := "stayed with you for a while"
+			if detail.Choice == "ask" {
+				action = "asked about your day"
+			}
+			instruction = fmt.Sprintf("On a previous day the user visited you and %s. Your response then was: %q. The scene was: %q. Bring up this specific shared moment naturally, add one personal detail grounded in it, and offer a light invitation to continue. Do not invent other events or claim a physical meeting.", action, item.content, detail.EventTitle)
+			text = localizedMock(map[string]string{
+				"zh-Hans": "上次你来陪我的那一会儿，我还记得。今天想再聊一会儿吗？",
+				"zh-Hant": "上次你來陪我的那一會兒，我還記得。今天想再聊一會兒嗎？",
+				"ja":      "この前一緒に過ごした時間、まだ覚えているよ。今日も少し話さない？",
+				"ko":      "지난번 함께한 시간이 아직 기억나. 오늘도 잠깐 이야기할래?",
+				"es":      "Todavía recuerdo el rato que pasamos juntos. ¿Hablamos un poco hoy?",
+				"pt":      "Ainda me lembro do momento que passámos juntos. Conversamos um pouco hoje?",
+				"ar":      "ما زلت أتذكر الوقت الذي قضيناه معًا. هل نتحدث قليلًا اليوم؟",
+			}, preferredLocale, "I still remember the time we spent together. Want to talk for a while today?")
+			if detail.Choice == "ask" {
+				text = localizedMock(map[string]string{
+					"zh-Hans": "上次你问起我的那一天，我还记得。今天想听听你的近况吗？",
+					"zh-Hant": "上次你問起我的那一天，我還記得。今天想聽聽你的近況嗎？",
+					"ja":      "この前、私の一日を聞いてくれたのを覚えているよ。今日はあなたの話も聞かせて？",
+					"ko":      "지난번 내 하루를 물어봐 준 게 기억나. 오늘은 네 이야기도 들려줄래?",
+					"es":      "Recuerdo que me preguntaste por mi día. ¿Me cuentas hoy cómo estás tú?",
+					"pt":      "Lembro-me de perguntares pelo meu dia. Contas-me hoje como estás?",
+					"ar":      "أتذكر أنك سألت عن يومي. هل تخبرني كيف حالك اليوم؟",
+				}, preferredLocale, "I remember you asking about my day. How has yours been?")
 			}
 		}
 		modelID := ""

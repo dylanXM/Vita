@@ -619,25 +619,33 @@ class _MemoriesPageState extends State<MemoriesPage> {
 }
 
 /// A past visit is a specific shared scene, not a generic memory action sheet.
-class _JourneyVisitPage extends StatelessWidget {
+class _JourneyVisitPage extends StatefulWidget {
   const _JourneyVisitPage({required this.item});
 
   final Map<String, dynamic> item;
 
   @override
+  State<_JourneyVisitPage> createState() => _JourneyVisitPageState();
+}
+
+class _JourneyVisitPageState extends State<_JourneyVisitPage> {
+  int _replay = 0;
+
+  @override
   Widget build(BuildContext context) {
     final vita = context.vita;
     final companion =
-        Map<String, dynamic>.from(item['companion'] as Map? ?? {});
-    final metadata = item['metadata'] is Map
-        ? Map<String, dynamic>.from(item['metadata'] as Map)
+        Map<String, dynamic>.from(widget.item['companion'] as Map? ?? {});
+    final metadata = widget.item['metadata'] is Map
+        ? Map<String, dynamic>.from(widget.item['metadata'] as Map)
         : const <String, dynamic>{};
     final name = '${companion['name'] ?? ''}';
     final companionId = '${companion['id'] ?? ''}';
     final imageUrl =
         '${metadata['portrait_url'] ?? companion['portrait_url'] ?? ''}';
     final eventTitle = '${metadata['event_title'] ?? ''}'.trim();
-    final date = DateTime.tryParse('${item['event_time'] ?? ''}')?.toLocal();
+    final date =
+        DateTime.tryParse('${widget.item['event_time'] ?? ''}')?.toLocal();
     final asking = metadata['choice'] == 'ask';
     return Scaffold(
       backgroundColor: vita.pageBg,
@@ -670,6 +678,7 @@ class _JourneyVisitPage extends StatelessWidget {
                   ColoredBox(color: vita.surface),
                   if (imageUrl.isNotEmpty)
                     TweenAnimationBuilder<double>(
+                      key: ValueKey(_replay),
                       tween: Tween(begin: 1.06, end: 1),
                       duration: const Duration(milliseconds: 700),
                       curve: Curves.easeOutCubic,
@@ -705,44 +714,67 @@ class _JourneyVisitPage extends StatelessWidget {
                             const TextStyle(color: Colors.white, fontSize: 13)),
                   ),
                   Positioned(
+                    top: 52,
+                    right: 18,
+                    child: IconButton.filledTonal(
+                      tooltip: 'journey.viewMoment'.tr,
+                      onPressed: () => setState(() => _replay++),
+                      icon: const Icon(Icons.replay_rounded),
+                    ),
+                  ),
+                  Positioned(
                     left: 22,
                     right: 22,
                     bottom: 28,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                            asking
-                                ? Icons.record_voice_over_rounded
-                                : Icons.favorite_rounded,
-                            color: Colors.white,
-                            size: 24),
-                        const SizedBox(height: 10),
-                        Text(
-                            asking ? 'world.sceneAsk'.tr : 'world.sceneStay'.tr,
-                            style: const TextStyle(
+                    child: TweenAnimationBuilder<double>(
+                        key: ValueKey(_replay),
+                        tween: Tween(begin: 0, end: 1),
+                        duration: const Duration(milliseconds: 900),
+                        curve: Curves.easeOutCubic,
+                        builder: (_, progress, child) => Opacity(
+                              opacity: progress,
+                              child: Transform.translate(
+                                offset: Offset(0, 20 * (1 - progress)),
+                                child: child,
+                              ),
+                            ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                                asking
+                                    ? Icons.record_voice_over_rounded
+                                    : Icons.favorite_rounded,
                                 color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700)),
-                        if (eventTitle.isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Text(eventTitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: Colors.white70, fontSize: 13)),
-                        ],
-                        const SizedBox(height: 12),
-                        Text(_journeyContent(item),
-                            maxLines: 5,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                height: 1.5)),
-                      ],
-                    ),
+                                size: 24),
+                            const SizedBox(height: 10),
+                            Text(
+                                asking
+                                    ? 'world.sceneAsk'.tr
+                                    : 'world.sceneStay'.tr,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w700)),
+                            if (eventTitle.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(eventTitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      color: Colors.white70, fontSize: 13)),
+                            ],
+                            const SizedBox(height: 12),
+                            Text(_journeyContent(widget.item),
+                                maxLines: 5,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    height: 1.5)),
+                          ],
+                        )),
                   ),
                 ]),
               ),
