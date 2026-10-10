@@ -244,12 +244,18 @@ class ChatController extends GetxController {
     final content = text.trim();
     if (content.isEmpty) return false;
     if (sending.value) return false;
+    sending.value = true;
     sendError.value = null;
     final String conversationId;
     try {
       conversationId = await ensureConversation();
     } on ApiException catch (e) {
       sendError.value = e.message;
+      sending.value = false;
+      return false;
+    } catch (_) {
+      sendError.value = 'chat.sendFailed'.tr;
+      sending.value = false;
       return false;
     }
     final optimisticId = 'local-${DateTime.now().microsecondsSinceEpoch}';
@@ -269,7 +275,6 @@ class ChatController extends GetxController {
       'delivery_status': 'sending',
       'created_at': DateTime.now().toUtc().toIso8601String(),
     });
-    sending.value = true;
     _beginReplyWait();
     try {
       final data = await ApiClient.instance.post(
@@ -462,6 +467,14 @@ class ChatController extends GetxController {
 
   void _replaceOptimistic(String optimisticId, Map<String, dynamic> message) {
     final index = messages.indexWhere((item) => item['id'] == optimisticId);
+    final serverIndex =
+        messages.indexWhere((item) => item['id'] == message['id']);
+    if (index >= 0 && serverIndex >= 0 && serverIndex != index) {
+      // Polling may have fetched the committed row before POST returned.
+      // Keep that row and discard its local placeholder.
+      messages.removeAt(index);
+      return;
+    }
     if (index < 0) {
       _addIfNew(message);
       return;

@@ -367,6 +367,10 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 		if err != nil {
 			return nil, err
 		}
+		replyLocale := detectSupportedLocale(latestQuestion, preferredLocale)
+		if !responseUsesRequiredScript(text, replyLocale) {
+			text = mockReply(profile, recent, replyLocale)
+		}
 	}
 	gesture := "smile"
 	if strings.ContainsAny(text, "?？") {
@@ -496,16 +500,9 @@ func (s *Service) ComposeTransferReply(ctx context.Context, conversationID, user
 	if err != nil {
 		return "", err
 	}
-	recent, err := s.loadRecentMessages(ctx, conversationID, 12)
-	if err != nil {
-		return "", err
-	}
 	locale := s.preferredLocale(ctx, userID)
 	if s.mock {
-		if strings.HasPrefix(locale, "zh") {
-			return "谢谢你想到我。这份心意我会记住，也想听听你今天过得怎么样。", nil
-		}
-		return "Thank you for thinking of me. I'll remember the gesture. How has your day been?", nil
+		return localizedTransferReply(locale), nil
 	}
 	models, err := s.loadTextRouteModels(ctx, "text_chat", profile.ID, userID)
 	if err != nil {
@@ -514,9 +511,57 @@ func (s *Service) ComposeTransferReply(ctx context.Context, conversationID, user
 	instruction := fmt.Sprintf("The user sent you %d virtual Vita coins as a gesture. Respond naturally in the selected App language, without asking for more coins or implying you need money.", coins)
 	text, _, err := s.generateTextWithFallback(ctx, profile.ID, "transfer_reply", models, GenerateRequest{
 		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy + "\n\n" + instruction,
-		Messages: recent, Temperature: 0.8, MaxTokens: 140,
+		Messages: []ChatMessage{{Role: "user", Content: instruction}}, Temperature: 0.8, MaxTokens: 140,
 	})
-	return strings.TrimSpace(text), err
+	if err != nil {
+		return "", err
+	}
+	text = strings.TrimSpace(text)
+	if !responseUsesRequiredScript(text, locale) {
+		return localizedTransferReply(locale), nil
+	}
+	return text, nil
+}
+
+func localizedTransferReply(locale string) string {
+	return localizedMock(map[string]string{
+		"zh-Hans": "谢谢你想到我。这份心意我收到了，今天你过得怎么样？",
+		"zh-Hant": "謝謝你想到我。這份心意我收到了，今天你過得怎麼樣？",
+		"ja":      "気にかけてくれてありがとう。その気持ちがうれしいよ。今日はどんな一日だった？",
+		"ko":      "나를 생각해 줘서 고마워. 그 마음이 정말 기뻐. 오늘은 어떻게 보냈어?",
+		"ar":      "شكرًا لأنك فكرت بي. أسعدتني لفتتك، كيف كان يومك؟",
+		"es":      "Gracias por pensar en mí. Me alegró mucho tu detalle. ¿Cómo te fue hoy?",
+		"pt":      "Obrigado por pensares em mim. Gostei muito do teu gesto. Como foi o teu dia?",
+	}, locale, "Thank you for thinking of me. Your gesture made me smile. How was your day?")
+}
+
+// A script check catches a model returning an entirely different language for
+// non-Latin App locales without rejecting names or short borrowed words.
+func responseUsesRequiredScript(text, locale string) bool {
+	locale = language.Normalize(locale)
+	var script *unicode.RangeTable
+	switch locale {
+	case "zh-Hans", "zh-Hant":
+		script = unicode.Han
+	case "ja":
+		script = unicode.Han
+	case "ko":
+		script = unicode.Hangul
+	case "ar":
+		script = unicode.Arabic
+	default:
+		return true
+	}
+	scriptCount, latinCount := 0, 0
+	for _, r := range text {
+		if unicode.In(r, script) ||
+			(locale == "ja" && unicode.In(r, unicode.Hiragana, unicode.Katakana)) {
+			scriptCount++
+		} else if unicode.In(r, unicode.Latin) && unicode.IsLetter(r) {
+			latinCount++
+		}
+	}
+	return scriptCount >= 2 && scriptCount*3 >= latinCount
 }
 
 // ComposeInteractionReaction lets a visit or gift have a character-led response
@@ -595,7 +640,7 @@ func (s *Service) ComposeInteractionReaction(ctx context.Context, userID, compan
 		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy,
 		Messages: recent, Temperature: 0.85, MaxTokens: 120,
 	})
-	if err != nil || strings.TrimSpace(response) == "" {
+	if err != nil || strings.TrimSpace(response) == "" || !responseUsesRequiredScript(response, locale) {
 		return fallback
 	}
 	return strings.TrimSpace(response)
@@ -1080,6 +1125,17 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 			if modelErr != nil {
 				_, _ = s.db.ExecContext(ctx, `UPDATE memories SET follow_up_claimed_at=NULL WHERE id=$1`, item.id)
 				continue
+			}
+			if !responseUsesRequiredScript(text, preferredLocale) {
+				text = localizedMock(map[string]string{
+					"zh-Hans": "想起你之前说的那件事，后来怎么样了？",
+					"zh-Hant": "想起你之前說的那件事，後來怎麼樣了？",
+					"ja":      "前に話してくれたこと、その後どうなった？",
+					"ko":      "전에 말해 준 일, 그 후 어떻게 됐어?",
+					"ar":      "تذكرت ما أخبرتني به سابقًا. كيف سارت الأمور؟",
+					"es":      "Me acordé de lo que me contaste. ¿Cómo fue después?",
+					"pt":      "Lembrei-me do que me contaste. Como correu depois?",
+				}, preferredLocale, "I remembered what you told me. How did it go?")
 			}
 		}
 		tx, err := s.db.BeginTx(ctx, nil)
@@ -1920,6 +1976,9 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 		modelID = model.ID
 		if err != nil {
 			return err
+		}
+		if !responseUsesRequiredScript(text, preferredLocale) {
+			text = mockProactiveMessage(targetLocale)
 		}
 	}
 	tx, err := s.db.BeginTx(ctx, nil)

@@ -108,6 +108,7 @@ class _ChatPageState extends State<ChatPage> {
   bool _journeyContextSent = false;
   String? _lifeEventContextId;
   String? _lifeEventContextTitle;
+  String? _autoLifeEventPrompt;
   final ValueNotifier<String?> _panel = ValueNotifier(null);
   static const double _panelHeight = 210;
 
@@ -209,7 +210,9 @@ class _ChatPageState extends State<ChatPage> {
     }
     final text = _input.text.trim();
     if (text.isEmpty) return;
+    final wasAutoPrompt = _autoLifeEventPrompt == _input.text;
     _input.clear();
+    _autoLifeEventPrompt = null;
     final send = ctrl.send(text,
         journeyVisitId: _journeyContextSent ? null : widget.journeyVisitId,
         lifeEventContextId: _lifeEventContextId);
@@ -217,7 +220,12 @@ class _ChatPageState extends State<ChatPage> {
     final queued = await send;
     if (!mounted) return;
     // Nothing reached the conversation: put the draft back so it is not lost.
-    if (!queued) _restoreDraft(text);
+    if (!queued) {
+      _restoreDraft(text);
+      if (wasAutoPrompt && _input.text == text) {
+        _autoLifeEventPrompt = text;
+      }
+    }
     if (queued && ctrl.sendError.value == null) {
       _journeyContextSent = true;
       setState(() {
@@ -255,15 +263,32 @@ class _ChatPageState extends State<ChatPage> {
     );
     if (!mounted || selected == null) return;
     final title = selected['title'] ?? '';
+    final oldAutoPrompt = _autoLifeEventPrompt;
+    final shouldReplaceDraft = _input.text.trim().isEmpty ||
+        (oldAutoPrompt != null && _input.text == oldAutoPrompt);
     setState(() {
       _lifeEventContextId =
           (selected['event_id'] ?? '').isEmpty ? null : selected['event_id'];
       _lifeEventContextTitle = title;
     });
-    if (_input.text.trim().isEmpty) {
-      _input.text = 'chat.event.prompt'.trParams({'title': title});
+    if (shouldReplaceDraft) {
+      _autoLifeEventPrompt = 'chat.event.prompt'.trParams({'title': title});
+      _input.text = _autoLifeEventPrompt!;
       _input.selection = TextSelection.collapsed(offset: _input.text.length);
+    } else {
+      _autoLifeEventPrompt = null;
     }
+  }
+
+  void _clearLifeEventContext() {
+    if (_autoLifeEventPrompt != null && _input.text == _autoLifeEventPrompt) {
+      _input.clear();
+    }
+    _autoLifeEventPrompt = null;
+    setState(() {
+      _lifeEventContextId = null;
+      _lifeEventContextTitle = null;
+    });
   }
 
   /// True while the IME is composing (e.g. pinyin candidates), when Enter
@@ -512,10 +537,7 @@ class _ChatPageState extends State<ChatPage> {
                                     color: context.vita.subText, fontSize: 12)),
                           ),
                           IconButton(
-                            onPressed: () => setState(() {
-                              _lifeEventContextId = null;
-                              _lifeEventContextTitle = null;
-                            }),
+                            onPressed: _clearLifeEventContext,
                             icon: const Icon(Icons.close_rounded, size: 17),
                             tooltip: 'common.cancel'.tr,
                           ),
@@ -598,9 +620,7 @@ class _ChatPageState extends State<ChatPage> {
           ? Colors.transparent
           : isUser
               ? context.vita.greenTint
-              : liveReply
-                  ? context.vita.greenTint
-                  : context.vita.surface;
+              : context.vita.surface;
       items.add(
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
@@ -641,13 +661,9 @@ class _ChatPageState extends State<ChatPage> {
                           : BoxDecoration(
                               color: bubbleColor,
                               border: Border.all(
-                                color: liveReply
-                                    ? context.vita.green.withValues(alpha: .32)
-                                    : isUser
-                                        ? context.vita.green
-                                            .withValues(alpha: .18)
-                                        : context.vita.text
-                                            .withValues(alpha: .06),
+                                color: isUser
+                                    ? context.vita.green.withValues(alpha: .18)
+                                    : context.vita.text.withValues(alpha: .06),
                               ),
                               borderRadius: BorderRadius.only(
                                 topLeft: const Radius.circular(20),

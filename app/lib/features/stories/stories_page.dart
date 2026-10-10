@@ -54,8 +54,9 @@ class StoriesController extends GetxController {
     }
   }
 
-  Future<void> start(
+  Future<Map<String, dynamic>?> start(
       Map<String, dynamic> background, Map<String, dynamic>? companion) async {
+    if (loading.value) return null;
     loading.value = true;
     try {
       final data = <String, dynamic>{
@@ -65,10 +66,10 @@ class StoriesController extends GetxController {
       if (companion != null) data['companion_id'] = companion['id'];
       final result = await ApiClient.instance.post('/v1/stories/', data: data);
       await load();
-      Get.to(() => StoryDetailPage(initial: _map(result)),
-          transition: Transition.cupertino);
+      return _map(result);
     } catch (error) {
       _showError(error);
+      return null;
     } finally {
       loading.value = false;
     }
@@ -317,86 +318,123 @@ class _StoryCastPage extends StatefulWidget {
 
 class _StoryCastPageState extends State<_StoryCastPage> {
   bool _chosen = false;
+  bool _starting = false;
   String? _actorId;
 
+  Future<void> _startStory(Map<String, dynamic>? actor) async {
+    if (_starting) return;
+    setState(() => _starting = true);
+    final story = await widget.controller.start(widget.background, actor);
+    if (!mounted) return;
+    if (story != null && story.isNotEmpty) {
+      Get.off(() => StoryDetailPage(initial: story),
+          transition: Transition.cupertino);
+      return;
+    }
+    setState(() => _starting = false);
+  }
+
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => PopScope(
+      canPop: !_starting,
+      child: Scaffold(
         backgroundColor: context.vita.pageBg,
         appBar: AppBar(
-          leading: const VitaBackButton(),
+          leading: VitaBackButton(onPressed: _starting ? () {} : null),
           title: Text('storyHub.cast'.tr),
         ),
-        body: Obx(() {
-          final actors = widget.controller.companions
-              .where((item) => item['creation_source'] != 'ai_pet')
-              .toList();
-          final selectedActor =
-              actors.firstWhereOrNull((item) => '${item['id']}' == _actorId);
-          return Column(children: [
-            Expanded(
-                child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              children: [
-                Text('${widget.background['title'] ?? ''}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: context.vita.text,
-                        fontSize: 21,
-                        fontWeight: FontWeight.w700)),
-                const SizedBox(height: 6),
-                Text('storyHub.chooseCompanion'.tr,
-                    style:
-                        TextStyle(color: context.vita.subText, fontSize: 13)),
-                const SizedBox(height: 20),
-                _ProtagonistOption(
-                  name: AuthController.to.nickname.isNotEmpty
-                      ? AuthController.to.nickname
-                      : 'storyHub.self'.tr,
-                  subtitle: 'storyHub.self'.tr,
-                  imageUrl: AuthController.to.avatarUrl,
-                  selected: _chosen && _actorId == null,
-                  onTap: () => setState(() {
-                    _chosen = true;
-                    _actorId = null;
-                  }),
-                ),
-                for (final actor in actors)
+        body: Stack(children: [
+          Obx(() {
+            final actors = widget.controller.companions
+                .where((item) => item['creation_source'] != 'ai_pet')
+                .toList();
+            final selectedActor =
+                actors.firstWhereOrNull((item) => '${item['id']}' == _actorId);
+            return Column(children: [
+              Expanded(
+                  child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                children: [
+                  Text('${widget.background['title'] ?? ''}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: context.vita.text,
+                          fontSize: 21,
+                          fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 6),
+                  Text('storyHub.chooseCompanion'.tr,
+                      style:
+                          TextStyle(color: context.vita.subText, fontSize: 13)),
+                  const SizedBox(height: 20),
                   _ProtagonistOption(
-                    name: '${actor['name'] ?? ''}',
-                    subtitle: '',
-                    imageUrl: actor['portrait_url'] as String?,
-                    selected: _chosen && _actorId == '${actor['id']}',
+                    name: AuthController.to.nickname.isNotEmpty
+                        ? AuthController.to.nickname
+                        : 'storyHub.self'.tr,
+                    subtitle: 'storyHub.self'.tr,
+                    imageUrl: AuthController.to.avatarUrl,
+                    selected: _chosen && _actorId == null,
                     onTap: () => setState(() {
                       _chosen = true;
-                      _actorId = '${actor['id']}';
+                      _actorId = null;
                     }),
                   ),
-              ],
-            )),
-            SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-                  child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: !_chosen ||
-                                (_actorId != null && selectedActor == null) ||
-                                widget.controller.loading.value
-                            ? null
-                            : () {
-                                Get.back();
-                                widget.controller
-                                    .start(widget.background, selectedActor);
-                              },
-                        icon: const Icon(Icons.movie_creation_outlined),
-                        label: Text('storyHub.action'.tr),
-                      )),
-                )),
-          ]);
-        }),
-      );
+                  for (final actor in actors)
+                    _ProtagonistOption(
+                      name: '${actor['name'] ?? ''}',
+                      subtitle: '',
+                      imageUrl: actor['portrait_url'] as String?,
+                      selected: _chosen && _actorId == '${actor['id']}',
+                      onTap: () => setState(() {
+                        _chosen = true;
+                        _actorId = '${actor['id']}';
+                      }),
+                    ),
+                ],
+              )),
+              SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                    child: SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: !_chosen ||
+                                  (_actorId != null && selectedActor == null) ||
+                                  widget.controller.loading.value
+                              ? null
+                              : () => _startStory(selectedActor),
+                          icon: const Icon(Icons.movie_creation_outlined),
+                          label: Text('storyHub.action'.tr),
+                        )),
+                  )),
+            ]);
+          }),
+          if (_starting) ...[
+            const Positioned.fill(
+              child: ModalBarrier(dismissible: false, color: Color(0xCC000000)),
+            ),
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 30),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: context.vita.green),
+                    const SizedBox(height: 22),
+                    Text('storyHub.loadingPlot'.tr,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ]),
+      ));
 }
 
 class _ProtagonistOption extends StatelessWidget {

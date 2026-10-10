@@ -10,6 +10,7 @@ import '../../shared/widgets.dart';
 import '../../shared/media_image.dart';
 import '../ai_pets/ai_pet_avatar.dart';
 import '../ai_pets/ai_pets_page.dart';
+import '../ai_pets/ai_pet_home_page.dart';
 import '../chat/chat_page.dart';
 import '../stories/stories_page.dart';
 
@@ -211,22 +212,17 @@ class ExplorePage extends StatelessWidget {
                       ExploreController.to.loadHighlights();
                     },
                   )),
-            Obx(() {
-              if (ExploreController.to.featuredPost != null) {
-                return const SizedBox.shrink();
-              }
-              return _PlaceCard(
-                icon: Icons.camera_alt_outlined,
-                title: 'explore.moments'.tr,
-                subtitle: 'discover.moments'.tr,
-                onTap: () {
-                  AnalyticsService.to
-                      .track('discover_moment_opened', category: 'life');
-                  Get.to(() => const MomentsPage(),
-                      transition: Transition.cupertino);
-                },
-              );
-            }),
+            _PlaceCard(
+              icon: Icons.camera_alt_outlined,
+              title: 'explore.moments'.tr,
+              subtitle: 'discover.moments'.tr,
+              onTap: () {
+                AnalyticsService.to
+                    .track('discover_moment_opened', category: 'life');
+                Get.to(() => const MomentsPage(),
+                    transition: Transition.cupertino);
+              },
+            ),
           ],
         ),
       ),
@@ -1011,6 +1007,8 @@ class _SignalFocusDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final author = Map<String, dynamic>.from(post['author'] as Map? ?? {});
+    final isOwnPet = post['is_own_companion'] == true &&
+        author['creation_source'] == 'ai_pet';
     final related = post['related_companion'];
     final media = _momentMediaUrls(post);
     final published = DateTime.tryParse('${post['published_at'] ?? ''}');
@@ -1093,15 +1091,26 @@ class _SignalFocusDialog extends StatelessWidget {
                       onPressed: () {
                         Navigator.pop(context);
                         Get.to(
-                            () => ChatPage(
+                          () => isOwnPet
+                              ? AIPetHomePage(
+                                  companionId: '${author['id']}',
+                                  name: '${author['name'] ?? ''}',
+                                  avatarUrl: '${author['portrait_url'] ?? ''}',
+                                  species: '${author['species'] ?? ''}',
+                                )
+                              : ChatPage(
                                   companionId: '${author['id']}',
                                   name: '${author['name'] ?? ''}',
                                   companion: author,
                                 ),
-                            transition: Transition.cupertino);
+                          transition: Transition.cupertino,
+                        );
                       },
-                      icon: const Icon(Icons.chat_bubble_outline_rounded),
-                      label: Text('world.talk'.tr),
+                      icon: Icon(isOwnPet
+                          ? Icons.pets_outlined
+                          : Icons.chat_bubble_outline_rounded),
+                      label: Text(
+                          isOwnPet ? 'aiPets.openHome'.tr : 'world.talk'.tr),
                     ),
                   ),
                 ],
@@ -1378,6 +1387,9 @@ class _MomentDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final vita = context.vita;
     final author = Map<String, dynamic>.from(post['author'] as Map? ?? {});
+    final isOwnPet = post['is_own_companion'] == true &&
+        author['creation_source'] == 'ai_pet' &&
+        '${author['id'] ?? ''}'.isNotEmpty;
     final related = post['related_companion'] is Map
         ? Map<String, dynamic>.from(post['related_companion'] as Map)
         : null;
@@ -1443,6 +1455,19 @@ class _MomentDetailPage extends StatelessWidget {
             published == null ? '' : formatDate(published.toLocal()),
             style: TextStyle(color: vita.subText, fontSize: 12),
           ),
+          if (isOwnPet) ...[
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: () => Get.to(() => AIPetHomePage(
+                    companionId: '${author['id']}',
+                    name: name,
+                    avatarUrl: '${author['portrait_url'] ?? ''}',
+                    species: '${author['species'] ?? ''}',
+                  )),
+              icon: const Icon(Icons.pets_outlined),
+              label: Text('aiPets.openHome'.tr),
+            ),
+          ],
         ],
       ),
     );
