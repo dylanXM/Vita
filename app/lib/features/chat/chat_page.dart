@@ -26,6 +26,7 @@ import 'companion_moment_page.dart';
 import 'companion_transfer_sheet.dart';
 import 'experience_sheet.dart';
 import 'gift_reveal_page.dart';
+import 'gift_visual.dart';
 
 /// Conversation within a companion's world.
 class ChatPage extends StatefulWidget {
@@ -1099,12 +1100,8 @@ class _AnimatedGiftCardState extends State<_AnimatedGiftCard>
 
   @override
   Widget build(BuildContext context) {
-    final payloadEmoji = widget.content.payload['emoji'];
-    final emoji = payloadEmoji is String && payloadEmoji.isNotEmpty
-        ? payloadEmoji
-        : widget.content.text.isNotEmpty
-            ? widget.content.text
-            : '🎁';
+    final giftIcon =
+        giftVisualIcon('${widget.content.payload['product_key'] ?? ''}');
     final coins = widget.content.payload['coins'];
     return AnimatedBuilder(
       animation: _controller,
@@ -1155,7 +1152,7 @@ class _AnimatedGiftCardState extends State<_AnimatedGiftCard>
                 color: Colors.white.withValues(alpha: .22),
                 shape: BoxShape.circle,
               ),
-              child: Text(emoji, style: const TextStyle(fontSize: 34)),
+              child: Icon(giftIcon, color: Colors.white, size: 34),
             ),
             const SizedBox(width: 12),
             Expanded(

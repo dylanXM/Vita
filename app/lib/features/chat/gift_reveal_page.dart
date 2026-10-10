@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../core/theme.dart';
 import '../../shared/media_image.dart';
+import 'gift_visual.dart';
 
 /// The paid gift is opened in a scene; the recorded chat message is only one
 /// trace of this interaction, not its entire outcome.
@@ -32,7 +33,8 @@ class _GiftRevealPageState extends State<GiftRevealPage> {
     final result = widget.response['result'] is Map
         ? widget.response['result'] as Map
         : const {};
-    final emoji = '${result['emoji'] ?? product['emoji'] ?? '🎁'}';
+    final giftIcon =
+        giftVisualIcon('${product['key'] ?? result['product_key'] ?? ''}');
     final reaction = '${result['reaction'] ?? ''}'.trim();
     final giftName = '${product['name_key'] ?? 'gift.sent.title'}'.tr;
     final portrait = widget.portraitUrl ?? '';
@@ -148,7 +150,7 @@ class _GiftRevealPageState extends State<GiftRevealPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                           Row(children: [
-                            Text(emoji, style: const TextStyle(fontSize: 28)),
+                            Icon(giftIcon, color: Colors.white, size: 28),
                             const SizedBox(width: 10),
                             Expanded(
                                 child: Text(widget.name,
@@ -202,7 +204,7 @@ class _GiftRevealPageState extends State<GiftRevealPage> {
                 duration: const Duration(milliseconds: 1050),
                 curve: Curves.easeOutBack,
                 scale: _opened ? .63 : 1,
-                child: Text(emoji, style: const TextStyle(fontSize: 80)),
+                child: Icon(giftIcon, color: const Color(0xFFFFD5DA), size: 80),
               ),
             ),
           ),

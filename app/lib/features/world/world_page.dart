@@ -16,6 +16,7 @@ import '../chat/chat_list_presentation.dart';
 import '../chat/chat_page.dart';
 import '../chat/experience_sheet.dart';
 import '../chat/gift_reveal_page.dart';
+import '../chat/gift_visual.dart';
 import '../companion/companion_create_method_page.dart';
 import '../shell/shell_page.dart';
 
@@ -515,11 +516,8 @@ class _RelationshipCard extends StatelessWidget {
         ? Map<String, dynamic>.from(scene!['recent_gift'] as Map)
         : null;
     final giftAt = DateTime.tryParse('${recentGift?['created_at'] ?? ''}');
-    final recentGiftEmoji = '${recentGift?['emoji'] ?? ''}'.trim();
-    final giftEmoji =
-        giftAt != null && DateTime.now().difference(giftAt).inHours < 48
-            ? (recentGiftEmoji.isEmpty ? '🎁' : recentGiftEmoji)
-            : '';
+    final showRecentGift =
+        giftAt != null && DateTime.now().difference(giftAt).inHours < 48;
     final reaction = '${effectiveVisit?['reaction'] ?? ''}'.trim();
     final momentLine = visited
         ? reaction.isNotEmpty
@@ -642,7 +640,7 @@ class _RelationshipCard extends StatelessWidget {
                   ),
                 ]),
               ),
-              if (giftEmoji.isNotEmpty)
+              if (showRecentGift)
                 Positioned(
                   top: 56,
                   right: 18,
@@ -657,8 +655,11 @@ class _RelationshipCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: Colors.white24),
                       ),
-                      child:
-                          Text(giftEmoji, style: const TextStyle(fontSize: 22)),
+                      child: Icon(
+                        giftVisualIcon('${recentGift?['product_key'] ?? ''}'),
+                        color: Colors.white,
+                        size: 22,
+                      ),
                     ),
                   ),
                 ),

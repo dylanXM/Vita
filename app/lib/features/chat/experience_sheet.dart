@@ -8,6 +8,7 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../billing/billing_controller.dart';
+import 'gift_visual.dart';
 
 class ExperienceSheet extends StatefulWidget {
   const ExperienceSheet(
@@ -518,7 +519,6 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
 
   Widget _buildGiftPreview(BuildContext context, Map<String, dynamic> product) {
     final key = '${product['key'] ?? ''}';
-    final emoji = '${product['emoji'] ?? '🎁'}';
     final sceneKey = switch (key) {
       'gift_coffee' => 'gift.preview.coffee',
       'gift_flowers' => 'gift.preview.flowers',
@@ -538,13 +538,25 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
       ),
       child: Stack(children: [
         Positioned(
-            right: -10,
-            top: -14,
-            child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: Text(emoji,
-                    key: ValueKey(key),
-                    style: const TextStyle(fontSize: 130)))),
+          right: -8,
+          top: -18,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: Container(
+              key: ValueKey(key),
+              width: 174,
+              height: 174,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: .08),
+                border: Border.all(color: Colors.white.withValues(alpha: .18)),
+              ),
+              child: Icon(giftVisualIcon(key),
+                  color: const Color(0xFFFFD5DA), size: 94),
+            ),
+          ),
+        ),
         Positioned.fill(
             child: DecoratedBox(
                 decoration: BoxDecoration(
