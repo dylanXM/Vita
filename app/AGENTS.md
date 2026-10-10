@@ -2,31 +2,27 @@
 
 ## Visual standard
 
-The App uses a WeChat-inspired mobile interface, adapted to Vita's companion
-product. Preserve the existing floating iOS Liquid Glass bottom navigation; it
-is an explicit product exception and must not be replaced with a WeChat tab bar
-unless the user specifically requests it.
+Vita is a companion product, not a WeChat-style messenger. Keep the floating
+bottom navigation and use `context.vita` theme colors throughout. World,
+Journey, Discover and Me may have distinct compositions, but typography,
+spacing, action hierarchy and motion should feel like one product.
 
-For every other surface:
-
-- Use `context.vita` colors. Primary green is `#07C160`, outgoing chat bubbles
-  use `#95EC69`, pages use a light-gray canvas, and grouped content uses flat
-  white surfaces with 0.5 px separators.
-- Keep navigation titles centered at 17 px. Avoid decorative gradients,
-  elevated cards, large shadows and oversized rounded containers in ordinary
-  list, settings and chat flows.
-- Conversation lists show avatar, name, latest-message preview and latest time.
-  Do not add a trailing chevron. Refresh the list after returning from chat.
-- Chat messages show the companion avatar on the left and the user's avatar on
-  the right. Outgoing bubbles are green; incoming bubbles are white. Preserve
-  text and emoji exactly as received.
-- Chat title bars show the character name as the primary title. Put secondary
-  actions in the overflow/detail sheet instead of crowding the title bar.
-- Prefer flat grouped rows and restrained 4-8 px radii. Material widgets may be
-  used as implementation primitives, but their default Material appearance
-  must not become the product's visible design language.
-- Touch targets must remain at least 44 logical pixels and layouts must support
-  system text scaling, safe areas, light mode and dark mode.
+- Keep each user-visible card or list item's outer size fixed. State changes,
+  missing content, long text and translations must not resize its portrait or
+  make neighboring items jump. Truncate within the fixed area and provide a
+  suitable detail view for full content.
+- Do not add sequence numbers to user-visible cards or lists.
+- Give a primary action a clear visual priority. Secondary actions stay
+  available without competing with it. Completing an interaction must reveal a
+  meaningful next step instead of leaving prominent disabled controls.
+- An important companion interaction should have visible scene/person feedback
+  and an interactive continuation. A short message or generic receipt sheet
+  alone is insufficient.
+- Preserve message content and emoji exactly as received. Avoid copying a
+  familiar messenger's bubble, header or information-page layout.
+- Secondary and deeper pages slide in from the right; tab switches do not.
+- Touch targets must remain at least 44 logical pixels. Support system text
+  scaling, safe areas, light and dark themes, and reduced-motion settings.
 
 ## Validation
 

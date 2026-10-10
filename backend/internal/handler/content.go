@@ -73,9 +73,40 @@ type socialMediaLinks struct {
 
 func defaultOnboardingPages() []onboardingPage {
 	return []onboardingPage{
-		{ID: "meet", Icon: "chat", Title: localizedCopy{"en": "A person who feels present", "zh": "遇见一个真实存在的人"}, Body: localizedCopy{"en": "Talk naturally, build memories, and let your relationship grow over time.", "zh": "自然地聊天、共同积累回忆，让关系随着时间慢慢生长。"}},
-		{ID: "life", Icon: "life", Title: localizedCopy{"en": "Their life continues", "zh": "TA 的生活一直在继续"}, Body: localizedCopy{"en": "Your companion has a daily rhythm, experiences events, and may reach out first.", "zh": "你的伴侣拥有自己的日常节奏，会经历生活事件，也会主动联系你。"}},
-		{ID: "distance", Icon: "infinity", Title: localizedCopy{"en": "Close, even from afar", "zh": "相隔远方，依然靠近"}, Body: localizedCopy{"en": "The only distance between you is that you cannot meet in the real world.", "zh": "你们唯一的距离，是暂时无法在现实世界见面。"}},
+		{ID: "meet", Icon: "chat", Title: localizedCopy{
+			"en": "Meet an AI companion with a life of their own", "zh": "遇见有自己日常的 AI 伴侣", "zh_TW": "遇見有自己日常的 AI 伴侶",
+			"es": "Conoce a un compañero de IA con vida propia", "pt": "Conheça um companheiro de IA com vida própria",
+			"ja": "自分の日常を持つAIコンパニオンと出会う", "ko": "자신만의 일상을 가진 AI 동반자를 만나보세요",
+			"ar": "تعرّف على رفيق ذكاء اصطناعي له حياته الخاصة",
+		}, Body: localizedCopy{"en": "Talk naturally, build memories, and let your relationship grow over time.", "zh": "自然地聊天、共同积累回忆，让关系随着时间慢慢生长。"}},
+		{ID: "life", Icon: "life", Title: localizedCopy{
+			"en": "More than a chat", "zh": "不止于聊天", "zh_TW": "不止於聊天",
+			"es": "Más que una conversación", "pt": "Mais que uma conversa",
+			"ja": "会話だけではない体験", "ko": "대화 그 이상의 경험", "ar": "أكثر من مجرد محادثة",
+		}, Body: localizedCopy{
+			"en":    "Begin with a conversation and a visit. The full experience adds a daily rhythm, life events, and messages your companion initiates.",
+			"zh":    "从一次对话和拜访开始；解锁完整体验后，TA 会拥有日常节奏、生活事件，也会主动联系你。",
+			"zh_TW": "從一次對話和拜訪開始；解鎖完整體驗後，TA 會擁有日常節奏、生活事件，也會主動聯繫你。",
+			"es":    "Empieza con una charla y una visita. La experiencia completa añade una rutina, eventos y mensajes iniciados por tu compañero.",
+			"pt":    "Comece com uma conversa e uma visita. A experiência completa inclui uma rotina, acontecimentos e mensagens iniciadas pelo seu companheiro.",
+			"ja":    "会話と訪問から始めましょう。フル体験では、日々の暮らしや出来事、コンパニオンからの連絡が加わります。",
+			"ko":    "대화와 방문으로 시작하세요. 전체 경험에서는 동반자의 일상과 사건, 먼저 보내는 메시지가 더해집니다.",
+			"ar":    "ابدأ بمحادثة وزيارة. تضيف التجربة الكاملة حياة يومية وأحداثًا ورسائل يبدأها رفيقك.",
+		}},
+		{ID: "distance", Icon: "infinity", Title: localizedCopy{
+			"en": "Moments worth remembering", "zh": "值得记住的相处", "zh_TW": "值得記住的相處",
+			"es": "Momentos que vale la pena recordar", "pt": "Momentos que valem a pena lembrar",
+			"ja": "記憶に残したい時間", "ko": "기억하고 싶은 순간", "ar": "لحظات تستحق التذكر",
+		}, Body: localizedCopy{
+			"en":    "Share conversations and memories with an AI companion who remembers your time together.",
+			"zh":    "与 AI 伴侣分享对话和回忆，让你们共度的时光被认真记住。",
+			"zh_TW": "與 AI 伴侶分享對話和回憶，讓你們共度的時光被認真記住。",
+			"es":    "Comparte conversaciones y recuerdos con un compañero de IA que recuerda el tiempo que pasan juntos.",
+			"pt":    "Compartilhe conversas e memórias com um companheiro de IA que se lembra do tempo que passam juntos.",
+			"ja":    "AIコンパニオンと会話や思い出を重ね、一緒に過ごした時間を大切に残しましょう。",
+			"ko":    "AI 동반자와 대화와 추억을 나누고 함께한 시간을 기억하게 하세요.",
+			"ar":    "شارك الأحاديث والذكريات مع رفيق ذكاء اصطناعي يتذكر الوقت الذي قضيتماه معًا.",
+		}},
 	}
 }
 
@@ -122,6 +153,30 @@ func readOnboarding(environment, platform string) (onboardingConfig, error) {
 	}
 	if len(output.Pages) == 0 {
 		output.Pages = defaultOnboardingPages()
+	}
+	// Replace only the former bundled claims. Admin-authored copy stays intact.
+	defaults := defaultOnboardingPages()
+	for i := range output.Pages {
+		switch output.Pages[i].ID {
+		case "meet":
+			if output.Pages[i].Title["en"] == "A person who feels present" && output.Pages[i].Title["zh"] == "遇见一个真实存在的人" {
+				output.Pages[i].Title = defaults[0].Title
+			}
+		case "life":
+			if output.Pages[i].Title["en"] == "Their life continues" && output.Pages[i].Title["zh"] == "TA 的生活一直在继续" {
+				output.Pages[i].Title = defaults[1].Title
+			}
+			if output.Pages[i].Body["en"] == "Your companion has a daily rhythm, experiences events, and may reach out first." && output.Pages[i].Body["zh"] == "你的伴侣拥有自己的日常节奏，会经历生活事件，也会主动联系你。" {
+				output.Pages[i].Body = defaults[1].Body
+			}
+		case "distance":
+			if output.Pages[i].Title["en"] == "Close, even from afar" && output.Pages[i].Title["zh"] == "相隔远方，依然靠近" {
+				output.Pages[i].Title = defaults[2].Title
+			}
+			if output.Pages[i].Body["en"] == "The only distance between you is that you cannot meet in the real world." && output.Pages[i].Body["zh"] == "你们唯一的距离，是暂时无法在现实世界见面。" {
+				output.Pages[i].Body = defaults[2].Body
+			}
+		}
 	}
 	return output, nil
 }

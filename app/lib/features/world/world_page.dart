@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 
 import '../../core/notice.dart';
 import '../../core/api_client.dart';
+import '../../core/analytics_service.dart';
 import '../../core/theme.dart';
 import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
@@ -32,6 +33,7 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
   Timer? _sceneTimer;
   String? _sceneCompanionId;
   Map<String, dynamic>? _scene;
+  String? _lastSceneAnalyticsKey;
   int _sceneRequestId = 0;
   bool _visitBusy = false;
   final Map<String, Map<String, dynamic>> _visitResults = {};
@@ -46,8 +48,21 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
       if (!mounted || _sceneCompanionId != id || _sceneRequestId != requestId) {
         return;
       }
-      setState(
-          () => _scene = data is Map ? Map<String, dynamic>.from(data) : null);
+      final parsed = data is Map ? Map<String, dynamic>.from(data) : null;
+      if (_visitResults[id]?['_local_date'] != parsed?['local_date']) {
+        _visitResults.remove(id);
+      }
+      setState(() => _scene = parsed);
+      final analyticsKey =
+          '$id:${_scene?['local_date']}:${_scene?['visited_today']}';
+      if (_lastSceneAnalyticsKey != analyticsKey) {
+        _lastSceneAnalyticsKey = analyticsKey;
+        AnalyticsService.to
+            .track('world_scene_viewed', category: 'life', properties: {
+          'has_event': _scene?['event'] is Map,
+          'visited_today': _scene?['visited_today'] == true,
+        });
+      }
     } catch (_) {
       if (mounted && _sceneCompanionId == id && _sceneRequestId == requestId) {
         setState(() => _scene = null);
@@ -79,6 +94,7 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
       );
       await ChatListController.to.load();
       if (!mounted) return;
+      AnalyticsService.to.track('world_note_sent', category: 'life');
       final reply = response is Map && response['companion_message'] is Map
           ? '${(response['companion_message'] as Map)['content'] ?? ''}'.trim()
           : '';
@@ -126,6 +142,7 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
 
   Future<void> _openGift(Map<String, dynamic> companion) async {
     final id = '${companion['id'] ?? ''}';
+    AnalyticsService.to.track('world_gift_opened', category: 'life');
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -171,15 +188,26 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
     if (_visitBusy) return;
     final id = '${companion['id'] ?? ''}';
     setState(() => _visitBusy = true);
+    AnalyticsService.to.track('world_visit_started',
+        category: 'life', properties: {'choice': choice});
     try {
       final data = await ApiClient.instance
           .post('/v1/companions/$id/world/visit', data: {'choice': choice});
       if (!mounted || data is! Map) return;
-      setState(() => _visitResults[id] = Map<String, dynamic>.from(data));
+      setState(() => _visitResults[id] = {
+            ...Map<String, dynamic>.from(data),
+            '_local_date': _scene?['local_date'],
+          });
+      AnalyticsService.to
+          .track('world_visit_completed', category: 'life', properties: {
+        'choice': choice,
+        'new_visit': data['new_visit'] == true,
+      });
       await _loadScene(id);
     } on ApiException catch (error) {
       if (error.action == 'open_subscription') {
-        if (mounted) await showSubscriptionPrompt(context, 'world.visitSubscription'.tr);
+        if (mounted)
+          await showSubscriptionPrompt(context, 'world.visitSubscription'.tr);
       } else {
         VitaNotice.error('world.visit'.tr, error.message);
       }
@@ -342,6 +370,12 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
                                 companion: current,
                                 scene: activeScene,
                                 onChat: () => _openChat(current),
+                                onJourney: () {
+                                  AnalyticsService.to.track(
+                                      'world_journey_opened',
+                                      category: 'life');
+                                  ShellController.to.switchTo(1);
+                                },
                                 onGift: () => _openGift(current),
                                 onNote: () => _leaveNote(current),
                                 visitBusy: _visitBusy,
@@ -403,6 +437,12 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
                                             ? activeScene
                                             : null,
                                         onChat: () => _openChat(item),
+                                        onJourney: () {
+                                          AnalyticsService.to.track(
+                                              'world_journey_opened',
+                                              category: 'life');
+                                          ShellController.to.switchTo(1);
+                                        },
                                         onGift: () => _openGift(item),
                                         onNote: () => _leaveNote(item),
                                         visitBusy: _visitBusy,
@@ -429,6 +469,7 @@ class _RelationshipCard extends StatelessWidget {
     required this.companion,
     required this.scene,
     required this.onChat,
+    required this.onJourney,
     required this.onGift,
     required this.onNote,
     required this.visitBusy,
@@ -439,6 +480,7 @@ class _RelationshipCard extends StatelessWidget {
   final Map<String, dynamic> companion;
   final Map<String, dynamic>? scene;
   final VoidCallback onChat;
+  final VoidCallback onJourney;
   final VoidCallback onGift;
   final VoidCallback onNote;
   final bool visitBusy;
@@ -451,6 +493,8 @@ class _RelationshipCard extends StatelessWidget {
     final name = '${companion['name'] ?? 'chat.companion'.tr}';
     final imageUrl = companion['portrait_url'] as String? ?? '';
     final place = scene?['place'] is Map ? scene!['place'] as Map : null;
+    final event = scene?['event'] is Map ? scene!['event'] as Map : null;
+    final eventTitle = '${event?['title'] ?? ''}'.trim();
     final placeTitle = '${place?['title'] ?? ''}'.trim();
     final hour = scene?['local_hour'] is num
         ? (scene!['local_hour'] as num).toInt()
@@ -464,6 +508,16 @@ class _RelationshipCard extends StatelessWidget {
     final visited = scene?['visited_today'] == true || effectiveVisit != null;
     final selectedChoice = '${effectiveVisit?['choice'] ?? ''}';
     final asking = selectedChoice == 'ask';
+    final reaction = '${effectiveVisit?['reaction'] ?? ''}'.trim();
+    final momentLine = visited
+        ? reaction.isNotEmpty
+            ? reaction
+            : (asking
+                ? 'world.choiceAskResult'.tr
+                : 'world.choiceStayResult'.tr)
+        : eventTitle.isNotEmpty
+            ? eventTitle
+            : 'world.phase.quiet'.tr;
     return ClipRRect(
       borderRadius: BorderRadius.circular(30),
       child: ColoredBox(
@@ -571,28 +625,32 @@ class _RelationshipCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (visited) ...[
-                      Row(children: [
-                        Icon(
-                            asking
-                                ? Icons.record_voice_over_rounded
-                                : Icons.favorite_rounded,
-                            size: 15,
-                            color: Colors.white),
-                        const SizedBox(width: 6),
-                        Expanded(
-                            child: Text(
-                          asking ? 'world.sceneAsk'.tr : 'world.sceneStay'.tr,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600),
-                        )),
-                      ]),
-                      const SizedBox(height: 8),
-                    ],
+                    SizedBox(
+                      height: 23,
+                      child: visited
+                          ? Row(children: [
+                              Icon(
+                                  asking
+                                      ? Icons.record_voice_over_rounded
+                                      : Icons.favorite_rounded,
+                                  size: 15,
+                                  color: Colors.white),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                  child: Text(
+                                asking
+                                    ? 'world.sceneAsk'.tr
+                                    : 'world.sceneStay'.tr,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600),
+                              )),
+                            ])
+                          : const SizedBox.shrink(),
+                    ),
                     Text(name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -600,6 +658,18 @@ class _RelationshipCard extends StatelessWidget {
                             color: Colors.white,
                             fontSize: 30,
                             fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 36,
+                      child: Text(momentLine,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              height: 1.3,
+                              fontWeight: FontWeight.w500)),
+                    ),
                   ],
                 ),
               ),
@@ -653,25 +723,33 @@ class _RelationshipCard extends StatelessWidget {
                     Row(children: [
                       Expanded(
                           child: _VisitChoice(
-                        label: visited && !asking
-                            ? 'world.visited'.tr
+                        label: visited
+                            ? 'world.sceneContinue'.tr
                             : 'world.choiceStay'.tr,
-                        icon: Icons.favorite_outline_rounded,
+                        icon: visited
+                            ? Icons.chat_bubble_outline_rounded
+                            : Icons.favorite_outline_rounded,
                         primary: true,
-                        onTap: visited || visitBusy
-                            ? null
-                            : () => onVisitChoice('stay'),
+                        onTap: visited
+                            ? onChat
+                            : visitBusy
+                                ? null
+                                : () => onVisitChoice('stay'),
                       )),
                       const SizedBox(width: 8),
                       Expanded(
                           child: _VisitChoice(
-                        label: visited && asking
-                            ? 'world.visited'.tr
+                        label: visited
+                            ? 'world.openJourney'.tr
                             : 'world.choiceAsk'.tr,
-                        icon: Icons.question_answer_outlined,
-                        onTap: visited || visitBusy
-                            ? null
-                            : () => onVisitChoice('ask'),
+                        icon: visited
+                            ? Icons.auto_stories_outlined
+                            : Icons.question_answer_outlined,
+                        onTap: visited
+                            ? onJourney
+                            : visitBusy
+                                ? null
+                                : () => onVisitChoice('ask'),
                       )),
                     ]),
                     const SizedBox(height: 8),

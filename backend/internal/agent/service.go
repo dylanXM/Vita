@@ -2137,7 +2137,7 @@ Current self and world: %s`, companionSystemBoundary, profile.Name, profile.Gend
 }
 
 func (s *Service) currentCompanionWorldContext(ctx context.Context, profile companionContext) string {
-	parts := make([]string, 0, 3)
+	parts := make([]string, 0, 4)
 	var mood, energy, stress, socialEnergy int
 	if err := s.db.QueryRowContext(ctx, `SELECT mood,energy,stress,social_energy FROM companion_states WHERE companion_id=$1`, profile.ID).
 		Scan(&mood, &energy, &stress, &socialEnergy); err == nil {
@@ -2148,6 +2148,22 @@ func (s *Service) currentCompanionWorldContext(ctx context.Context, profile comp
 		FROM life_events WHERE companion_id=$1 AND status='active' AND start_time<=CURRENT_TIMESTAMP AND end_time>CURRENT_TIMESTAMP
 		ORDER BY start_time DESC,id DESC LIMIT 1`, profile.ID).Scan(&title, &description, &location, &emotion); err == nil {
 		parts = append(parts, fmt.Sprintf("Current activity: %s — %s; place: %s; feeling: %s", title, description, location, emotion))
+	}
+	var visitChoice, visitReaction string
+	if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(payload->>'choice',''),COALESCE(payload->>'reaction','')
+		FROM world_interactions WHERE user_id=$1 AND companion_id=$2 AND kind='visit'
+		AND created_at>CURRENT_TIMESTAMP-INTERVAL '24 hours'
+		ORDER BY created_at DESC LIMIT 1`, profile.UserID, profile.ID).Scan(&visitChoice, &visitReaction); err == nil {
+		if visitChoice == "ask" || visitChoice == "stay" {
+			visitAction := "stayed with you"
+			if visitChoice == "ask" {
+				visitAction = "asked about your day"
+			}
+			parts = append(parts, "Recent shared visit: the user "+visitAction+". Acknowledge this only when it naturally connects to the conversation; do not invent a physical meeting.")
+			if visitReaction != "" {
+				parts = append(parts, "Your response during that visit: "+truncate(visitReaction, 240))
+			}
+		}
 	}
 	var timezone string
 	if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(timezone,'UTC') FROM users WHERE id=$1`, profile.UserID).Scan(&timezone); err == nil {

@@ -487,6 +487,11 @@ class _MemoriesPageState extends State<MemoriesPage> {
   }
 
   void _openEvent(BuildContext context, Map<String, dynamic> item) {
+    AnalyticsService.to
+        .track('journey_item_opened', category: 'life', properties: {
+      'type': '${item['type'] ?? ''}',
+      'experience_stage': _journeyExperienceStage(item),
+    });
     final companion =
         Map<String, dynamic>.from(item['companion'] as Map? ?? {});
     final companionId = '${companion['id'] ?? ''}';
@@ -504,6 +509,11 @@ class _MemoriesPageState extends State<MemoriesPage> {
                 name: '${companion['name'] ?? ''}',
                 avatarUrl: companion['portrait_url'] as String?,
               ),
+          transition: Transition.cupertino);
+      return;
+    }
+    if (item['type'] == 'world_visit' && companionId.isNotEmpty) {
+      Get.to(() => _JourneyVisitPage(item: item),
           transition: Transition.cupertino);
       return;
     }
@@ -542,21 +552,6 @@ class _MemoriesPageState extends State<MemoriesPage> {
                   style: TextStyle(
                       color: context.vita.text, fontSize: 16, height: 1.6)),
               const SizedBox(height: 24),
-              if (item['type'] == 'world_visit' && companionId.isNotEmpty) ...[
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () {
-                      Navigator.pop(sheetContext);
-                      ShellController.to.selectedCompanionId.value =
-                          companionId;
-                      ShellController.to.switchTo(0);
-                    },
-                    child: Text('journey.enterWorld'.tr),
-                  ),
-                ),
-                const SizedBox(height: 10),
-              ],
               SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
@@ -590,6 +585,171 @@ class _MemoriesPageState extends State<MemoriesPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// A past visit is a specific shared scene, not a generic memory action sheet.
+class _JourneyVisitPage extends StatelessWidget {
+  const _JourneyVisitPage({required this.item});
+
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context) {
+    final vita = context.vita;
+    final companion =
+        Map<String, dynamic>.from(item['companion'] as Map? ?? {});
+    final metadata = item['metadata'] is Map
+        ? Map<String, dynamic>.from(item['metadata'] as Map)
+        : const <String, dynamic>{};
+    final name = '${companion['name'] ?? ''}';
+    final companionId = '${companion['id'] ?? ''}';
+    final imageUrl =
+        '${metadata['portrait_url'] ?? companion['portrait_url'] ?? ''}';
+    final eventTitle = '${metadata['event_title'] ?? ''}'.trim();
+    final date = DateTime.tryParse('${item['event_time'] ?? ''}')?.toLocal();
+    final asking = metadata['choice'] == 'ask';
+    return Scaffold(
+      backgroundColor: vita.pageBg,
+      body: SafeArea(
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 18, 10),
+            child: Row(children: [
+              IconButton(
+                onPressed: () => Get.back(),
+                icon: const Icon(Icons.arrow_back_ios_new_rounded),
+              ),
+              Expanded(
+                child: Text('journey.viewMoment'.tr,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: vita.text,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700)),
+              ),
+            ]),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: Stack(fit: StackFit.expand, children: [
+                  ColoredBox(color: vita.surface),
+                  if (imageUrl.isNotEmpty)
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 1.06, end: 1),
+                      duration: const Duration(milliseconds: 700),
+                      curve: Curves.easeOutCubic,
+                      builder: (_, scale, child) =>
+                          Transform.scale(scale: scale, child: child),
+                      child: VitaMediaImage(url: imageUrl, fit: BoxFit.cover),
+                    ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x66000000),
+                          Color(0x11000000),
+                          Color(0xE6000000)
+                        ],
+                        stops: [0, .42, 1],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 20,
+                    right: 20,
+                    top: 20,
+                    child: Text(
+                        date == null
+                            ? name
+                            : '$name  ·  ${formatDateSeparator(date)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 13)),
+                  ),
+                  Positioned(
+                    left: 22,
+                    right: 22,
+                    bottom: 28,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                            asking
+                                ? Icons.record_voice_over_rounded
+                                : Icons.favorite_rounded,
+                            color: Colors.white,
+                            size: 24),
+                        const SizedBox(height: 10),
+                        Text(
+                            asking ? 'world.sceneAsk'.tr : 'world.sceneStay'.tr,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700)),
+                        if (eventTitle.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(eventTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: Colors.white70, fontSize: 13)),
+                        ],
+                        const SizedBox(height: 12),
+                        Text(_journeyContent(item),
+                            maxLines: 5,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                height: 1.5)),
+                      ],
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+            child: Row(children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    Get.back();
+                    ShellController.to.selectedCompanionId.value = companionId;
+                    ShellController.to.switchTo(0);
+                  },
+                  child: Text('journey.enterWorld'.tr,
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Get.to(
+                      () => ChatPage(
+                          companionId: companionId,
+                          name: name,
+                          companion: companion),
+                      transition: Transition.cupertino),
+                  child: Text('world.talk'.tr,
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+              ),
+            ]),
+          ),
+        ]),
       ),
     );
   }

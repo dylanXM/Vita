@@ -18,6 +18,31 @@ import (
 
 var worldRegionPattern = regexp.MustCompile(`^[A-Z]{2}$`)
 
+// The default companion is the first encounter with the world. Let users
+// experience its scene and one daily visit while their free chat trial lasts;
+// all other life features keep their existing subscription rules.
+func requireWorldAccess(c *gin.Context, companionID string, startTrial bool) bool {
+	userID := c.GetString("user_id")
+	var isDefault bool
+	if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT is_default FROM companions WHERE id=$1 AND user_id=$2 AND active=true`, companionID, userID).Scan(&isDefault); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "companion not found"})
+		return false
+	}
+	if !isDefault {
+		return requireCompanionLifeAccess(c, companionID)
+	}
+	allowed, _, err := defaultChatAccess(userID, startTrial)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check free trial"})
+		return false
+	}
+	if !allowed {
+		subscriptionRequired(c, "default_companion_trial_expired", "Subscribe to continue visiting your companion")
+		return false
+	}
+	return true
+}
+
 func worldSceneKind(eventType string) string {
 	switch eventType {
 	case "work", "study":
@@ -90,7 +115,7 @@ func UpdateWorldPreferences(c *gin.Context) {
 // Every consumer receives the same event ID, place, phase and active campaign.
 func GetWorldScene(c *gin.Context) {
 	companionID, userID := c.Param("id"), c.GetString("user_id")
-	if !requireCompanionLifeAccess(c, companionID) {
+	if !requireWorldAccess(c, companionID, false) {
 		return
 	}
 	_, region, localNow, err := worldUserSettings(userID)
@@ -267,7 +292,7 @@ func GetWorldScene(c *gin.Context) {
 // relationship and mood change are committed together, so retries are safe.
 func VisitWorld(c *gin.Context) {
 	companionID, userID := c.Param("id"), c.GetString("user_id")
-	if !requireCompanionLifeAccess(c, companionID) {
+	if !requireWorldAccess(c, companionID, true) {
 		return
 	}
 	var input struct {
@@ -302,7 +327,14 @@ func VisitWorld(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load visit event"})
 		return
 	}
-	payload, _ := json.Marshal(map[string]any{"source": "world_scene", "source_event_id": eventID.String, "choice": input.Choice})
+	var portraitURL string
+	if err := tx.QueryRowContext(c.Request.Context(), `SELECT COALESCE(NULLIF(c.avatar_url,''),p.image_url,'')
+		FROM companions c LEFT JOIN companion_portraits p ON p.id=c.portrait_id WHERE c.id=$1`, companionID).Scan(&portraitURL); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load visit portrait"})
+		return
+	}
+	payload, _ := json.Marshal(map[string]any{"source": "world_scene", "source_event_id": eventID.String,
+		"event_title": eventTitle, "portrait_url": portraitURL, "choice": input.Choice})
 	result, err := tx.ExecContext(c.Request.Context(), `INSERT INTO world_interactions(id,user_id,companion_id,life_event_id,kind,request_key,local_date,payload)
 		VALUES($1,$2,$3,$4,'visit',$5,$6,$7) ON CONFLICT DO NOTHING`, uuid.New().String(), userID, companionID, eventID, "visit:"+companionID+":"+localNow.Format("2006-01-02"), localNow.Format("2006-01-02"), payload)
 	if err != nil {

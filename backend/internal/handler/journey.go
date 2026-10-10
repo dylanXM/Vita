@@ -45,15 +45,20 @@ func GetJourney(c *gin.Context) {
 			SELECT m.id,COALESCE(m.type,'memory') AS kind,'' AS title,
 				COALESCE(m.content,'') AS content,
 				COALESCE(m.event_time,m.created_at,CURRENT_TIMESTAMP::timestamp) AS occurred_at,
-				false AS readonly,m.companion_id,COALESCE(m.metadata,'{}'::jsonb) AS metadata
+				false AS readonly,m.companion_id,COALESCE(NULLIF(m.metadata::text,''),'{}')::jsonb AS metadata
 			FROM memories m
 			WHERE (m.type<>'shared_experience'
-				OR COALESCE(m.metadata->>'paid_experience','false')<>'true'
-				OR COALESCE(m.metadata->>'event_id','')='')
-				AND NOT (m.type='world_visit' AND m.content IN (
-					'The user visited me today.',
-					'The user stayed with me during a visit.',
-					'The user asked about my day during a visit.'))
+				OR COALESCE(COALESCE(NULLIF(m.metadata::text,''),'{}')::jsonb->>'paid_experience','false')<>'true'
+				OR COALESCE(COALESCE(NULLIF(m.metadata::text,''),'{}')::jsonb->>'event_id','')='')
+				AND m.type IS DISTINCT FROM 'world_visit'
+			UNION ALL
+			SELECT w.id,'world_visit' AS kind,'' AS title,
+				COALESCE(NULLIF(w.payload->>'reaction',''),
+					CASE WHEN w.payload->>'choice'='ask' THEN 'The user asked about my day during a visit.'
+					ELSE 'The user stayed with me during a visit.' END) AS content,
+				w.created_at AS occurred_at,true AS readonly,w.companion_id,w.payload AS metadata
+			FROM world_interactions w
+			WHERE w.user_id=$1 AND w.kind='visit'
 			UNION ALL
 			SELECT k.id,'keepsake' AS kind,k.title,k.content,k.created_at AS occurred_at,
 				true AS readonly,k.companion_id,COALESCE(k.payload,'{}'::jsonb) AS metadata

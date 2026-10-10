@@ -101,6 +101,19 @@ class ExplorePage extends StatelessWidget {
               child: Text('discover.subtitle'.tr,
                   style: TextStyle(color: vita.subText, fontSize: 13)),
             ),
+            Obx(() {
+              final posts = ExploreController.to.posts;
+              if (posts.isEmpty) return const SizedBox.shrink();
+              return _FeaturedMoment(
+                post: posts.first,
+                onTap: () {
+                  AnalyticsService.to
+                      .track('discover_moment_opened', category: 'life');
+                  Get.to(() => const MomentsPage(),
+                      transition: Transition.cupertino);
+                },
+              );
+            }),
             Obx(() => _PlaceCard(
                   icon: Icons.auto_stories_outlined,
                   title: 'storyHub.title'.tr,
@@ -110,6 +123,8 @@ class ExplorePage extends StatelessWidget {
                           'count': '${ExploreController.to.storyChapter.value}'
                         }),
                   onTap: () async {
+                    AnalyticsService.to
+                        .track('discover_story_opened', category: 'life');
                     await Get.to(() => const StoriesPage(),
                         transition: Transition.cupertino);
                     ExploreController.to.loadHighlights();
@@ -124,6 +139,8 @@ class ExplorePage extends StatelessWidget {
                               {'name': ExploreController.to.petName.value!})
                           : 'discover.pets'.tr,
                   onTap: () async {
+                    AnalyticsService.to
+                        .track('discover_pet_opened', category: 'life');
                     await Get.to(() => const AIPetsPage(),
                         transition: Transition.cupertino);
                     ExploreController.to.loadHighlights();
@@ -131,19 +148,115 @@ class ExplorePage extends StatelessWidget {
                 )),
             Obx(() {
               final posts = ExploreController.to.posts;
-              final content = posts.isEmpty
-                  ? ''
-                  : 'discover.momentCount'
-                      .trParams({'count': '${posts.length}'});
+              if (posts.isNotEmpty) return const SizedBox.shrink();
               return _PlaceCard(
                 icon: Icons.camera_alt_outlined,
                 title: 'explore.moments'.tr,
-                subtitle: content.isEmpty ? 'discover.moments'.tr : content,
-                onTap: () => Get.to(() => const MomentsPage(),
-                    transition: Transition.cupertino),
+                subtitle: 'discover.moments'.tr,
+                onTap: () {
+                  AnalyticsService.to
+                      .track('discover_moment_opened', category: 'life');
+                  Get.to(() => const MomentsPage(),
+                      transition: Transition.cupertino);
+                },
               );
             }),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A real recent moment gives Discover a reason to open today.
+class _FeaturedMoment extends StatelessWidget {
+  const _FeaturedMoment({required this.post, required this.onTap});
+
+  final Map<String, dynamic> post;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final vita = context.vita;
+    final author = Map<String, dynamic>.from(post['author'] as Map? ?? {});
+    final media = _momentMediaUrls(post);
+    final content = '${post['content'] ?? ''}'.trim();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+      child: Material(
+        color: vita.surface,
+        borderRadius: BorderRadius.circular(22),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            height: 176,
+            child: Stack(fit: StackFit.expand, children: [
+              if (media.isNotEmpty)
+                VitaMediaImage(url: media.first, fit: BoxFit.cover),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: media.isEmpty
+                        ? [vita.surface, vita.surface]
+                        : const [Color(0x33000000), Color(0xDD000000)],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 18,
+                right: 18,
+                top: 16,
+                child: Row(children: [
+                  Icon(Icons.blur_on_rounded,
+                      size: 19,
+                      color: media.isEmpty ? vita.green : Colors.white),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text('explore.moments'.tr,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: media.isEmpty ? vita.text : Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700)),
+                  ),
+                  Icon(Icons.arrow_outward_rounded,
+                      size: 18,
+                      color: media.isEmpty ? vita.subText : Colors.white),
+                ]),
+              ),
+              Positioned(
+                left: 18,
+                right: 18,
+                bottom: 18,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('${author['name'] ?? ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color:
+                                media.isEmpty ? vita.subText : Colors.white70,
+                            fontSize: 12)),
+                    const SizedBox(height: 5),
+                    Text(content.isEmpty ? 'discover.moments'.tr : content,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: media.isEmpty ? vita.text : Colors.white,
+                            fontSize: 16,
+                            height: 1.3,
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ]),
+          ),
         ),
       ),
     );
@@ -173,32 +286,40 @@ class _PlaceCard extends StatelessWidget {
             onTap: onTap,
             child: Ink(
               color: context.vita.surface,
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Row(children: [
-                  Icon(icon, size: 30, color: context.vita.text),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(title,
-                            style: TextStyle(
-                                color: context.vita.text,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700)),
-                        const SizedBox(height: 5),
-                        Text(subtitle,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                color: context.vita.subText, fontSize: 13)),
-                      ],
+              child: SizedBox(
+                height: 104,
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Row(children: [
+                    Icon(icon, size: 30, color: context.vita.text),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: context.vita.text,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 5),
+                          Flexible(
+                              child: Text(subtitle,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      color: context.vita.subText,
+                                      fontSize: 13))),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(Icons.chevron_right, color: context.vita.subText),
-                ]),
+                    const SizedBox(width: 8),
+                    Icon(Icons.chevron_right, color: context.vita.subText),
+                  ]),
+                ),
               ),
             ),
           ),
