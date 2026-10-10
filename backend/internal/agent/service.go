@@ -281,6 +281,16 @@ func (s *Service) Reply(ctx context.Context, conversationID, userID string) (*Sa
 	return s.replyNow(ctx, conversationID, userID, profile)
 }
 
+// CheckChatRoute verifies that this user can use a configured chat model
+// before an existing delayed-reply row makes a new send look pending.
+func (s *Service) CheckChatRoute(ctx context.Context, companionID, userID string) error {
+	if s.mock {
+		return nil
+	}
+	_, err := s.loadTextRouteModels(ctx, "text_chat", companionID, userID)
+	return err
+}
+
 func (s *Service) replyNow(ctx context.Context, conversationID, userID string, profile companionContext) (*SavedMessage, error) {
 	recent, err := s.loadRecentMessages(ctx, conversationID, 24)
 	if err != nil {
@@ -288,6 +298,7 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 	}
 	models, err := s.loadTextRouteModels(ctx, "text_chat", profile.ID, userID)
 	if err != nil && !s.mock {
+		s.recordRun(ctx, profile.ID, "reply", "", "failed", err.Error())
 		return nil, err
 	}
 
@@ -2527,6 +2538,11 @@ func (s *Service) recordRun(ctx context.Context, companionID, kind, modelID, sta
 func (s *Service) recordRunWithInput(ctx context.Context, companionID, kind, modelID, status, runError, inputSummary string) {
 	if s.db == nil {
 		return
+	}
+	if ctx.Err() != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+		defer cancel()
 	}
 	_, _ = s.db.ExecContext(ctx, `
 		INSERT INTO agent_runs (id, companion_id, kind, model_id, status, error, input_summary, finished_at)

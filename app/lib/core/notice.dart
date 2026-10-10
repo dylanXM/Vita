@@ -109,18 +109,6 @@ class _NoticeBannerState extends State<_NoticeBanner>
   Widget build(BuildContext context) {
     final vita = context.vita;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final color = switch (widget.kind) {
-      _NoticeKind.success => vita.green,
-      _NoticeKind.error => vita.red,
-      _NoticeKind.warning => const Color(0xFFD89527),
-      _NoticeKind.info => const Color(0xFF5A91D8),
-    };
-    final icon = switch (widget.kind) {
-      _NoticeKind.success => Icons.check_circle_rounded,
-      _NoticeKind.error => Icons.error_rounded,
-      _NoticeKind.warning => Icons.warning_rounded,
-      _NoticeKind.info => Icons.info_rounded,
-    };
     final radius = BorderRadius.circular(22);
     return Positioned(
       top: 0,
@@ -200,8 +188,6 @@ class _NoticeBannerState extends State<_NoticeBanner>
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
                                         )),
-                                    const Spacer(),
-                                    Icon(icon, size: 16, color: color),
                                   ]),
                                   const SizedBox(height: 8),
                                   Text(

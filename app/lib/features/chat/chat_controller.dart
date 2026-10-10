@@ -25,14 +25,13 @@ class ChatController extends GetxController {
   final companionStatus = ''.obs;
   final companionBusy = false.obs;
   final replyStatus = 'none'.obs;
-  final replyWorking = false.obs;
-  final replyWaitSeconds = 0.obs;
+  String? replyPendingMessageId;
+  int replyPendingAgeSeconds = 0;
   final trialStatus = 'none'.obs;
   final trialExpiresAt = RxnString();
   String? _conversationId;
   Timer? _pollTimer;
   Timer? _trialTimer;
-  Timer? _replyTimer;
   DateTime? _replyStartedAt;
   bool _polling = false;
 
@@ -48,7 +47,6 @@ class ChatController extends GetxController {
   void onClose() {
     _pollTimer?.cancel();
     _trialTimer?.cancel();
-    _replyTimer?.cancel();
     super.onClose();
   }
 
@@ -170,10 +168,19 @@ class ChatController extends GetxController {
     final data = await ApiClient.instance
         .get('/v1/conversations/$_conversationId/reply-status');
     if (data is Map && data['status'] is String) {
+      replyPendingMessageId = data['trigger_message_id'] as String?;
+      replyPendingAgeSeconds = (data['age_seconds'] as num?)?.toInt() ?? 0;
       replyStatus.value = data['status'] as String;
-      replyWaitSeconds.value = (data['age_seconds'] as num?)?.toInt() ?? 0;
       if (_latestUserHasReply) replyStatus.value = 'none';
-      if (replyStatus.value == 'none') replyWorking.value = false;
+    }
+  }
+
+  Future<bool> refreshReplyStatus() async {
+    try {
+      await _loadReplyStatus();
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -198,18 +205,18 @@ class ChatController extends GetxController {
 
   void _beginReplyWait() {
     _replyStartedAt = DateTime.now();
+    replyPendingMessageId = null;
+    replyPendingAgeSeconds = 0;
     replyStatus.value = 'none';
-    replyWorking.value = false;
-    replyWaitSeconds.value = 0;
-    _replyTimer?.cancel();
-    _replyTimer = Timer(const Duration(seconds: 3), () {
-      if (sending.value) replyWorking.value = true;
-    });
   }
 
   void _applyReplyResponse(Map data) {
-    _replyTimer?.cancel();
-    replyWorking.value = false;
+    final userMessage = data['user_message'];
+    replyPendingMessageId = userMessage is Map
+        ? userMessage['id'] as String?
+        : data['id'] as String?;
+    replyPendingAgeSeconds =
+        DateTime.now().difference(_replyStartedAt ?? DateTime.now()).inSeconds;
     if (data['companion_message'] is Map) {
       replyStatus.value = 'none';
     } else {
@@ -219,22 +226,8 @@ class ChatController extends GetxController {
               ? 'none'
               : 'failed';
       if (replyStatus.value == 'pending') {
-        replyWaitSeconds.value = DateTime.now()
-            .difference(_replyStartedAt ?? DateTime.now())
-            .inSeconds;
         if (_latestUserHasReply) replyStatus.value = 'none';
       }
-    }
-  }
-
-  Future<void> retryReply() async {
-    final id = _conversationId;
-    if (id == null) return;
-    try {
-      await ApiClient.instance.post('/v1/conversations/$id/reply-status/retry');
-      replyStatus.value = 'pending';
-    } catch (_) {
-      replyStatus.value = 'failed';
     }
   }
 
@@ -331,8 +324,6 @@ class ChatController extends GetxController {
         sendError.value = e.message;
       }
     } finally {
-      _replyTimer?.cancel();
-      replyWorking.value = false;
       sending.value = false;
     }
     return true;
@@ -423,8 +414,6 @@ class ChatController extends GetxController {
         sendError.value = e.message;
       }
     } finally {
-      _replyTimer?.cancel();
-      replyWorking.value = false;
       sending.value = false;
     }
     return true;

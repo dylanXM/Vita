@@ -168,9 +168,8 @@ class VitaTranslations extends Translations {
       'chat.sendFailed': 'Message not sent',
       'chat.replyPending':
           'The other person may be busy. You can leave for now; we’ll notify you when they reply.',
-      'chat.replyWorking': 'Your companion is replying…',
-      'chat.replyFailed': 'The reply could not be completed. Please try again.',
-      'chat.replyRetry': 'Retry',
+      'chat.replyFailed':
+          'We have not received a reply yet. Please come back later.',
       'chat.photoMessage': 'Photo',
       'subscription.required.title': 'Subscription required',
       'subscription.required.create':
@@ -879,9 +878,7 @@ class VitaTranslations extends Translations {
       'chat.voiceMessage': '语音消息',
       'chat.sendFailed': '消息发送失败',
       'chat.replyPending': '对方可能正在忙，你可以先离开，收到后会通知你',
-      'chat.replyWorking': '正在回复…',
-      'chat.replyFailed': '回复未能完成，请重试',
-      'chat.replyRetry': '重试',
+      'chat.replyFailed': '暂时还没有收到回复，请稍后再来看看',
       'chat.photoMessage': '图片',
       'subscription.required.title': '需要订阅',
       'subscription.required.create': '订阅后才能创建自己的角色。',

@@ -92,7 +92,10 @@ class _ChatPageState extends State<ChatPage> {
   final _player = AudioPlayer();
   late final Worker _messageWorker;
   late final Worker _replyStatusWorker;
-  late final Worker _replyWorkingWorker;
+  String _previousReplyStatus = 'none';
+  Timer? _slowReplyTimer;
+  static const _slowReplyThreshold = Duration(seconds: 200);
+  static final Set<String> _notifiedSlowReplies = <String>{};
   Timer? _recordingTimer;
   bool _recording = false;
   final ValueNotifier<String?> _panel = ValueNotifier(null);
@@ -105,13 +108,19 @@ class _ChatPageState extends State<ChatPage> {
       if (!mounted) return;
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
     });
-    _replyStatusWorker = ever(ctrl.replyStatus, (_) {
+    _replyStatusWorker = ever(ctrl.replyStatus, (status) {
       if (!mounted) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-    });
-    _replyWorkingWorker = ever(ctrl.replyWorking, (_) {
-      if (!mounted) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+      _slowReplyTimer?.cancel();
+      if (status == 'pending' || status == 'processing') {
+        _scheduleSlowReplyNotice();
+      }
+      if (status == 'failed' &&
+          (ctrl.sending.value ||
+              _previousReplyStatus == 'pending' ||
+              _previousReplyStatus == 'processing')) {
+        VitaNotice.info('chat.message'.tr, 'chat.replyFailed'.tr);
+      }
+      _previousReplyStatus = status;
     });
     if (widget.companion?['friendship_active'] == false) {
       ctrl.accessError.value = 'friendship_inactive';
@@ -124,7 +133,7 @@ class _ChatPageState extends State<ChatPage> {
     _player.dispose();
     _messageWorker.dispose();
     _replyStatusWorker.dispose();
-    _replyWorkingWorker.dispose();
+    _slowReplyTimer?.cancel();
     _recordingTimer?.cancel();
     _input.dispose();
     _scroll.dispose();
@@ -234,6 +243,25 @@ class _ChatPageState extends State<ChatPage> {
     } else if (reason != null && reason.isNotEmpty) {
       VitaNotice.error('chat.message'.tr, reason);
     }
+  }
+
+  void _scheduleSlowReplyNotice() {
+    final messageId = ctrl.replyPendingMessageId;
+    if (messageId == null || _notifiedSlowReplies.contains(messageId)) return;
+    final remaining =
+        _slowReplyThreshold - Duration(seconds: ctrl.replyPendingAgeSeconds);
+    _slowReplyTimer =
+        Timer(remaining > Duration.zero ? remaining : Duration.zero, () async {
+      if (!await ctrl.refreshReplyStatus() ||
+          !mounted ||
+          ctrl.replyPendingMessageId != messageId ||
+          (ctrl.replyStatus.value != 'pending' &&
+              ctrl.replyStatus.value != 'processing') ||
+          !_notifiedSlowReplies.add(messageId)) {
+        return;
+      }
+      VitaNotice.info('chat.message'.tr, 'chat.replyPending'.tr);
+    });
   }
 
   void _scrollToBottom() {
@@ -554,37 +582,6 @@ class _ChatPageState extends State<ChatPage> {
           ),
         ),
       );
-    }
-
-    final replyStatus = ctrl.replyStatus.value;
-    if (replyStatus != 'none' || ctrl.replyWorking.value) {
-      final failed = replyStatus == 'failed';
-      items.add(SizedBox(
-        height: 62,
-        child: Row(children: [
-          Icon(failed ? Icons.error_outline : Icons.hourglass_empty,
-              size: 17, color: context.vita.subText),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              failed
-                  ? 'chat.replyFailed'.tr
-                  : (replyStatus == 'pending' || replyStatus == 'processing') &&
-                          ctrl.replyWaitSeconds.value >= 60
-                      ? 'chat.replyPending'.tr
-                      : 'chat.replyWorking'.tr,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, color: context.vita.text),
-            ),
-          ),
-          if (failed)
-            TextButton(
-              onPressed: ctrl.retryReply,
-              child: Text('chat.replyRetry'.tr),
-            ),
-        ]),
-      ));
     }
 
     return ListView(

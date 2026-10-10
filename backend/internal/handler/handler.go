@@ -1422,21 +1422,45 @@ func SendMessage(c *gin.Context) {
 	}
 	userMessage := &agent.SavedMessage{ID: msgID, ConversationID: conversationID, SenderType: "user", MessageType: req.MessageType, Content: req.Content, MediaURL: mediaURL, Payload: map[string]any{}, Source: "user", LifeEventID: activeLifeID.String, DeliveryStatus: "delivered", CreatedAt: createdAt}
 	response := SendMessageResponse{ID: msgID, Content: req.Content, Sender: "user", Created: createdAt, UserMessage: userMessage, TrialExpiresAt: trialExpiresAt}
+	// The user message is committed. Keep reply generation and recovery queue
+	// writes alive even if the client leaves the chat or its request is canceled.
+	postCommitCtx, postCommitCancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 50*time.Second)
+	defer postCommitCancel()
 	if companionAgent == nil {
 		response.AgentError = "agent service is unavailable"
 		response.ReplyStatus = "failed"
 		c.JSON(http.StatusCreated, response)
 		return
 	}
+	if routeErr := companionAgent.CheckChatRoute(postCommitCtx, companionID, userID); errors.Is(routeErr, agent.ErrModelRouteUnavailable) {
+		_, queueErr := db.Get().ExecContext(postCommitCtx, `INSERT INTO pending_agent_replies(conversation_id,user_id,companion_id,trigger_message_id,scheduled_at,status,last_error)
+			VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP,'failed',$5) ON CONFLICT(conversation_id) DO UPDATE SET
+			trigger_message_id=EXCLUDED.trigger_message_id,status='failed',attempts=0,last_error=EXCLUDED.last_error,
+			created_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP`, conversationID, userID, companionID, msgID, routeErr.Error())
+		response.ReplyStatus = "failed"
+		if queueErr != nil {
+			response.AgentError = "failed to record unavailable reply route"
+		}
+		c.JSON(http.StatusCreated, response)
+		return
+	}
+	// A terminal failure belongs to the previous message. The next message
+	// should get a fresh direct reply attempt instead of inheriting pending.
+	if _, err := db.Get().ExecContext(postCommitCtx, `DELETE FROM pending_agent_replies WHERE conversation_id=$1 AND status='failed'`, conversationID); err != nil {
+		response.AgentError = "failed to clear previous reply"
+		response.ReplyStatus = "failed"
+		c.JSON(http.StatusCreated, response)
+		return
+	}
 	var pending bool
-	if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT EXISTS(SELECT 1 FROM pending_agent_replies WHERE conversation_id=$1)`, conversationID).Scan(&pending); err != nil {
+	if err := db.Get().QueryRowContext(postCommitCtx, `SELECT EXISTS(SELECT 1 FROM pending_agent_replies WHERE conversation_id=$1)`, conversationID).Scan(&pending); err != nil {
 		response.AgentError = "failed to check pending reply"
 		response.ReplyStatus = "failed"
 		c.JSON(http.StatusCreated, response)
 		return
 	}
 	if pending {
-		_, err := db.Get().ExecContext(c.Request.Context(), `UPDATE pending_agent_replies SET trigger_message_id=$2,status='pending',attempts=0,
+		_, err := db.Get().ExecContext(postCommitCtx, `UPDATE pending_agent_replies SET trigger_message_id=$2,status='pending',attempts=0,
 			scheduled_at=LEAST(scheduled_at,CURRENT_TIMESTAMP),last_error='',created_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE conversation_id=$1`, conversationID, msgID)
 		if err == nil {
 			response.ReplyStatus = "pending"
@@ -1447,19 +1471,19 @@ func SendMessage(c *gin.Context) {
 		c.JSON(http.StatusCreated, response)
 		return
 	}
-	replyCtx, cancel := context.WithTimeout(c.Request.Context(), 40*time.Second)
+	replyCtx, cancel := context.WithTimeout(postCommitCtx, 40*time.Second)
 	defer cancel()
 	reply, replyErr := companionAgent.Reply(replyCtx, conversationID, userID)
 	if replyErr != nil {
 		var replySaved bool
-		if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT EXISTS(SELECT 1 FROM messages
+		if err := db.Get().QueryRowContext(postCommitCtx, `SELECT EXISTS(SELECT 1 FROM messages
 			WHERE conversation_id=$1 AND sender_type='assistant' AND source='reply' AND created_at>=$2)`, conversationID, createdAt).Scan(&replySaved); err == nil && replySaved {
 			response.ReplyStatus = "none"
 			c.JSON(http.StatusCreated, response)
 			return
 		}
 		if errors.Is(replyErr, agent.ErrModelRouteUnavailable) {
-			_, queueErr := db.Get().ExecContext(c.Request.Context(), `INSERT INTO pending_agent_replies(conversation_id,user_id,companion_id,trigger_message_id,scheduled_at,status,last_error)
+			_, queueErr := db.Get().ExecContext(postCommitCtx, `INSERT INTO pending_agent_replies(conversation_id,user_id,companion_id,trigger_message_id,scheduled_at,status,last_error)
 				VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP,'failed',$5) ON CONFLICT(conversation_id) DO UPDATE SET
 				trigger_message_id=EXCLUDED.trigger_message_id,status='failed',last_error=EXCLUDED.last_error,
 				created_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP`, conversationID, userID, companionID, msgID, replyErr.Error())
@@ -1470,7 +1494,7 @@ func SendMessage(c *gin.Context) {
 			c.JSON(http.StatusCreated, response)
 			return
 		}
-		_, queueErr := db.Get().ExecContext(c.Request.Context(), `INSERT INTO pending_agent_replies(conversation_id,user_id,companion_id,trigger_message_id,scheduled_at)
+		_, queueErr := db.Get().ExecContext(postCommitCtx, `INSERT INTO pending_agent_replies(conversation_id,user_id,companion_id,trigger_message_id,scheduled_at)
 			VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP) ON CONFLICT(conversation_id) DO UPDATE SET
 			trigger_message_id=EXCLUDED.trigger_message_id,status='pending',attempts=0,scheduled_at=CURRENT_TIMESTAMP,
 			last_error='',created_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP`, conversationID, userID, companionID, msgID)
@@ -1500,16 +1524,19 @@ func GetReplyStatus(c *gin.Context) {
 		WHERE conversation_id=$1 AND status IN ('pending','processing') AND created_at<CURRENT_TIMESTAMP-INTERVAL '7 minutes'`, conversationID)
 	var status string
 	var ageSeconds int
-	if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT status,GREATEST(0,EXTRACT(EPOCH FROM CURRENT_TIMESTAMP-created_at)::int)
-		FROM pending_agent_replies WHERE conversation_id=$1`, conversationID).Scan(&status, &ageSeconds); errors.Is(err, sql.ErrNoRows) {
+	var triggerMessageID string
+	if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT p.status,GREATEST(0,EXTRACT(EPOCH FROM CURRENT_TIMESTAMP-m.created_at)::int),p.trigger_message_id
+		FROM pending_agent_replies p JOIN messages m ON m.id=p.trigger_message_id WHERE p.conversation_id=$1`, conversationID).Scan(&status, &ageSeconds, &triggerMessageID); errors.Is(err, sql.ErrNoRows) {
 		status = "none"
 	} else if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load reply status"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": status, "age_seconds": ageSeconds})
+	c.JSON(http.StatusOK, gin.H{"status": status, "age_seconds": ageSeconds, "trigger_message_id": triggerMessageID})
 }
 
+// Retained for app versions already using this endpoint; the current chat UI
+// handles recovery automatically and does not offer a manual retry action.
 func RetryReply(c *gin.Context) {
 	conversationID, userID := c.Param("id"), c.GetString("user_id")
 	result, err := db.Get().ExecContext(c.Request.Context(), `UPDATE pending_agent_replies p SET status='pending',attempts=0,
