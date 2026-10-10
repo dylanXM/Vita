@@ -16,6 +16,7 @@ class MemoriesController extends GetxController {
   static MemoriesController get to => Get.find();
 
   final companionsLoading = false.obs;
+  final companionsFailed = false.obs;
   final memoriesLoading = false.obs;
   final companions = <Map<String, dynamic>>[].obs;
   final memories = <Map<String, dynamic>>[].obs;
@@ -24,20 +25,39 @@ class MemoriesController extends GetxController {
   final journeyLoadingMore = false.obs;
   final journeyFailed = false.obs;
   final journeyHasMore = false.obs;
+  bool journeyInitialized = false;
   final activeCompanionId = RxnString();
   String? _journeyCompanionId;
   String _journeyQuery = '';
   int _journeyOffset = 0;
   int _journeyRequest = 0;
+  int _companionsRequest = 0;
 
   @override
   void onInit() {
     super.onInit();
-    loadCompanions();
-    loadJourney();
+    // Tab data is requested when the tab is first shown after sign-in.
+  }
+
+  void prepareForShell() {
+    ++_journeyRequest;
+    ++_companionsRequest;
+    journeyInitialized = false;
+    journey.clear();
+    companions.clear();
+    journeyLoading.value = false;
+    journeyLoadingMore.value = false;
+    companionsLoading.value = false;
+    journeyFailed.value = false;
+    companionsFailed.value = false;
+    journeyHasMore.value = false;
+    _journeyOffset = 0;
+    _journeyCompanionId = null;
+    _journeyQuery = '';
   }
 
   Future<void> loadJourney({String? companionId, String query = ''}) async {
+    journeyInitialized = true;
     _journeyCompanionId = companionId;
     _journeyQuery = query.trim();
     final request = ++_journeyRequest;
@@ -53,7 +73,8 @@ class MemoriesController extends GetxController {
         if (_journeyQuery.isNotEmpty) 'q': _journeyQuery,
       });
       if (request != _journeyRequest) return;
-      final payload = data is Map ? data : const {};
+      if (data is! Map) throw StateError('invalid journey response');
+      final payload = data;
       journey.assignAll((payload['items'] as List? ?? const [])
           .whereType<Map>()
           .map((item) => Map<String, dynamic>.from(item)));
@@ -99,20 +120,25 @@ class MemoriesController extends GetxController {
   }
 
   Future<void> loadCompanions() async {
+    final request = ++_companionsRequest;
     companionsLoading.value = true;
+    companionsFailed.value = false;
     try {
       final data = await ApiClient.instance.get('/v1/companions');
-      if (data is List) {
-        companions.assignAll(
-          data
-              .whereType<Map<String, dynamic>>()
-              .where((item) => item['creation_source'] != 'ai_pet')
-              .map((item) => Map<String, dynamic>.from(item)),
-        );
-      }
+      if (request != _companionsRequest) return;
+      if (data is! List) throw StateError('invalid companions response');
+      companions.assignAll(
+        data
+            .whereType<Map<String, dynamic>>()
+            .where((item) => item['creation_source'] != 'ai_pet')
+            .map((item) => Map<String, dynamic>.from(item)),
+      );
     } catch (_) {
+      if (request == _companionsRequest && companions.isEmpty) {
+        companionsFailed.value = true;
+      }
     } finally {
-      companionsLoading.value = false;
+      if (request == _companionsRequest) companionsLoading.value = false;
     }
   }
 
@@ -425,23 +451,32 @@ class _MemoriesPageState extends State<MemoriesPage> {
               controller.journey.isEmpty)
             SliverList.builder(
               itemCount: 3,
-              itemBuilder: (_, __) => const VitaSkeletonCard(withAvatar: true),
+              itemBuilder: (_, __) => const Padding(
+                padding: EdgeInsets.fromLTRB(18, 0, 18, 8),
+                child: SizedBox(
+                  height: 144,
+                  child: VitaSkeleton(height: 144, radius: 18),
+                ),
+              ),
             )
           else if (controller.journey.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
               child: VitaEmpty(
-                icon: controller.journeyFailed.value
+                icon: controller.journeyFailed.value ||
+                        controller.companionsFailed.value
                     ? Icons.wifi_off_outlined
                     : Icons.auto_stories_outlined,
-                title: controller.journeyFailed.value
+                title: controller.journeyFailed.value ||
+                        controller.companionsFailed.value
                     ? 'common.loadFailed'.tr
                     : _query.isNotEmpty
                         ? 'contacts.noResults'.tr
                         : controller.companions.isEmpty
                             ? 'memories.createFirst'.tr
                             : 'memories.empty'.tr,
-                subtitle: controller.journeyFailed.value
+                subtitle: controller.journeyFailed.value ||
+                        controller.companionsFailed.value
                     ? 'common.pullToRetry'.tr
                     : _query.isNotEmpty
                         ? 'contacts.noResultsSub'.tr

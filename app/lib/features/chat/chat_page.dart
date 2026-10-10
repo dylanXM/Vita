@@ -569,7 +569,8 @@ class _ChatPageState extends State<ChatPage> {
             child: Text(
               failed
                   ? 'chat.replyFailed'.tr
-                  : replyStatus == 'pending' || replyStatus == 'processing'
+                  : (replyStatus == 'pending' || replyStatus == 'processing') &&
+                          ctrl.replyWaitSeconds.value >= 60
                       ? 'chat.replyPending'.tr
                       : 'chat.replyWorking'.tr,
               maxLines: 2,

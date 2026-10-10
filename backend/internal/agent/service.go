@@ -34,6 +34,8 @@ type Service struct {
 	media  *storage.Service
 }
 
+var ErrModelRouteUnavailable = errors.New("model route unavailable")
+
 type SavedMessage struct {
 	ID             string         `json:"id"`
 	ConversationID string         `json:"conversation_id"`
@@ -338,8 +340,8 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 		return nil, err
 	}
 	// Do not hold a short direct-chat request open for optional speech.
-	deadline, hasDeadline := ctx.Deadline()
-	if profile.VoiceEnabled && (!hasDeadline || time.Until(deadline) > 30*time.Second) {
+	_, hasDeadline := ctx.Deadline()
+	if profile.VoiceEnabled && !hasDeadline {
 		if audioModels, modelErr := s.loadModelRouteModels(ctx, "audio_speech", userID); modelErr == nil {
 			voice := "alloy"
 			voiceConfig := map[string]any{}
@@ -901,8 +903,8 @@ func (s *Service) DispatchDueReplies(ctx context.Context) error {
 			}
 		} else {
 			retry := time.Now().UTC().Add(time.Duration(1<<min(item.attempts, 2)) * time.Minute)
-			_, _ = s.db.ExecContext(ctx, `UPDATE pending_agent_replies SET status=CASE WHEN attempts+1>=3 THEN 'failed' ELSE 'pending' END,
-				attempts=attempts+1,scheduled_at=$2,last_error=$3,updated_at=CURRENT_TIMESTAMP WHERE conversation_id=$1 AND status='processing'`, item.conversationID, retry, truncate(err.Error(), 1000))
+			_, _ = s.db.ExecContext(ctx, `UPDATE pending_agent_replies SET status=CASE WHEN $4 OR attempts+1>=3 THEN 'failed' ELSE 'pending' END,
+				attempts=attempts+1,scheduled_at=$2,last_error=$3,updated_at=CURRENT_TIMESTAMP WHERE conversation_id=$1 AND status='processing'`, item.conversationID, retry, truncate(err.Error(), 1000), errors.Is(err, ErrModelRouteUnavailable))
 		}
 	}
 	return nil
@@ -2257,13 +2259,13 @@ func (s *Service) loadModelRouteModels(ctx context.Context, routeKey, userID str
 	err := s.db.QueryRowContext(ctx, `SELECT enabled,primary_model_id,fallback_model_ids::text,media_type
 		FROM agent_media_routes WHERE route_key=$1`, routeKey).Scan(&enabled, &primary, &fallbackRaw, &mediaType)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("model behavior %s is not configured", routeKey)
+		return nil, fmt.Errorf("%w: model behavior %s is not configured", ErrModelRouteUnavailable, routeKey)
 	}
 	if err != nil {
 		return nil, err
 	}
 	if !enabled || !primary.Valid || strings.TrimSpace(primary.String) == "" {
-		return nil, fmt.Errorf("model behavior %s is not configured", routeKey)
+		return nil, fmt.Errorf("%w: model behavior %s is not configured", ErrModelRouteUnavailable, routeKey)
 	}
 	ids := make([]string, 0)
 	if userID != "" {
@@ -2324,7 +2326,7 @@ func (s *Service) loadModelRouteModels(ctx context.Context, routeKey, userID str
 		}
 	}
 	if len(models) == 0 {
-		return nil, fmt.Errorf("model behavior %s has no available models", routeKey)
+		return nil, fmt.Errorf("%w: model behavior %s has no available models", ErrModelRouteUnavailable, routeKey)
 	}
 	return models, nil
 }

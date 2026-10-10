@@ -31,14 +31,25 @@ class ShellController extends GetxController {
 
   void switchTo(int i) {
     if (i == index.value) return;
+    if (i == 1) {
+      final memories = MemoriesController.to;
+      memories.loadCompanions();
+      if (journeyFocusCompanionId.value == null &&
+          !memories.journeyInitialized) {
+        memories.journeyLoading.value = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (index.value == 1 && !memories.journeyInitialized) {
+            memories.loadJourney();
+          }
+        });
+      }
+    }
     const tabs = ['world', 'journey', 'discover', 'me'];
     AnalyticsService.to.track('tab_selected',
         category: 'navigation',
         properties: {'from': tabs[index.value], 'to': tabs[i]});
     index.value = i;
-    if (i == 1) {
-      MemoriesController.to.loadCompanions();
-    } else if (i == 2) {
+    if (i == 2) {
       ExploreController.to.loadPosts();
       ExploreController.to.loadHighlights();
     }
@@ -56,6 +67,9 @@ class _ShellPageState extends State<ShellPage> {
   @override
   void initState() {
     super.initState();
+    ShellController.to.index.value = 0;
+    ShellController.to.journeyFocusCompanionId.value = null;
+    MemoriesController.to.prepareForShell();
     AdmobController.to.refreshConfig();
     PushNotificationService.instance.activateForSignedInUser();
     WidgetsBinding.instance.addPostFrameCallback((_) async {

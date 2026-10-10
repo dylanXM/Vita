@@ -26,12 +26,14 @@ class ChatController extends GetxController {
   final companionBusy = false.obs;
   final replyStatus = 'none'.obs;
   final replyWorking = false.obs;
+  final replyWaitSeconds = 0.obs;
   final trialStatus = 'none'.obs;
   final trialExpiresAt = RxnString();
   String? _conversationId;
   Timer? _pollTimer;
   Timer? _trialTimer;
   Timer? _replyTimer;
+  DateTime? _replyStartedAt;
   bool _polling = false;
 
   @override
@@ -169,13 +171,36 @@ class ChatController extends GetxController {
         .get('/v1/conversations/$_conversationId/reply-status');
     if (data is Map && data['status'] is String) {
       replyStatus.value = data['status'] as String;
+      replyWaitSeconds.value = (data['age_seconds'] as num?)?.toInt() ?? 0;
+      if (_latestUserHasReply) replyStatus.value = 'none';
       if (replyStatus.value == 'none') replyWorking.value = false;
     }
   }
 
+  bool get _latestUserHasReply {
+    DateTime? latestUser;
+    DateTime? latestReply;
+    for (final message in messages) {
+      final at = DateTime.tryParse('${message['created_at'] ?? ''}');
+      if (at == null) continue;
+      if (message['sender_type'] == 'user' &&
+          message['delivery_status'] != 'failed') {
+        if (latestUser == null || at.isAfter(latestUser)) latestUser = at;
+      } else if (message['sender_type'] == 'assistant' &&
+          message['source'] == 'reply') {
+        if (latestReply == null || at.isAfter(latestReply)) latestReply = at;
+      }
+    }
+    return latestUser != null &&
+        latestReply != null &&
+        !latestReply.isBefore(latestUser);
+  }
+
   void _beginReplyWait() {
+    _replyStartedAt = DateTime.now();
     replyStatus.value = 'none';
     replyWorking.value = false;
+    replyWaitSeconds.value = 0;
     _replyTimer?.cancel();
     _replyTimer = Timer(const Duration(seconds: 3), () {
       if (sending.value) replyWorking.value = true;
@@ -193,6 +218,12 @@ class ChatController extends GetxController {
           : data['reply_status'] == 'none'
               ? 'none'
               : 'failed';
+      if (replyStatus.value == 'pending') {
+        replyWaitSeconds.value = DateTime.now()
+            .difference(_replyStartedAt ?? DateTime.now())
+            .inSeconds;
+        if (_latestUserHasReply) replyStatus.value = 'none';
+      }
     }
   }
 

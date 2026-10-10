@@ -1447,7 +1447,7 @@ func SendMessage(c *gin.Context) {
 		c.JSON(http.StatusCreated, response)
 		return
 	}
-	replyCtx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+	replyCtx, cancel := context.WithTimeout(c.Request.Context(), 40*time.Second)
 	defer cancel()
 	reply, replyErr := companionAgent.Reply(replyCtx, conversationID, userID)
 	if replyErr != nil {
@@ -1455,6 +1455,18 @@ func SendMessage(c *gin.Context) {
 		if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT EXISTS(SELECT 1 FROM messages
 			WHERE conversation_id=$1 AND sender_type='assistant' AND source='reply' AND created_at>=$2)`, conversationID, createdAt).Scan(&replySaved); err == nil && replySaved {
 			response.ReplyStatus = "none"
+			c.JSON(http.StatusCreated, response)
+			return
+		}
+		if errors.Is(replyErr, agent.ErrModelRouteUnavailable) {
+			_, queueErr := db.Get().ExecContext(c.Request.Context(), `INSERT INTO pending_agent_replies(conversation_id,user_id,companion_id,trigger_message_id,scheduled_at,status,last_error)
+				VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP,'failed',$5) ON CONFLICT(conversation_id) DO UPDATE SET
+				trigger_message_id=EXCLUDED.trigger_message_id,status='failed',last_error=EXCLUDED.last_error,
+				created_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP`, conversationID, userID, companionID, msgID, replyErr.Error())
+			response.ReplyStatus = "failed"
+			if queueErr != nil {
+				response.AgentError = "failed to record unavailable reply route"
+			}
 			c.JSON(http.StatusCreated, response)
 			return
 		}
@@ -1487,13 +1499,15 @@ func GetReplyStatus(c *gin.Context) {
 	_, _ = db.Get().ExecContext(c.Request.Context(), `UPDATE pending_agent_replies SET status='failed',last_error='reply overdue',updated_at=CURRENT_TIMESTAMP
 		WHERE conversation_id=$1 AND status IN ('pending','processing') AND created_at<CURRENT_TIMESTAMP-INTERVAL '7 minutes'`, conversationID)
 	var status string
-	if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT status FROM pending_agent_replies WHERE conversation_id=$1`, conversationID).Scan(&status); errors.Is(err, sql.ErrNoRows) {
+	var ageSeconds int
+	if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT status,GREATEST(0,EXTRACT(EPOCH FROM CURRENT_TIMESTAMP-created_at)::int)
+		FROM pending_agent_replies WHERE conversation_id=$1`, conversationID).Scan(&status, &ageSeconds); errors.Is(err, sql.ErrNoRows) {
 		status = "none"
 	} else if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load reply status"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": status})
+	c.JSON(http.StatusOK, gin.H{"status": status, "age_seconds": ageSeconds})
 }
 
 func RetryReply(c *gin.Context) {

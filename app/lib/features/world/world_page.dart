@@ -251,6 +251,11 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    final companions = ChatListController.to;
+    companions.prepareInitialLoad();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) companions.load();
+    });
     _sceneTimer = Timer.periodic(
       const Duration(minutes: 1),
       (_) => _refreshVisibleScene(),
@@ -357,8 +362,42 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
             ),
             Expanded(
               child: current == null
-                  ? Center(
-                      child: _EmptyRelationship(onCreate: _createCompanion))
+                  ? controller.loading.value
+                      ? Padding(
+                          padding: EdgeInsets.only(
+                            top: 14,
+                            bottom: VitaTabBar.reservedHeight + 50,
+                          ),
+                          child: FractionallySizedBox(
+                            widthFactor: .84,
+                            child: const VitaSkeleton(
+                              height: double.infinity,
+                              radius: 30,
+                            ),
+                          ),
+                        )
+                      : controller.failed.value
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.wifi_off_outlined,
+                                      size: 42, color: context.vita.subText),
+                                  const SizedBox(height: 12),
+                                  Text('common.loadFailed'.tr,
+                                      style:
+                                          TextStyle(color: context.vita.text)),
+                                  const SizedBox(height: 12),
+                                  TextButton(
+                                    onPressed: () => controller.load(),
+                                    child: Text('common.retry'.tr),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : Center(
+                              child: _EmptyRelationship(
+                                  onCreate: _createCompanion))
                   : Padding(
                       padding: EdgeInsets.only(
                         top: 14,

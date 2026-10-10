@@ -16,18 +16,21 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
   static ChatListController get to => Get.find();
 
   final loading = false.obs;
+  final failed = false.obs;
   final companions = <Map<String, dynamic>>[].obs;
   final searchQuery = ''.obs;
 
   Timer? _poll;
   bool _silent = false;
+  int _requestId = 0;
 
   @override
   void onInit() {
     super.onInit();
     WidgetsBinding.instance.addObserver(this);
     load();
-    _poll = Timer.periodic(const Duration(seconds: 30), (_) => load(silent: true));
+    _poll =
+        Timer.periodic(const Duration(seconds: 30), (_) => load(silent: true));
   }
 
   @override
@@ -44,24 +47,41 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
     }
   }
 
+  void prepareInitialLoad() {
+    ++_requestId;
+    companions.clear();
+    loading.value = true;
+    failed.value = false;
+    _silent = false;
+  }
+
   Future<void> load({bool silent = false}) async {
-    if (silent && _silent) return;
+    if (silent && (_silent || loading.value)) return;
+    final requestId = ++_requestId;
     _silent = silent;
-    if (!silent) loading.value = true;
+    if (!silent) {
+      loading.value = true;
+      failed.value = false;
+    }
     try {
       final data = await ApiClient.instance.get('/v1/companions');
-      if (data is List) {
-        companions.assignAll(
-          data.whereType<Map<String, dynamic>>()
-              .where((e) => e['creation_source'] != 'ai_pet')
-              .map((e) => Map<String, dynamic>.from(e)),
-        );
-      }
+      if (requestId != _requestId) return;
+      if (data is! List) throw StateError('invalid companions response');
+      companions.assignAll(
+        data
+            .whereType<Map<String, dynamic>>()
+            .where((e) => e['creation_source'] != 'ai_pet')
+            .map((e) => Map<String, dynamic>.from(e)),
+      );
     } catch (_) {
-      // keep the previous list; the empty state explains itself
+      if (requestId == _requestId && !silent && companions.isEmpty) {
+        failed.value = true;
+      }
     } finally {
-      loading.value = false;
-      _silent = false;
+      if (requestId == _requestId) {
+        loading.value = false;
+        _silent = false;
+      }
     }
   }
 
