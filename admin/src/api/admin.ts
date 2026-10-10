@@ -56,6 +56,7 @@ import type {
   StorageConfig,
   StorageConfigInput,
   StorageProvider,
+  ProductMetrics,
 } from "./types";
 
 /** Admin sign-in. The API also accepts a 6-digit code for the same accounts. */
@@ -68,6 +69,8 @@ export const authApi = {
 /** Live counts behind the dashboard tiles. */
 export const statsApi = {
   get: (signal?: AbortSignal) => http.get<AdminStats>("/admin/stats", { signal }),
+  product: (days: 7 | 30, signal?: AbortSignal) =>
+    http.get<ProductMetrics>("/admin/product-metrics", { params: { days }, signal }),
 };
 
 /** Admin user management — every call is admin-only on the server. */

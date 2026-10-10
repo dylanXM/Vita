@@ -167,6 +167,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		`CREATE INDEX IF NOT EXISTS idx_verification_codes_expires ON verification_codes(expires_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_users_product_metrics ON users(environment,role_id,created_at)`,
 		`CREATE TABLE IF NOT EXISTS credit_transactions (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL REFERENCES users(id),
@@ -372,6 +373,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			UNIQUE(provider, transaction_id)
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_billing_purchases_scope ON billing_purchases(environment, platform, purchased_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_billing_purchases_metrics ON billing_purchases(environment,status,purchased_at DESC,user_id)`,
 		`CREATE TABLE IF NOT EXISTS admin_grant_operations (
 			id TEXT PRIMARY KEY,
 			operator_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
@@ -429,6 +431,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_conversations_user_companion ON conversations(user_id,companion_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_messages_conversation_created ON messages(conversation_id,created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_messages_product_metrics ON messages(created_at DESC,conversation_id) WHERE sender_type='user'`,
 		`CREATE TABLE IF NOT EXISTS memories (
 			id TEXT PRIMARY KEY,
 			companion_id TEXT NOT NULL REFERENCES companions(id),
@@ -641,6 +644,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_companion_gifts_companion ON companion_gifts(companion_id, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_companion_gifts_product_metrics ON companion_gifts(created_at DESC,user_id)`,
 		`ALTER TABLE companion_gifts ADD COLUMN IF NOT EXISTS product_key TEXT NOT NULL DEFAULT 'gift_coins'`,
 		`ALTER TABLE companions ADD COLUMN IF NOT EXISTS equipped_outfit_key TEXT NOT NULL DEFAULT ''`,
 		`CREATE TABLE IF NOT EXISTS ai_pet_breeds (
@@ -948,6 +952,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		`ALTER TABLE analytics_events ALTER COLUMN environment SET DEFAULT 'prod'`,
 		`CREATE INDEX IF NOT EXISTS idx_analytics_events_install ON analytics_events(anonymous_id,created_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_analytics_events_scope ON analytics_events(environment,platform,event_name,created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_analytics_events_product_metrics ON analytics_events(environment,created_at DESC,user_id) WHERE user_id IS NOT NULL`,
 		`ALTER TABLE notification_outbox ALTER COLUMN channel SET DEFAULT 'push'`,
 		`CREATE TABLE IF NOT EXISTS device_push_tokens (
 			id TEXT PRIMARY KEY,
@@ -1059,6 +1064,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_world_one_visit_per_day ON world_interactions(companion_id,local_date) WHERE kind='visit'`,
 		`CREATE INDEX IF NOT EXISTS idx_world_interactions_companion ON world_interactions(companion_id,created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_world_interactions_product_metrics ON world_interactions(created_at DESC,user_id) WHERE kind='visit'`,
 		`CREATE TABLE IF NOT EXISTS companion_moment_sessions (
 			event_id TEXT PRIMARY KEY REFERENCES life_events(id) ON DELETE CASCADE,
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

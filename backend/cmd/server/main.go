@@ -266,6 +266,7 @@ func main() {
 		{
 			admin.POST("/images", handler.AdminUploadImage)
 			admin.GET("/stats", handler.AdminStats)
+			admin.GET("/product-metrics", handler.AdminProductMetrics)
 			admin.GET("/storage-config", handler.AdminGetStorageConfig)
 			admin.PUT("/storage-config", handler.AdminUpdateStorageConfig)
 			admin.POST("/storage-config/test", handler.AdminTestStorageConfig)

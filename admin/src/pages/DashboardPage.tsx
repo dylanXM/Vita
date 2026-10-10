@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { statsApi, healthApi } from "@/api/admin";
 import { formatDate, formatNumber, relativeTime } from "@/lib/format";
+import { ProductMetricsPanel } from "./ProductMetricsPanel";
 
 export function DashboardPage() {
   const { t } = useTranslation();
@@ -120,6 +121,8 @@ export function DashboardPage() {
           loading={loading}
         />
       </div>
+
+      <ProductMetricsPanel />
 
       <Card>
         <CardHeader>

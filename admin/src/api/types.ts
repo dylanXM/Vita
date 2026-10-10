@@ -39,6 +39,44 @@ export interface AdminStats {
   generated_at: string;
 }
 
+/** Complete database-calendar days; retention cohorts use 30 eligible signup days. */
+export interface ProductMetrics {
+  days: 7 | 30;
+  window_start: string;
+  window_end_exclusive: string;
+  generated_at: string;
+  new_users: number;
+  active_users: number;
+  repeat_active_users: number;
+  active_yesterday: number;
+  active_30d: number;
+  meaningful_repeat_users: number;
+  new_chat_users: number;
+  new_visit_users: number;
+  activated_new_users: number;
+  messages: number;
+  visits: number;
+  gifts: number;
+  paying_users: number;
+  purchases: number;
+  subscription_purchases: number;
+  coin_pack_purchases: number;
+  purchases_with_amount: number;
+  due_experiences: number;
+  completed_experiences: number;
+  d1: { cohort_users: number; retained_users: number; rate: number };
+  d7: { cohort_users: number; retained_users: number; rate: number };
+  daily: Array<{
+    date: string;
+    active_users: number;
+    new_users: number;
+    paying_users: number;
+    messages: number;
+    visits: number;
+    gifts: number;
+  }>;
+}
+
 /** The single content scope persisted in legacy environment columns. */
 export type Environment = "prod";
 
