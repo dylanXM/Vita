@@ -52,219 +52,386 @@ class MePage extends StatelessWidget {
     final auth = AuthController.to;
     final billing = BillingController.to;
     final vita = context.vita;
-    final plan = billing.isSubscribed
-        ? 'Vita ${billing.entitlements.join(' + ').toUpperCase()}'
-        : 'me.free'.tr;
-    final inviteCode = auth.profile.value?['invite_code'] as String? ?? '';
-
     return Scaffold(
       backgroundColor: vita.pageBg,
-      // Bottom is open so the list scrolls behind the floating glass tab bar.
+      // Settings is the final action; the version follows it as metadata.
       body: SafeArea(
         bottom: false,
         child: Obx(
-          () => ListView(
-            padding: const EdgeInsets.only(bottom: 90),
-            children: [
-              const VitaTabHeader(title: 'Vita', showDivider: false),
-              Container(
-                margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                decoration: BoxDecoration(
-                  color: vita.surface,
-                  border: Border.all(color: vita.divider),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                child: Row(
-                  children: [
-                    ClipOval(
-                      child: auth.avatarUrl.isEmpty
-                          ? Image.asset(
-                              'assets/icons/profile_default.png',
-                              width: 52,
-                              height: 52,
-                              fit: BoxFit.cover,
-                            )
-                          : SizedBox(
-                              width: 52,
-                              height: 52,
-                              child: VitaMediaImage(
-                                url: auth.avatarUrl,
-                                errorBuilder: (_, __, ___) => Image.asset(
-                                  'assets/icons/profile_default.png',
-                                  width: 52,
-                                  height: 52,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            auth.nickname.isNotEmpty
-                                ? auth.nickname
-                                : (auth.email.isEmpty
-                                    ? 'me.account'.tr
-                                    : auth.email),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                              color: vita.text,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            plan,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: vita.subText,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Subscription group.
-              VitaCard(
-                radius: 12,
-                margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Column(
-                  children: [
-                    VitaListTile(
-                      customIcon: const VitaMenuIcon(
-                        icon: Icons.workspace_premium_outlined,
-                        color: Color(0xFFE9A820),
-                      ),
-                      title: 'me.plus.title'.tr,
-                      subtitle: billing.isSubscribed
-                          ? 'me.plus.active'.trParams({
-                              'ent':
-                                  billing.entitlements.join(', ').toUpperCase(),
-                            })
-                          : 'me.plus.unlock'.tr,
-                      borderRadius: BorderRadius.zero,
-                      onTap: () {
-                        AnalyticsService.to.track('subscription_page_opened',
-                            category: 'billing', properties: {'source': 'me'});
-                        Get.to(() => const SubscriptionPage(),
-                            transition: Transition.cupertino,
-                            duration: const Duration(milliseconds: 300));
-                      },
-                    ),
-                    const Divider(indent: 52, height: 0.5),
-                    VitaListTile(
-                      customIcon: const VitaMenuIcon(
-                        icon: Icons.paid_outlined,
-                        color: Color(0xFFF1A33B),
-                      ),
-                      title: 'me.credits'.tr,
-                      subtitle: 'me.credits.available'.trParams({
-                        'n': '${billing.balance.value}',
-                      }),
-                      borderRadius: BorderRadius.zero,
-                      onTap: () {
-                        AnalyticsService.to.track('credits_page_opened',
-                            category: 'billing', properties: {'source': 'me'});
-                        Get.to(() => const CreditsPage(),
-                            transition: Transition.cupertino,
-                            duration: const Duration(milliseconds: 300));
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-              VitaCard(
-                radius: 12,
-                margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Column(children: [
-                  _MeAction(
-                    icon: Icons.card_giftcard_outlined,
-                    title: 'me.inviteCode'.tr,
-                    value: inviteCode.isEmpty ? '—' : inviteCode,
-                    onTap: inviteCode.isEmpty
-                        ? null
-                        : () async {
-                            AnalyticsService.to.track(
-                                'profile_invite_code_copied',
-                                category: 'profile');
-                            await Clipboard.setData(
-                                ClipboardData(text: inviteCode));
-                            VitaNotice.success(
-                                'me.inviteCode'.tr, 'me.inviteCopied'.tr);
-                          },
-                  ),
-                  const Divider(indent: 52, height: 0.5),
-                  _MeAction(
-                      icon: Icons.mail_outline_rounded,
-                      title: 'me.contact'.tr,
-                      onTap: _contactUs),
-                  const Divider(indent: 52, height: 0.5),
-                  _MeAction(
-                      icon: Icons.star_outline_rounded,
-                      title: 'me.rate'.tr,
-                      onTap: _rateApp),
-                ]),
-              ),
-
-              VitaCard(
-                radius: 12,
-                margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: _MeAction(
-                  icon: Icons.settings_outlined,
-                  title: 'me.settings'.tr,
-                  onTap: () {
-                    AnalyticsService.to
-                        .track('profile_settings_opened', category: 'profile');
-                    Get.to(() => const SettingsPage(),
+          () {
+            final inviteCode =
+                auth.profile.value?['invite_code'] as String? ?? '';
+            return ListView(
+              padding: const EdgeInsets.only(bottom: 90),
+              children: [
+                const VitaTabHeader(title: 'Vita', showDivider: false),
+                _LifePassport(
+                  name: auth.nickname.isNotEmpty
+                      ? auth.nickname
+                      : (auth.email.isEmpty ? 'me.account'.tr : auth.email),
+                  avatarUrl: auth.avatarUrl,
+                  plan: billing.isSubscribed
+                      ? 'Vita ${billing.entitlements.join(' + ').toUpperCase()}'
+                      : 'me.free'.tr,
+                  subscriptionStatus: billing.isSubscribed
+                      ? 'me.plus.active'.trParams({
+                          'ent': billing.entitlements.join(', ').toUpperCase(),
+                        })
+                      : 'me.plus.unlock'.tr,
+                  balance: billing.balance.value,
+                  inviteCode: inviteCode,
+                  onSubscription: () {
+                    AnalyticsService.to.track('subscription_page_opened',
+                        category: 'billing', properties: {'source': 'me'});
+                    Get.to(() => const SubscriptionPage(),
                         transition: Transition.cupertino,
                         duration: const Duration(milliseconds: 300));
                   },
+                  onCredits: () {
+                    AnalyticsService.to.track('credits_page_opened',
+                        category: 'billing', properties: {'source': 'me'});
+                    Get.to(() => const CreditsPage(),
+                        transition: Transition.cupertino,
+                        duration: const Duration(milliseconds: 300));
+                  },
+                  onCopy: inviteCode.isEmpty
+                      ? null
+                      : () async {
+                          AnalyticsService.to.track(
+                              'profile_invite_code_copied',
+                              category: 'profile');
+                          await Clipboard.setData(
+                              ClipboardData(text: inviteCode));
+                          VitaNotice.success(
+                              'me.inviteCode'.tr, 'me.inviteCopied'.tr);
+                        },
                 ),
-              ),
-
-              Obx(() {
-                final links = AppContentController.to.socialLinks.value;
-                if (links.isEmpty) return const SizedBox.shrink();
-                return _SocialMediaCard(links: links);
-              }),
-
-              const SizedBox(height: 24),
-              Text(
-                'me.version'.tr,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: vita.subText),
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                  child: Text('me.services'.tr,
+                      style: TextStyle(
+                          color: vita.subText,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600)),
+                ),
+                VitaCard(
+                  radius: 12,
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(children: [
+                    _MeAction(
+                        icon: Icons.mail_outline_rounded,
+                        title: 'me.contact'.tr,
+                        onTap: _contactUs),
+                    const Divider(indent: 52, height: 0.5),
+                    _MeAction(
+                        icon: Icons.star_outline_rounded,
+                        title: 'me.rate'.tr,
+                        onTap: _rateApp),
+                  ]),
+                ),
+                Obx(() {
+                  final links = AppContentController.to.socialLinks.value;
+                  if (links.isEmpty) return const SizedBox.shrink();
+                  return _SocialMediaCard(links: links);
+                }),
+                VitaCard(
+                  radius: 12,
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: _MeAction(
+                    icon: Icons.settings_outlined,
+                    title: 'me.settings'.tr,
+                    onTap: () {
+                      AnalyticsService.to.track('profile_settings_opened',
+                          category: 'profile');
+                      Get.to(() => const SettingsPage(),
+                          transition: Transition.cupertino,
+                          duration: const Duration(milliseconds: 300));
+                    },
+                  ),
+                ),
+                Text(
+                  'me.version'.tr,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: vita.subText),
+                ),
+                const SizedBox(height: 24),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 }
 
+class _LifePassport extends StatelessWidget {
+  const _LifePassport({
+    required this.name,
+    required this.avatarUrl,
+    required this.plan,
+    required this.subscriptionStatus,
+    required this.balance,
+    required this.inviteCode,
+    required this.onSubscription,
+    required this.onCredits,
+    required this.onCopy,
+  });
+
+  final String name;
+  final String avatarUrl;
+  final String plan;
+  final String subscriptionStatus;
+  final int balance;
+  final String inviteCode;
+  final VoidCallback onSubscription;
+  final VoidCallback onCredits;
+  final VoidCallback? onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final vita = context.vita;
+    return Container(
+      height: 252,
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: vita.divider),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [vita.greenTint, vita.surface, vita.surface],
+          stops: const [0, .48, 1],
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(23),
+        child: Stack(children: [
+          Positioned(
+            top: -46,
+            right: -34,
+            child: Container(
+              width: 142,
+              height: 142,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                    color: vita.green.withValues(alpha: .14), width: 1),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 17, 18, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  height: 65,
+                  child: Row(children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: avatarUrl.isEmpty
+                          ? Image.asset('assets/icons/profile_default.png',
+                              width: 62, height: 62, fit: BoxFit.cover)
+                          : SizedBox(
+                              width: 62,
+                              height: 62,
+                              child: VitaMediaImage(
+                                url: avatarUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Image.asset(
+                                  'assets/icons/profile_default.png',
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                    ),
+                    const SizedBox(width: 13),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: vita.text,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 4),
+                          Text(plan,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style:
+                                  TextStyle(color: vita.subText, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 14),
+                Row(children: [
+                  Expanded(
+                    child: _PassportAction(
+                      icon: Icons.workspace_premium_rounded,
+                      label: 'me.plus.title'.tr,
+                      value: subscriptionStatus,
+                      onTap: onSubscription,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _PassportAction(
+                      icon: Icons.paid_rounded,
+                      label: 'me.credits'.tr,
+                      value: '$balance',
+                      onTap: onCredits,
+                    ),
+                  ),
+                ]),
+                const Spacer(),
+                SizedBox(
+                  width: double.infinity,
+                  height: 1,
+                  child: CustomPaint(
+                    painter: _PassportPerforation(vita.divider),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 48,
+                  child: InkWell(
+                    onTap: onCopy,
+                    borderRadius: BorderRadius.circular(10),
+                    child: Row(children: [
+                      Icon(Icons.confirmation_number_outlined,
+                          color: vita.green, size: 20),
+                      const SizedBox(width: 11),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('me.inviteCode'.tr,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: vita.subText, fontSize: 11)),
+                            const SizedBox(height: 3),
+                            Text(inviteCode.isEmpty ? '—' : inviteCode,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: vita.text,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1)),
+                          ],
+                        ),
+                      ),
+                      if (onCopy != null)
+                        Icon(Icons.copy_rounded, color: vita.green, size: 18),
+                    ]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _PassportAction extends StatelessWidget {
+  const _PassportAction({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final vita = context.vita;
+    return Material(
+      color: vita.surface.withValues(alpha: .78),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          height: 68,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: vita.divider),
+          ),
+          child: Row(children: [
+            Icon(icon, size: 19, color: vita.green),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: vita.subText, fontSize: 11)),
+                  const SizedBox(height: 3),
+                  Text(value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: vita.text,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_outward_rounded, size: 14, color: vita.subText),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _PassportPerforation extends CustomPainter {
+  const _PassportPerforation(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1;
+    for (double x = 0; x < size.width; x += 8) {
+      canvas.drawLine(
+          Offset(x, 0), Offset((x + 4).clamp(0, size.width), 0), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PassportPerforation oldDelegate) =>
+      color != oldDelegate.color;
+}
+
 class _MeAction extends StatelessWidget {
   const _MeAction(
-      {required this.icon,
-      required this.title,
-      required this.onTap,
-      this.value});
+      {required this.icon, required this.title, required this.onTap});
 
   final IconData icon;
   final String title;
-  final String? value;
   final VoidCallback? onTap;
 
   @override
@@ -283,17 +450,6 @@ class _MeAction extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style:
                           TextStyle(color: context.vita.text, fontSize: 15))),
-              if (value != null)
-                Expanded(
-                    child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(value!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.right,
-                      style:
-                          TextStyle(color: context.vita.subText, fontSize: 13)),
-                )),
               const SizedBox(width: 6),
               Icon(Icons.chevron_right_rounded,
                   size: 20, color: context.vita.subText),

@@ -68,7 +68,7 @@ class _AIPetsPageState extends State<AIPetsPage> {
       return;
     }
     if (breed['can_adopt'] != true) {
-      await showSubscriptionPrompt('aiPets.subscriptionRequired'.tr);
+      await showSubscriptionPrompt(context, 'aiPets.subscriptionRequired'.tr);
       return;
     }
     final nameController =
@@ -134,7 +134,7 @@ class _AIPetsPageState extends State<AIPetsPage> {
       await _load();
     } on ApiException catch (error) {
       if (error.action == 'open_subscription') {
-        await showSubscriptionPrompt('aiPets.subscriptionRequired'.tr);
+        if (mounted) await showSubscriptionPrompt(context, 'aiPets.subscriptionRequired'.tr);
       } else {
         VitaNotice.error('aiPets.error'.tr, error.message);
       }

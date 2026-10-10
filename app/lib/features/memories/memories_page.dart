@@ -8,6 +8,9 @@ import '../../core/theme.dart';
 import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
 import '../life/life_detail_page.dart';
+import '../chat/chat_page.dart';
+import '../chat/companion_moment_page.dart';
+import '../shell/shell_page.dart';
 
 class MemoriesController extends GetxController {
   static MemoriesController get to => Get.find();
@@ -165,16 +168,67 @@ class MemoriesController extends GetxController {
 
 String _journeyContent(Map<String, dynamic> item) {
   final raw = '${item['content'] ?? ''}';
+  if (item['type'] == 'shared_experience' ||
+      item['type'] == 'experience_appointment') {
+    final stage = _journeyExperienceStage(item);
+    if (stage == 'booked') {
+      final metadata = item['metadata'] as Map?;
+      final start =
+          DateTime.tryParse('${metadata?['starts_at'] ?? ''}')?.toLocal();
+      return start == null
+          ? 'journey.booked'.tr
+          : 'journey.bookedAt'.trParams({
+              'date': formatDate(start),
+              'time': formatClock(start),
+            });
+    }
+    if (stage == 'active') {
+      return raw.isEmpty ? 'journey.inProgress'.tr : raw.tr;
+    }
+    if (stage == 'finished') {
+      return raw.isEmpty ? 'journey.finished'.tr : raw.tr;
+    }
+    if (raw.startsWith('experience.date.') && raw.endsWith('.desc')) {
+      return 'journey.legacyMoment'.tr;
+    }
+  }
   if (item['type'] == 'world_visit') {
-    if (raw == 'The user visited me today.') return 'world.visitMemory'.tr;
+    if (raw == 'The user visited me today.') return 'journey.visitMoment'.tr;
     if (raw == 'The user stayed with me during a visit.') {
-      return 'world.choiceStayResult'.tr;
+      return 'journey.visitStay'.tr;
     }
     if (raw == 'The user asked about my day during a visit.') {
-      return 'world.choiceAskResult'.tr;
+      return 'journey.visitAsk'.tr;
     }
   }
   return raw.tr;
+}
+
+String _journeyExperienceStage(Map<String, dynamic> item) {
+  if (item['type'] != 'shared_experience' &&
+      item['type'] != 'experience_appointment') {
+    return '';
+  }
+  final metadata = item['metadata'];
+  if (metadata is! Map || '${metadata['event_id'] ?? ''}'.isEmpty) {
+    return '';
+  }
+  final stage = '${metadata['stage'] ?? ''}';
+  return const {'booked', 'active', 'finished'}.contains(stage) ? stage : '';
+}
+
+String _journeyActionLabel(Map<String, dynamic> item) {
+  if (item['type'] == 'world_visit') return 'journey.viewMoment'.tr;
+  switch (_journeyExperienceStage(item)) {
+    case 'booked':
+      return 'journey.prepareExperience'.tr;
+    case 'active':
+      return 'journey.continueExperience'.tr;
+    case 'finished':
+      return 'journey.revisitExperience'.tr;
+    default:
+      return 'journey.openCompanion'.tr;
+  }
 }
 
 /// A searchable collection of companion journeys.
@@ -420,7 +474,7 @@ class _MemoriesPageState extends State<MemoriesPage> {
           itemBuilder: (context, index) {
             final item = group.items[index];
             return Padding(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
               child: _JourneyEventTile(
                 item: item,
                 onTap: () => _openEvent(context, item),
@@ -435,6 +489,24 @@ class _MemoriesPageState extends State<MemoriesPage> {
   void _openEvent(BuildContext context, Map<String, dynamic> item) {
     final companion =
         Map<String, dynamic>.from(item['companion'] as Map? ?? {});
+    final companionId = '${companion['id'] ?? ''}';
+    final metadata = item['metadata'] is Map
+        ? Map<String, dynamic>.from(item['metadata'] as Map)
+        : const <String, dynamic>{};
+    final eventId = '${metadata['event_id'] ?? ''}';
+    if (_journeyExperienceStage(item).isNotEmpty &&
+        companionId.isNotEmpty &&
+        eventId.isNotEmpty) {
+      Get.to(
+          () => CompanionMomentPage(
+                companionId: companionId,
+                eventId: eventId,
+                name: '${companion['name'] ?? ''}',
+                avatarUrl: companion['portrait_url'] as String?,
+              ),
+          transition: Transition.cupertino);
+      return;
+    }
     final time = DateTime.tryParse('${item['event_time'] ?? ''}')?.toLocal();
     final content = _journeyContent(item);
     showModalBottomSheet<void>(
@@ -470,6 +542,21 @@ class _MemoriesPageState extends State<MemoriesPage> {
                   style: TextStyle(
                       color: context.vita.text, fontSize: 16, height: 1.6)),
               const SizedBox(height: 24),
+              if (item['type'] == 'world_visit' && companionId.isNotEmpty) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      ShellController.to.selectedCompanionId.value =
+                          companionId;
+                      ShellController.to.switchTo(0);
+                    },
+                    child: Text('journey.enterWorld'.tr),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
               SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
@@ -480,6 +567,26 @@ class _MemoriesPageState extends State<MemoriesPage> {
                     },
                     child: Text('journey.openCompanion'.tr),
                   )),
+              if (companionId.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      Get.to(
+                          () => ChatPage(
+                                companionId: companionId,
+                                name: '${companion['name'] ?? ''}',
+                                companion: companion,
+                              ),
+                          transition: Transition.cupertino);
+                    },
+                    icon: const Icon(Icons.chat_bubble_outline_rounded),
+                    label: Text('world.talk'.tr),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -547,7 +654,7 @@ class _JourneyEventTile extends StatelessWidget {
     final isKeepsake = item['type'] == 'keepsake';
     final accent = context.vita.green;
     return SizedBox(
-      height: 190,
+      height: 144,
       child: Row(children: [
         SizedBox(
             width: 19,
@@ -560,7 +667,7 @@ class _JourneyEventTile extends StatelessWidget {
                     child: Container(
                         width: 1, color: accent.withValues(alpha: .36))),
                 Positioned(
-                    top: 34,
+                    top: 25,
                     child: Container(
                         width: 7,
                         height: 7,
@@ -620,7 +727,7 @@ class _JourneyEventTile extends StatelessWidget {
                 stops: const [0, .54, 1],
               )))),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 17, 18, 18),
+                padding: const EdgeInsets.fromLTRB(16, 12, 14, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -665,7 +772,7 @@ class _JourneyEventTile extends StatelessWidget {
                         alignment: Alignment.centerLeft,
                         widthFactor: .78,
                         child: Text(content,
-                            maxLines: title.isEmpty ? 3 : 2,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                                 color: context.vita.text,
@@ -674,12 +781,18 @@ class _JourneyEventTile extends StatelessWidget {
                                     ? FontWeight.w600
                                     : FontWeight.w400,
                                 height: 1.35))),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 7),
                     Row(children: [
-                      Text(time == null ? '' : formatDateSeparator(time),
-                          style: TextStyle(
-                              color: context.vita.subText, fontSize: 11)),
-                      const Spacer(),
+                      Expanded(
+                          child: Text(
+                        _journeyActionLabel(item),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: accent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600),
+                      )),
                       Icon(Icons.arrow_forward_rounded,
                           size: 16, color: accent),
                     ]),

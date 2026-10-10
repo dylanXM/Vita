@@ -16,7 +16,6 @@ import '../chat/chat_page.dart';
 import '../chat/experience_sheet.dart';
 import '../chat/gift_reveal_page.dart';
 import '../companion/companion_create_method_page.dart';
-import 'world_visit_page.dart';
 import '../shell/shell_page.dart';
 
 /// A relationship-first entrance with equal space for every companion.
@@ -34,6 +33,8 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
   String? _sceneCompanionId;
   Map<String, dynamic>? _scene;
   int _sceneRequestId = 0;
+  bool _visitBusy = false;
+  final Map<String, Map<String, dynamic>> _visitResults = {};
 
   Future<void> _loadScene(String id) async {
     if (id.isEmpty) return;
@@ -157,22 +158,35 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _openScene(
-      Map<String, dynamic> companion, Map<String, dynamic> scene) async {
-    final action = await Get.to<String>(
-        () => WorldVisitPage(
-              companion: companion,
-              scene: scene,
-              onVisited: () => _loadScene('${companion['id'] ?? ''}'),
-            ),
-        transition: Transition.cupertino);
-    if (!mounted) return;
-    if (action == 'chat') {
-      await _openChat(companion);
-    } else if (action == 'gift') {
-      await _openGift(companion);
-    } else if (action == 'note') {
-      await _leaveNote(companion);
+  void _centerCard(int page) {
+    if (page != _visiblePage && _pages?.hasClients == true) {
+      _pages!.animateToPage(page,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic);
+    }
+  }
+
+  Future<void> _chooseVisit(
+      Map<String, dynamic> companion, String choice) async {
+    if (_visitBusy) return;
+    final id = '${companion['id'] ?? ''}';
+    setState(() => _visitBusy = true);
+    try {
+      final data = await ApiClient.instance
+          .post('/v1/companions/$id/world/visit', data: {'choice': choice});
+      if (!mounted || data is! Map) return;
+      setState(() => _visitResults[id] = Map<String, dynamic>.from(data));
+      await _loadScene(id);
+    } on ApiException catch (error) {
+      if (error.action == 'open_subscription') {
+        if (mounted) await showSubscriptionPrompt(context, 'world.visitSubscription'.tr);
+      } else {
+        VitaNotice.error('world.visit'.tr, error.message);
+      }
+    } catch (_) {
+      VitaNotice.error('world.visit'.tr, 'world.actionFailed'.tr);
+    } finally {
+      if (mounted) setState(() => _visitBusy = false);
     }
   }
 
@@ -229,7 +243,7 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
 
   Future<void> _createCompanion() async {
     if (!BillingController.to.isSubscribed) {
-      await showSubscriptionPrompt('subscription.required.create'.tr);
+      await showSubscriptionPrompt(context, 'subscription.required.create'.tr);
       return;
     }
     await Get.to(() => const CompanionCreateMethodPage(),
@@ -328,9 +342,12 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
                                 companion: current,
                                 scene: activeScene,
                                 onChat: () => _openChat(current),
-                                onOpenScene: activeScene == null
-                                    ? null
-                                    : () => _openScene(current, activeScene),
+                                onGift: () => _openGift(current),
+                                onNote: () => _leaveNote(current),
+                                visitBusy: _visitBusy,
+                                visitResult: _visitResults[currentId],
+                                onVisitChoice: (choice) =>
+                                    _chooseVisit(current, choice),
                               ),
                             )
                           : PageView.builder(
@@ -372,18 +389,27 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
                                       child: child,
                                     );
                                   },
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 5),
-                                    child: _RelationshipCard(
-                                      companion: item,
-                                      scene:
-                                          id == currentId ? activeScene : null,
-                                      onChat: () => _openChat(item),
-                                      onOpenScene: id == currentId &&
-                                              activeScene != null
-                                          ? () => _openScene(item, activeScene)
-                                          : null,
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.translucent,
+                                    onTap: page == _visiblePage
+                                        ? null
+                                        : () => _centerCard(page),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 5),
+                                      child: _RelationshipCard(
+                                        companion: item,
+                                        scene: id == currentId
+                                            ? activeScene
+                                            : null,
+                                        onChat: () => _openChat(item),
+                                        onGift: () => _openGift(item),
+                                        onNote: () => _leaveNote(item),
+                                        visitBusy: _visitBusy,
+                                        visitResult: _visitResults[id],
+                                        onVisitChoice: (choice) =>
+                                            _chooseVisit(item, choice),
+                                      ),
                                     ),
                                   ),
                                 );
@@ -403,61 +429,49 @@ class _RelationshipCard extends StatelessWidget {
     required this.companion,
     required this.scene,
     required this.onChat,
-    required this.onOpenScene,
+    required this.onGift,
+    required this.onNote,
+    required this.visitBusy,
+    required this.visitResult,
+    required this.onVisitChoice,
   });
 
   final Map<String, dynamic> companion;
   final Map<String, dynamic>? scene;
   final VoidCallback onChat;
-  final VoidCallback? onOpenScene;
+  final VoidCallback onGift;
+  final VoidCallback onNote;
+  final bool visitBusy;
+  final Map<String, dynamic>? visitResult;
+  final ValueChanged<String> onVisitChoice;
 
   @override
   Widget build(BuildContext context) {
     final vita = context.vita;
     final name = '${companion['name'] ?? 'chat.companion'.tr}';
     final imageUrl = companion['portrait_url'] as String? ?? '';
-    final presentation = ChatListPresentation.from(companion);
-    final event = scene?['event'] is Map ? scene!['event'] as Map : null;
     final place = scene?['place'] is Map ? scene!['place'] as Map : null;
-    final eventTitle = '${event?['title'] ?? ''}'.trim();
     final placeTitle = '${place?['title'] ?? ''}'.trim();
-    final waiting = presentation.unreadCount > 0;
-    final phase = scene?['phase'] as String?;
-    final phaseLabel = switch (phase) {
-      'active' ||
-      'celebration' ||
-      'together' ||
-      'quiet' =>
-        'world.phase.$phase'.tr,
-      _ => 'world.ready'.tr,
-    };
-    final preview = !waiting && eventTitle.isNotEmpty
-        ? eventTitle.tr
-        : presentation.message.isNotEmpty
-            ? presentation.preview(
-                fallback: 'world.ready'.tr,
-                voiceLabel: 'chat.voiceMessage'.tr,
-                photoLabel: 'chat.photoMessage'.tr,
-              )
-            : 'world.ready'.tr;
-    final next =
-        scene?['next_event'] is Map ? scene!['next_event'] as Map : null;
-    final nextAt = next == null
-        ? null
-        : DateTime.tryParse('${next['start_time'] ?? ''}')?.toLocal();
     final hour = scene?['local_hour'] is num
         ? (scene!['local_hour'] as num).toInt()
         : DateTime.now().hour;
     final night = hour < 6 || hour >= 19;
     final sky = night ? const Color(0xFF252446) : const Color(0xFFB988A5);
     final glow = night ? const Color(0xFF7265A2) : const Color(0xFFE9AF88);
+    final savedVisit = scene?['today_visit'];
+    final effectiveVisit = visitResult ??
+        (savedVisit is Map ? Map<String, dynamic>.from(savedVisit) : null);
+    final visited = scene?['visited_today'] == true || effectiveVisit != null;
+    final selectedChoice = '${effectiveVisit?['choice'] ?? ''}';
+    final asking = selectedChoice == 'ask';
     return ClipRRect(
       borderRadius: BorderRadius.circular(30),
       child: ColoredBox(
         color: vita.surface,
         child: Column(children: [
           Expanded(
-            child: Stack(fit: StackFit.expand, children: [
+            child: ClipRect(
+                child: Stack(fit: StackFit.expand, children: [
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -468,11 +482,48 @@ class _RelationshipCard extends StatelessWidget {
                 ),
               ),
               if (imageUrl.isNotEmpty)
-                VitaMediaImage(
-                  url: imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox.expand(),
+                AnimatedSlide(
+                  duration: const Duration(milliseconds: 850),
+                  curve: Curves.easeOutCubic,
+                  offset: !visited
+                      ? Offset.zero
+                      : asking
+                          ? const Offset(-.035, 0)
+                          : const Offset(.025, 0),
+                  child: AnimatedScale(
+                    duration: const Duration(milliseconds: 850),
+                    curve: Curves.easeOutCubic,
+                    scale: !visited
+                        ? 1
+                        : asking
+                            ? 1.14
+                            : 1.08,
+                    child: VitaMediaImage(
+                      url: imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox.expand(),
+                    ),
+                  ),
                 ),
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 850),
+                opacity: visited ? 1 : 0,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: asking
+                          ? const Alignment(.85, -.35)
+                          : const Alignment(-.8, .25),
+                      radius: 1.15,
+                      colors: [
+                        (asking ? const Color(0xFFB6A0FF) : glow)
+                            .withValues(alpha: .28),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -515,83 +566,220 @@ class _RelationshipCard extends StatelessWidget {
               Positioned(
                 left: 20,
                 right: 20,
-                bottom: 18,
-                child: Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 30,
-                    fontWeight: FontWeight.w700,
-                  ),
+                bottom: 19,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (visited) ...[
+                      Row(children: [
+                        Icon(
+                            asking
+                                ? Icons.record_voice_over_rounded
+                                : Icons.favorite_rounded,
+                            size: 15,
+                            color: Colors.white),
+                        const SizedBox(width: 6),
+                        Expanded(
+                            child: Text(
+                          asking ? 'world.sceneAsk'.tr : 'world.sceneStay'.tr,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600),
+                        )),
+                      ]),
+                      const SizedBox(height: 8),
+                    ],
+                    Text(name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 30,
+                            fontWeight: FontWeight.w700)),
+                  ],
                 ),
               ),
-            ]),
+            ])),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(19, 13, 19, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  height: 18,
-                  child: Text(
-                    waiting ? 'world.waiting'.tr : phaseLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: waiting ? vita.green : vita.subText,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+          SizedBox(
+            height: 164,
+            child: ColoredBox(
+              color: vita.surface,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(19, 12, 19, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                        height: 20,
+                        child: Row(children: [
+                          Expanded(
+                            child: Text(
+                              visited
+                                  ? 'world.visited'.tr
+                                  : placeTitle.isEmpty
+                                      ? 'world.visit'.tr
+                                      : 'world.visitAt'.trParams({
+                                          'place': placeTitle.isEmpty
+                                              ? 'world.place.home'.tr
+                                              : placeTitle.tr,
+                                        }),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: vita.green,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                          if (visitBusy)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: SizedBox.square(
+                                dimension: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: vita.green,
+                                ),
+                              ),
+                            ),
+                        ])),
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      Expanded(
+                          child: _VisitChoice(
+                        label: visited && !asking
+                            ? 'world.visited'.tr
+                            : 'world.choiceStay'.tr,
+                        icon: Icons.favorite_outline_rounded,
+                        primary: true,
+                        onTap: visited || visitBusy
+                            ? null
+                            : () => onVisitChoice('stay'),
+                      )),
+                      const SizedBox(width: 8),
+                      Expanded(
+                          child: _VisitChoice(
+                        label: visited && asking
+                            ? 'world.visited'.tr
+                            : 'world.choiceAsk'.tr,
+                        icon: Icons.question_answer_outlined,
+                        onTap: visited || visitBusy
+                            ? null
+                            : () => onVisitChoice('ask'),
+                      )),
+                    ]),
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      Expanded(
+                          child: _WorldUtilityAction(
+                        label: 'world.talk'.tr,
+                        icon: Icons.chat_bubble_outline_rounded,
+                        onTap: onChat,
+                      )),
+                      Expanded(
+                          child: _WorldUtilityAction(
+                        label: 'world.giveGift'.tr,
+                        icon: Icons.card_giftcard_outlined,
+                        onTap: onGift,
+                      )),
+                      Expanded(
+                          child: _WorldUtilityAction(
+                        label: 'world.leaveNote'.tr,
+                        icon: Icons.edit_note_rounded,
+                        onTap: onNote,
+                      )),
+                    ]),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                SizedBox(
-                  height: 44,
-                  child: Text(preview,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: vita.text, fontSize: 16, height: 1.35)),
-                ),
-                const SizedBox(height: 10),
-                if (nextAt != null) ...[
-                  Text(
-                      'world.nextMeeting'.trParams({
-                        'time':
-                            '${formatDateSeparator(nextAt)} ${formatClock(nextAt)}',
-                        'event':
-                            '${next!['title'] ?? next['location'] ?? ''}'.tr,
-                      }),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: vita.subText, fontSize: 12)),
-                  const SizedBox(height: 8),
-                ],
-                Row(children: [
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: onOpenScene,
-                      child: Text('world.openScene'.tr,
-                          maxLines: 1, overflow: TextOverflow.ellipsis),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.outlined(
-                      onPressed: onChat,
-                      tooltip: 'world.talk'.tr,
-                      icon: const Icon(Icons.chat_bubble_outline_rounded)),
-                ]),
-              ],
+              ),
             ),
           ),
         ]),
       ),
     );
   }
+}
+
+class _VisitChoice extends StatelessWidget {
+  const _VisitChoice(
+      {required this.label,
+      required this.icon,
+      required this.onTap,
+      this.primary = false});
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    final vita = context.vita;
+    final primaryText = Theme.of(context).colorScheme.onPrimary;
+    return Material(
+      color: primary ? vita.green : vita.greenTint,
+      borderRadius: BorderRadius.circular(13),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(13),
+        child: Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 9),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(13),
+            border: primary
+                ? null
+                : Border.all(color: vita.green.withValues(alpha: .28)),
+          ),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(icon, size: 16, color: primary ? primaryText : vita.green),
+            const SizedBox(width: 5),
+            Flexible(
+                child: Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: primary ? primaryText : vita.text,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700))),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _WorldUtilityAction extends StatelessWidget {
+  const _WorldUtilityAction(
+      {required this.label, required this.icon, required this.onTap});
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          height: 48,
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(icon, size: 17, color: context.vita.subText),
+            const SizedBox(height: 2),
+            Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: context.vita.subText, fontSize: 10)),
+          ]),
+        ),
+      );
 }
 
 class _EmptyRelationship extends StatelessWidget {

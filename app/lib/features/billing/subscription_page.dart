@@ -1,4 +1,5 @@
 import '../../shared/widgets.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -8,24 +9,29 @@ import '../../core/theme.dart';
 import 'billing_controller.dart';
 import 'billing_products.dart';
 
-Future<void> showSubscriptionPrompt(String reason) async {
-  final openPlans = await Get.dialog<bool>(
-    AlertDialog(
+Future<void> showSubscriptionPrompt(BuildContext context, String reason) async {
+  if (!context.mounted) return;
+  final openPlans = await showCupertinoDialog<bool>(
+    context: context,
+    builder: (dialogContext) => CupertinoAlertDialog(
       title: Text('subscription.required.title'.tr),
       content: Text('$reason\n\n${'subscription.description'.tr}'),
       actions: [
-        TextButton(
-          onPressed: () => Get.back(result: false),
-          child: Text('common.cancel'.tr),
+        CupertinoDialogAction(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: Text('common.cancel'.tr,
+              style: const TextStyle(color: CupertinoColors.systemGrey)),
         ),
-        TextButton(
-          onPressed: () => Get.back(result: true),
+        CupertinoDialogAction(
+          onPressed: () => Navigator.pop(dialogContext, true),
           child: Text('subscription.viewPlans'.tr),
         ),
       ],
     ),
   );
-  if (openPlans == true) await Get.toNamed('/subscription');
+  if (openPlans == true && context.mounted) {
+    await Get.toNamed('/subscription');
+  }
 }
 
 class SubscriptionPage extends StatefulWidget {

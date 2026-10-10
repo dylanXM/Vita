@@ -128,9 +128,21 @@ func GetWorldScene(c *gin.Context) {
 		return
 	}
 	var visitsToday int
-	if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT COUNT(*) FROM world_interactions WHERE companion_id=$1 AND kind='visit' AND local_date=$2`, companionID, localNow.Format("2006-01-02")).Scan(&visitsToday); err != nil {
+	if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT COUNT(*) FROM world_interactions WHERE user_id=$1 AND companion_id=$2 AND kind='visit' AND local_date=$3`, userID, companionID, localNow.Format("2006-01-02")).Scan(&visitsToday); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load world visits"})
 		return
+	}
+	var todayVisit any
+	if visitsToday > 0 {
+		var choice, reaction, gesture string
+		err := db.Get().QueryRowContext(c.Request.Context(), `SELECT COALESCE(payload->>'choice','stay'),COALESCE(payload->>'reaction',''),COALESCE(payload->>'gesture','')
+			FROM world_interactions WHERE user_id=$1 AND companion_id=$2 AND kind='visit' AND local_date=$3
+			ORDER BY created_at DESC LIMIT 1`, userID, companionID, localNow.Format("2006-01-02")).Scan(&choice, &reaction, &gesture)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load today's visit"})
+			return
+		}
+		todayVisit = gin.H{"choice": choice, "reaction": reaction, "gesture": gesture}
 	}
 	var nextID, nextType, nextTitle, nextDescription, nextLocation string
 	var nextStart time.Time
@@ -246,7 +258,7 @@ func GetWorldScene(c *gin.Context) {
 		"companion_id": companionID, "local_date": localNow.Format("2006-01-02"), "region_code": region,
 		"local_hour": localNow.Hour(),
 		"phase":      phase, "place": gin.H{"kind": kind, "title": placeTitle, "description": placeDescription},
-		"event": event, "next_event": nextEvent, "campaign": campaign, "mood": mood, "visited_today": visitsToday > 0,
+		"event": event, "next_event": nextEvent, "campaign": campaign, "mood": mood, "visited_today": visitsToday > 0, "today_visit": todayVisit,
 		"memories": memories, "connections": connections, "last_action": lastAction, "recent_gift": recentGift,
 	})
 }

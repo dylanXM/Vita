@@ -116,19 +116,20 @@ class _NoticeBannerState extends State<_NoticeBanner>
       _NoticeKind.info => const Color(0xFF5A91D8),
     };
     final icon = switch (widget.kind) {
-      _NoticeKind.success => Icons.check_circle_outline_rounded,
-      _NoticeKind.error => Icons.error_outline_rounded,
-      _NoticeKind.warning => Icons.warning_amber_rounded,
-      _NoticeKind.info => Icons.info_outline_rounded,
+      _NoticeKind.success => Icons.check_circle_rounded,
+      _NoticeKind.error => Icons.error_rounded,
+      _NoticeKind.warning => Icons.warning_rounded,
+      _NoticeKind.info => Icons.info_rounded,
     };
+    final radius = BorderRadius.circular(22);
     return Positioned(
       top: 0,
-      left: 12,
-      right: 12,
+      left: 10,
+      right: 10,
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.only(top: 8),
+          padding: const EdgeInsets.only(top: 6),
           child: IgnorePointer(
             child: FadeTransition(
               opacity: _animation,
@@ -138,76 +139,94 @@ class _NoticeBannerState extends State<_NoticeBanner>
                   end: Offset.zero,
                 ).animate(CurvedAnimation(
                     parent: _animation, curve: Curves.easeOutCubic)),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: DefaultTextStyle(
-                    style: (Theme.of(context).textTheme.bodyMedium ??
-                            const TextStyle())
-                        .copyWith(decoration: TextDecoration.none),
-                    child: Semantics(
-                      container: true,
-                      liveRegion: true,
-                      label: '${widget.title}. ${widget.message}',
+                child: DefaultTextStyle(
+                  style: (Theme.of(context).textTheme.bodyMedium ??
+                          const TextStyle())
+                      .copyWith(decoration: TextDecoration.none),
+                  child: Semantics(
+                    container: true,
+                    liveRegion: true,
+                    label: '${widget.title}. ${widget.message}',
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: radius,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black
+                                .withValues(alpha: dark ? 0.28 : 0.14),
+                            blurRadius: 24,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: radius,
                         child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              color: dark
-                                  ? const Color(0xE82B2B30)
-                                  : const Color(0xF2FFFFFF),
+                              color: vita.surface
+                                  .withValues(alpha: dark ? 0.84 : 0.88),
                               border: Border.all(
-                                color: dark
-                                    ? Colors.white.withValues(alpha: 0.12)
-                                    : Colors.black.withValues(alpha: 0.06),
+                                color: Colors.white
+                                    .withValues(alpha: dark ? 0.12 : 0.75),
+                                width: 0.5,
                               ),
-                              borderRadius: BorderRadius.circular(18),
+                              borderRadius: radius,
                             ),
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 12),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.max,
+                              padding:
+                                  const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(icon, size: 21, color: color),
-                                  const SizedBox(width: 11),
-                                  Expanded(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          widget.title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            color: dark
-                                                ? Colors.white
-                                                : const Color(0xFF19191C),
-                                          ),
-                                        ),
-                                        if (widget.message.isNotEmpty) ...[
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            widget.message,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              height: 1.3,
-                                              color: dark
-                                                  ? Colors.white70
-                                                  : const Color(0xFF65656C),
-                                            ),
-                                          ),
-                                        ],
-                                      ],
+                                  Row(children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(5),
+                                      child: Image.asset(
+                                        'assets/branding/vita_app_icon_1024.png',
+                                        width: 22,
+                                        height: 22,
+                                        cacheWidth: 66,
+                                        cacheHeight: 66,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 7),
+                                    Text('Vita',
+                                        style: TextStyle(
+                                          color: vita.subText,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        )),
+                                    const Spacer(),
+                                    Icon(icon, size: 16, color: color),
+                                  ]),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    widget.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: vita.text,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
+                                  if (widget.message.isNotEmpty) ...[
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      widget.message,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: vita.text,
+                                        fontSize: 13,
+                                        height: 1.3,
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
