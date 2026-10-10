@@ -20,7 +20,6 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
-  final _inviteCode = TextEditingController();
   bool _obscurePassword = true;
   bool _acceptedLegal = false;
 
@@ -48,7 +47,6 @@ class _LoginPageState extends State<LoginPage> {
     _password.removeListener(_onFieldChanged);
     _email.dispose();
     _password.dispose();
-    _inviteCode.dispose();
     super.dispose();
   }
 
@@ -73,7 +71,6 @@ class _LoginPageState extends State<LoginPage> {
       final terms =
           AppContentController.to.legalDocument(LegalDocumentType.terms);
       if (await AuthController.to.loginWithGoogle(
-        inviteCode: _inviteCode.text,
         acceptedLegal: _acceptedLegal && privacy != null && terms != null,
         privacyPolicyVersion: _acceptedLegal ? (privacy?.version ?? '') : '',
         termsVersion: _acceptedLegal ? (terms?.version ?? '') : '',
@@ -177,21 +174,6 @@ class _LoginPageState extends State<LoginPage> {
                 ],
               ),
               const SizedBox(height: 24),
-              TextField(
-                controller: _inviteCode,
-                autocorrect: false,
-                textCapitalization: TextCapitalization.characters,
-                textInputAction: TextInputAction.done,
-                decoration: InputDecoration(
-                  hintText: 'auth.inviteCodeOptional'.tr,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'auth.inviteNewAccountsOnly'.tr,
-                style: TextStyle(fontSize: 12, color: context.vita.subText),
-              ),
-              const SizedBox(height: 8),
               RegistrationLegalConsent(
                 accepted: _acceptedLegal,
                 onChanged: (value) => setState(() => _acceptedLegal = value),
