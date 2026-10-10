@@ -60,6 +60,7 @@ interface FormState {
   api_key: string;
   remote_id: string;
   display_name: string;
+  scenarios: AIModelScenario[];
   enabled: boolean;
 }
 
@@ -70,6 +71,7 @@ const emptyForm: FormState = {
   api_key: "",
   remote_id: "",
   display_name: "",
+  scenarios: [],
   enabled: true,
 };
 
@@ -98,7 +100,10 @@ export function ModelServicesPage() {
     .map((model) => ({ model, provider: (config.data?.providers ?? []).find((p) => p.id === model.provider_id) }))
     .filter((row): row is ServiceRow => Boolean(row.provider));
 
-  const refresh = () => void queryClient.invalidateQueries({ queryKey: ["agent-config"] });
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ["agent-config"] });
+    void queryClient.invalidateQueries({ queryKey: ["media-model-routes"] });
+  };
   const openCreate = () => {
     setForm(emptyForm);
     setEditor({ mode: "create", row: null });
@@ -111,6 +116,7 @@ export function ModelServicesPage() {
       api_key: "",
       remote_id: row.model.model_name,
       display_name: row.model.display_name,
+      scenarios: row.model.configured_scenarios ?? [],
       enabled: row.model.enabled,
     });
     setEditor({ mode: "edit", row });
@@ -148,7 +154,7 @@ export function ModelServicesPage() {
         provider_id: provider.id,
         model_name: form.remote_id.trim(),
         display_name: form.display_name.trim(),
-        scenarios: [],
+        scenarios: form.scenarios,
         subscription_plan_ids: [],
         enabled: form.enabled,
       });
@@ -358,7 +364,7 @@ function EditorDialog({
     onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))),
   });
   const canSave = Boolean(
-    form.name.trim() && form.kind && form.remote_id.trim() && form.display_name.trim() && (isEdit || form.api_key),
+    form.name.trim() && form.kind && form.remote_id.trim() && form.display_name.trim() && (isEdit || (form.api_key && form.scenarios.length > 0)),
   );
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { onClose(); setConn(null); } }}>
@@ -408,6 +414,28 @@ function EditorDialog({
             <Input value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} />
           </Field>
         </div>
+        {!isEdit && (
+          <div className="rounded-md border p-4">
+            <div className="font-medium">{t("modelServices.scenarios")}</div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {ALL_SCENARIOS.map((scenario) => (
+                <label key={scenario} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.scenarios.includes(scenario)}
+                    onChange={() => setForm({
+                      ...form,
+                      scenarios: form.scenarios.includes(scenario)
+                        ? form.scenarios.filter((item) => item !== scenario)
+                        : [...form.scenarios, scenario],
+                    })}
+                  />
+                  {t(`mediaModels.route.${scenario}`)}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
         <label className="flex items-center gap-2 text-sm">
           <Switch checked={form.enabled} onCheckedChange={(v) => setForm({ ...form, enabled: v })} />
           {t("modelServices.enabled")}

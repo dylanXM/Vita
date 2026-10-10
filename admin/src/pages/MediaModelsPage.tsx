@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Headphones, Image, MessageCircle, Plus, Save, Trash2, Video } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import { agentApi } from "@/api/admin";
 import type { AIModel, MediaModelRoute, MediaModelType } from "@/api/types";
@@ -89,6 +90,7 @@ function RouteEditor({ route, models, onChange }: { route: MediaModelRoute; mode
         </div>
       </div>
       {candidates.length === 0 && <p className="mt-3 text-sm text-amber-600">{t("mediaModels.noCompatibleModels")}</p>}
+      <Link to="/model-services" className="mt-3 inline-block text-xs text-muted-foreground underline">{t("mediaModels.configureEligibility")}</Link>
     </div>
   );
 }

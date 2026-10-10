@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -45,7 +46,7 @@ func (s *Service) GenerateCharacterProfile(ctx context.Context, userID, mode, so
 	prompt := fmt.Sprintf(`%s
 
 Return one strict JSON object with exactly these fields: name, gender, persona, appearance, city, occupation, interests, personality_tags, speaking_style, likes, dislikes, life_habits, life_goal, backstory.
-personality_tags must contain 1 to 8 short lowercase English tags. Use an empty string when the source does not establish a field. Do not invent sensitive personal facts, contact details, or claims about a real person's private life. The result must be suitable for an explicitly AI character.
+All fields except personality_tags must be strings, including interests, likes, dislikes and life_habits. personality_tags must contain 1 to 8 short lowercase English tags as an array of strings. Use an empty string when the source does not establish a string field. Do not invent sensitive personal facts, contact details, or claims about a real person's private life. The result must be suitable for an explicitly AI character.
 
 Source:
 %s`, task, source)
@@ -68,8 +69,36 @@ func parseCharacterProfile(output string) (CharacterProfile, error) {
 		clean = strings.TrimPrefix(clean, "```")
 		clean = strings.TrimSuffix(strings.TrimSpace(clean), "```")
 	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(clean), &fields); err != nil {
+		return CharacterProfile{}, fmt.Errorf("decode character profile: %w", err)
+	}
+	for _, field := range []string{"name", "gender", "persona", "appearance", "city", "occupation", "interests", "speaking_style", "likes", "dislikes", "life_habits", "life_goal", "backstory"} {
+		raw := bytes.TrimSpace(fields[field])
+		if len(raw) == 0 || string(raw) == "null" {
+			continue
+		}
+		if raw[0] == '[' {
+			var parts []string
+			if err := json.Unmarshal(raw, &parts); err != nil {
+				return CharacterProfile{}, fmt.Errorf("decode character profile %s: %w", field, err)
+			}
+			joined, _ := json.Marshal(strings.Join(parts, ", "))
+			fields[field] = joined
+		}
+	}
+	if raw := bytes.TrimSpace(fields["personality_tags"]); len(raw) > 0 && raw[0] == '"' {
+		var tag string
+		if err := json.Unmarshal(raw, &tag); err == nil {
+			fields["personality_tags"], _ = json.Marshal([]string{tag})
+		}
+	}
+	normalized, err := json.Marshal(fields)
+	if err != nil {
+		return CharacterProfile{}, fmt.Errorf("encode character profile: %w", err)
+	}
 	var profile CharacterProfile
-	if err := json.Unmarshal([]byte(clean), &profile); err != nil {
+	if err := json.Unmarshal(normalized, &profile); err != nil {
 		return CharacterProfile{}, fmt.Errorf("decode character profile: %w", err)
 	}
 	profile.Name = strings.TrimSpace(profile.Name)
