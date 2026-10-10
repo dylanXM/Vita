@@ -14,6 +14,10 @@ import '../memories/memories_page.dart';
 import '../explore/explore_page.dart';
 import '../whats_new/whats_new_sheet.dart';
 import '../ads/admob_controller.dart';
+import '../chat/chat_list_controller.dart';
+import '../chat/chat_list_presentation.dart';
+import '../chat/chat_page.dart';
+import '../../shared/widgets.dart';
 
 /// Main shell for the world, journey, discover and account destinations.
 class ShellController extends GetxController {
@@ -85,37 +89,184 @@ class _ShellPageState extends State<ShellPage> {
     return Scaffold(
       backgroundColor: context.vita.pageBg,
       extendBody: true,
-      body: Builder(
-        builder: (context) {
-          final mq = MediaQuery.of(context);
-          final safeBottom = mq.padding.bottom;
-          return MediaQuery(
-            // Tab pages receive an extra bottom inset for the floating dock
-            // while their backgrounds continue behind it.
-            data: mq.copyWith(
-              padding: mq.padding.copyWith(
-                bottom: safeBottom + VitaTabBar.reservedHeight,
+      body: Stack(children: [
+        Builder(
+          builder: (context) {
+            final mq = MediaQuery.of(context);
+            final safeBottom = mq.padding.bottom;
+            return MediaQuery(
+              // Tab pages receive an extra bottom inset for the floating dock
+              // while their backgrounds continue behind it.
+              data: mq.copyWith(
+                padding: mq.padding.copyWith(
+                  bottom: safeBottom + VitaTabBar.reservedHeight,
+                ),
               ),
-            ),
-            child: Obx(
-              () => IndexedStack(
-                index: ctrl.index.value,
-                children: [
-                  TickerMode(
-                    enabled: ctrl.index.value == 0,
-                    child: const WorldPage(),
-                  ),
-                  const MemoriesPage(),
-                  const ExplorePage(),
-                  const MePage(),
-                ],
+              child: Obx(
+                () => IndexedStack(
+                  index: ctrl.index.value,
+                  children: [
+                    TickerMode(
+                      enabled: ctrl.index.value == 0,
+                      child: const WorldPage(),
+                    ),
+                    const MemoriesPage(),
+                    const ExplorePage(),
+                    const MePage(),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
-      ),
+            );
+          },
+        ),
+        Positioned(
+          left: 22,
+          right: 22,
+          bottom: VitaTabBar.reservedHeight + 8,
+          child: Obx(() {
+            if (!Get.isRegistered<ChatListController>()) {
+              return const SizedBox.shrink();
+            }
+            final unread = ChatListController.to.companions
+                .where(
+                    (item) => ChatListPresentation.from(item).unreadCount > 0)
+                .toList();
+            if (unread.isEmpty) {
+              return const AnimatedSwitcher(
+                duration: Duration(milliseconds: 240),
+                child: SizedBox.shrink(),
+              );
+            }
+            unread.sort((a, b) {
+              final aTime = ChatListPresentation.from(a).messageAt;
+              final bTime = ChatListPresentation.from(b).messageAt;
+              return (bTime ?? DateTime(0)).compareTo(aTime ?? DateTime(0));
+            });
+            final companion = unread.first;
+            final presentation = ChatListPresentation.from(companion);
+            return AnimatedSwitcher(
+              duration: const Duration(milliseconds: 240),
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, .15),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              ),
+              child: _UnreadMessageEntry(
+                key: ValueKey(
+                    '${companion['id']}:${companion['last_message_at']}'),
+                companion: companion,
+                presentation: presentation,
+                onTap: () async {
+                  final id = '${companion['id'] ?? ''}';
+                  if (id.isEmpty) return;
+                  await Get.to(() => ChatPage(
+                        companionId: id,
+                        name: '${companion['name'] ?? 'chat.companion'.tr}',
+                        companion: companion,
+                      ));
+                  await ChatListController.to.load(silent: true);
+                },
+              ),
+            );
+          }),
+        ),
+      ]),
       bottomNavigationBar: Obx(
         () => VitaTabBar(index: ctrl.index.value, onTap: ctrl.switchTo),
+      ),
+    );
+  }
+}
+
+class _UnreadMessageEntry extends StatelessWidget {
+  const _UnreadMessageEntry({
+    super.key,
+    required this.companion,
+    required this.presentation,
+    required this.onTap,
+  });
+
+  final Map<String, dynamic> companion;
+  final ChatListPresentation presentation;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = '${companion['name'] ?? 'chat.companion'.tr}';
+    return Material(
+      color: context.vita.surface,
+      elevation: 10,
+      shadowColor: Colors.black.withValues(alpha: .28),
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          height: 62,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: context.vita.green.withValues(alpha: .4)),
+          ),
+          child: Row(children: [
+            VitaAvatar(
+              name: name,
+              radius: 20,
+              imageUrl: companion['portrait_url'] as String?,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+                child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: context.vita.text,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13)),
+                const SizedBox(height: 3),
+                Text(
+                    presentation.preview(
+                        fallback: 'chat.message'.tr,
+                        voiceLabel: 'chat.voiceMessage'.tr,
+                        photoLabel: 'chat.photoMessage'.tr),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style:
+                        TextStyle(color: context.vita.subText, fontSize: 12)),
+              ],
+            )),
+            const SizedBox(width: 8),
+            Container(
+              constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 5),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                  color: context.vita.green,
+                  borderRadius: BorderRadius.circular(10)),
+              child: Text(
+                  presentation.unreadCount > 99
+                      ? '99+'
+                      : '${presentation.unreadCount}',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700)),
+            ),
+            const SizedBox(width: 5),
+            Icon(Icons.chevron_right_rounded,
+                color: context.vita.subText, size: 19),
+          ]),
+        ),
       ),
     );
   }

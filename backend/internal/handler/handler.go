@@ -1276,11 +1276,12 @@ func DeleteCompanion(c *gin.Context) {
 }
 
 type SendMessageRequest struct {
-	Content        string `json:"content"`
-	MessageType    string `json:"message_type"`
-	MediaID        string `json:"media_id"`
-	LifeEventID    string `json:"life_event_id"`
-	JourneyVisitID string `json:"journey_visit_id"`
+	Content            string `json:"content"`
+	MessageType        string `json:"message_type"`
+	MediaID            string `json:"media_id"`
+	LifeEventID        string `json:"life_event_id"`
+	LifeEventContextID string `json:"life_event_context_id"`
+	JourneyVisitID     string `json:"journey_visit_id"`
 }
 
 type SendMessageResponse struct {
@@ -1400,6 +1401,15 @@ func SendMessage(c *gin.Context) {
 		trialExpiresAt = expires
 	}
 	messagePayload := map[string]any{}
+	if req.LifeEventContextID != "" {
+		var contextEventID string
+		if err := tx.QueryRowContext(c.Request.Context(), `SELECT e.id FROM life_events e
+			WHERE e.id=$1 AND e.companion_id=$2`, req.LifeEventContextID, companionID).Scan(&contextEventID); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "event not found", "code": "event_not_found"})
+			return
+		}
+		messagePayload["life_event_context_id"] = contextEventID
+	}
 	if req.JourneyVisitID != "" {
 		var visitID string
 		if err := tx.QueryRowContext(c.Request.Context(), `SELECT id FROM world_interactions
@@ -1863,6 +1873,44 @@ func GetLifeEvents(c *gin.Context) {
 		events = append(events, gin.H{"id": id, "event_type": eventType, "title": title, "description": description, "location": location, "start_time": startTime, "end_time": endTime, "emotion": emotion, "importance": importance, "user_relevance": userRelevance, "shareability": shareability, "payload": payload, "generation_source": generationSource, "shared_at": nullTime(sharedAt)})
 	}
 	c.JSON(http.StatusOK, gin.H{"events": events})
+}
+
+func GetLifeEvent(c *gin.Context) {
+	companionID := c.Param("id")
+	if !requireCompanionLifeAccess(c, companionID) {
+		return
+	}
+	var id, eventType, title, description, location, emotion, payloadRaw, generationSource string
+	var startTime, endTime time.Time
+	var importance, userRelevance int
+	var shareability bool
+	var sharedAt sql.NullTime
+	err := db.Get().QueryRowContext(c.Request.Context(), `SELECT e.id,COALESCE(e.event_type,''),COALESCE(e.title,''),
+		COALESCE(e.description,''),COALESCE(e.location,''),e.start_time,e.end_time,COALESCE(e.emotion,''),
+		e.importance,e.user_relevance,e.shareability,e.payload::text,e.generation_source,e.shared_at
+		FROM life_events e JOIN companions cp ON cp.id=e.companion_id
+		WHERE e.id=$1 AND e.companion_id=$2 AND cp.user_id=$3`,
+		c.Param("event_id"), companionID, c.GetString("user_id")).Scan(&id, &eventType, &title,
+		&description, &location, &startTime, &endTime, &emotion, &importance, &userRelevance,
+		&shareability, &payloadRaw, &generationSource, &sharedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get life event"})
+		return
+	}
+	payload := map[string]any{}
+	if err := json.Unmarshal([]byte(payloadRaw), &payload); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid event payload"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"id": id, "event_type": eventType, "title": title,
+		"description": description, "location": location, "start_time": startTime, "end_time": endTime,
+		"emotion": emotion, "importance": importance, "user_relevance": userRelevance,
+		"shareability": shareability, "payload": payload, "generation_source": generationSource,
+		"shared_at": nullTime(sharedAt)})
 }
 
 func GetMemories(c *gin.Context) {

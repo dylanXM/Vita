@@ -106,6 +106,8 @@ class _ChatPageState extends State<ChatPage> {
   Timer? _recordingTimer;
   bool _recording = false;
   bool _journeyContextSent = false;
+  String? _lifeEventContextId;
+  String? _lifeEventContextTitle;
   final ValueNotifier<String?> _panel = ValueNotifier(null);
   static const double _panelHeight = 210;
 
@@ -209,13 +211,20 @@ class _ChatPageState extends State<ChatPage> {
     if (text.isEmpty) return;
     _input.clear();
     final send = ctrl.send(text,
-        journeyVisitId: _journeyContextSent ? null : widget.journeyVisitId);
+        journeyVisitId: _journeyContextSent ? null : widget.journeyVisitId,
+        lifeEventContextId: _lifeEventContextId);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
     final queued = await send;
     if (!mounted) return;
     // Nothing reached the conversation: put the draft back so it is not lost.
     if (!queued) _restoreDraft(text);
-    if (queued && ctrl.sendError.value == null) _journeyContextSent = true;
+    if (queued && ctrl.sendError.value == null) {
+      _journeyContextSent = true;
+      setState(() {
+        _lifeEventContextId = null;
+        _lifeEventContextTitle = null;
+      });
+    }
     _reportSendResult(queued);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
@@ -226,6 +235,35 @@ class _ChatPageState extends State<ChatPage> {
     if (_input.text.isNotEmpty) return;
     _input.text = text;
     _input.selection = TextSelection.collapsed(offset: text.length);
+  }
+
+  Future<void> _openLifeEvent(Map<String, dynamic> message) async {
+    final eventId = '${message['life_event_id'] ?? ''}';
+    final payload = message['payload'] is Map
+        ? Map<String, dynamic>.from(message['payload'] as Map)
+        : const <String, dynamic>{};
+    final selected = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: context.vita.surface,
+      builder: (_) => _LifeEventSheet(
+        companionId: widget.companionId,
+        eventId: eventId,
+        fallback: payload,
+      ),
+    );
+    if (!mounted || selected == null) return;
+    final title = selected['title'] ?? '';
+    setState(() {
+      _lifeEventContextId =
+          (selected['event_id'] ?? '').isEmpty ? null : selected['event_id'];
+      _lifeEventContextTitle = title;
+    });
+    if (_input.text.trim().isEmpty) {
+      _input.text = 'chat.event.prompt'.trParams({'title': title});
+      _input.selection = TextSelection.collapsed(offset: _input.text.length);
+    }
   }
 
   /// True while the IME is composing (e.g. pinyin candidates), when Enter
@@ -459,6 +497,30 @@ class _ChatPageState extends State<ChatPage> {
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (_lifeEventContextId != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+                        child: Row(children: [
+                          Icon(Icons.auto_stories_outlined,
+                              size: 16, color: context.vita.green),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(_lifeEventContextTitle ?? '',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: context.vita.subText, fontSize: 12)),
+                          ),
+                          IconButton(
+                            onPressed: () => setState(() {
+                              _lifeEventContextId = null;
+                              _lifeEventContextTitle = null;
+                            }),
+                            icon: const Icon(Icons.close_rounded, size: 17),
+                            tooltip: 'common.cancel'.tr,
+                          ),
+                        ]),
+                      ),
                     Obx(() => _buildInputBar(
                         locked: ctrl.accessError.value != null, panel: panel)),
                     if (panel == 'emoji') _buildEmojiPanel(),
@@ -599,6 +661,7 @@ class _ChatPageState extends State<ChatPage> {
                         companionId: widget.companionId,
                         avatarUrl: widget.companion?['portrait_url'] as String?,
                         onPlayVoice: _playVoice,
+                        onOpenLifeEvent: _openLifeEvent,
                       ),
                     ),
                     if (isUser && deliveryStatus != 'delivered')
@@ -883,18 +946,14 @@ class _ChatMessageBody extends StatelessWidget {
     required this.companionId,
     this.avatarUrl,
     required this.onPlayVoice,
+    required this.onOpenLifeEvent,
   });
 
   final Map<String, dynamic> message;
   final String companionId;
   final String? avatarUrl;
   final ValueChanged<String> onPlayVoice;
-
-  void _openCompanionWorld() {
-    ShellController.to.selectedCompanionId.value = companionId;
-    ShellController.to.switchTo(0);
-    Get.back();
-  }
+  final Future<void> Function(Map<String, dynamic>) onOpenLifeEvent;
 
   @override
   Widget build(BuildContext context) {
@@ -1035,7 +1094,7 @@ class _ChatMessageBody extends StatelessWidget {
             (payload['event_location'] as String? ?? '').isNotEmpty)) {
       if (children.isNotEmpty) children.add(const SizedBox(height: 8));
       children.add(InkWell(
-        onTap: _openCompanionWorld,
+        onTap: () => onOpenLifeEvent(message),
         borderRadius: BorderRadius.circular(6),
         child: Container(
           padding: const EdgeInsets.all(10),
@@ -1068,6 +1127,156 @@ class _ChatMessageBody extends StatelessWidget {
     return Column(
         crossAxisAlignment: CrossAxisAlignment.start, children: children);
   }
+}
+
+class _LifeEventSheet extends StatefulWidget {
+  const _LifeEventSheet({
+    required this.companionId,
+    required this.eventId,
+    required this.fallback,
+  });
+
+  final String companionId;
+  final String eventId;
+  final Map<String, dynamic> fallback;
+
+  @override
+  State<_LifeEventSheet> createState() => _LifeEventSheetState();
+}
+
+class _LifeEventSheetState extends State<_LifeEventSheet> {
+  late final Future<Map<String, dynamic>?> _event = _loadEvent();
+
+  Future<Map<String, dynamic>?> _loadEvent() async {
+    if (widget.eventId.isEmpty) return null;
+    try {
+      final data = await ApiClient.instance.get(
+          '/v1/companions/${widget.companionId}/life/events/${widget.eventId}');
+      return data is Map ? Map<String, dynamic>.from(data) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>?>(
+        future: _event,
+        builder: (context, snapshot) {
+          final event = snapshot.data;
+          final title =
+              '${event?['title'] ?? widget.fallback['event_title'] ?? ''}'
+                  .trim();
+          final description =
+              '${event?['description'] ?? widget.fallback['event_description'] ?? ''}'
+                  .trim();
+          final location =
+              '${event?['location'] ?? widget.fallback['event_location'] ?? ''}'
+                  .trim();
+          final start =
+              DateTime.tryParse('${event?['start_time'] ?? ''}')?.toLocal();
+          final end =
+              DateTime.tryParse('${event?['end_time'] ?? ''}')?.toLocal();
+          final now = DateTime.now();
+          final isActive = start != null &&
+              end != null &&
+              !now.isBefore(start) &&
+              now.isBefore(end);
+          final stage = start == null || end == null
+              ? 'chat.event.shared'.tr
+              : now.isBefore(start)
+                  ? 'chat.event.upcoming'.tr
+                  : isActive
+                      ? 'chat.event.now'.tr
+                      : 'chat.event.past'.tr;
+          final payload = event?['payload'] is Map
+              ? event!['payload'] as Map
+              : widget.fallback;
+          final media = payload['media_urls'];
+          final imageUrl =
+              media is List && media.isNotEmpty && media.first is String
+                  ? media.first as String
+                  : '';
+          return SafeArea(
+            top: false,
+            child: SizedBox(
+              height: MediaQuery.sizeOf(context).height * .68,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(22, 4, 22, 22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (imageUrl.isNotEmpty) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: SizedBox(
+                          height: 185,
+                          width: double.infinity,
+                          child:
+                              VitaMediaImage(url: imageUrl, fit: BoxFit.cover),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                    ],
+                    Text(stage,
+                        style: TextStyle(
+                            color: context.vita.green,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 10),
+                    Text(title,
+                        style: TextStyle(
+                            color: context.vita.text,
+                            fontSize: 23,
+                            fontWeight: FontWeight.w700)),
+                    if (start != null || location.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        [
+                          if (start != null)
+                            '${formatDate(start)} ${formatClock(start)}',
+                          if (location.isNotEmpty) location,
+                        ].join(' · '),
+                        style: TextStyle(
+                            color: context.vita.subText, fontSize: 12),
+                      ),
+                    ],
+                    if (description.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      Text(description,
+                          style: TextStyle(
+                              color: context.vita.text,
+                              fontSize: 15,
+                              height: 1.55)),
+                    ],
+                    if (snapshot.connectionState ==
+                        ConnectionState.waiting) ...[
+                      const SizedBox(height: 18),
+                      const LinearProgressIndicator(minHeight: 2),
+                    ],
+                    const SizedBox(height: 26),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: title.isEmpty
+                            ? null
+                            : () => Navigator.of(context).pop({
+                                  'title': title,
+                                  'event_id': widget.eventId,
+                                }),
+                        icon: const Icon(Icons.chat_bubble_outline_rounded,
+                            size: 17),
+                        label: Text(isActive
+                            ? 'chat.event.discussNow'.tr
+                            : 'chat.event.discuss'.tr),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
 }
 
 class _LinkedMessageText extends StatefulWidget {

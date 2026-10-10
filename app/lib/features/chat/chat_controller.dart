@@ -238,7 +238,9 @@ class ChatController extends GetxController {
   /// nothing could be queued, so the caller keeps the draft, and records the
   /// reason in [sendError].
   Future<bool> send(String text,
-      {String? momentEventId, String? journeyVisitId}) async {
+      {String? momentEventId,
+      String? journeyVisitId,
+      String? lifeEventContextId}) async {
     final content = text.trim();
     if (content.isEmpty) return false;
     if (sending.value) return false;
@@ -261,6 +263,8 @@ class ChatController extends GetxController {
       'life_event_id': momentEventId ?? '',
       'payload': <String, dynamic>{
         if (journeyVisitId != null) 'journey_visit_id': journeyVisitId,
+        if (lifeEventContextId != null)
+          'life_event_context_id': lifeEventContextId,
       },
       'delivery_status': 'sending',
       'created_at': DateTime.now().toUtc().toIso8601String(),
@@ -275,6 +279,8 @@ class ChatController extends GetxController {
           'message_type': 'text',
           if (momentEventId != null) 'life_event_id': momentEventId,
           if (journeyVisitId != null) 'journey_visit_id': journeyVisitId,
+          if (lifeEventContextId != null)
+            'life_event_context_id': lifeEventContextId,
         },
       );
       if (data is Map) {
@@ -295,6 +301,8 @@ class ChatController extends GetxController {
             'life_event_id': momentEventId ?? '',
             'payload': <String, dynamic>{
               if (journeyVisitId != null) 'journey_visit_id': journeyVisitId,
+              if (lifeEventContextId != null)
+                'life_event_context_id': lifeEventContextId,
             },
             'delivery_status': 'delivered',
             'created_at': data['created_at'],

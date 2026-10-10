@@ -20,6 +20,7 @@ class PushNotificationService {
   bool _active = false;
   StreamSubscription<String>? _tokenSubscription;
   StreamSubscription<RemoteMessage>? _openSubscription;
+  StreamSubscription<RemoteMessage>? _foregroundSubscription;
   Map<String, dynamic>? _pendingNavigation;
   String? _registeredToken;
 
@@ -54,6 +55,11 @@ class PushNotificationService {
       _openSubscription = FirebaseMessaging.onMessageOpenedApp.listen(
         (message) => _handleNavigation(message.data),
       );
+      _foregroundSubscription = FirebaseMessaging.onMessage.listen((_) {
+        if (Get.isRegistered<ChatListController>()) {
+          unawaited(ChatListController.to.load(silent: true));
+        }
+      });
       final initial = await FirebaseMessaging.instance.getInitialMessage();
       if (initial != null) _pendingNavigation = initial.data;
     } catch (error) {
@@ -180,5 +186,6 @@ class PushNotificationService {
   Future<void> dispose() async {
     await _tokenSubscription?.cancel();
     await _openSubscription?.cancel();
+    await _foregroundSubscription?.cancel();
   }
 }

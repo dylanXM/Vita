@@ -206,6 +206,7 @@ func main() {
 			life.Use(middleware.RequireAuth())
 			life.GET("/today", handler.GetTodayLife)
 			life.GET("/events", handler.GetLifeEvents)
+			life.GET("/events/:event_id", handler.GetLifeEvent)
 		}
 		world := api.Group("/companions/:id/world", middleware.RequireAuth())
 		{
