@@ -374,7 +374,8 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
                                   AnalyticsService.to.track(
                                       'world_journey_opened',
                                       category: 'life');
-                                  ShellController.to.switchTo(1);
+                                  ShellController.to
+                                      .showJourneyForCompanion(currentId);
                                 },
                                 onGift: () => _openGift(current),
                                 onNote: () => _leaveNote(current),
@@ -441,7 +442,8 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
                                           AnalyticsService.to.track(
                                               'world_journey_opened',
                                               category: 'life');
-                                          ShellController.to.switchTo(1);
+                                          ShellController.to
+                                              .showJourneyForCompanion(id);
                                         },
                                         onGift: () => _openGift(item),
                                         onNote: () => _leaveNote(item),

@@ -1083,8 +1083,13 @@ func CreateCompanion(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "choose no more than 8 personality tags"})
 		return
 	}
-	if req.RelationshipStage == "" {
-		req.RelationshipStage = "stranger"
+	if err := alignCompanionRelationship(c.Request.Context(), &req); err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, errCompanionPortraitUnavailable) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
+		return
 	}
 	creationSource := strings.TrimSpace(req.CreationSource)
 	if creationSource == "" {
@@ -1220,6 +1225,14 @@ func UpdateCompanion(c *gin.Context) {
 	}
 	if len(req.PersonalityTags) > 8 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "choose no more than 8 personality tags"})
+		return
+	}
+	if err := alignCompanionRelationship(c.Request.Context(), &req); err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, errCompanionPortraitUnavailable) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 	tags, _ := json.Marshal(req.PersonalityTags)

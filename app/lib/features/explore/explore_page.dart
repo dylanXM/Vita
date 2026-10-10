@@ -8,6 +8,7 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../../shared/media_image.dart';
+import '../ai_pets/ai_pet_avatar.dart';
 import '../ai_pets/ai_pets_page.dart';
 import '../chat/chat_page.dart';
 import '../stories/stories_page.dart';
@@ -19,7 +20,9 @@ class ExploreController extends GetxController {
   final postsLoadFailed = false.obs;
   final posts = <Map<String, dynamic>>[].obs;
   final storyChapter = RxnInt();
+  final storyCoverUrl = RxnString();
   final petName = RxnString();
+  final petAvatarUrl = RxnString();
 
   Map<String, dynamic>? get featuredPost {
     final cutoff = DateTime.now().subtract(const Duration(hours: 48));
@@ -50,6 +53,9 @@ class ExploreController extends GetxController {
         storyChapter.value = stories.isEmpty
             ? null
             : (stories.first['current_chapter_no'] as num?)?.toInt();
+        storyCoverUrl.value = stories.isEmpty
+            ? null
+            : '${stories.first['cover_url'] ?? ''}'.trim();
       }
     } catch (_) {
       // The entry remains available when the optional preview cannot load.
@@ -63,6 +69,9 @@ class ExploreController extends GetxController {
         petName.value = adopted.isEmpty
             ? null
             : '${adopted.first['adopted_companion_name'] ?? adopted.first['name'] ?? ''}';
+        petAvatarUrl.value = adopted.isEmpty
+            ? null
+            : '${adopted.first['avatar_url'] ?? ''}'.trim();
       }
     } catch (_) {
       // Keep the normal pet entry visible.
@@ -125,6 +134,7 @@ class ExplorePage extends StatelessWidget {
               }
               final hasStory = ctrl.storyChapter.value != null;
               final petName = ctrl.petName.value;
+              final leadIsPet = !hasStory && petName?.isNotEmpty == true;
               return _DiscoveryLead(
                 icon: hasStory
                     ? Icons.auto_stories_rounded
@@ -142,6 +152,12 @@ class ExplorePage extends StatelessWidget {
                     : petName?.isNotEmpty == true
                         ? 'discover.myPet'.trParams({'name': petName!})
                         : 'discover.stories'.tr,
+                artworkUrl: hasStory
+                    ? ctrl.storyCoverUrl.value ?? ''
+                    : leadIsPet
+                        ? ctrl.petAvatarUrl.value ?? ''
+                        : '',
+                isPet: leadIsPet,
                 onTap: () async {
                   if (!hasStory && petName?.isNotEmpty == true) {
                     await Get.to(() => const AIPetsPage(),
@@ -240,7 +256,7 @@ class _FeaturedMoment extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: SizedBox(
-            height: 232,
+            height: 380,
             child: Stack(fit: StackFit.expand, children: [
               if (media.isNotEmpty)
                 VitaMediaImage(url: media.first, fit: BoxFit.cover),
@@ -324,11 +340,15 @@ class _DiscoveryLead extends StatelessWidget {
       {required this.icon,
       required this.title,
       required this.subtitle,
+      required this.artworkUrl,
+      required this.isPet,
       required this.onTap});
 
   final IconData icon;
   final String title;
   final String subtitle;
+  final String artworkUrl;
+  final bool isPet;
   final VoidCallback onTap;
 
   @override
@@ -340,7 +360,7 @@ class _DiscoveryLead extends StatelessWidget {
           child: InkWell(
             onTap: onTap,
             child: Ink(
-              height: 232,
+              height: 380,
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
@@ -348,38 +368,81 @@ class _DiscoveryLead extends StatelessWidget {
                   colors: [Color(0xFF4D3D65), Color(0xFF1E1B28)],
                 ),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(22),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              child: LayoutBuilder(
+                builder: (context, constraints) => Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Text('discover.today'.tr,
-                        style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600)),
-                    const Spacer(),
-                    Icon(icon, color: Colors.white70, size: 34),
-                    const SizedBox(height: 12),
-                    Text(title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 6),
-                    Text(subtitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 13)),
-                    const SizedBox(height: 14),
-                    Text('discover.enter'.tr,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700)),
+                    Positioned(
+                      top: 18,
+                      right: -constraints.maxWidth * .10,
+                      bottom: 8,
+                      width: constraints.maxWidth * .88,
+                      child: artworkUrl.isNotEmpty
+                          ? isPet
+                              ? AIPetAvatar(name: title, imageUrl: artworkUrl)
+                              : VitaMediaImage(
+                                  url: artworkUrl, fit: BoxFit.cover)
+                          : Center(
+                              child: Icon(icon,
+                                  size: 122,
+                                  color: Colors.white.withValues(alpha: .20))),
+                    ),
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [Color(0xE62B2339), Color(0x002B2339)],
+                          stops: [0, .85],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 22,
+                      right: 22,
+                      top: 22,
+                      child: Text('discover.today'.tr,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                    Positioned(
+                      left: 22,
+                      right: constraints.maxWidth * .30,
+                      bottom: 24,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(icon, color: Colors.white70, size: 27),
+                          const SizedBox(height: 10),
+                          Text(title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 25,
+                                  fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 6),
+                          Text(subtitle,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: Colors.white70, fontSize: 13)),
+                          const SizedBox(height: 14),
+                          Text('discover.enter'.tr,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),

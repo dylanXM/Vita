@@ -32,30 +32,30 @@ func ensureDefaultCompanions(userID string) error {
 		(SELECT id FROM companion_portraits WHERE enabled=true AND is_default=true)`, userID); err != nil {
 		return err
 	}
-	rows, err := db.Get().Query(`SELECT id,name,gender,personality_tags::text
+	rows, err := db.Get().Query(`SELECT id,name,personality_tags::text
 		FROM companion_portraits WHERE enabled=true AND is_default=true ORDER BY sort_order,name`)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var portraitID, name, gender, tags string
-		if err := rows.Scan(&portraitID, &name, &gender, &tags); err != nil {
+		var portraitID, name, tags string
+		if err := rows.Scan(&portraitID, &name, &tags); err != nil {
 			return err
 		}
 		companionID := uuid.New().String()
-		_, err = db.Get().Exec(`UPDATE companions SET name=$3,gender=$4,personality_tags=$5,
+		_, err = db.Get().Exec(`UPDATE companions SET name=$3,gender='friend',relationship_stage='acquaintance',personality_tags=$4,
 			active=true,updated_at=CURRENT_TIMESTAMP WHERE user_id=$1 AND portrait_id=$2 AND is_default=true`,
-			userID, portraitID, name, gender, tags)
+			userID, portraitID, name, tags)
 		if err != nil {
 			return err
 		}
 		_, err = db.Get().Exec(`INSERT INTO companions
 			(id,user_id,name,gender,persona,relationship_stage,personality_tags,portrait_id,creation_source,
 			 proactive_enabled,active,is_default,life_enabled,friendship_active)
-			VALUES ($1,$2,$3,$4,$5,'acquaintance',$6,$7,'system_default',false,true,true,false,true)
+			VALUES ($1,$2,$3,'friend',$4,'acquaintance',$5,$6,'system_default',false,true,true,false,true)
 			ON CONFLICT DO NOTHING`, companionID, userID, name,
-			gender, "A welcoming default Vita companion available during the free chat experience.", tags, portraitID)
+			"A welcoming default Vita companion available during the free chat experience.", tags, portraitID)
 		if err != nil {
 			return err
 		}

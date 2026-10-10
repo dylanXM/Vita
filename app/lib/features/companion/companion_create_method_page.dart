@@ -12,6 +12,7 @@ import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../chat/chat_list_controller.dart';
 import 'companion_create_page.dart';
+import 'companion_relation_rules.dart';
 
 enum AICompanionCreateMode { description, meet }
 
@@ -147,6 +148,7 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
       key: TextEditingController(),
   };
   String _gender = 'custom';
+  String? _profileGender;
   String _relationship = 'stranger';
   String? _imagePath;
   String? _documentPath;
@@ -223,11 +225,17 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
         final value = profile[entry.key];
         entry.value.text = value is List ? value.join(', ') : '${value ?? ''}';
       }
-      _gender = '${profile['gender'] ?? 'custom'}';
-      if (!const ['girlfriend', 'boyfriend', 'friend', 'custom']
-          .contains(_gender)) {
-        _gender = 'custom';
-      }
+      _profileGender = '${profile['gender'] ?? ''}';
+      final knownGender = companionKnownGender(_profileGender);
+      final draftedRole = _profileGender!.trim().toLowerCase();
+      _gender = companionRoles.contains(draftedRole)
+          ? draftedRole
+          : knownGender == 'male'
+              ? 'boyfriend'
+              : knownGender == 'female'
+                  ? 'girlfriend'
+                  : 'custom';
+      _relationship = compatibleCompanionStage(_relationship, _gender);
       _avatarMediaId = payload['avatar_media_id'] as String?;
       setState(() => _hasDraft = true);
       AnalyticsService.to.track('companion_draft_generated',
@@ -383,8 +391,11 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
           _selectRow(
             'companion.create.who'.tr,
             _gender,
-            const ['girlfriend', 'boyfriend', 'friend', 'custom'],
-            (value) => setState(() => _gender = value),
+            companionRolesForGender(_profileGender),
+            (value) => setState(() {
+              _gender = value;
+              _relationship = compatibleCompanionStage(_relationship, value);
+            }),
             (value) => 'relation.$value'.tr,
           ),
           Divider(
@@ -395,7 +406,7 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
           _selectRow(
             'companion.create.closeness'.tr,
             _relationship,
-            const ['stranger', 'acquaintance', 'close', 'partner'],
+            companionStagesForRole(_gender),
             (value) => setState(() => _relationship = value),
             (value) => 'stage.$value'.tr,
           ),

@@ -242,6 +242,7 @@ class MemoriesPage extends StatefulWidget {
 class _MemoriesPageState extends State<MemoriesPage> {
   final TextEditingController _search = TextEditingController();
   final ScrollController _scroll = ScrollController();
+  late final Worker _journeyFocusWorker;
   bool _showSearch = false;
   String? _selectedCompanionId;
   String _query = '';
@@ -249,6 +250,20 @@ class _MemoriesPageState extends State<MemoriesPage> {
   @override
   void initState() {
     super.initState();
+    final focus = ShellController.to.journeyFocusCompanionId;
+    _journeyFocusWorker = ever<String?>(focus, (companionId) {
+      if (companionId == null || companionId.isEmpty) return;
+      _focusOnCompanion(companionId);
+      focus.value = null;
+    });
+    if (focus.value?.isNotEmpty == true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final companionId = focus.value;
+        if (!mounted || companionId == null || companionId.isEmpty) return;
+        _focusOnCompanion(companionId);
+        focus.value = null;
+      });
+    }
     _scroll.addListener(() {
       if (_scroll.hasClients &&
           _scroll.position.extentAfter < 500 &&
@@ -260,9 +275,22 @@ class _MemoriesPageState extends State<MemoriesPage> {
 
   @override
   void dispose() {
+    _journeyFocusWorker.dispose();
     _search.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  void _focusOnCompanion(String companionId) {
+    if (!mounted) return;
+    _search.clear();
+    setState(() {
+      _selectedCompanionId = companionId;
+      _query = '';
+      _showSearch = false;
+    });
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+    MemoriesController.to.loadJourney(companionId: companionId);
   }
 
   Future<void> _reload() async {

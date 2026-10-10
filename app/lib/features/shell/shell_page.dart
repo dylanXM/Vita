@@ -21,6 +21,13 @@ class ShellController extends GetxController {
 
   final index = 0.obs;
   final selectedCompanionId = RxnString();
+  final journeyFocusCompanionId = RxnString();
+
+  void showJourneyForCompanion(String companionId) {
+    if (companionId.isEmpty) return;
+    journeyFocusCompanionId.value = companionId;
+    switchTo(1);
+  }
 
   void switchTo(int i) {
     if (i == index.value) return;

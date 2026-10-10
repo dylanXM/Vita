@@ -7,6 +7,7 @@ import '../../core/analytics_service.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../chat/chat_list_controller.dart';
+import 'companion_relation_rules.dart';
 
 /// Companion creation — a single scrollable form grouped into sections.
 class CompanionCreatePage extends StatefulWidget {
@@ -21,8 +22,9 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
   final _city = TextEditingController();
   final _occupation = TextEditingController();
   final _interests = TextEditingController();
-  String _gender = 'girlfriend';
+  String _gender = 'custom';
   String _relationship = 'stranger';
+  bool _roleEdited = false;
   bool _busy = false;
   bool _loadingOptions = true;
   final Set<String> _personalityTags = {};
@@ -41,8 +43,12 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
   List<Map<String, dynamic>> _portraits = const [];
   String? _portraitId;
 
-  static const _genders = ['girlfriend', 'boyfriend', 'friend', 'custom'];
-  static const _stages = ['stranger', 'acquaintance', 'close', 'partner'];
+  String? get _portraitGender {
+    for (final portrait in _portraits) {
+      if (portrait['id'] == _portraitId) return '${portrait['gender'] ?? ''}';
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -272,6 +278,18 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
                               return GestureDetector(
                                 onTap: () => setState(() {
                                   _portraitId = id;
+                                  final portraitGender =
+                                      '${portrait['gender'] ?? ''}';
+                                  final knownGender =
+                                      companionKnownGender(portraitGender);
+                                  _gender = !_roleEdited && knownGender != null
+                                      ? knownGender == 'male'
+                                          ? 'boyfriend'
+                                          : 'girlfriend'
+                                      : compatibleCompanionRole(
+                                          _gender, portraitGender);
+                                  _relationship = compatibleCompanionStage(
+                                      _relationship, _gender);
                                   final suggested =
                                       portrait['personality_tags'];
                                   if (_personalityTags.isEmpty &&
@@ -333,7 +351,14 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
                             color: context.vita.text)),
                     const SizedBox(height: 10),
                     _chipRow(
-                        _genders, _gender, (g) => setState(() => _gender = g)),
+                        companionRolesForGender(_portraitGender),
+                        _gender,
+                        (g) => setState(() {
+                              _roleEdited = true;
+                              _gender = g;
+                              _relationship =
+                                  compatibleCompanionStage(_relationship, g);
+                            })),
                     const SizedBox(height: 18),
                     Text('companion.create.closeness'.tr,
                         style: TextStyle(
@@ -341,7 +366,7 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
                             fontWeight: FontWeight.w600,
                             color: context.vita.text)),
                     const SizedBox(height: 10),
-                    _chipRow(_stages, _relationship,
+                    _chipRow(companionStagesForRole(_gender), _relationship,
                         (s) => setState(() => _relationship = s)),
                   ],
                 ),
