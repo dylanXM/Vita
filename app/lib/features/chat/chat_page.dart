@@ -359,6 +359,40 @@ class _ChatPageState extends State<ChatPage> {
               () => _buildMessages(ctrl),
             ),
           ),
+          Obx(() {
+            final status = ctrl.replyStatus.value;
+            final working = ctrl.replyWorking.value;
+            if (status == 'none' && !working) return const SizedBox.shrink();
+            final failed = status == 'failed';
+            return Container(
+              height: 62,
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              alignment: Alignment.center,
+              color: context.vita.surface,
+              child: Row(children: [
+                Icon(failed ? Icons.error_outline : Icons.hourglass_empty,
+                    size: 17, color: context.vita.subText),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    failed
+                        ? 'chat.replyFailed'.tr
+                        : status == 'pending' || status == 'processing'
+                            ? 'chat.replyPending'.tr
+                            : 'chat.replyWorking'.tr,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: context.vita.text),
+                  ),
+                ),
+                if (failed)
+                  TextButton(
+                    onPressed: ctrl.retryReply,
+                    child: Text('chat.replyRetry'.tr),
+                  ),
+              ]),
+            );
+          }),
           SafeArea(
             top: false,
             child: ValueListenableBuilder<String?>(

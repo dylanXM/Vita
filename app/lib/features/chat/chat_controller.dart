@@ -24,11 +24,14 @@ class ChatController extends GetxController {
   final sendError = RxnString();
   final companionStatus = ''.obs;
   final companionBusy = false.obs;
+  final replyStatus = 'none'.obs;
+  final replyWorking = false.obs;
   final trialStatus = 'none'.obs;
   final trialExpiresAt = RxnString();
   String? _conversationId;
   Timer? _pollTimer;
   Timer? _trialTimer;
+  Timer? _replyTimer;
   bool _polling = false;
 
   @override
@@ -43,6 +46,7 @@ class ChatController extends GetxController {
   void onClose() {
     _pollTimer?.cancel();
     _trialTimer?.cancel();
+    _replyTimer?.cancel();
     super.onClose();
   }
 
@@ -53,8 +57,13 @@ class ChatController extends GetxController {
       await _syncConversation();
       if (_conversationId != null) {
         await _loadMessages();
+        try {
+          await _loadReplyStatus();
+        } catch (_) {
+          // Message loading and polling must survive a status fetch failure.
+        }
         _pollTimer ??=
-            Timer.periodic(const Duration(seconds: 15), (_) => poll());
+            Timer.periodic(const Duration(seconds: 5), (_) => poll());
       }
     } on ApiException catch (e) {
       if (e.action == 'open_subscription') {
@@ -146,10 +155,55 @@ class ChatController extends GetxController {
           _addIfNew(message);
         }
       }
+      if (replyStatus.value != 'none') await _loadReplyStatus();
     } catch (_) {
       // Polling is best effort; the next interval catches up.
     } finally {
       _polling = false;
+    }
+  }
+
+  Future<void> _loadReplyStatus() async {
+    if (_conversationId == null) return;
+    final data = await ApiClient.instance
+        .get('/v1/conversations/$_conversationId/reply-status');
+    if (data is Map && data['status'] is String) {
+      replyStatus.value = data['status'] as String;
+      if (replyStatus.value == 'none') replyWorking.value = false;
+    }
+  }
+
+  void _beginReplyWait() {
+    replyStatus.value = 'none';
+    replyWorking.value = false;
+    _replyTimer?.cancel();
+    _replyTimer = Timer(const Duration(seconds: 3), () {
+      if (sending.value) replyWorking.value = true;
+    });
+  }
+
+  void _applyReplyResponse(Map data) {
+    _replyTimer?.cancel();
+    replyWorking.value = false;
+    if (data['companion_message'] is Map) {
+      replyStatus.value = 'none';
+    } else {
+      replyStatus.value = data['reply_status'] == 'pending'
+          ? 'pending'
+          : data['reply_status'] == 'none'
+              ? 'none'
+              : 'failed';
+    }
+  }
+
+  Future<void> retryReply() async {
+    final id = _conversationId;
+    if (id == null) return;
+    try {
+      await ApiClient.instance.post('/v1/conversations/$id/reply-status/retry');
+      replyStatus.value = 'pending';
+    } catch (_) {
+      replyStatus.value = 'failed';
     }
   }
 
@@ -185,6 +239,7 @@ class ChatController extends GetxController {
       'created_at': DateTime.now().toUtc().toIso8601String(),
     });
     sending.value = true;
+    _beginReplyWait();
     try {
       final data = await ApiClient.instance.post(
         '/v1/conversations/$conversationId/messages',
@@ -195,6 +250,7 @@ class ChatController extends GetxController {
         },
       );
       if (data is Map) {
+        _applyReplyResponse(data);
         _updateTrialFromMessage(data);
         final userMessage = data['user_message'];
         final companionMessage = data['companion_message'];
@@ -225,9 +281,11 @@ class ChatController extends GetxController {
           'character_count': content.length,
         });
       } else {
+        replyStatus.value = 'failed';
         _markFailed(optimisticId);
       }
     } on ApiException catch (e) {
+      replyStatus.value = 'failed';
       _markFailed(optimisticId);
       AnalyticsService.to
           .track('message_send_failed', category: 'chat', properties: {
@@ -242,6 +300,8 @@ class ChatController extends GetxController {
         sendError.value = e.message;
       }
     } finally {
+      _replyTimer?.cancel();
+      replyWorking.value = false;
       sending.value = false;
     }
     return true;
@@ -300,11 +360,13 @@ class ChatController extends GetxController {
         'delivery_status': 'sending',
         'created_at': DateTime.now().toUtc().toIso8601String(),
       });
+      _beginReplyWait();
       final data = await ApiClient.instance.post(
         '/v1/conversations/$conversationId/messages',
         data: {'message_type': 'voice', 'media_id': mediaID},
       );
       if (data is Map) {
+        _applyReplyResponse(data);
         _updateTrialFromMessage(data);
         final userMessage = data['user_message'];
         final companionMessage = data['companion_message'];
@@ -317,8 +379,12 @@ class ChatController extends GetxController {
         if (companionMessage is Map) {
           _addIfNew(Map<String, dynamic>.from(companionMessage));
         }
+      } else if (optimisticId != null) {
+        replyStatus.value = 'failed';
+        _markFailed(optimisticId);
       }
     } on ApiException catch (e) {
+      replyStatus.value = 'failed';
       if (optimisticId != null) _markFailed(optimisticId);
       if (e.action == 'open_subscription') {
         accessError.value = e.code ?? 'subscription_required';
@@ -326,6 +392,8 @@ class ChatController extends GetxController {
         sendError.value = e.message;
       }
     } finally {
+      _replyTimer?.cancel();
+      replyWorking.value = false;
       sending.value = false;
     }
     return true;

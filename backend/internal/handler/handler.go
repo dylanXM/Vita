@@ -1290,6 +1290,7 @@ type SendMessageResponse struct {
 	UserMessage      *agent.SavedMessage `json:"user_message,omitempty"`
 	CompanionMessage *agent.SavedMessage `json:"companion_message"`
 	AgentError       string              `json:"agent_error,omitempty"`
+	ReplyStatus      string              `json:"reply_status,omitempty"`
 	TrialExpiresAt   *time.Time          `json:"trial_expires_at,omitempty"`
 }
 
@@ -1423,18 +1424,92 @@ func SendMessage(c *gin.Context) {
 	response := SendMessageResponse{ID: msgID, Content: req.Content, Sender: "user", Created: createdAt, UserMessage: userMessage, TrialExpiresAt: trialExpiresAt}
 	if companionAgent == nil {
 		response.AgentError = "agent service is unavailable"
+		response.ReplyStatus = "failed"
 		c.JSON(http.StatusCreated, response)
 		return
 	}
-	replyCtx, cancel := context.WithTimeout(c.Request.Context(), 50*time.Second)
+	var pending bool
+	if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT EXISTS(SELECT 1 FROM pending_agent_replies WHERE conversation_id=$1)`, conversationID).Scan(&pending); err != nil {
+		response.AgentError = "failed to check pending reply"
+		response.ReplyStatus = "failed"
+		c.JSON(http.StatusCreated, response)
+		return
+	}
+	if pending {
+		_, err := db.Get().ExecContext(c.Request.Context(), `UPDATE pending_agent_replies SET trigger_message_id=$2,status='pending',attempts=0,
+			scheduled_at=LEAST(scheduled_at,CURRENT_TIMESTAMP),last_error='',created_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE conversation_id=$1`, conversationID, msgID)
+		if err == nil {
+			response.ReplyStatus = "pending"
+		} else {
+			response.ReplyStatus = "failed"
+			response.AgentError = "failed to queue companion reply"
+		}
+		c.JSON(http.StatusCreated, response)
+		return
+	}
+	replyCtx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
 	defer cancel()
 	reply, replyErr := companionAgent.Reply(replyCtx, conversationID, userID)
 	if replyErr != nil {
-		response.AgentError = "companion could not reply yet"
+		var replySaved bool
+		if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT EXISTS(SELECT 1 FROM messages
+			WHERE conversation_id=$1 AND sender_type='assistant' AND source='reply' AND created_at>=$2)`, conversationID, createdAt).Scan(&replySaved); err == nil && replySaved {
+			response.ReplyStatus = "none"
+			c.JSON(http.StatusCreated, response)
+			return
+		}
+		_, queueErr := db.Get().ExecContext(c.Request.Context(), `INSERT INTO pending_agent_replies(conversation_id,user_id,companion_id,trigger_message_id,scheduled_at)
+			VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP) ON CONFLICT(conversation_id) DO UPDATE SET
+			trigger_message_id=EXCLUDED.trigger_message_id,status='pending',attempts=0,scheduled_at=CURRENT_TIMESTAMP,
+			last_error='',created_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP`, conversationID, userID, companionID, msgID)
+		if queueErr == nil {
+			response.ReplyStatus = "pending"
+		} else {
+			response.ReplyStatus = "failed"
+			response.AgentError = "companion could not reply yet"
+		}
 	} else {
 		response.CompanionMessage = reply
+		if reply == nil {
+			response.ReplyStatus = "pending"
+		}
 	}
 	c.JSON(http.StatusCreated, response)
+}
+
+func GetReplyStatus(c *gin.Context) {
+	conversationID, userID := c.Param("id"), c.GetString("user_id")
+	var owned bool
+	if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT EXISTS(SELECT 1 FROM conversations WHERE id=$1 AND user_id=$2)`, conversationID, userID).Scan(&owned); err != nil || !owned {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
+		return
+	}
+	_, _ = db.Get().ExecContext(c.Request.Context(), `UPDATE pending_agent_replies SET status='failed',last_error='reply overdue',updated_at=CURRENT_TIMESTAMP
+		WHERE conversation_id=$1 AND status IN ('pending','processing') AND created_at<CURRENT_TIMESTAMP-INTERVAL '7 minutes'`, conversationID)
+	var status string
+	if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT status FROM pending_agent_replies WHERE conversation_id=$1`, conversationID).Scan(&status); errors.Is(err, sql.ErrNoRows) {
+		status = "none"
+	} else if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load reply status"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": status})
+}
+
+func RetryReply(c *gin.Context) {
+	conversationID, userID := c.Param("id"), c.GetString("user_id")
+	result, err := db.Get().ExecContext(c.Request.Context(), `UPDATE pending_agent_replies p SET status='pending',attempts=0,
+		scheduled_at=CURRENT_TIMESTAMP,last_error='',created_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+		WHERE p.conversation_id=$1 AND p.status='failed' AND EXISTS(SELECT 1 FROM conversations cv WHERE cv.id=p.conversation_id AND cv.user_id=$2)`, conversationID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retry reply"})
+		return
+	}
+	if changed, _ := result.RowsAffected(); changed == 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "no failed reply to retry"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "pending"})
 }
 
 func GetMessages(c *gin.Context) {

@@ -184,6 +184,8 @@ func main() {
 			conversations.POST("/", handler.GetOrCreateConversation)
 			conversations.POST("/:id/messages", handler.SendMessage)
 			conversations.GET("/:id/messages", handler.GetMessages)
+			conversations.GET("/:id/reply-status", handler.GetReplyStatus)
+			conversations.POST("/:id/reply-status/retry", handler.RetryReply)
 			conversations.GET("/:id/media", handler.GetConversationMedia)
 		}
 

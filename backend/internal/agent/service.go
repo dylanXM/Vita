@@ -138,6 +138,24 @@ func (s *Service) Run(ctx context.Context, interval time.Duration) {
 	if interval <= 0 {
 		interval = time.Minute
 	}
+	// Direct chat recovery must not wait behind image, story, or life jobs.
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := s.DispatchDueReplies(ctx); err != nil {
+					log.Printf("agent delayed replies: %v", err)
+				}
+				if err := s.DispatchPushOutbox(ctx); err != nil {
+					log.Printf("agent push dispatch: %v", err)
+				}
+			}
+		}
+	}()
 	s.runTick(ctx)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -154,9 +172,6 @@ func (s *Service) Run(ctx context.Context, interval time.Duration) {
 func (s *Service) runTick(ctx context.Context) {
 	if err := s.ProcessPendingStoryboard(ctx); err != nil {
 		log.Printf("storyboard generation: %v", err)
-	}
-	if err := s.DispatchDueReplies(ctx); err != nil {
-		log.Printf("agent delayed replies: %v", err)
 	}
 	if err := s.DispatchMemoryFollowups(ctx); err != nil {
 		log.Printf("agent memory follow-ups: %v", err)
@@ -261,25 +276,6 @@ func (s *Service) Reply(ctx context.Context, conversationID, userID string) (*Sa
 	if err != nil {
 		return nil, err
 	}
-	status, err := s.CurrentStatus(ctx, profile.ID, userID)
-	if err != nil {
-		return nil, err
-	}
-	var togetherNow bool
-	_ = s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM life_events
-		WHERE companion_id=$1 AND event_type='shared_activity' AND generation_source='user_purchase'
-		AND start_time<=CURRENT_TIMESTAMP AND end_time>CURRENT_TIMESTAMP AND status='active')`, profile.ID).Scan(&togetherNow)
-	if status.Busy && status.AvailableAt != nil && !togetherNow {
-		var triggerMessageID string
-		if err := s.db.QueryRowContext(ctx, `SELECT id FROM messages WHERE conversation_id=$1 AND sender_type='user' ORDER BY created_at DESC LIMIT 1`, conversationID).Scan(&triggerMessageID); err != nil {
-			return nil, err
-		}
-		_, err := s.db.ExecContext(ctx, `INSERT INTO pending_agent_replies(conversation_id,user_id,companion_id,trigger_message_id,scheduled_at)
-			VALUES($1,$2,$3,$4,$5) ON CONFLICT(conversation_id) DO UPDATE SET trigger_message_id=EXCLUDED.trigger_message_id,
-			scheduled_at=EXCLUDED.scheduled_at,status='pending',last_error='',updated_at=CURRENT_TIMESTAMP`,
-			conversationID, userID, profile.ID, triggerMessageID, *status.AvailableAt)
-		return nil, err
-	}
 	return s.replyNow(ctx, conversationID, userID, profile)
 }
 
@@ -341,7 +337,9 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 	if err != nil {
 		return nil, err
 	}
-	if profile.VoiceEnabled {
+	// Do not hold a short direct-chat request open for optional speech.
+	deadline, hasDeadline := ctx.Deadline()
+	if profile.VoiceEnabled && (!hasDeadline || time.Until(deadline) > 30*time.Second) {
 		if audioModels, modelErr := s.loadModelRouteModels(ctx, "audio_speech", userID); modelErr == nil {
 			voice := "alloy"
 			voiceConfig := map[string]any{}
@@ -854,8 +852,12 @@ func replyDelayForEvent(eventType string, eventEnd, now time.Time) time.Duration
 }
 
 func (s *Service) DispatchDueReplies(ctx context.Context) error {
+	if _, err := s.db.ExecContext(ctx, `UPDATE pending_agent_replies SET status='pending',updated_at=CURRENT_TIMESTAMP
+		WHERE status='processing' AND updated_at<CURRENT_TIMESTAMP-INTERVAL '2 minutes'`); err != nil {
+		return err
+	}
 	rows, err := s.db.QueryContext(ctx, `SELECT conversation_id,user_id,companion_id,attempts FROM pending_agent_replies
-		WHERE status='pending' AND scheduled_at<=CURRENT_TIMESTAMP ORDER BY scheduled_at LIMIT 20`)
+		WHERE status='pending' AND attempts<3 AND scheduled_at<=CURRENT_TIMESTAMP ORDER BY scheduled_at LIMIT 20`)
 	if err != nil {
 		return err
 	}
@@ -884,14 +886,23 @@ func (s *Service) DispatchDueReplies(ctx context.Context) error {
 			continue
 		}
 		profile, err := s.loadCompanionForConversation(ctx, item.conversationID, item.userID)
+		var reply *SavedMessage
 		if err == nil {
-			_, err = s.replyNow(ctx, item.conversationID, item.userID, profile)
+			reply, err = s.replyNow(ctx, item.conversationID, item.userID, profile)
 		}
 		if err == nil {
 			_, err = s.db.ExecContext(ctx, `DELETE FROM pending_agent_replies WHERE conversation_id=$1 AND status='processing'`, item.conversationID)
+			if err == nil && reply != nil {
+				outbox, _ := json.Marshal(map[string]any{"title": profile.Name, "body": reply.Content, "message_id": reply.ID, "type": "text"})
+				if _, pushErr := s.db.ExecContext(ctx, `INSERT INTO notification_outbox(id,user_id,companion_id,message_id,channel,payload,status)
+					VALUES($1,$2,$3,$4,'push',$5,'ready') ON CONFLICT DO NOTHING`, uuid.New().String(), item.userID, item.companionID, reply.ID, outbox); pushErr != nil {
+					log.Printf("delayed reply push: %v", pushErr)
+				}
+			}
 		} else {
-			retry := time.Now().UTC().Add(time.Duration(1<<min(item.attempts, 5)) * time.Minute)
-			_, _ = s.db.ExecContext(ctx, `UPDATE pending_agent_replies SET status='pending',attempts=attempts+1,scheduled_at=$2,last_error=$3,updated_at=CURRENT_TIMESTAMP WHERE conversation_id=$1`, item.conversationID, retry, truncate(err.Error(), 1000))
+			retry := time.Now().UTC().Add(time.Duration(1<<min(item.attempts, 2)) * time.Minute)
+			_, _ = s.db.ExecContext(ctx, `UPDATE pending_agent_replies SET status=CASE WHEN attempts+1>=3 THEN 'failed' ELSE 'pending' END,
+				attempts=attempts+1,scheduled_at=$2,last_error=$3,updated_at=CURRENT_TIMESTAMP WHERE conversation_id=$1 AND status='processing'`, item.conversationID, retry, truncate(err.Error(), 1000))
 		}
 	}
 	return nil
