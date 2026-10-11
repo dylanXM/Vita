@@ -263,3 +263,22 @@ func TestAnthropicNoTextDiagnostics(t *testing.T) {
 		t.Fatalf("expected raw snippet, got %v", err)
 	}
 }
+
+func TestClientRejectsTokenTruncatedText(t *testing.T) {
+	for _, kind := range []string{"openai", "anthropic"} {
+		t.Run(kind, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if kind == "openai" {
+					w.Write([]byte(`{"choices":[{"finish_reason":"length","message":{"content":"小组作业的初"}}]}`))
+				} else {
+					w.Write([]byte(`{"stop_reason":"max_tokens","content":[{"type":"text","text":"小组作业的初"}]}`))
+				}
+			}))
+			defer server.Close()
+			text, err := NewClient().GenerateText(context.Background(), Model{Kind: kind, BaseURL: server.URL, APIKey: "key", ModelName: "test"}, GenerateRequest{MaxTokens: 10})
+			if err == nil || text != "" {
+				t.Fatalf("truncated reply accepted: %q, %v", text, err)
+			}
+		})
+	}
+}

@@ -274,12 +274,12 @@ const en = {
   },
 
   billing: {
-    plansTitle: "Subscription plans", plansDesc: "Configure subscription products separately by platform.",
-    packsTitle: "Coin packs", packsDesc: "Configure one-time coin products separately by platform.",
+    plansTitle: "Subscription plans", plansDesc: "Configure shared App subscriptions and Web subscriptions.",
+    packsTitle: "Coin packs", packsDesc: "Configure shared App coin packs and Web coin packs.",
     activityTitle: "Purchases & ledger", activityDesc: "Review purchases and coin movements within the selected platform.",
     addPlan: "Add plan", addPack: "Add coin pack", purchases: "Purchases", ledger: "Coin ledger",
     allPlatforms: "All platforms", platformLabel: "Platform",
-    platform: { ios: "iOS", android: "Android", web: "Web", system: "System" },
+    platform: { app: "App", ios: "iOS", android: "Android", web: "Web", system: "System" },
     name: "Name", key: "Key", coins: "Coins", price: "Price (USD)", period: "Period", productId: "Store product ID", benefits: "Plan benefits", benefitsHint: "One benefit per line, up to 12 lines. These are descriptions shown in the app; they do not change feature access or grants.",
     periods: { week: "Weekly", month: "Monthly", year: "Yearly" },
     status: "Status", actions: "Actions", enabled: "Enabled", disabled: "Disabled", popular: "Popular",

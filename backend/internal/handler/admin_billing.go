@@ -33,6 +33,15 @@ type adminProduct struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+func billingCatalogPlatform(value string) string {
+	if value == "ios" || value == "android" {
+		return "app"
+	}
+	return value
+}
+
+func validBillingCatalogPlatform(value string) bool { return value == "app" || value == "web" }
+
 func validBillingPlatform(value string) bool {
 	return value == "ios" || value == "android" || value == "web"
 }
@@ -48,7 +57,7 @@ func validateAdminProduct(c *gin.Context, item *adminProduct, plan bool) bool {
 	item.ProductID = strings.TrimSpace(item.ProductID)
 	item.Environment = currentEnvironment()
 	if item.Key == "" || item.Name == "" ||
-		!validBillingPlatform(item.Platform) || item.Coins < 0 || item.PriceUSD < 0 || item.SortOrder < 0 {
+		!validBillingCatalogPlatform(item.Platform) || item.Coins < 0 || item.PriceUSD < 0 || item.SortOrder < 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product configuration"})
 		return false
 	}
@@ -89,8 +98,8 @@ func AdminListSubscriptionPlans(c *gin.Context) {
 	          FROM subscription_plans WHERE environment = $1`
 	args := []any{environment}
 	if platform != "" {
-		if !validBillingPlatform(platform) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "platform must be ios, android, or web"})
+		if !validBillingCatalogPlatform(platform) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "platform must be app or web"})
 			return
 		}
 		query += ` AND platform = $2`
@@ -120,8 +129,8 @@ func AdminListSubscriptionPlans(c *gin.Context) {
 // ListSubscriptionPlanBenefits exposes only the display copy for active store
 // products. Purchase eligibility and grants remain server-side decisions.
 func ListSubscriptionPlanBenefits(c *gin.Context) {
-	platform := strings.ToLower(strings.TrimSpace(c.GetHeader("X-Vita-Platform")))
-	if !validBillingPlatform(platform) {
+	platform := billingCatalogPlatform(strings.ToLower(strings.TrimSpace(c.GetHeader("X-Vita-Platform"))))
+	if !validBillingCatalogPlatform(platform) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid platform"})
 		return
 	}
@@ -238,8 +247,8 @@ func AdminListCoinPacks(c *gin.Context) {
 	          FROM coin_packs WHERE environment = $1`
 	args := []any{environment}
 	if platform != "" {
-		if !validBillingPlatform(platform) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "platform must be ios, android, or web"})
+		if !validBillingCatalogPlatform(platform) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "platform must be app or web"})
 			return
 		}
 		query += ` AND platform = $2`

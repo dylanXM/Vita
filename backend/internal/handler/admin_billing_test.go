@@ -68,3 +68,25 @@ func TestCreditsFromProductIDSupportsVitaCatalog(t *testing.T) {
 		}
 	}
 }
+
+func TestBillingCatalogPlatform(t *testing.T) {
+	for _, platform := range []string{"ios", "android", "app"} {
+		if got := billingCatalogPlatform(platform); got != "app" {
+			t.Errorf("%s mapped to %s", platform, got)
+		}
+	}
+	if billingCatalogPlatform("web") != "web" {
+		t.Fatal("web catalog changed")
+	}
+	for _, platform := range []string{"ios", "android", "system", ""} {
+		if validBillingCatalogPlatform(platform) {
+			t.Errorf("legacy catalog platform accepted: %s", platform)
+		}
+	}
+	if !validBillingCatalogPlatform("app") || !validBillingCatalogPlatform("web") {
+		t.Fatal("supported catalog rejected")
+	}
+	if !validBillingPlatform("ios") || !validBillingPlatform("android") {
+		t.Fatal("store transaction platforms rejected")
+	}
+}

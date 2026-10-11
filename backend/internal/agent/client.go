@@ -192,7 +192,8 @@ func (c *Client) openAI(ctx context.Context, model Model, input GenerateRequest)
 	}
 	var response struct {
 		Choices []struct {
-			Message struct {
+			FinishReason string `json:"finish_reason"`
+			Message      struct {
 				Content          json.RawMessage `json:"content"`
 				ReasoningContent string          `json:"reasoning_content"`
 			} `json:"message"`
@@ -204,6 +205,9 @@ func (c *Client) openAI(ctx context.Context, model Model, input GenerateRequest)
 	}
 	if len(response.Choices) == 0 {
 		return "", fmt.Errorf("openai-compatible provider returned no choices")
+	}
+	if response.Choices[0].FinishReason == "length" {
+		return "", fmt.Errorf("provider text was truncated by token limit")
 	}
 	msg := response.Choices[0].Message
 	if text := extractOpenAIText(msg.Content); text != "" {
@@ -267,12 +271,16 @@ func (c *Client) anthropic(ctx context.Context, model Model, input GenerateReque
 	}
 	// Anthropic format: content blocks, text inside type=="text" blocks.
 	var anthro struct {
-		Content []struct {
+		StopReason string `json:"stop_reason"`
+		Content    []struct {
 			Type string `json:"type"`
 			Text string `json:"text"`
 		} `json:"content"`
 	}
 	_ = json.Unmarshal(raw, &anthro)
+	if anthro.StopReason == "max_tokens" {
+		return "", fmt.Errorf("provider text was truncated by token limit")
+	}
 	for _, block := range anthro.Content {
 		if block.Type == "text" && strings.TrimSpace(block.Text) != "" {
 			return strings.TrimSpace(block.Text), nil

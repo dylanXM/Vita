@@ -15,13 +15,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "@/components/ui/sonner";
 import { coinPacksApi, subscriptionPlansApi } from "@/api/admin";
 import { errorMessage } from "@/api/client";
-import { type BillingPlatform, type BillingProduct, type Environment } from "@/api/types";
+import { type BillingCatalogPlatform, type BillingProduct, type Environment } from "@/api/types";
 
-const PLATFORMS: BillingPlatform[] = ["ios", "android", "web"];
+const PLATFORMS: BillingCatalogPlatform[] = ["app", "web"];
 
 function emptyProduct(environment: Environment, plan: boolean): BillingProduct {
   return {
-    id: "", key: "", name: "", environment, platform: "ios", coins: 0,
+    id: "", key: "", name: "", environment, platform: "app", coins: 0,
     price_usd: 0, period: plan ? "month" : undefined, product_id: "", popular: false,
     enabled: true, sort_order: 0, benefits: plan ? [] : undefined,
   };
@@ -38,7 +38,7 @@ export function CoinPacksPage() {
 function BillingProductsPage({ plan }: { plan: boolean }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [platform, setPlatform] = useState<BillingPlatform | "all">("all");
+  const [platform, setPlatform] = useState<BillingCatalogPlatform | "all">("all");
   const [editing, setEditing] = useState<BillingProduct | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const activeEnv: Environment = "prod";
@@ -72,7 +72,7 @@ function BillingProductsPage({ plan }: { plan: boolean }) {
       } />
       <Card><CardContent className="space-y-4 p-4">
         <div className="flex flex-wrap gap-3">
-          <Select value={platform} onValueChange={(v) => setPlatform(v as BillingPlatform | "all")}>
+          <Select value={platform} onValueChange={(v) => setPlatform(v as BillingCatalogPlatform | "all")}>
             <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t("billing.allPlatforms")}</SelectItem>
@@ -138,7 +138,7 @@ function ProductDialog({ open, onOpenChange, product, environment, plan, onSaved
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label={t("billing.name")}><Input value={form.name} onChange={(e) => set("name", e.target.value)} /></Field>
       <Field label={t("billing.key")}><Input value={form.key} onChange={(e) => set("key", e.target.value)} /></Field>
-      <Field label={t("billing.platformLabel")}><Select value={form.platform} onValueChange={(v) => set("platform", v as BillingPlatform)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{PLATFORMS.map((v) => <SelectItem key={v} value={v}>{t(`billing.platform.${v}`)}</SelectItem>)}</SelectContent></Select></Field>
+      <Field label={t("billing.platformLabel")}><Select value={form.platform} onValueChange={(v) => set("platform", v as BillingCatalogPlatform)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{PLATFORMS.map((v) => <SelectItem key={v} value={v}>{t(`billing.platform.${v}`)}</SelectItem>)}</SelectContent></Select></Field>
       <Field label={t("billing.coins")}><Input type="number" min={plan ? 0 : 1} value={form.coins} onChange={(e) => set("coins", Number(e.target.value))} /></Field>
       <Field label={t("billing.price")}><Input type="number" min="0" step="0.01" value={form.price_usd} onChange={(e) => set("price_usd", Number(e.target.value))} /></Field>
       {plan && <Field label={t("billing.period")}><Select value={form.period} onValueChange={(v) => set("period", v as BillingProduct["period"])}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{["week","month","year"].map((v) => <SelectItem key={v} value={v}>{t(`billing.periods.${v}`)}</SelectItem>)}</SelectContent></Select></Field>}

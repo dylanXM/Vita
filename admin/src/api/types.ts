@@ -180,13 +180,14 @@ export interface AdminUserInput {
 }
 
 export type BillingPlatform = "ios" | "android" | "web";
+export type BillingCatalogPlatform = "app" | "web";
 
 export interface BillingProduct {
   id: string;
   key: string;
   name: string;
   environment: Environment;
-  platform: BillingPlatform;
+  platform: BillingCatalogPlatform;
   coins: number;
   price_usd: number;
   period?: "week" | "month" | "year";

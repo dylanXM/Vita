@@ -274,12 +274,12 @@ const zhHans = {
   },
 
   billing: {
-    plansTitle: "订阅计划", plansDesc: "按平台分别配置订阅商品。",
-    packsTitle: "金币包", packsDesc: "按平台分别配置一次性金币商品。",
+    plansTitle: "订阅计划", plansDesc: "统一配置 App 订阅商品，保留独立的 Web 订阅。",
+    packsTitle: "金币包", packsDesc: "统一配置 App 金币包，保留独立的 Web 金币包。",
     activityTitle: "购买与流水", activityDesc: "查看指定平台中的购买记录和金币变动。",
     addPlan: "新增订阅计划", addPack: "新增金币包", purchases: "购买记录", ledger: "金币流水",
     allPlatforms: "全部平台", platformLabel: "平台",
-    platform: { ios: "iOS", android: "Android", web: "网页", system: "系统" },
+    platform: { app: "App", ios: "iOS", android: "Android", web: "网页", system: "系统" },
     name: "名称", key: "标识", coins: "金币", price: "价格（美元）", period: "周期", productId: "商店商品 ID", benefits: "套餐权益说明", benefitsHint: "每行一项，最多 12 项。仅用于 App 展示，不改变实际功能权限或发放额度。",
     periods: { week: "每周", month: "每月", year: "每年" },
     status: "状态", actions: "操作", enabled: "启用", disabled: "停用", popular: "热门",

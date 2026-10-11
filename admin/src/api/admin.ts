@@ -26,6 +26,7 @@ import type {
   AdminCompanionInput,
   CompanionPortrait,
   BillingPlatform,
+  BillingCatalogPlatform,
   BillingProduct,
   BillingPurchase,
   CreditLedgerEntry,
@@ -109,7 +110,7 @@ export const healthApi = {
 
 export interface BillingFilters {
   environment: Environment;
-  platform?: BillingPlatform | "system";
+  platform?: BillingPlatform | BillingCatalogPlatform | "system";
   page?: number;
   page_size?: number;
 }

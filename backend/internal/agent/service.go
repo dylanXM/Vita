@@ -196,6 +196,10 @@ func (s *Service) runTick(ctx context.Context) {
 	if err := s.DispatchPushOutbox(ctx); err != nil {
 		log.Printf("agent push dispatch: %v", err)
 	}
+	if err := s.RepairProactiveEventMessages(ctx); err != nil {
+		log.Printf("agent event message repair: %v", err)
+	}
+
 }
 
 // GenerateDueLifePhotos creates scene images only for real, already-due life
@@ -1361,6 +1365,7 @@ func (s *Service) generatePlan(ctx context.Context, profile companionContext, lo
 	systemPrompt := `You plan a believable daily timeline for a fictional AI companion.
 RESPONSE FORMAT: output ONLY a single JSON array. No prose, no explanation, no markdown fences.
 The very first character of your reply MUST be '[' and the very last character MUST be ']'. Do not write anything before or after the array.`
+	systemPrompt += "\nWrite every title, description, location and moment_text in the user's App language: " + s.preferredLocale(ctx, profile.UserID) + ". Keep identifiers and JSON keys unchanged."
 	request := GenerateRequest{System: systemPrompt, Messages: []ChatMessage{{Role: "user", Content: prompt}}, Temperature: 0.6, MaxTokens: 4096}
 	var lastErr error
 	for _, model := range models {
@@ -1972,7 +1977,7 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 			Messages: []ChatMessage{{Role: "user", Content: fmt.Sprintf(
 				"Write one unsolicited message from %s's own point of view. A shareable event in your world is: %s — %s, at %s. Ground the message in your current mood, activity, location, personality, or this event. Choose one concrete detail worth sharing. Do not respond to, quote, or continue the user's last message. Do not start with a greeting or ask a generic question. If this event has already ended, speak of it as something that happened, not as something happening now.",
 				event.name, event.title, event.description, event.location)}},
-			Temperature: 0.95, MaxTokens: 180,
+			Temperature: 0.95, MaxTokens: 512,
 		})
 		modelID = model.ID
 		if err != nil {
@@ -1981,6 +1986,13 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 		if !responseUsesRequiredScript(text, preferredLocale) {
 			text = mockProactiveMessage(targetLocale)
 		}
+	}
+	if !s.mock {
+		localized, localizeErr := s.localizeEventMessage(ctx, event.userID, event.companionID, targetLocale, eventMessageText{Content: text, Title: event.title, Description: event.description, Location: event.location})
+		if localizeErr != nil {
+			return localizeErr
+		}
+		text, event.title, event.description, event.location = localized.Content, localized.Title, localized.Description, localized.Location
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -1999,9 +2011,9 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 	}
 	payload, _ := json.Marshal(map[string]any{
 		"event_title": event.title, "event_description": event.description, "event_location": event.location,
-		"media_urls": mediaURLs, "model_id": modelID,
+		"media_urls": mediaURLs, "model_id": modelID, "event_locale": targetLocale, "event_text_version": 1,
 	})
-	result, err := tx.ExecContext(ctx, `UPDATE life_events SET shared_at = CURRENT_TIMESTAMP WHERE id = $1 AND shared_at IS NULL`, event.id)
+	result, err := tx.ExecContext(ctx, `UPDATE life_events SET shared_at = CURRENT_TIMESTAMP,title=$2,description=$3,location=$4 WHERE id = $1 AND shared_at IS NULL`, event.id, event.title, event.description, event.location)
 	if err != nil {
 		return err
 	}
@@ -2372,7 +2384,7 @@ func (s *Service) loadModelRouteModels(ctx context.Context, routeKey, userID str
 			FROM ai_models m
 			JOIN ai_model_subscription_plans link ON link.model_id=m.id
 			JOIN subscription_plans p ON p.id=link.subscription_plan_id AND p.enabled=true
-			JOIN subscriptions s ON s.user_id=$1 AND s.environment=p.environment AND s.platform=p.platform AND s.product_id=p.product_id
+			JOIN subscriptions s ON s.user_id=$1 AND s.environment=p.environment AND p.platform=CASE WHEN s.platform IN ('ios','android') THEN 'app' ELSE s.platform END AND s.product_id=p.product_id
 			WHERE m.enabled=true AND m.capabilities ? $2 AND m.configured_scenarios ? $3
 			  AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP)
 			GROUP BY m.id,m.created_at ORDER BY m.created_at DESC,m.id DESC`, userID, mediaType, routeKey)
@@ -2412,7 +2424,7 @@ func (s *Service) loadModelRouteModels(ctx context.Context, routeKey, userID str
 				OR EXISTS(
 					SELECT 1 FROM ai_model_subscription_plans link
 					JOIN subscription_plans p ON p.id=link.subscription_plan_id AND p.enabled=true
-					JOIN subscriptions s ON s.user_id=$4 AND s.environment=p.environment AND s.platform=p.platform AND s.product_id=p.product_id
+					JOIN subscriptions s ON s.user_id=$4 AND s.environment=p.environment AND p.platform=CASE WHEN s.platform IN ('ios','android') THEN 'app' ELSE s.platform END AND s.product_id=p.product_id
 					WHERE link.model_id=m.id AND s.status='active'
 					AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP)
 				))

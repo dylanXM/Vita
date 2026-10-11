@@ -298,7 +298,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			key TEXT NOT NULL,
 			name TEXT NOT NULL,
 			environment TEXT NOT NULL CHECK (environment IN ('dev', 'beta', 'prod')),
-			platform TEXT NOT NULL CHECK (platform IN ('ios', 'android', 'web')),
+			platform TEXT NOT NULL CHECK (platform IN ('app', 'web')),
 			coins_granted INTEGER NOT NULL DEFAULT 0,
 			price_usd NUMERIC(12,2) NOT NULL DEFAULT 0,
 			period TEXT NOT NULL CHECK (period IN ('week', 'month', 'year')),
@@ -309,6 +309,11 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			UNIQUE(environment, platform, key)
 		)`,
+		`DO $$ BEGIN
+ IF EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='subscription_plans'::regclass AND conname='subscription_plans_platform_check' AND position('app' in pg_get_constraintdef(oid))=0) THEN
+ ALTER TABLE subscription_plans DROP CONSTRAINT subscription_plans_platform_check;
+ ALTER TABLE subscription_plans ADD CONSTRAINT subscription_plans_platform_check CHECK(platform IN ('app','web','ios','android'));
+ END IF; END $$`,
 		`CREATE INDEX IF NOT EXISTS idx_subscription_plans_scope ON subscription_plans(environment, platform, sort_order)`,
 		`ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS benefits TEXT[] NOT NULL DEFAULT '{}'`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_subscription_plans_product ON subscription_plans(environment, platform, product_id) WHERE product_id <> ''`,
@@ -317,7 +322,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			key TEXT NOT NULL,
 			name TEXT NOT NULL,
 			environment TEXT NOT NULL CHECK (environment IN ('dev', 'beta', 'prod')),
-			platform TEXT NOT NULL CHECK (platform IN ('ios', 'android', 'web')),
+			platform TEXT NOT NULL CHECK (platform IN ('app', 'web')),
 			coins INTEGER NOT NULL,
 			price_usd NUMERIC(12,2) NOT NULL DEFAULT 0,
 			product_id TEXT NOT NULL DEFAULT '',
@@ -328,6 +333,11 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			UNIQUE(environment, platform, key)
 		)`,
+		`DO $$ BEGIN
+ IF EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='coin_packs'::regclass AND conname='coin_packs_platform_check' AND position('app' in pg_get_constraintdef(oid))=0) THEN
+ ALTER TABLE coin_packs DROP CONSTRAINT coin_packs_platform_check;
+ ALTER TABLE coin_packs ADD CONSTRAINT coin_packs_platform_check CHECK(platform IN ('app','web','ios','android'));
+ END IF; END $$`,
 		`CREATE INDEX IF NOT EXISTS idx_coin_packs_scope ON coin_packs(environment, platform, sort_order)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_coin_packs_product ON coin_packs(environment, platform, product_id) WHERE product_id <> ''`,
 		`INSERT INTO subscription_plans
@@ -340,10 +350,8 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			('premium_yearly','Vita Premium Yearly',1200,159.99::numeric,'year','vita.premium.yearly',40)
 		 ) AS products(key,name,coins,price,period,product_id,sort_order)
 		 CROSS JOIN (VALUES('prod')) AS environments(env)
-		 CROSS JOIN (VALUES('ios'),('android')) AS platforms(platform)
-		 ON CONFLICT(environment,platform,key) DO UPDATE SET
-			name=EXCLUDED.name,coins_granted=EXCLUDED.coins_granted,price_usd=EXCLUDED.price_usd,
-			period=EXCLUDED.period,product_id=EXCLUDED.product_id,sort_order=EXCLUDED.sort_order`,
+		 CROSS JOIN (VALUES('app')) AS platforms(platform)
+		 ON CONFLICT(environment,platform,key) DO NOTHING`,
 		`INSERT INTO coin_packs
 			(id,key,name,environment,platform,coins,price_usd,product_id,popular,enabled,sort_order)
 		 SELECT 'catalog-' || env || '-' || platform || '-' || key,key,name,env,platform,coins,price,product_id,popular,true,sort_order
@@ -353,8 +361,8 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 			('coins_1200','1,200 Coins',1200,14.99::numeric,'vita.coins.1200',false,30)
 		 ) AS products(key,name,coins,price,product_id,popular,sort_order)
 		 CROSS JOIN (VALUES('prod')) AS environments(env)
-		 CROSS JOIN (VALUES('ios'),('android')) AS platforms(platform)
-		 ON CONFLICT(environment,platform,key) DO UPDATE SET product_id=EXCLUDED.product_id`,
+		 CROSS JOIN (VALUES('app')) AS platforms(platform)
+		 ON CONFLICT(environment,platform,key) DO NOTHING`,
 		`CREATE TABLE IF NOT EXISTS billing_purchases (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL REFERENCES users(id),

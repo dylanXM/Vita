@@ -518,7 +518,7 @@ func configuredProductCredits(table, productID, platform string) (int, bool) {
 	var credits int
 	err := db.Get().QueryRow(`SELECT `+coinColumn+` FROM `+table+
 		` WHERE environment=$1 AND platform=$2 AND product_id=$3 AND enabled=true LIMIT 1`,
-		currentEnvironment(), platform, productID).Scan(&credits)
+		currentEnvironment(), billingCatalogPlatform(platform), productID).Scan(&credits)
 	if err != nil {
 		return 0, false
 	}
@@ -536,7 +536,7 @@ func grantDueAnnualSubscriptionCreditsAt(now time.Time) error {
 	rows, err := db.Get().Query(`SELECT s.user_id,s.provider,s.provider_ref,s.platform,
 			s.current_period_start,s.current_period_end,p.coins_granted
 		 FROM subscriptions s
-		 JOIN subscription_plans p ON p.environment=s.environment AND p.platform=s.platform
+		 JOIN subscription_plans p ON p.environment=s.environment AND p.platform=CASE WHEN s.platform IN ('ios','android') THEN 'app' ELSE s.platform END
 			AND p.product_id=s.product_id AND p.period='year' AND p.enabled=true
 		 WHERE s.provider='revenuecat' AND s.status='active'
 			AND s.current_period_start IS NOT NULL AND s.current_period_end IS NOT NULL

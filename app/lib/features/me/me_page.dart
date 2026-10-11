@@ -89,7 +89,7 @@ class MePage extends StatelessWidget {
                   child: Column(children: [
                     _MeAction(
                       icon: Icons.workspace_premium_rounded,
-                      title: 'me.plus.title'.tr,
+                      title: 'me.subscriptionLabel'.tr,
                       value: billing.isSubscribed
                           ? 'me.plus.active'.trParams({
                               'ent':
@@ -289,6 +289,9 @@ class _LifePassport extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    Icon(Icons.chevron_right_rounded,
+                        size: 20, color: vita.subText),
                   ]),
                 ),
               ],
@@ -343,8 +346,9 @@ class _MeAction extends StatelessWidget {
                           TextStyle(color: context.vita.text, fontSize: 15))),
               if (value != null) ...[
                 const SizedBox(width: 8),
-                Flexible(
+                Expanded(
                     child: Text(value!,
+                        textAlign: TextAlign.end,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(

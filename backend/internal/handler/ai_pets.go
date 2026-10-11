@@ -196,7 +196,7 @@ func ListAIPetBreeds(c *gin.Context) {
 		(EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=$1 AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP)) AND
 		 (NOT EXISTS(SELECT 1 FROM ai_pet_breed_subscription_plans link WHERE link.breed_id=b.id) OR EXISTS(
 			SELECT 1 FROM ai_pet_breed_subscription_plans link JOIN subscription_plans p ON p.id=link.subscription_plan_id
-			JOIN subscriptions s ON s.user_id=$1 AND s.environment=p.environment AND s.platform=p.platform AND s.product_id=p.product_id
+			JOIN subscriptions s ON s.user_id=$1 AND s.environment=p.environment AND p.platform=CASE WHEN s.platform IN ('ios','android') THEN 'app' ELSE s.platform END AND s.product_id=p.product_id
 			WHERE link.breed_id=b.id AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP))))
 		FROM ai_pet_breeds b WHERE b.environment=$2 AND b.enabled=true ORDER BY b.sort_order,b.name`, userID, currentEnvironment())
 	if err != nil {
@@ -241,7 +241,7 @@ func AdoptAIPet(c *gin.Context) {
 		(EXISTS(SELECT 1 FROM subscriptions s WHERE s.user_id=$1 AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP)) AND
 		 (NOT EXISTS(SELECT 1 FROM ai_pet_breed_subscription_plans link WHERE link.breed_id=b.id) OR EXISTS(
 			SELECT 1 FROM ai_pet_breed_subscription_plans link JOIN subscription_plans p ON p.id=link.subscription_plan_id
-			JOIN subscriptions s ON s.user_id=$1 AND s.environment=p.environment AND s.platform=p.platform AND s.product_id=p.product_id
+			JOIN subscriptions s ON s.user_id=$1 AND s.environment=p.environment AND p.platform=CASE WHEN s.platform IN ('ios','android') THEN 'app' ELSE s.platform END AND s.product_id=p.product_id
 			WHERE link.breed_id=b.id AND s.status='active' AND (s.current_period_end IS NULL OR s.current_period_end>CURRENT_TIMESTAMP))))
 		FROM ai_pet_breeds b WHERE b.id=$2 AND b.environment=$3 AND b.enabled=true`, userID, input.BreedID, currentEnvironment()).Scan(
 		&breed.ID, &breed.Name, &breed.Species, &breed.Personality, &breed.Description, &breed.AvatarURL, &breed.SpriteSheetURL, &breed.ActionSheetURL, &canAdopt)
