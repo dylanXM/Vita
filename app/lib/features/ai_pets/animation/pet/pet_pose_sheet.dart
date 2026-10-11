@@ -76,7 +76,8 @@ class _PetPoseSheetState extends State<PetPoseSheet> {
     final actionImage = await _loadImage(widget.actionSheetUrl);
     if (!mounted || generation != _loadGeneration) return;
     if (actionImage == null || !_validSheet(actionImage)) return;
-    final frames = List.generate(6, (index) => _cell(actionImage, index));
+    final frames = List.generate(
+        6, (index) => _cell(actionImage, index, actionSheet: true));
     final animations = <PetState, SpriteAnimation>{
       PetState.walking: SpriteAnimation.spriteList(
         [frames[0], frames[1], frames[2], frames[1]],
@@ -104,17 +105,20 @@ class _PetPoseSheetState extends State<PetPoseSheet> {
       image.height >= 2 &&
       (image.width / image.height - 1.5).abs() < .02;
 
-  Sprite _cell(ui.Image image, int index) {
+  Sprite _cell(ui.Image image, int index, {bool actionSheet = false}) {
     final width = image.width / 3.0;
     final height = image.height / 2.0;
     // Authored top-row paws can cross the atlas midpoint. Keep the lower-row
     // source inside its own artwork so feeding/drinking never show a stray paw.
-    final lowerRowInset = index >= 3 ? height * .06 : 0.0;
+    // Action frames start closer to the midpoint than the static poses.
+    final rowOverlap = height * (actionSheet ? .02 : .06);
+    final lowerRowInset = index >= 3 ? rowOverlap : 0.0;
+    final upperRowOverflow = index < 3 ? rowOverlap : 0.0;
     return Sprite(
       image,
       srcPosition:
           Vector2((index % 3) * width, (index ~/ 3) * height + lowerRowInset),
-      srcSize: Vector2(width, height - lowerRowInset),
+      srcSize: Vector2(width, height - lowerRowInset + upperRowOverflow),
     );
   }
 

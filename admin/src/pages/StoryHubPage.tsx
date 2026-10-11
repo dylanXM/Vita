@@ -8,6 +8,7 @@ import { storiesApi } from "@/api/admin";
 import { errorMessage } from "@/api/client";
 import type { Environment, StoryBackground, StoryBackgroundInput, StoryConfig } from "@/api/types";
 import { ConfigurationButton } from "@/components/configuration-button";
+import { AdminImageInput, isAdminImageURL } from "@/components/admin-image-input";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -42,10 +43,11 @@ export function StoryHubPage() {
   const [editing, setEditing] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StoryBackground | null>(null);
   const [form, setForm] = useState<StoryBackgroundInput>(blank("prod"));
+  const [coverUploading, setCoverUploading] = useState(false);
 
   useEffect(() => { if (!rulesOpen && config.data) setRules(config.data); }, [config.data, rulesOpen]);
   const refresh = () => { void queryClient.invalidateQueries({ queryKey: ["story-backgrounds", active] }); };
-  const closeBackground = () => { setBackgroundOpen(false); setEditing(null); };
+  const closeBackground = () => { if (coverUploading) return; setBackgroundOpen(false); setEditing(null); };
   const saveRules = useMutation({
     mutationFn: () => storiesApi.saveConfig(rules!),
     onSuccess: (value) => {
@@ -116,7 +118,7 @@ export function StoryHubPage() {
         <DialogHeader><DialogTitle>{editing ? t("storyHub.edit") : t("storyHub.create")}</DialogTitle><DialogDescription>{t("storyHub.backgrounds")}</DialogDescription></DialogHeader>
         <div className="grid gap-4 md:grid-cols-2">
           <Field label={t("storyHub.name")}><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
-          <Field label={t("storyHub.cover")}><Input value={form.cover_url} onChange={(e) => setForm({ ...form, cover_url: e.target.value })} /></Field>
+          <Field wide label={t("storyHub.cover")}><AdminImageInput value={form.cover_url} onChange={(url) => setForm((current) => ({ ...current, cover_url: url.trim() }))} onUploadingChange={setCoverUploading} /></Field>
           <Field label={t("storyHub.genre")}><Input value={form.genre} onChange={(e) => setForm({ ...form, genre: e.target.value })} /></Field>
           <Field label={t("storyHub.sort")}><Input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} /></Field>
           <Field wide label={t("storyHub.synopsis")}><textarea className={area} value={form.synopsis} onChange={(e) => setForm({ ...form, synopsis: e.target.value })} /></Field>
@@ -126,7 +128,7 @@ export function StoryHubPage() {
           <Field label={t("storyHub.goal")}><textarea className={area} value={form.story_goal} onChange={(e) => setForm({ ...form, story_goal: e.target.value })} /></Field>
         </div>
         <label className="flex gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />{t("storyHub.enabled")}</label>
-        <DialogFooter><Button variant="outline" onClick={closeBackground}>{t("users.cancel")}</Button><Button disabled={!form.title.trim() || !form.world_setting.trim() || !form.opening.trim() || save.isPending} onClick={() => save.mutate()}>{editing ? <Save /> : <Plus />}{t("storyHub.saveBackground")}</Button></DialogFooter>
+        <DialogFooter><Button variant="outline" disabled={coverUploading} onClick={closeBackground}>{t("users.cancel")}</Button><Button disabled={coverUploading || Boolean(form.cover_url && !isAdminImageURL(form.cover_url)) || !form.title.trim() || !form.world_setting.trim() || !form.opening.trim() || save.isPending} onClick={() => save.mutate()}>{editing ? <Save /> : <Plus />}{t("storyHub.saveBackground")}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
     <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(next) => { if (!next) setDeleteTarget(null); }}>
