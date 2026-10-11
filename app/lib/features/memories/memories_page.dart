@@ -762,10 +762,11 @@ class _JourneyVisitPageState extends State<_JourneyVisitPage> {
                 onPressed: companionId.isEmpty
                     ? null
                     : () {
-                        Get.back();
                         ShellController.to.selectedCompanionId.value =
                             companionId;
                         ShellController.to.switchTo(0);
+                        Get.until((route) =>
+                            route.settings.name == '/shell' || route.isFirst);
                       },
                 child: Text('journey.enterWorld'.tr),
               ),
