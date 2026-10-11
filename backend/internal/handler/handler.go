@@ -1615,6 +1615,7 @@ func GetMessages(c *gin.Context) {
 	}
 	defer rows.Close()
 	var messages []map[string]interface{}
+	var latestRead time.Time
 	for rows.Next() {
 		var m map[string]interface{}
 		var id, conversationID, senderType, messageType, content, mediaURL, payloadRaw, source, lifeEventID, deliveryStatus string
@@ -1626,8 +1627,17 @@ func GetMessages(c *gin.Context) {
 		_ = json.Unmarshal([]byte(payloadRaw), &payload)
 		m = map[string]interface{}{"id": id, "conversation_id": conversationID, "sender_type": senderType, "message_type": messageType, "content": content, "media_url": mediaURL, "payload": payload, "source": source, "life_event_id": lifeEventID, "delivery_status": deliveryStatus, "created_at": created}
 		messages = append(messages, m)
+		if created.After(latestRead) {
+			latestRead = created
+		}
 	}
-	_, _ = db.Get().Exec(`UPDATE conversations SET last_read_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$2`, conversationID, userID)
+	if err := rows.Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get messages"})
+		return
+	}
+	if !latestRead.IsZero() {
+		_, _ = db.Get().Exec(`UPDATE conversations SET last_read_at=GREATEST(last_read_at,$3),updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$2`, conversationID, userID, latestRead)
+	}
 	c.JSON(http.StatusOK, messages)
 }
 

@@ -74,6 +74,12 @@ void main() {
         ChatController(companionId: 'companion-1', companionName: 'Ava');
     await controller.load();
   });
+  test('covered chat does not fetch or mark new messages read', () async {
+    controller.isVisible = () => false;
+    await controller.poll();
+    expect(adapter.reads, 1);
+  });
+
   tearDown(() {
     controller.onClose();
     Get.reset();
@@ -113,7 +119,9 @@ void main() {
     await send;
     await controller.poll();
     expect(controller.messages, hasLength(2));
-    expect(controller.messages.where((m) => m['id'] == 'server-1'), hasLength(1));
-    expect(controller.messages.where((m) => m['id'] == 'reply-1'), hasLength(1));
+    expect(
+        controller.messages.where((m) => m['id'] == 'server-1'), hasLength(1));
+    expect(
+        controller.messages.where((m) => m['id'] == 'reply-1'), hasLength(1));
   });
 }

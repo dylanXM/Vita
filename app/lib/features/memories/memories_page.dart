@@ -290,7 +290,8 @@ String _journeyActionLabel(Map<String, dynamic> item) {
 
 /// A searchable collection of companion journeys.
 class MemoriesPage extends StatefulWidget {
-  const MemoriesPage({super.key});
+  const MemoriesPage({super.key, this.companionId});
+  final String? companionId;
 
   @override
   State<MemoriesPage> createState() => _MemoriesPageState();
@@ -307,6 +308,13 @@ class _MemoriesPageState extends State<MemoriesPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.companionId != null) {
+      _selectedCompanionId = widget.companionId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _reload();
+      });
+    }
     final focus = ShellController.to.journeyFocusCompanionId;
     _journeyFocusWorker = ever<String?>(focus, (companionId) {
       if (companionId == null || companionId.isEmpty) return;
@@ -402,6 +410,9 @@ class _MemoriesPageState extends State<MemoriesPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: context.vita.pageBg,
+        appBar: widget.companionId == null
+            ? null
+            : AppBar(title: Text('tab.journey'.tr)),
         body: SafeArea(
           bottom: false,
           child: Obx(() => _buildBody(context, MemoriesController.to)),
@@ -420,38 +431,40 @@ class _MemoriesPageState extends State<MemoriesPage> {
         controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
-          SliverToBoxAdapter(
-              child: VitaTabHeader(
-            title: 'tab.journey'.tr,
-            showDivider: false,
-            actions: IconButton(
-              tooltip: 'contacts.search'.tr,
-              icon: Icon(_showSearch ? Icons.close : Icons.search_rounded),
-              onPressed: () {
-                setState(() {
-                  _showSearch = !_showSearch;
-                  if (!_showSearch) {
-                    _search.clear();
-                    _query = '';
-                    controller.loadJourney(companionId: _selectedCompanionId);
-                  }
-                });
-              },
-            ),
-          )),
-          SliverToBoxAdapter(
-              child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 2, 18, 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () => _chooseCompanion(context),
-                icon: const Icon(Icons.tune_rounded, size: 18),
-                label:
-                    Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+          if (widget.companionId == null)
+            SliverToBoxAdapter(
+                child: VitaTabHeader(
+              title: 'tab.journey'.tr,
+              showDivider: false,
+              actions: IconButton(
+                tooltip: 'contacts.search'.tr,
+                icon: Icon(_showSearch ? Icons.close : Icons.search_rounded),
+                onPressed: () {
+                  setState(() {
+                    _showSearch = !_showSearch;
+                    if (!_showSearch) {
+                      _search.clear();
+                      _query = '';
+                      controller.loadJourney(companionId: _selectedCompanionId);
+                    }
+                  });
+                },
               ),
-            ),
-          )),
+            )),
+          if (widget.companionId == null)
+            SliverToBoxAdapter(
+                child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 2, 18, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => _chooseCompanion(context),
+                  icon: const Icon(Icons.tune_rounded, size: 18),
+                  label:
+                      Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+              ),
+            )),
           if (_showSearch)
             SliverToBoxAdapter(
                 child: Padding(

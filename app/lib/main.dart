@@ -3,6 +3,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
 
 import 'core/bootstrap.dart';
+import 'features/chat/chat_list_controller.dart';
+import 'features/chat/message_notification_overlay.dart';
 import 'core/analytics_service.dart';
 import 'core/i18n/translations.dart';
 import 'core/push_notification_service.dart';
@@ -65,13 +67,14 @@ class _VitaAppState extends State<VitaApp> {
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       translations: VitaTranslations(),
       debugShowCheckedModeBanner: false,
-      builder: (context, child) =>
-          AIPetDesktopOverlay(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => MessageNotificationOverlay(
+          child: AIPetDesktopOverlay(child: child ?? const SizedBox.shrink())),
       routingCallback: (routing) {
         final route = routing?.current;
         if (route != null && route.isNotEmpty) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             AIPetDesktopController.to.currentRoute.value = route;
+            ChatListController.to.currentRoute.value = route;
           });
           AnalyticsService.to.screen(route);
         }

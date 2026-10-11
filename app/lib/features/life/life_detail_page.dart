@@ -5,6 +5,7 @@ import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../../shared/media_image.dart';
 import '../chat/chat_page.dart';
+import '../shell/shell_page.dart';
 import '../chat/companion_moment_page.dart';
 import '../chat/experience_sheet.dart';
 import 'companion_story_section.dart';
@@ -112,6 +113,15 @@ class LifeDetailPage extends StatelessWidget {
                   ),
                 ),
               ]),
+              const SizedBox(height: 10),
+              _ActionCard(
+                icon: Icons.auto_stories_outlined,
+                label: 'world.cardJourney'.tr,
+                filled: false,
+                onTap: _id.isEmpty
+                    ? null
+                    : () => ShellController.to.showJourneyForCompanion(_id),
+              ),
               if (tags.isNotEmpty) ...[
                 const SizedBox(height: 30),
                 _SectionHeading(title: 'contactDetail.tags'.tr),

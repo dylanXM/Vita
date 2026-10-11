@@ -2,6 +2,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vita/features/chat/chat_list_presentation.dart';
 
 void main() {
+  test('world card prioritizes chat over activity and handles media', () {
+    String line(Map<String, dynamic> data) =>
+        ChatListPresentation.from(data).worldPreview(
+            activity: 'Walking in the park',
+            voiceLabel: 'Voice',
+            photoLabel: 'Photo');
+    expect(line({}), 'Walking in the park');
+    expect(line({'last_message': 'Hello 🌸'}), 'Hello 🌸');
+    expect(line({'last_message_type': 'voice'}), '[Voice]');
+    expect(
+        line(
+            {'last_message_type': 'image_text', 'last_message': 'A new photo'}),
+        '[Photo] A new photo');
+  });
   test('uses media labels while preserving image message content', () {
     final voice = ChatListPresentation.from({
       'last_message': 'transcript',

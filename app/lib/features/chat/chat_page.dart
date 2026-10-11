@@ -89,7 +89,9 @@ class _ChatPageState extends State<ChatPage> {
   ];
 
   late final ChatController ctrl = Get.put(
-    ChatController(companionId: widget.companionId, companionName: widget.name),
+    ChatController(companionId: widget.companionId, companionName: widget.name)
+      ..isVisible =
+          () => mounted && (ModalRoute.of(context)?.isCurrent ?? false),
     tag: widget.companionId,
   );
   final _input = TextEditingController();
@@ -844,10 +846,9 @@ class _ChatPageState extends State<ChatPage> {
               );
             },
           ),
-          const SizedBox(width: 20),
           _MorePanelButton(
             icon: Icons.card_giftcard_rounded,
-            label: '礼物',
+            label: 'experience.collection.gifts'.tr,
             onTap: () {
               _panel.value = null;
               showModalBottomSheet<void>(
@@ -900,6 +901,18 @@ class _ChatPageState extends State<ChatPage> {
                         }
                       }));
             },
+          ),
+          _MorePanelButton(
+            icon: Icons.call_outlined,
+            label: 'chat.voiceChat'.tr,
+            onTap: () =>
+                VitaNotice.info('chat.voiceChat'.tr, 'chat.callComingSoon'.tr),
+          ),
+          _MorePanelButton(
+            icon: Icons.videocam_outlined,
+            label: 'chat.videoChat'.tr,
+            onTap: () =>
+                VitaNotice.info('chat.videoChat'.tr, 'chat.callComingSoon'.tr),
           ),
         ],
       ),
@@ -1678,7 +1691,8 @@ class _MorePanelButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Expanded(
+        child: GestureDetector(
       onTap: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1695,10 +1709,12 @@ class _MorePanelButton extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 12, color: context.vita.subText)),
         ],
       ),
-    );
+    ));
   }
 }
 

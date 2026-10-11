@@ -10,7 +10,7 @@ import 'chat_list_controller.dart';
 import 'chat_list_presentation.dart';
 import 'chat_page.dart';
 
-/// Chat tab — a continuous conversation list with familiar message-app rhythm.
+/// Companion contacts with the latest message and unread state.
 class ChatListPage extends StatelessWidget {
   const ChatListPage({super.key});
 
@@ -25,8 +25,7 @@ class ChatListPage extends StatelessWidget {
         child: Column(
           children: [
             VitaTabHeader(
-              title: 'Vita',
-              subtitle: 'chat.subtitle'.tr,
+              title: 'tab.contacts'.tr,
               showDivider: false,
               actions: IconButton(
                 onPressed: () {
@@ -136,6 +135,8 @@ class ChatListPage extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,

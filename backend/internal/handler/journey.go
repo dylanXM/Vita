@@ -53,7 +53,8 @@ func GetJourney(c *gin.Context) {
 				AND m.type IS DISTINCT FROM 'world_visit'
 			UNION ALL
 			SELECT w.id,'world_visit' AS kind,'' AS title,
-				COALESCE(NULLIF(w.payload->>'reaction',''),
+				COALESCE(NULLIF(visit_event.title,''),NULLIF(w.payload->>'event_title',''),
+					NULLIF(visit_event.description,''),
 					CASE WHEN w.payload->>'choice'='ask' THEN 'The user asked about my day during a visit.'
 					ELSE 'The user stayed with me during a visit.' END) AS content,
 				w.created_at AS occurred_at,true AS readonly,w.companion_id,
@@ -63,6 +64,7 @@ func GetJourney(c *gin.Context) {
 					ORDER BY msg.created_at DESC LIMIT 1
 				),'')) AS metadata
 			FROM world_interactions w
+			LEFT JOIN life_events visit_event ON visit_event.id=w.life_event_id AND visit_event.companion_id=w.companion_id
 			LEFT JOIN LATERAL (
 				SELECT m.id FROM memories m
 				WHERE m.companion_id=w.companion_id AND m.type='world_visit'

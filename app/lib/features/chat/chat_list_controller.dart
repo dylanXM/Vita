@@ -10,7 +10,7 @@ import '../../core/api_client.dart';
 /// Refreshes on three triggers:
 ///  * pull-to-refresh from the UI,
 ///  * app foreground resume (lifecycle),
-///  * a quiet 30s timer while the page is alive, so Life Engine proactive
+///  * a quiet 5s timer while the page is alive, so Life Engine proactive
 ///    messages show up without the user having to enter and exit a chat.
 class ChatListController extends GetxController with WidgetsBindingObserver {
   static ChatListController get to => Get.find();
@@ -19,6 +19,7 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
   final failed = false.obs;
   final companions = <Map<String, dynamic>>[].obs;
   final searchQuery = ''.obs;
+  final currentRoute = ''.obs;
 
   Timer? _poll;
   bool _silent = false;
@@ -30,7 +31,7 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     load();
     _poll =
-        Timer.periodic(const Duration(seconds: 30), (_) => load(silent: true));
+        Timer.periodic(const Duration(seconds: 5), (_) => load(silent: true));
   }
 
   @override

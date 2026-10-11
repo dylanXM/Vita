@@ -10,6 +10,7 @@ import '../../core/analytics_service.dart';
 class ChatController extends GetxController {
   final String companionId;
   final String companionName;
+  bool Function()? isVisible;
 
   ChatController({required this.companionId, required this.companionName});
 
@@ -131,7 +132,10 @@ class ChatController extends GetxController {
   }
 
   Future<void> poll() async {
-    if (_polling || sending.value || _conversationId == null) return;
+    if (_polling ||
+        sending.value ||
+        _conversationId == null ||
+        isVisible?.call() == false) return;
     _polling = true;
     try {
       String? latest;
@@ -153,8 +157,8 @@ class ChatController extends GetxController {
       // lost when the newly delivered message advances the polling cursor.
       if (sending.value) {
         if (data is List) {
-          _deferredPollMessages.addAll(
-              data.whereType<Map>().map(Map<String, dynamic>.from));
+          _deferredPollMessages
+              .addAll(data.whereType<Map>().map(Map<String, dynamic>.from));
         }
         return;
       }

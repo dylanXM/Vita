@@ -97,6 +97,29 @@ void main() {
 
   tearDown(Get.reset);
 
+  testWidgets('call placeholders show coming soon without leaving chat',
+      (tester) async {
+    Get.put<AnalyticsService>(_FakeAnalyticsService());
+    await tester.pumpWidget(GetMaterialApp(
+      theme: VitaTheme.light,
+      translations: VitaTranslations(),
+      locale: const Locale('en'),
+      home: const ChatPage(companionId: 'companion-1', name: 'Ava'),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.add_circle_outline));
+    await tester.pumpAndSettle();
+    for (final icon in [Icons.call_outlined, Icons.videocam_outlined]) {
+      await tester.tap(find.byIcon(icon));
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(find.text('Coming soon'), findsOneWidget);
+      expect(find.byType(ChatPage), findsOneWidget);
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
       'send stays enabled and keeps the draft when the conversation '
       'cannot be created', (tester) async {

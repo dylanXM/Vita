@@ -30,6 +30,21 @@ class ChatListPresentation {
   final DateTime? messageAt;
   final int unreadCount;
 
+  String worldPreview(
+      {required String activity,
+      required String voiceLabel,
+      required String photoLabel}) {
+    final hasMessage = messageAt != null ||
+        message.isNotEmpty ||
+        messageType == 'voice' ||
+        messageType == 'image' ||
+        messageType == 'image_text';
+    return hasMessage
+        ? preview(
+            fallback: activity, voiceLabel: voiceLabel, photoLabel: photoLabel)
+        : activity;
+  }
+
   String preview({
     required String fallback,
     required String voiceLabel,

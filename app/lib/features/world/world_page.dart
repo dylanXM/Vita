@@ -252,9 +252,12 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     final companions = ChatListController.to;
-    companions.prepareInitialLoad();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) companions.load();
+      if (!mounted) return;
+      // The global message banner also observes this list. Reset it only
+      // after the navigator has finished building this page.
+      companions.prepareInitialLoad();
+      companions.load();
     });
     _sceneTimer = Timer.periodic(
       const Duration(minutes: 1),
@@ -557,16 +560,11 @@ class _RelationshipCard extends StatelessWidget {
     final giftAt = DateTime.tryParse('${recentGift?['created_at'] ?? ''}');
     final showRecentGift =
         giftAt != null && DateTime.now().difference(giftAt).inHours < 48;
-    final reaction = '${effectiveVisit?['reaction'] ?? ''}'.trim();
-    final momentLine = visited
-        ? reaction.isNotEmpty
-            ? reaction
-            : (asking
-                ? 'world.choiceAskResult'.tr
-                : 'world.choiceStayResult'.tr)
-        : eventTitle.isNotEmpty
-            ? eventTitle
-            : 'world.phase.quiet'.tr;
+    final momentLine = ChatListPresentation.from(companion).worldPreview(
+      activity: eventTitle.isNotEmpty ? eventTitle : 'world.phase.quiet'.tr,
+      voiceLabel: 'chat.voiceMessage'.tr,
+      photoLabel: 'chat.photoMessage'.tr,
+    );
     return ClipRRect(
       borderRadius: BorderRadius.circular(30),
       child: ColoredBox(
@@ -764,7 +762,7 @@ class _RelationshipCard extends StatelessWidget {
             ])),
           ),
           SizedBox(
-            height: 164,
+            height: 80,
             child: ColoredBox(
               color: vita.surface,
               child: Padding(
@@ -773,93 +771,24 @@ class _RelationshipCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    SizedBox(
-                        height: 20,
-                        child: Row(children: [
-                          Expanded(
-                            child: Text(
-                              visited
-                                  ? 'world.visited'.tr
-                                  : placeTitle.isEmpty
-                                      ? 'world.visit'.tr
-                                      : 'world.visitAt'.trParams({
-                                          'place': placeTitle.isEmpty
-                                              ? 'world.place.home'.tr
-                                              : placeTitle.tr,
-                                        }),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                  color: vita.green,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                          if (visitBusy)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: SizedBox.square(
-                                dimension: 14,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: vita.green,
-                                ),
-                              ),
-                            ),
-                        ])),
-                    const SizedBox(height: 8),
                     Row(children: [
-                      Expanded(
-                          child: _VisitChoice(
-                        label: visited
-                            ? 'world.sceneContinue'.tr
-                            : 'world.choiceStay'.tr,
-                        icon: visited
-                            ? Icons.chat_bubble_outline_rounded
-                            : Icons.favorite_outline_rounded,
-                        primary: true,
-                        onTap: visited
-                            ? onChat
-                            : visitBusy
-                                ? null
-                                : () => onVisitChoice('stay'),
-                      )),
-                      const SizedBox(width: 8),
-                      Expanded(
-                          child: _VisitChoice(
-                        label: visited
-                            ? 'world.openJourney'.tr
-                            : 'world.choiceAsk'.tr,
-                        icon: visited
-                            ? Icons.auto_stories_outlined
-                            : Icons.question_answer_outlined,
-                        onTap: visited
-                            ? onJourney
-                            : visitBusy
-                                ? null
-                                : () => onVisitChoice('ask'),
-                      )),
-                    ]),
-                    const SizedBox(height: 8),
-                    Row(children: [
-                      if (!visited)
-                        Expanded(
-                            child: _WorldUtilityAction(
-                          label: 'world.talk'.tr,
-                          icon: Icons.chat_bubble_outline_rounded,
-                          onTap: onChat,
-                        )),
                       Expanded(
                           child: _WorldUtilityAction(
-                        label: 'world.giveGift'.tr,
+                        label: 'world.cardChat'.tr,
+                        icon: Icons.chat_bubble_outline_rounded,
+                        onTap: onChat,
+                      )),
+                      Expanded(
+                          child: _WorldUtilityAction(
+                        label: 'world.cardGift'.tr,
                         icon: Icons.card_giftcard_outlined,
                         onTap: onGift,
                       )),
                       Expanded(
                           child: _WorldUtilityAction(
-                        label: 'world.leaveNote'.tr,
-                        icon: Icons.edit_note_rounded,
-                        onTap: onNote,
+                        label: 'world.cardJourney'.tr,
+                        icon: Icons.auto_stories_outlined,
+                        onTap: onJourney,
                       )),
                     ]),
                   ],
@@ -868,56 +797,6 @@ class _RelationshipCard extends StatelessWidget {
             ),
           ),
         ]),
-      ),
-    );
-  }
-}
-
-class _VisitChoice extends StatelessWidget {
-  const _VisitChoice(
-      {required this.label,
-      required this.icon,
-      required this.onTap,
-      this.primary = false});
-
-  final String label;
-  final IconData icon;
-  final VoidCallback? onTap;
-  final bool primary;
-
-  @override
-  Widget build(BuildContext context) {
-    final vita = context.vita;
-    final primaryText = Theme.of(context).colorScheme.onPrimary;
-    return Material(
-      color: primary ? vita.green : vita.greenTint,
-      borderRadius: BorderRadius.circular(13),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(13),
-        child: Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 9),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(13),
-            border: primary
-                ? null
-                : Border.all(color: vita.green.withValues(alpha: .28)),
-          ),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(icon, size: 16, color: primary ? primaryText : vita.green),
-            const SizedBox(width: 5),
-            Flexible(
-                child: Text(label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        color: primary ? primaryText : vita.text,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700))),
-          ]),
-        ),
       ),
     );
   }
