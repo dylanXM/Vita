@@ -636,6 +636,10 @@ class VitaTranslations extends Translations {
       'story.invitationAfter': 'After @event, try something new together.',
       'story.invitationFirst': 'Start your first shared experience.',
       'story.invitationNext': 'Choose another shared experience.',
+      'contactDetail.deleteFriend': 'Delete friend',
+      'contactDetail.deleteFriendConfirm':
+          'Delete this friend? You can restore them from Deleted companions in Settings within 30 days.',
+      'contactDetail.friendDeleted': 'Friend deleted',
       'contactDetail.chat': 'Message',
       'contactDetail.active': 'Active',
       'contactDetail.paused': 'Paused',
@@ -1354,6 +1358,10 @@ class VitaTranslations extends Translations {
       'story.invitationAfter': '接着“@event”，再创造一段新的经历。',
       'story.invitationFirst': '开启你们的第一次共同体验。',
       'story.invitationNext': '选择下一次共同体验。',
+      'contactDetail.deleteFriend': '删除好友',
+      'contactDetail.deleteFriendConfirm':
+          '确定删除该好友？删除后可在 30 天内通过设置中的“已删除联系人”恢复。',
+      'contactDetail.friendDeleted': '好友已删除',
       'contactDetail.chat': '发消息',
       'contactDetail.active': '关系正常',
       'contactDetail.paused': '关系暂停',

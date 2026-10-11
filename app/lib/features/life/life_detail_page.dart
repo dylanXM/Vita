@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../core/theme.dart';
+import '../../core/api_client.dart';
+import '../../core/notice.dart';
+import '../chat/chat_list_controller.dart';
 import '../../shared/widgets.dart';
 import '../../shared/media_image.dart';
 import '../chat/chat_page.dart';
@@ -10,10 +13,18 @@ import '../chat/companion_moment_page.dart';
 import '../chat/experience_sheet.dart';
 import 'companion_story_section.dart';
 
-class LifeDetailPage extends StatelessWidget {
+class LifeDetailPage extends StatefulWidget {
   const LifeDetailPage({super.key, required this.companion});
 
   final Map<String, dynamic> companion;
+
+  @override
+  State<LifeDetailPage> createState() => _LifeDetailPageState();
+}
+
+class _LifeDetailPageState extends State<LifeDetailPage> {
+  bool _deleting = false;
+  Map<String, dynamic> get companion => widget.companion;
 
   String get _id => companion['id'] as String? ?? '';
   String get _name => companion['name'] as String? ?? 'chat.companion'.tr;
@@ -112,16 +123,18 @@ class LifeDetailPage extends StatelessWidget {
                     onTap: _id.isEmpty ? null : () => _showExperiences(context),
                   ),
                 ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _ActionCard(
+                    icon: Icons.auto_stories_outlined,
+                    label: 'world.cardJourney'.tr,
+                    filled: false,
+                    onTap: _id.isEmpty
+                        ? null
+                        : () => ShellController.to.showJourneyForCompanion(_id),
+                  ),
+                ),
               ]),
-              const SizedBox(height: 10),
-              _ActionCard(
-                icon: Icons.auto_stories_outlined,
-                label: 'world.cardJourney'.tr,
-                filled: false,
-                onTap: _id.isEmpty
-                    ? null
-                    : () => ShellController.to.showJourneyForCompanion(_id),
-              ),
               if (tags.isNotEmpty) ...[
                 const SizedBox(height: 30),
                 _SectionHeading(title: 'contactDetail.tags'.tr),
@@ -161,11 +174,71 @@ class LifeDetailPage extends StatelessWidget {
                   onExperience: (key) =>
                       _showExperiences(context, recommendedKey: key),
                 ),
+              if (_id.isNotEmpty && companion['is_default'] != true) ...[
+                const SizedBox(height: 30),
+                OutlinedButton.icon(
+                  onPressed: _deleting ? null : _deleteFriend,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                  icon: _deleting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.person_remove_outlined),
+                  label: Text('contactDetail.deleteFriend'.tr),
+                ),
+              ],
             ]),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _deleteFriend() async {
+    if (_deleting || _id.isEmpty || companion['is_default'] == true) return;
+    setState(() => _deleting = true);
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('contactDetail.deleteFriend'.tr),
+          content: Text('contactDetail.deleteFriendConfirm'.tr),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text('common.cancel'.tr),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(dialogContext).colorScheme.error,
+              ),
+              child: Text('contactDetail.deleteFriend'.tr),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      await ApiClient.instance.delete('/v1/companions/$_id');
+      if (Get.isRegistered<ChatListController>()) {
+        await ChatListController.to.load();
+      }
+      if (!mounted) return;
+      Get.until((route) => route.settings.name == '/shell' || route.isFirst);
+      VitaNotice.success(
+          'contactDetail.deleteFriend'.tr, 'contactDetail.friendDeleted'.tr);
+    } on ApiException catch (error) {
+      if (mounted) {
+        VitaNotice.error('contactDetail.deleteFriend'.tr, error.message);
+      }
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
   }
 
   void _openChat() {
@@ -330,19 +403,29 @@ class _ActionCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 17),
-          child: Row(children: [
-            Icon(icon, color: color, size: 21),
-            const SizedBox(width: 9),
-            Expanded(
-                child: Text(label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style:
-                        TextStyle(color: color, fontWeight: FontWeight.w600))),
-            Icon(Icons.arrow_outward_rounded, color: color, size: 16),
-          ]),
+        child: Tooltip(
+          message: label,
+          child: SizedBox(
+            height: 76,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: color, size: 21),
+                  const SizedBox(height: 6),
+                  Flexible(
+                    child: Text(label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: color, fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
