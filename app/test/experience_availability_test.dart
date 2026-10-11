@@ -14,6 +14,8 @@ void main() {
   bool launched = true;
   bool subscriptionOnly = true;
   bool subscribed = false;
+  String category = 'photo';
+  int balance = 100;
   late List<String> purchases;
   setUp(() {
     Get.testMode = true;
@@ -21,17 +23,19 @@ void main() {
     launched = true;
     subscriptionOnly = true;
     subscribed = false;
+    category = 'photo';
+    balance = 100;
     purchases = [];
     stub = dio.InterceptorsWrapper(onRequest: (options, handler) {
       if (options.method == 'POST') purchases.add(options.path);
       handler.resolve(
           dio.Response(requestOptions: options, statusCode: 200, data: {
-        'balance': 100,
+        'balance': balance,
         'is_subscribed': subscribed,
         'products': [
           {
             'key': 'life_photo',
-            'category': 'photo',
+            'category': category,
             'coins': 20,
             'name_key': 'experience.photo',
             'description_key': 'experience.photo.desc',
@@ -76,6 +80,7 @@ void main() {
     final translations = VitaTranslations().keys;
     for (final locale in translations.entries) {
       for (final key in [
+        'experience.insufficientCoins',
         'experience.comingSoon',
         'experience.subscriptionOnly',
         'experience.subscribeToUse'
@@ -83,6 +88,26 @@ void main() {
         expect(locale.value[key], isNotEmpty, reason: '${locale.key}: $key');
       }
     }
+  });
+  testWidgets('date invitation is disabled when balance is below price',
+      (tester) async {
+    category = 'date';
+    subscriptionOnly = false;
+    balance = 19;
+    await open(tester);
+    expect(tester.widget<ElevatedButton>(find.byType(ElevatedButton)).onPressed,
+        isNull);
+    expect(find.text('Not enough coins'), findsOneWidget);
+    expect(purchases, isEmpty);
+  });
+  testWidgets('date invitation is enabled when balance equals price',
+      (tester) async {
+    category = 'date';
+    subscriptionOnly = false;
+    balance = 20;
+    await open(tester);
+    expect(tester.widget<ElevatedButton>(find.byType(ElevatedButton)).onPressed,
+        isNotNull);
   });
   testWidgets('unlaunched experiences remain visible and cannot be purchased',
       (tester) async {

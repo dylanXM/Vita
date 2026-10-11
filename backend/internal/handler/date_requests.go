@@ -46,8 +46,10 @@ func requestCompanionDate(c *gin.Context, userID, companionID, productKey string
 	requestID := uuid.New().String()
 	inserted, err := db.Get().ExecContext(ctx, `INSERT INTO companion_date_requests
 		(id,user_id,companion_id,product_key,idempotency_key,scheduled_at,status)
-		VALUES($1,$2,$3,$4,$5,$6,'requested') ON CONFLICT(user_id,idempotency_key) DO NOTHING`,
-		requestID, userID, companionID, productKey, input.IdempotencyKey, start)
+		SELECT $1,$2,$3,$4,$5,$6,'requested' FROM users
+		WHERE id=$2 AND credits_balance >= $7
+		ON CONFLICT(user_id,idempotency_key) DO NOTHING`,
+		requestID, userID, companionID, productKey, input.IdempotencyKey, start, product.Coins)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save date request"})
 		return
@@ -58,6 +60,10 @@ func requestCompanionDate(c *gin.Context, userID, companionID, productKey string
 		err := db.Get().QueryRowContext(ctx, `SELECT id,product_key,status,reason,result::text
 			FROM companion_date_requests WHERE user_id=$1 AND idempotency_key=$2`, userID, input.IdempotencyKey).
 			Scan(&existingID, &existingProduct, &status, &reason, &resultRaw)
+		if errors.Is(err, sql.ErrNoRows) {
+			writeSpendError(c, credits.ErrInsufficientCredit)
+			return
+		}
 		if err != nil || existingProduct != productKey {
 			c.JSON(http.StatusConflict, gin.H{"error": "date request key already used", "code": "invalid_request"})
 			return

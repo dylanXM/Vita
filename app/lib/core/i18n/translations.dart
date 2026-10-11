@@ -222,6 +222,7 @@ class VitaTranslations extends Translations {
       'gift.sent.message':
           '@coins coins sent. Your companion feels closer to you.',
       'gift.failed': 'Could not send gift',
+      'experience.insufficientCoins': 'Not enough coins',
       'experience.comingSoon': 'Coming soon',
       'experience.subscriptionOnly': 'Subscription only',
       'experience.subscribeToUse': 'Subscribe to use',
@@ -989,6 +990,7 @@ class VitaTranslations extends Translations {
       'gift.sent.title': '赠送成功',
       'gift.sent.message': '已赠送 @coins 金币，TA 对你的好感提升了。',
       'gift.failed': '赠送失败',
+      'experience.insufficientCoins': '金币不足',
       'experience.comingSoon': '即将上线',
       'experience.subscriptionOnly': '订阅专用',
       'experience.subscribeToUse': '订阅后使用',

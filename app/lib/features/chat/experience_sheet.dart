@@ -102,6 +102,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     }
     final key = product['key'] as String? ?? '';
     final coins = product['coins'] as int? ?? 0;
+    if (product['category'] == 'date' && _balance < coins) return;
     final owned = _owned[key] == true;
     final appointment =
         product['category'] == 'date' ? await _chooseAppointment() : null;
@@ -684,30 +685,36 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     final comingSoon = product['is_launched'] == false;
     final requiresSubscription =
         product['subscription_only'] == true && !_isSubscribed;
+    final insufficientDateCoins =
+        date && _balance < (product['coins'] as int? ?? 0);
     final label = comingSoon
         ? 'experience.comingSoon'.tr
         : requiresSubscription
             ? 'experience.subscribeToUse'.tr
-            : equipped
-                ? 'experience.equipped'.tr
-                : owned
-                    ? 'experience.equip'.tr
-                    : gift
-                        ? 'experience.gift.send'
-                            .trParams({'coins': "${product['coins']}"})
-                        : date
-                            ? 'experience.date.request'.tr
-                            : "${'experience.use'.tr} · $price";
+            : insufficientDateCoins
+                ? 'experience.insufficientCoins'.tr
+                : equipped
+                    ? 'experience.equipped'.tr
+                    : owned
+                        ? 'experience.equip'.tr
+                        : gift
+                            ? 'experience.gift.send'
+                                .trParams({'coins': "${product['coins']}"})
+                            : date
+                                ? 'experience.date.request'.tr
+                                : "${'experience.use'.tr} · $price";
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
       decoration: BoxDecoration(
           color: context.vita.surface,
           border: Border(top: BorderSide(color: context.vita.divider))),
       child: ElevatedButton(
-        onPressed:
-            _buying != null || comingSoon || (equipped && !requiresSubscription)
-                ? null
-                : () => _purchase(product),
+        onPressed: _buying != null ||
+                comingSoon ||
+                (insufficientDateCoins && !requiresSubscription) ||
+                (equipped && !requiresSubscription)
+            ? null
+            : () => _purchase(product),
         style: ElevatedButton.styleFrom(
           minimumSize: const Size.fromHeight(52),
           shape:
