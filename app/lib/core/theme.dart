@@ -10,12 +10,12 @@ import 'package:flutter/material.dart';
 /// whole app automatically.
 ///
 /// The palette is carried on the [ThemeData] as a [VitaPaletteToken]
-/// extension, so widget tests that only provide `VitaTheme.light` (violet)
+/// extension, so widget tests that only provide `VitaTheme.light` (blue)
 /// keep working without registering a settings controller.
 
-/// Switchable brand color schemes. [VitaPalette.violet] is the default.
+/// Switchable brand color schemes. [VitaPalette.blue] is the default.
 enum VitaPalette {
-  /// Dream Violet — romantic, private (default).
+  /// Dream Violet — romantic, private.
   violet,
 
   /// Warm Coral — warm, waiting.
@@ -229,7 +229,7 @@ class VitaBrandColors {
   };
 
   static VitaBrandColors of(VitaPalette p) =>
-      _table[p] ?? _table[VitaPalette.violet]!;
+      _table[p] ?? _table[VitaPalette.blue]!;
 }
 
 /// Carries the active [VitaPalette] on [ThemeData] so `context.vita` can
@@ -274,7 +274,7 @@ class VitaThemeData {
     required this.brandGradient,
   });
 
-  /// Light palette for the default (violet) scheme. Kept as a const for
+  /// Light palette for the original violet scheme. Kept as a const for
   /// backward compatibility with existing tests and the app boot path.
   static const VitaThemeData light = VitaThemeData(
     brightness: Brightness.light,
@@ -304,7 +304,7 @@ class VitaThemeData {
     ),
   );
 
-  /// Dark palette for the default (violet) scheme.
+  /// Dark palette for the original violet scheme.
   static const VitaThemeData dark = VitaThemeData(
     brightness: Brightness.dark,
     green: Color(0xFF9D85FF),
@@ -440,7 +440,7 @@ class VitaThemeData {
   /// Tokens matching the current theme brightness and palette of [context].
   static VitaThemeData of(BuildContext context) {
     final ext = Theme.of(context).extension<VitaPaletteToken>();
-    final palette = ext?.palette ?? VitaPalette.violet;
+    final palette = ext?.palette ?? VitaPalette.blue;
     final brightness = Theme.of(context).brightness;
     return brightness == Brightness.dark
         ? VitaThemeData.darkFor(palette)
@@ -529,9 +529,9 @@ extension VitaTextStyle on VitaThemeData {
 class VitaTheme {
   VitaTheme._();
 
-  /// Default (violet) light theme — kept for the app boot path and tests.
-  static ThemeData get light => lightFor(VitaPalette.violet);
-  static ThemeData get dark => darkFor(VitaPalette.violet);
+  /// Default (blue) light theme — kept for the app boot path and tests.
+  static ThemeData get light => lightFor(VitaPalette.blue);
+  static ThemeData get dark => darkFor(VitaPalette.blue);
 
   /// Light [ThemeData] for an explicit [palette].
   static ThemeData lightFor(VitaPalette palette) =>

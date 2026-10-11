@@ -83,8 +83,8 @@ class VitaSettingsController extends GetxController {
   /// The theme mode applied to the app: explicit choice or [ThemeMode.system].
   ThemeMode get appliedThemeMode => themeMode.value ?? ThemeMode.system;
 
-  /// The brand color scheme applied to the app: explicit choice or violet.
-  VitaPalette get currentPalette => palette.value ?? VitaPalette.violet;
+  /// The brand color scheme applied to the app: explicit choice or blue.
+  VitaPalette get currentPalette => palette.value ?? VitaPalette.blue;
 
   void setThemeMode(ThemeMode? mode) {
     themeMode.value = mode;
