@@ -113,12 +113,19 @@ class _PetPoseSheetState extends State<PetPoseSheet> {
     // Action frames start closer to the midpoint than the static poses.
     final rowOverlap = height * (actionSheet ? .02 : .06);
     final lowerRowInset = index >= 3 ? rowOverlap : 0.0;
-    final upperRowOverflow = index < 3 ? rowOverlap : 0.0;
+    // The bundled ragdoll sitting cell has a complete silhouette above the
+    // midpoint; its left edge contains a fragment from the standing cell.
+    final ragdollSitting = !actionSheet &&
+        widget.sheetUrl == 'asset://assets/ai_pets/cat_ragdoll_poses.png' &&
+        index == 1;
+    final leftInset = ragdollSitting ? width * .035 : 0.0;
+    final upperRowOverflow = index < 3 && !ragdollSitting ? rowOverlap : 0.0;
     return Sprite(
       image,
-      srcPosition:
-          Vector2((index % 3) * width, (index ~/ 3) * height + lowerRowInset),
-      srcSize: Vector2(width, height - lowerRowInset + upperRowOverflow),
+      srcPosition: Vector2((index % 3) * width + leftInset,
+          (index ~/ 3) * height + lowerRowInset),
+      srcSize:
+          Vector2(width - leftInset, height - lowerRowInset + upperRowOverflow),
     );
   }
 
