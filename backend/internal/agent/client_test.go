@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -280,5 +281,76 @@ func TestClientRejectsTokenTruncatedText(t *testing.T) {
 				t.Fatalf("truncated reply accepted: %q, %v", text, err)
 			}
 		})
+	}
+}
+
+func TestKieSunburstImageClient(t *testing.T) {
+	t.Setenv("VITA_PUBLIC_API_BASE_URL", "https://api.example.com")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Header.Get("Authorization") != "Bearer key" {
+			t.Error("missing authorization")
+		}
+		switch r.URL.Path {
+		case "/api/v1/jobs/createTask":
+			var body struct {
+				Model    string            `json:"model"`
+				Input    map[string]string `json:"input"`
+				Callback string            `json:"callBackUrl"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Callback != "https://api.example.com/v1/providers/kie/callback" {
+				t.Errorf("callback=%q", body.Callback)
+			}
+			if body.Model != "gpt-image-2-5-sunburst-text-to-image" || body.Input["prompt"] != "cafe" || body.Input["aspect_ratio"] != "1:1" || body.Input["resolution"] != "1K" || body.Input["background"] != "opaque" {
+				t.Errorf("unexpected request: %+v", body)
+			}
+			io.WriteString(w, `{"code":200,"data":{"taskId":"task+1"}}`)
+		case "/api/v1/jobs/recordInfo":
+			if r.URL.Query().Get("taskId") != "task+1" {
+				t.Error("task ID was not escaped")
+			}
+			io.WriteString(w, `{"code":200,"data":{"state":"success","resultJson":"{\"resultUrls\":[\"https://cdn.example/image.png\"]}"}}`)
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	result, err := NewClient().GenerateImage(context.Background(), Model{Kind: "kie", BaseURL: server.URL, APIKey: "key", ModelName: "gpt-image-2-5-sunburst-text-to-image"}, GenerateImageRequest{Prompt: "cafe", Size: "1024x1024"})
+	if err != nil || result != "https://cdn.example/image.png" {
+		t.Fatalf("result=%q err=%v", result, err)
+	}
+}
+
+func TestKiePollRejectsProviderError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{"code":401,"msg":"unauthorized","data":{"state":"success","resultJson":"invalid"}}`)
+	}))
+	defer server.Close()
+	if _, err := NewClient().kiePollResult(context.Background(), Model{BaseURL: server.URL}, "task"); err == nil {
+		t.Fatal("provider error accepted")
+	}
+}
+
+func TestKieBaseAcceptsTaskEndpoint(t *testing.T) {
+	for _, base := range []string{"https://api.kie.ai", "https://api.kie.ai/api/v1/jobs/createTask/", "https://api.kie.ai/api/v1"} {
+		if actual := kieBase(Model{BaseURL: base}); actual != "https://api.kie.ai" {
+			t.Errorf("base=%s actual=%s", base, actual)
+		}
+	}
+}
+func TestKieCallbackSignalsOnlyPendingTask(t *testing.T) {
+	ch := make(chan struct{}, 1)
+	kiePendingTasks.Store("pending", ch)
+	defer kiePendingTasks.Delete("pending")
+	NotifyKieTask("unknown")
+	NotifyKieTask("pending")
+	NotifyKieTask("pending")
+	select {
+	case <-ch:
+	default:
+		t.Fatal("missing callback notification")
 	}
 }

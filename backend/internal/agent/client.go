@@ -8,7 +8,10 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -449,15 +452,19 @@ func kieBase(model Model) string {
 	if b == "" {
 		return "https://api.kie.ai"
 	}
+	for _, suffix := range []string{"/api/v1/jobs/createTask", "/api/v1/jobs/recordInfo", "/api/v1/jobs", "/api/v1"} {
+		b = strings.TrimSuffix(b, suffix)
+	}
 	return b
 }
 
 // kieCreateTask submits a generation task and returns its taskId.
 func (c *Client) kieCreateTask(ctx context.Context, model Model, input map[string]any) (string, error) {
-	body, _ := json.Marshal(map[string]any{
-		"model": model.ModelName,
-		"input": input,
-	})
+	bodyData := map[string]any{"model": model.ModelName, "input": input}
+	if callback := kieCallbackURL(); callback != "" {
+		bodyData["callBackUrl"] = callback
+	}
+	body, _ := json.Marshal(bodyData)
 	endpoint := kieBase(model) + "/api/v1/jobs/createTask"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
@@ -470,6 +477,9 @@ func (c *Client) kieCreateTask(ctx context.Context, model Model, input map[strin
 		return "", fmt.Errorf("kie createTask: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("kie createTask HTTP status %d", resp.StatusCode)
+	}
 	reader := io.LimitReader(resp.Body, maxProviderResponseBytes)
 	var out struct {
 		Code int    `json:"code"`
@@ -490,7 +500,10 @@ func (c *Client) kieCreateTask(ctx context.Context, model Model, input map[strin
 
 // kiePollResult waits for a task to reach success/fail and returns its resultJson.
 func (c *Client) kiePollResult(ctx context.Context, model Model, taskID string) (string, error) {
-	endpoint := kieBase(model) + "/api/v1/jobs/recordInfo?taskId=" + taskID
+	signal := make(chan struct{}, 1)
+	kiePendingTasks.Store(taskID, signal)
+	defer kiePendingTasks.Delete(taskID)
+	endpoint := kieBase(model) + "/api/v1/jobs/recordInfo?taskId=" + url.QueryEscape(taskID)
 	deadline := time.Now().Add(90 * time.Second)
 	for {
 		if time.Now().After(deadline) {
@@ -504,6 +517,10 @@ func (c *Client) kiePollResult(ctx context.Context, model Model, taskID string) 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			return "", fmt.Errorf("kie recordInfo: %w", err)
+		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			resp.Body.Close()
+			return "", fmt.Errorf("kie recordInfo HTTP status %d", resp.StatusCode)
 		}
 		reader := io.LimitReader(resp.Body, maxProviderResponseBytes)
 		var out struct {
@@ -520,6 +537,9 @@ func (c *Client) kiePollResult(ctx context.Context, model Model, taskID string) 
 		if decodeErr != nil {
 			return "", fmt.Errorf("kie recordInfo decode: %w", decodeErr)
 		}
+		if out.Code != 200 {
+			return "", fmt.Errorf("kie recordInfo failed: code=%d msg=%s", out.Code, out.Msg)
+		}
 		switch out.Data.State {
 		case "success":
 			if strings.TrimSpace(out.Data.ResultJSON) == "" {
@@ -532,6 +552,7 @@ func (c *Client) kiePollResult(ctx context.Context, model Model, taskID string) 
 		select {
 		case <-ctx.Done():
 			return "", ctx.Err()
+		case <-signal:
 		case <-time.After(2 * time.Second):
 		}
 	}
@@ -553,7 +574,11 @@ func kieResultURL(resultJSON string) (string, error) {
 
 // kieGenerateImage runs the async KIE flow for text-to-image and returns the image URL.
 func (c *Client) kieGenerateImage(ctx context.Context, model Model, input GenerateImageRequest) (string, error) {
-	taskID, err := c.kieCreateTask(ctx, model, map[string]any{"prompt": input.Prompt})
+	params, err := kieImageInput(model, input)
+	if err != nil {
+		return "", err
+	}
+	taskID, err := c.kieCreateTask(ctx, model, params)
 	if err != nil {
 		return "", err
 	}
@@ -623,4 +648,51 @@ func (c *Client) kieTestConnection(ctx context.Context, model Model) ([]string, 
 		return nil, rawText, fmt.Errorf("kie rejected the API key (HTTP %d)", resp.StatusCode)
 	}
 	return nil, rawText, nil
+}
+
+// kieImageInput keeps model-specific parameters out of other providers' requests.
+func kieImageInput(model Model, input GenerateImageRequest) (map[string]any, error) {
+	params := map[string]any{"prompt": input.Prompt}
+	if model.ModelName != "gpt-image-2-5-sunburst-text-to-image" {
+		return params, nil
+	}
+	ratio, resolution := "1:1", "1K"
+	switch input.Size {
+	case "", "1024x1024":
+	case "1536x1024":
+		ratio = "3:2"
+	case "1024x1536":
+		ratio = "2:3"
+	case "2048x2048":
+		resolution = "2K"
+	case "4096x4096":
+		resolution = "4K"
+	default:
+		return nil, fmt.Errorf("unsupported Kie Sunburst image size %q", input.Size)
+	}
+	params["aspect_ratio"] = ratio
+	params["resolution"] = resolution
+	params["background"] = "opaque"
+	return params, nil
+}
+
+var kiePendingTasks sync.Map
+
+// Callbacks are wake-up hints only. Provider queries remain authoritative so
+// untrusted callback bodies cannot fulfill jobs or change billing state.
+func NotifyKieTask(taskID string) {
+	if pending, ok := kiePendingTasks.Load(taskID); ok {
+		select {
+		case pending.(chan struct{}) <- struct{}{}:
+		default:
+		}
+	}
+}
+
+func kieCallbackURL() string {
+	base := strings.TrimRight(strings.TrimSpace(os.Getenv("VITA_PUBLIC_API_BASE_URL")), "/")
+	if base == "" {
+		return ""
+	}
+	return base + "/v1/providers/kie/callback"
 }

@@ -143,8 +143,8 @@ func upsertProvider(c *gin.Context, id string) {
 		return
 	}
 	input.Kind = strings.ToLower(strings.TrimSpace(input.Kind))
-	if input.Kind != "openai" && input.Kind != "anthropic" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "kind must be openai or anthropic"})
+	if input.Kind != "openai" && input.Kind != "anthropic" && input.Kind != "kie" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "kind must be openai, anthropic or kie"})
 		return
 	}
 	if id == "" {
@@ -211,8 +211,8 @@ func AdminTestProviderConnection(c *gin.Context) {
 		return
 	}
 	kind := strings.ToLower(strings.TrimSpace(input.Kind))
-	if kind != "openai" && kind != "anthropic" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "kind must be openai or anthropic"})
+	if kind != "openai" && kind != "anthropic" && kind != "kie" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "kind must be openai, anthropic or kie"})
 		return
 	}
 	apiKey := strings.TrimSpace(input.APIKey)
@@ -420,8 +420,8 @@ func AdminTestModel(c *gin.Context) {
 			APIKey:    inlineKey,
 			ModelName: modelName,
 		}
-		if model.Kind != "openai" && model.Kind != "anthropic" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "kind must be openai or anthropic"})
+		if model.Kind != "openai" && model.Kind != "anthropic" && model.Kind != "kie" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "kind must be openai, anthropic or kie"})
 			return
 		}
 	} else {

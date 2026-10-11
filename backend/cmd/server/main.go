@@ -253,6 +253,7 @@ func main() {
 		api.GET("/admin-images/:id", handler.GetAdminImage)
 
 		api.GET("/health", handler.Health)
+		api.POST("/providers/kie/callback", middleware.RateLimit(120, time.Minute), handler.KieCallback)
 		api.GET("/app-content", handler.AppContent)
 		api.POST("/events", middleware.RateLimit(120, time.Minute), handler.IngestAnalyticsEvents)
 

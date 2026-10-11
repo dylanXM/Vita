@@ -45,7 +45,7 @@ void main() {
         home: const MePage()));
     await tester.pumpAndSettle();
     expect(find.text('Membership & wallet'), findsOneWidget);
-    expect(find.text('Vita Plus & Premium'), findsOneWidget);
+    expect(find.text('Vita Plus'), findsOneWidget);
     expect(find.text('Active'), findsOneWidget);
     expect(find.text('ava@example.com'), findsOneWidget);
     expect(find.text('Vita PLUS_MONTHLY'), findsNothing);

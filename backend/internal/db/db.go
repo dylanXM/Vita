@@ -492,7 +492,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		`CREATE TABLE IF NOT EXISTS ai_providers (
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
-			kind TEXT NOT NULL CHECK (kind IN ('openai', 'anthropic')),
+			kind TEXT NOT NULL CHECK (kind IN ('openai', 'anthropic', 'kie')),
 			base_url TEXT NOT NULL,
 			api_key_ciphertext TEXT NOT NULL DEFAULT '',
 			enabled BOOLEAN NOT NULL DEFAULT true,

@@ -88,8 +88,8 @@ class MePage extends StatelessWidget {
                     Padding(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                         child: Row(children: [
-                          Expanded(
-                              child: Text('Vita Plus & Premium',
+                          Flexible(
+                              child: Text('me.plus.title'.tr,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
