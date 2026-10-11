@@ -548,10 +548,24 @@ String _paletteLabel(BuildContext context, VitaPalette palette) {
       return 'palette.rose'.tr;
     case VitaPalette.teal:
       return 'palette.teal'.tr;
+    case VitaPalette.blue:
+      return 'palette.blue'.tr;
+    case VitaPalette.purple:
+      return 'palette.purple'.tr;
+    case VitaPalette.pink:
+      return 'palette.pink'.tr;
+    case VitaPalette.redAccent:
+      return 'palette.redAccent'.tr;
+    case VitaPalette.orange:
+      return 'palette.orange'.tr;
+    case VitaPalette.yellow:
+      return 'palette.yellow'.tr;
+    case VitaPalette.leafGreen:
+      return 'palette.leafGreen'.tr;
   }
 }
 
-/// Brand color scheme picker — four palettes with live swatch previews.
+/// Brand color scheme picker — palettes with live swatch previews.
 class PalettePage extends StatelessWidget {
   const PalettePage({super.key});
 

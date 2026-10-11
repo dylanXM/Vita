@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// Vita design system — a character-world visual language with light and
-/// dark palettes, plus four switchable brand color schemes (palettes).
+/// dark palettes, plus switchable brand color schemes (palettes).
 ///
 /// Soft surfaces and expressive accents anchor the world. Every page resolves its
 /// colors through `context.vita`, which returns the [VitaThemeData] matching
@@ -25,7 +25,14 @@ enum VitaPalette {
   rose,
 
   /// Lake Teal — calm, dependable.
-  teal;
+  teal,
+  blue,
+  purple,
+  pink,
+  redAccent,
+  orange,
+  yellow,
+  leafGreen;
 
   /// Stable storage key value (persisted in SharedPreferences).
   String get storageKey => name;
@@ -120,6 +127,104 @@ class VitaBrandColors {
         bubbleGreen: Color(0xFF1F5A56),
         gradient: [Color(0xFF35C9C2), Color(0xFF0B9A94)],
       ),
+    ),
+    VitaPalette.blue: VitaBrandColors._(
+      Brand(
+          green: Color(0xFF007AFF),
+          greenDark: Color(0xFF005AC2),
+          greenTint: Color(0xFFE8F2FF),
+          bubbleGreen: Color(0xFFC3DEFF),
+          gradient: [Color(0xFF007AFF), Color(0xFF005AC2)]),
+      Brand(
+          green: Color(0xFF66ADFF),
+          greenDark: Color(0xFF007AFF),
+          greenTint: Color(0x3366ADFF),
+          bubbleGreen: Color(0xFF244A75),
+          gradient: [Color(0xFF66ADFF), Color(0xFF007AFF)]),
+    ),
+    VitaPalette.purple: VitaBrandColors._(
+      Brand(
+          green: Color(0xFF953C98),
+          greenDark: Color(0xFF762578),
+          greenTint: Color(0xFFF7EAF7),
+          bubbleGreen: Color(0xFFE9C6EA),
+          gradient: [Color(0xFF953C98), Color(0xFF762578)]),
+      Brand(
+          green: Color(0xFFCB85CD),
+          greenDark: Color(0xFF953C98),
+          greenTint: Color(0x33CB85CD),
+          bubbleGreen: Color(0xFF583559),
+          gradient: [Color(0xFFCB85CD), Color(0xFF953C98)]),
+    ),
+    VitaPalette.pink: VitaBrandColors._(
+      Brand(
+          green: Color(0xFFF6469D),
+          greenDark: Color(0xFFBB2874),
+          greenTint: Color(0xFFFFEAF5),
+          bubbleGreen: Color(0xFFFFC7E3),
+          gradient: [Color(0xFFF6469D), Color(0xFFBB2874)]),
+      Brand(
+          green: Color(0xFFFF86BF),
+          greenDark: Color(0xFFF6469D),
+          greenTint: Color(0x33FF86BF),
+          bubbleGreen: Color(0xFF753450),
+          gradient: [Color(0xFFFF86BF), Color(0xFFF6469D)]),
+    ),
+    VitaPalette.redAccent: VitaBrandColors._(
+      Brand(
+          green: Color(0xFFE9313D),
+          greenDark: Color(0xFFB9232E),
+          greenTint: Color(0xFFFFECEE),
+          bubbleGreen: Color(0xFFFFC9CF),
+          gradient: [Color(0xFFE9313D), Color(0xFFB9232E)]),
+      Brand(
+          green: Color(0xFFFF7882),
+          greenDark: Color(0xFFE9313D),
+          greenTint: Color(0x33FF7882),
+          bubbleGreen: Color(0xFF752D35),
+          gradient: [Color(0xFFFF7882), Color(0xFFE9313D)]),
+    ),
+    VitaPalette.orange: VitaBrandColors._(
+      Brand(
+          green: Color(0xFFFF850B),
+          greenDark: Color(0xFFB85C00),
+          greenTint: Color(0xFFFFF2E6),
+          bubbleGreen: Color(0xFFFFDDB7),
+          gradient: [Color(0xFFFF850B), Color(0xFFB85C00)]),
+      Brand(
+          green: Color(0xFFFFAE60),
+          greenDark: Color(0xFFFF850B),
+          greenTint: Color(0x33FFAE60),
+          bubbleGreen: Color(0xFF704523),
+          gradient: [Color(0xFFFFAE60), Color(0xFFFF850B)]),
+    ),
+    VitaPalette.yellow: VitaBrandColors._(
+      Brand(
+          green: Color(0xFFD5A000),
+          greenDark: Color(0xFF967000),
+          greenTint: Color(0xFFFFF8DA),
+          bubbleGreen: Color(0xFFFFEB9B),
+          gradient: [Color(0xFFD5A000), Color(0xFF967000)]),
+      Brand(
+          green: Color(0xFFFFD458),
+          greenDark: Color(0xFFD5A000),
+          greenTint: Color(0x33FFD458),
+          bubbleGreen: Color(0xFF685629),
+          gradient: [Color(0xFFFFD458), Color(0xFFD5A000)]),
+    ),
+    VitaPalette.leafGreen: VitaBrandColors._(
+      Brand(
+          green: Color(0xFF5ABB3D),
+          greenDark: Color(0xFF357E20),
+          greenTint: Color(0xFFEEF9E9),
+          bubbleGreen: Color(0xFFD1ECC5),
+          gradient: [Color(0xFF5ABB3D), Color(0xFF357E20)]),
+      Brand(
+          green: Color(0xFF8BD672),
+          greenDark: Color(0xFF5ABB3D),
+          greenTint: Color(0x338BD672),
+          bubbleGreen: Color(0xFF355B29),
+          gradient: [Color(0xFF8BD672), Color(0xFF5ABB3D)]),
     ),
   };
 
