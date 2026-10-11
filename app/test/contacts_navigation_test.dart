@@ -86,7 +86,7 @@ void main() {
     expect(find.text('Contacts'), findsOneWidget);
     expect(find.text('Hello 🌸'), findsOneWidget);
     expect(find.text('2'), findsOneWidget);
-    await tester.tap(find.text('Mimi'));
+    await tester.tap(find.text('Mimi').last);
     await tester.pumpAndSettle();
     expect(find.byType(ChatPage), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -106,8 +106,7 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
-  testWidgets(
-      'original contact rows retain equal height and relocated add button',
+  testWidgets('compact conversations retain equal height without duplicate shortcuts',
       (tester) async {
     final contacts = Get.put<ChatListController>(_Contacts());
     contacts.companions.assignAll([
@@ -120,6 +119,8 @@ void main() {
       },
     ]);
     await tester.pumpWidget(host(const ChatListPage()));
+    expect(find.text('Ava'), findsOneWidget);
+    expect(find.text('Mimi'), findsOneWidget);
     expect(find.text('Old chat'), findsOneWidget);
     expect(find.text('Hello 🌸'), findsOneWidget);
     expect(

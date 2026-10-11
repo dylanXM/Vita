@@ -80,13 +80,9 @@ class ChatListPage extends StatelessWidget {
       onRefresh: () => ctrl.load(),
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(0, 8, 0, 90),
+        padding: const EdgeInsets.fromLTRB(6, 8, 6, 100),
         itemCount: list.length,
-        separatorBuilder: (context, _) => Divider(
-          height: 0.5,
-          indent: 82,
-          color: context.vita.divider,
-        ),
+        separatorBuilder: (context, _) => const SizedBox(height: 2),
         itemBuilder: (context, i) {
           final c = list[i];
           final id = c['id'] as String? ?? '';
@@ -119,36 +115,38 @@ class ChatListPage extends StatelessWidget {
               await ctrl.load();
             },
             child: Container(
-              color: context.vita.surface,
+              color: context.vita.pageBg,
               height: 72,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(
                 children: [
                   VitaAvatar(
                       name: name,
                       radius: 22,
                       imageUrl: c['portrait_url'] as String?,
-                      borderRadius: BorderRadius.circular(8)),
-                  const SizedBox(width: 12),
+                      borderRadius: BorderRadius.circular(22)),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w700,
                                 color: context.vita.text)),
-                        const SizedBox(height: 3),
-                        Text(
+                        const SizedBox(height: 4),
+                        Flexible(
+                            child: Text(
                           subtitle,
                           style: TextStyle(
                               fontSize: 12.5, color: context.vita.subText),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                        ),
+                        )),
                       ],
                     ),
                   ),
@@ -156,20 +154,21 @@ class ChatListPage extends StatelessWidget {
                     const SizedBox(width: 10),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         if (time.isNotEmpty)
                           Text(time,
                               style: TextStyle(
                                   fontSize: 11, color: context.vita.subText)),
                         if (presentation.unreadCount > 0) ...[
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           Container(
                             constraints: const BoxConstraints(
                                 minWidth: 18, minHeight: 18),
                             padding: const EdgeInsets.symmetric(horizontal: 5),
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: context.vita.red,
+                              color: context.vita.green,
                               borderRadius: BorderRadius.circular(9),
                             ),
                             child: Text(
@@ -201,7 +200,7 @@ class _ChatSearchBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final ctrl = ChatListController.to;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
+      padding: const EdgeInsets.fromLTRB(18, 4, 18, 4),
       child: TextField(
         onChanged: (v) => ctrl.searchQuery.value = v,
         textInputAction: TextInputAction.search,
@@ -222,15 +221,15 @@ class _ChatSearchBox extends StatelessWidget {
           prefixIconConstraints:
               const BoxConstraints(minWidth: 38, minHeight: 40),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.zero,
+            borderRadius: BorderRadius.circular(18),
             borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.zero,
+            borderRadius: BorderRadius.circular(18),
             borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.zero,
+            borderRadius: BorderRadius.circular(18),
             borderSide: BorderSide.none,
           ),
         ),
