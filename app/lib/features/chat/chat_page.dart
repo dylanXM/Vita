@@ -96,7 +96,6 @@ class _ChatPageState extends State<ChatPage> {
   );
   final _input = TextEditingController();
   final _scroll = ScrollController();
-  int _scrollRequest = 0;
   final _recorder = AudioRecorder();
   final _player = AudioPlayer();
   late final Worker _messageWorker;
@@ -343,30 +342,10 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  Future<void> _scrollToBottom() async {
-    final request = ++_scrollRequest;
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted || !_scroll.hasClients || request != _scrollRequest) return;
-    try {
-      await _scroll.animateTo(
-        _scroll.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-      );
-    } catch (_) {
-      // The page can close while the scroll animation is in flight.
-      return;
-    }
-    // Long bubbles can change the list extent while the animation is running.
-    // Correct the final position after layout, without overriding a user drag.
-    for (var pass = 0; pass < 3; pass++) {
-      await WidgetsBinding.instance.endOfFrame;
-      if (!mounted || !_scroll.hasClients || request != _scrollRequest) return;
-      final remaining =
-          _scroll.position.maxScrollExtent - _scroll.position.pixels;
-      if (remaining <= 1) return;
-      _scroll.jumpTo(_scroll.position.maxScrollExtent);
-    }
+  void _scrollToBottom() {
+    if (!mounted || !_scroll.hasClients) return;
+    // The reversed list starts at the newest message; no animated traversal.
+    _scroll.jumpTo(_scroll.position.minScrollExtent);
   }
 
   void _insertEmoji(String emoji) {
@@ -717,13 +696,11 @@ class _ChatPageState extends State<ChatPage> {
       );
     }
 
-    return Listener(
-      onPointerDown: (_) => ++_scrollRequest,
-      child: ListView(
-        controller: _scroll,
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-        children: items,
-      ),
+    return ListView(
+      controller: _scroll,
+      reverse: true,
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      children: items.reversed.toList(),
     );
   }
 
