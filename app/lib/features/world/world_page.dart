@@ -814,20 +814,18 @@ class _WorldUtilityAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vita = context.vita;
-    final foreground = primary ? vita.green : vita.text;
+    final foreground =
+        primary ? Theme.of(context).colorScheme.onPrimary : vita.text;
     return SizedBox(
         height: 48,
         child: Semantics(
           button: true,
           label: label,
           child: Material(
-            color: primary ? vita.greenTint : vita.surface,
+            color: primary ? vita.green : vita.surface,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
-                side: BorderSide(
-                    color: primary
-                        ? vita.green.withValues(alpha: .22)
-                        : vita.divider)),
+                side: BorderSide(color: primary ? vita.green : vita.divider)),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: onTap,
@@ -838,7 +836,7 @@ class _WorldUtilityAction extends StatelessWidget {
                       children: [
                         Icon(icon,
                             size: 16,
-                            color: primary ? vita.green : vita.subText),
+                            color: primary ? foreground : vita.subText),
                         const SizedBox(width: 5),
                         Flexible(
                             child: Text(label,
