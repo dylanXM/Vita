@@ -301,7 +301,7 @@ func loadAccessibleBackground(id, userID, environment string) (storyBackground, 
 }
 
 func ListStories(c *gin.Context) {
-	rows, err := db.Get().Query(`SELECT s.id,s.title,s.current_chapter_no,s.status,s.created_at,s.updated_at,COALESCE(c.id,''),COALESCE(c.name,''),COALESCE(NULLIF(c.avatar_url,''),p.image_url,''),COALESCE(s.background_snapshot->>'cover_url','') FROM stories s LEFT JOIN companions c ON c.id=s.companion_id LEFT JOIN companion_portraits p ON p.id=c.portrait_id WHERE s.user_id=$1 ORDER BY s.updated_at DESC`, c.GetString("user_id"))
+	rows, err := db.Get().Query(`SELECT s.id,s.title,s.current_chapter_no,s.status,s.created_at,s.updated_at,COALESCE(c.id,''),COALESCE(c.name,''),COALESCE(NULLIF(c.avatar_url,''),p.image_url,''),COALESCE(NULLIF(s.background_snapshot->>'cover_url',''),b.cover_url,'') FROM stories s LEFT JOIN story_backgrounds b ON b.id=s.background_id LEFT JOIN companions c ON c.id=s.companion_id LEFT JOIN companion_portraits p ON p.id=c.portrait_id WHERE s.user_id=$1 ORDER BY s.updated_at DESC`, c.GetString("user_id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load stories"})
 		return

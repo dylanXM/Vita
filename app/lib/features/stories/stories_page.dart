@@ -634,66 +634,62 @@ class _BackgroundTile extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Stack(fit: StackFit.expand, children: [
-            if (cover.isNotEmpty)
-              VitaMediaImage(
-                url: cover,
-                errorBuilder: (_, __, ___) => const SizedBox.expand(),
-              ),
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0x00000000), Color(0xE8191525)],
-                  stops: [.25, 1],
+          child: Row(children: [
+            SizedBox(
+              width: 88,
+              height: double.infinity,
+              child: cover.trim().isNotEmpty
+                  ? VitaMediaImage(
+                      url: cover.trim(),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(Icons.auto_stories_outlined,
+                              color: Colors.white54)))
+                  : const Center(
+                      child: Icon(Icons.auto_stories_outlined,
+                          size: 30, color: Colors.white54)),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 0, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('${background['title'] ?? ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white)),
+                    const SizedBox(height: 8),
+                    Text(
+                        '${background['synopsis'] ?? background['world_setting'] ?? ''}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12, height: 1.35, color: Colors.white70)),
+                  ],
                 ),
               ),
             ),
-            if (background['custom'] == true)
-              const Positioned(
-                top: 12,
-                left: 14,
-                child: Icon(Icons.lock_outline, size: 18, color: Colors.white),
-              ),
-            Positioned(
-              top: 0,
-              right: 0,
-              child: IconButton(
-                onPressed: onInfo,
-                icon:
-                    const Icon(Icons.info_outline_rounded, color: Colors.white),
-              ),
-            ),
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 18,
+            SizedBox(
+              width: 48,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('${background['title'] ?? ''}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 17,
-                          height: 1.15,
-                          fontWeight: FontWeight.w700,
+                  IconButton(
+                      onPressed: onInfo,
+                      icon: const Icon(Icons.info_outline_rounded,
                           color: Colors.white)),
-                  const SizedBox(height: 8),
-                  Text(
-                      '${background['synopsis'] ?? background['world_setting'] ?? ''}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 12, height: 1.35, color: Colors.white70)),
-                  const SizedBox(height: 4),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Icon(Icons.add_circle_outline_rounded,
-                        size: 20, color: Colors.white),
-                  ),
+                  IconButton(
+                      onPressed: onTap,
+                      icon: Icon(
+                          background['custom'] == true
+                              ? Icons.lock_outline
+                              : Icons.add_circle_outline_rounded,
+                          color: Colors.white)),
                 ],
               ),
             ),
