@@ -1287,6 +1287,15 @@ func (s *Service) ensurePlan(ctx context.Context, profile companionContext, time
 	if status == "completed" && !force {
 		return nil
 	}
+	if status == "failed" && !force {
+		var coolingDown bool
+		if err := conn.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM agent_runs WHERE companion_id=$1 AND kind='life_plan' AND status='failed' AND finished_at > CURRENT_TIMESTAMP - INTERVAL '15 minutes')`, profile.ID).Scan(&coolingDown); err != nil {
+			return err
+		}
+		if coolingDown {
+			return nil
+		}
+	}
 	// All failures, including cancellation and persistence failures, must clear
 	// generating. Use a fresh context while we still own the per-day lock.
 	defer func() {

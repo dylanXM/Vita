@@ -7,6 +7,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"vita/internal/language"
 )
 
 func completeEventMessage(text string) bool {
@@ -32,7 +34,24 @@ type eventMessageText struct {
 	Location    string `json:"location"`
 }
 
+// Complete text matching the required script can use the existing validation without a second model request.
+// Latin-script languages still require translation because script alone cannot distinguish them.
+func eventTextAlreadyLocalized(locale string, input eventMessageText) bool {
+	switch language.Normalize(locale) {
+	case "zh-Hans", "zh-Hant", "ja", "ko", "ar":
+	default:
+		return false
+	}
+	return completeEventMessage(input.Content) && strings.TrimSpace(input.Title) != "" &&
+		responseUsesRequiredScript(input.Content, locale) && responseUsesRequiredScript(input.Title, locale) &&
+		(input.Description == "" || responseUsesRequiredScript(input.Description, locale)) &&
+		(input.Location == "" || responseUsesRequiredScript(input.Location, locale))
+}
+
 func (s *Service) localizeEventMessage(ctx context.Context, userID, companionID, locale string, input eventMessageText) (eventMessageText, error) {
+	if eventTextAlreadyLocalized(locale, input) {
+		return input, nil
+	}
 	models, err := s.loadTextRouteModels(ctx, "text_proactive", "", userID)
 	if err != nil {
 		return input, err
@@ -81,21 +100,22 @@ func (s *Service) RepairProactiveEventMessages(ctx context.Context) error {
 		return nil
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT m.id,c.user_id,c.companion_id,m.content,m.payload::text,m.life_event_id,
- COALESCE(e.title,''),COALESCE(e.description,''),COALESCE(e.location,'')
+ COALESCE(e.title,''),COALESCE(e.description,''),COALESCE(e.location,''),COALESCE(u.preferred_locale,'en')
  FROM messages m JOIN conversations c ON c.id=m.conversation_id
  JOIN life_events e ON e.id=m.life_event_id JOIN users u ON u.id=c.user_id
- WHERE m.source='proactive' AND m.message_type IN ('life_card','image_text')
+ WHERE m.created_at >= CURRENT_TIMESTAMP - INTERVAL '7 days'
+ AND m.source='proactive' AND m.message_type IN ('life_card','image_text')
  AND (NOT (m.payload ? 'event_repair_retry_after') OR (m.payload->>'event_repair_retry_after')::timestamptz <= CURRENT_TIMESTAMP)
  AND (COALESCE(m.payload->>'event_text_version','') <> '1' OR COALESCE(m.payload->>'event_locale','') <> u.preferred_locale)
  ORDER BY m.created_at DESC LIMIT 2`)
 	if err != nil {
 		return err
 	}
-	type item struct{ id, user, companion, content, payload, event, title, description, location string }
+	type item struct{ id, user, companion, content, payload, event, title, description, location, storedLocale string }
 	var items []item
 	for rows.Next() {
 		var x item
-		if err = rows.Scan(&x.id, &x.user, &x.companion, &x.content, &x.payload, &x.event, &x.title, &x.description, &x.location); err != nil {
+		if err = rows.Scan(&x.id, &x.user, &x.companion, &x.content, &x.payload, &x.event, &x.title, &x.description, &x.location, &x.storedLocale); err != nil {
 			rows.Close()
 			return err
 		}
@@ -108,7 +128,15 @@ func (s *Service) RepairProactiveEventMessages(ctx context.Context) error {
 	}
 	var firstErr error
 	for _, x := range items {
-		locale := s.preferredLocale(ctx, x.user)
+		locale := language.Normalize(x.storedLocale)
+		var existing map[string]any
+		if json.Unmarshal([]byte(x.payload), &existing) == nil && fmt.Sprint(existing["event_text_version"]) == "1" && existing["event_locale"] != nil && strings.TrimSpace(fmt.Sprint(existing["event_locale"])) != "" && language.Normalize(fmt.Sprint(existing["event_locale"])) == locale {
+			_, updateErr := s.db.ExecContext(ctx, `UPDATE messages SET payload=jsonb_set(payload,'{event_locale}',to_jsonb($3::text)) WHERE id=$1 AND payload=$2::jsonb`, x.id, x.payload, x.storedLocale)
+			if updateErr != nil {
+				return updateErr
+			}
+			continue
+		}
 		output, localErr := s.localizeEventMessage(ctx, x.user, x.companion, locale, eventMessageText{Content: x.content, Title: x.title, Description: x.description, Location: x.location})
 		if localErr != nil {
 			if firstErr == nil {
