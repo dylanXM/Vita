@@ -148,7 +148,7 @@ class ExplorePage extends StatelessWidget {
       body: SafeArea(
         bottom: false,
         child: ListView(
-          padding: const EdgeInsets.only(bottom: 90),
+          padding: const EdgeInsets.only(bottom: 126),
           children: [
             VitaTabHeader(title: 'tab.discover'.tr, showDivider: false),
             Obx(() {

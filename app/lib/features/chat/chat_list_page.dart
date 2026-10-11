@@ -17,6 +17,8 @@ class ChatListPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ctrl = ChatListController.to;
+    // Shell already includes the floating dock in this bottom inset.
+    final bottomSpacing = MediaQuery.paddingOf(context).bottom + 36;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
       // Bottom is open so the list scrolls behind the floating glass tab bar.
@@ -46,18 +48,18 @@ class ChatListPage extends StatelessWidget {
               ),
             ),
             _ChatSearchBox(),
-            Expanded(child: Obx(() => _buildBody(ctrl))),
+            Expanded(child: Obx(() => _buildBody(ctrl, bottomSpacing))),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBody(ChatListController ctrl) {
+  Widget _buildBody(ChatListController ctrl, double bottomSpacing) {
     final list = ctrl.filtered;
     if (ctrl.loading.value && ctrl.companions.isEmpty) {
       return ListView.builder(
-        padding: const EdgeInsets.only(bottom: 90),
+        padding: EdgeInsets.only(bottom: bottomSpacing),
         itemCount: 4,
         itemBuilder: (_, __) => const VitaSkeletonCard(),
       );
@@ -80,7 +82,7 @@ class ChatListPage extends StatelessWidget {
       onRefresh: () => ctrl.load(),
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(6, 8, 6, 100),
+        padding: EdgeInsets.fromLTRB(6, 8, 6, bottomSpacing),
         itemCount: list.length,
         separatorBuilder: (context, _) => const SizedBox(height: 2),
         itemBuilder: (context, i) {
