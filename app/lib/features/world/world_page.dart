@@ -500,38 +500,120 @@ class _AddCompanionCard extends StatelessWidget {
       color: vita.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(30),
-        side: BorderSide(color: vita.green.withValues(alpha: .18)),
+        side: BorderSide(color: vita.divider),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onCreate,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: vita.green.withValues(alpha: .1),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Icon(Icons.add_rounded, size: 36, color: vita.green),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'world.create'.tr,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      color: vita.text,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700),
-                ),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color.lerp(vita.surface, vita.green, .14)!,
+                vita.surface
               ],
             ),
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Center(
+                  child: SizedBox(
+                    width: 200,
+                    height: 200,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 180,
+                          height: 180,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: vita.green.withValues(alpha: .12)),
+                            gradient: RadialGradient(colors: [
+                              vita.green.withValues(alpha: .12),
+                              vita.green.withValues(alpha: 0)
+                            ]),
+                          ),
+                        ),
+                        Transform.rotate(
+                          angle: -.15,
+                          child: Container(
+                            width: 100,
+                            height: 82,
+                            decoration: BoxDecoration(
+                              color: vita.surface,
+                              borderRadius: BorderRadius.circular(26),
+                              border: Border.all(
+                                  color: vita.green.withValues(alpha: .2)),
+                            ),
+                            child: Icon(Icons.chat_bubble_outline_rounded,
+                                size: 44, color: vita.green),
+                          ),
+                        ),
+                        PositionedDirectional(
+                            end: 20,
+                            top: 26,
+                            child: Icon(Icons.auto_awesome_rounded,
+                                size: 32, color: vita.green)),
+                        PositionedDirectional(
+                            start: 25,
+                            bottom: 28,
+                            child: Icon(Icons.auto_awesome_rounded,
+                                size: 18,
+                                color: vita.green.withValues(alpha: .5))),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 26),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('world.addTitle'.tr,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: vita.text,
+                              fontSize: 26,
+                              fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 12),
+                      Text('world.addHint'.tr,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: vita.subText, fontSize: 14, height: 1.5)),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                        backgroundColor: vita.green,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onPrimary),
+                    onPressed: onCreate,
+                    icon: const Icon(Icons.add_rounded, size: 20),
+                    label: Text('world.create'.tr,
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

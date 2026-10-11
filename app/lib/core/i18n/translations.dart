@@ -25,6 +25,9 @@ class VitaTranslations extends Translations {
       'world.title': 'Now',
       'world.subtitle': 'A place to meet again, whenever you return',
       'world.create': 'Meet a companion',
+      'world.addTitle': 'New stories begin with a hello',
+      'world.addHint':
+          'Meet a companion and share the moments of everyday life.',
       'world.emptyTitle': 'A new moment starts here',
       'world.emptyHint': 'Create a companion to begin your story',
       'world.ready': 'Here with you',
@@ -823,6 +826,8 @@ class VitaTranslations extends Translations {
       'world.title': '此刻',
       'world.subtitle': '每次回来，都能在这里与 TA 相遇',
       'world.create': '遇见伙伴',
+      'world.addTitle': '新的故事，从相遇开始',
+      'world.addHint': '遇见一位伙伴，一起分享生活里的此刻。',
       'world.emptyTitle': '新的相遇，从此刻开始',
       'world.emptyHint': '创建伙伴，开启你们的故事',
       'world.ready': '正在这里陪你',
