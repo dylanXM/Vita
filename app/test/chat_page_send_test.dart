@@ -11,6 +11,8 @@ import 'package:vita/core/api_client.dart';
 import 'package:vita/core/i18n/translations.dart';
 import 'package:vita/core/theme.dart';
 import 'package:vita/features/chat/chat_page.dart';
+import 'package:vita/features/life/life_detail_page.dart';
+import 'package:vita/shared/widgets.dart';
 
 /// Fails every request, which is exactly the state the chat must survive: no
 /// conversation can be created and nothing can be sent.
@@ -35,6 +37,9 @@ class _FailingAdapter implements HttpClientAdapter {
 }
 
 class _ChatHistoryAdapter implements HttpClientAdapter {
+  _ChatHistoryAdapter({this.liveReply = false});
+  final bool liveReply;
+
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
@@ -50,6 +55,11 @@ class _ChatHistoryAdapter implements HttpClientAdapter {
                   'sender_type': 'companion',
                   'message_type': 'text',
                   'content': 'message $index',
+                  if (liveReply)
+                    'payload': {
+                      'interaction_stage': 'chat',
+                      'gesture': 'smile'
+                    },
                   'created_at': DateTime.utc(2026, 1, 1)
                       .add(Duration(minutes: index))
                       .toIso8601String(),
@@ -142,4 +152,39 @@ void main() {
     expect(find.text('message 39'), findsOneWidget);
     expect(find.text('message 0'), findsNothing);
   });
+  for (final liveReply in [false, true]) {
+    testWidgets('companion avatar opens detail (live reply: $liveReply)',
+        (tester) async {
+      Get.put<AnalyticsService>(_FakeAnalyticsService());
+      ApiClient.instance.dio.httpClientAdapter =
+          _ChatHistoryAdapter(liveReply: liveReply);
+      await tester.pumpWidget(GetMaterialApp(
+        theme: VitaTheme.light,
+        translations: VitaTranslations(),
+        locale: const Locale('en'),
+        home: const ChatPage(
+          companionId: 'companion-1',
+          name: 'Ava',
+          companion: {'city': 'Tokyo', 'occupation': 'Designer'},
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.more_horiz), findsNothing);
+      final avatar = find.byType(VitaAvatar).last;
+      expect(tester.getSize(avatar), const Size(44, 44));
+      await tester.tap(avatar);
+      await tester.pumpAndSettle();
+      final detail = tester.widget<LifeDetailPage>(find.byType(LifeDetailPage));
+      expect(detail.companion, {
+        'id': 'companion-1',
+        'name': 'Ava',
+        'city': 'Tokyo',
+        'occupation': 'Designer',
+      });
+      Get.back();
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatPage), findsOneWidget);
+      expect(find.text('message 39'), findsOneWidget);
+    });
+  }
 }

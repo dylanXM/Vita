@@ -13,6 +13,7 @@ import '../ai_pets/ai_pet_avatar.dart';
 import '../ai_pets/ai_pets_page.dart';
 import '../ai_pets/ai_pet_home_page.dart';
 import '../chat/chat_page.dart';
+import '../life/life_detail_page.dart';
 import '../auth/auth_controller.dart';
 import '../stories/stories_page.dart';
 
@@ -613,7 +614,7 @@ class MomentsPage extends StatefulWidget {
 }
 
 class _MomentsPageState extends State<MomentsPage> {
-  bool _showTimeline = true;
+  bool _showTimeline = false;
 
   @override
   Widget build(BuildContext context) {
@@ -840,7 +841,7 @@ class _UniversePage extends StatelessWidget {
               ),
             ),
             Positioned(
-              top: MediaQuery.paddingOf(context).top + 70,
+              bottom: MediaQuery.paddingOf(context).bottom + 52,
               left: 24,
               right: 24,
               child: Text(
@@ -849,10 +850,11 @@ class _UniversePage extends StatelessWidget {
                     : formatDateSeparator(slice.date!),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
@@ -873,7 +875,7 @@ class _UniversePage extends StatelessWidget {
               Positioned(
                 left: 32,
                 right: 32,
-                bottom: 76,
+                bottom: MediaQuery.paddingOf(context).bottom + 100,
                 child: Text(
                   '“${slice.posts.first['content']}”',
                   maxLines: 3,
@@ -887,11 +889,11 @@ class _UniversePage extends StatelessWidget {
                 ),
               ),
             if (page + 1 < pageCount)
-              const Positioned(
+              Positioned(
                 left: 0,
                 right: 0,
-                bottom: 18,
-                child: Icon(Icons.keyboard_arrow_down_rounded,
+                bottom: MediaQuery.paddingOf(context).bottom + 18,
+                child: const Icon(Icons.keyboard_arrow_down_rounded,
                     color: Colors.white54, size: 28),
               ),
           ]),
@@ -1173,12 +1175,29 @@ class _SignalFocusDialog extends StatelessWidget {
                   Text(formatDate(published.toLocal()),
                       style:
                           TextStyle(color: context.vita.subText, fontSize: 12)),
+                if ('${author['id'] ?? ''}'.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Get.to(
+                          () => LifeDetailPage(companion: author),
+                          transition: Transition.cupertino,
+                        );
+                      },
+                      icon: const Icon(Icons.person_outline_rounded),
+                      label: Text('explore.openSpace'.tr),
+                    ),
+                  ),
+                ],
                 if (post['is_own_companion'] == true &&
                     '${author['id'] ?? ''}'.isNotEmpty) ...[
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
-                    child: FilledButton.icon(
+                    child: ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
                         Get.to(

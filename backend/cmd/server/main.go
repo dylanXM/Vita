@@ -259,8 +259,11 @@ func main() {
 		// Current account — used by the admin dashboard to rehydrate a stored
 		// session and to verify the account has the admin role.
 		api.GET("/me", middleware.RequireAuth(), handler.Me)
+		api.POST("/me/invitation", middleware.RequireAuth(), handler.BindInvitation)
 		api.PUT("/me/locale", middleware.RequireAuth(), handler.UpdateMyLocale)
 		api.PUT("/me/profile", middleware.RequireAuth(), handler.UpdateMyProfile)
+		api.PUT("/me/password", middleware.RequireAuth(), handler.ChangeMyPassword)
+		api.POST("/me/password/code", middleware.RequireAuth(), handler.SendPasswordResetCode)
 		api.GET("/me/world-preferences", middleware.RequireAuth(), handler.GetWorldPreferences)
 		api.PUT("/me/world-preferences", middleware.RequireAuth(), handler.UpdateWorldPreferences)
 		api.DELETE("/me", middleware.RequireAuth(), handler.DeleteMe)

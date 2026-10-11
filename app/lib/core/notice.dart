@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import 'theme.dart';
+import '../shared/notification_surface.dart';
 
 enum _NoticeKind { success, error, warning, info }
 
@@ -108,16 +108,14 @@ class _NoticeBannerState extends State<_NoticeBanner>
   @override
   Widget build(BuildContext context) {
     final vita = context.vita;
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final radius = BorderRadius.circular(22);
     return Positioned(
       top: 0,
-      left: 10,
-      right: 10,
+      left: 22,
+      right: 22,
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.only(top: 6),
+          padding: const EdgeInsets.only(top: 8),
           child: IgnorePointer(
             child: FadeTransition(
               opacity: _animation,
@@ -135,88 +133,51 @@ class _NoticeBannerState extends State<_NoticeBanner>
                     container: true,
                     liveRegion: true,
                     label: '${widget.title}. ${widget.message}',
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: radius,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black
-                                .withValues(alpha: dark ? 0.28 : 0.14),
-                            blurRadius: 24,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: radius,
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: vita.surface
-                                  .withValues(alpha: dark ? 0.84 : 0.88),
-                              border: Border.all(
-                                color: Colors.white
-                                    .withValues(alpha: dark ? 0.12 : 0.75),
-                                width: 0.5,
+                    child: VitaNotificationSurface(
+                      child: SizedBox(
+                        height: 62,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Row(children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.asset(
+                                'assets/branding/vita_app_icon_1024.png',
+                                width: 40,
+                                height: 40,
+                                cacheWidth: 120,
+                                cacheHeight: 120,
+                                fit: BoxFit.cover,
                               ),
-                              borderRadius: radius,
                             ),
-                            child: Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                            const SizedBox(width: 10),
+                            Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Row(children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(5),
-                                      child: Image.asset(
-                                        'assets/branding/vita_app_icon_1024.png',
-                                        width: 22,
-                                        height: 22,
-                                        cacheWidth: 66,
-                                        cacheHeight: 66,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 7),
-                                    Text('Vita',
-                                        style: TextStyle(
-                                          color: vita.subText,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        )),
-                                  ]),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    widget.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: vita.text,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
+                                  Flexible(
+                                      child: Text(widget.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                              color: vita.text,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700))),
                                   if (widget.message.isNotEmpty) ...[
                                     const SizedBox(height: 3),
-                                    Text(
-                                      widget.message,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: vita.text,
-                                        fontSize: 13,
-                                        height: 1.3,
-                                      ),
-                                    ),
+                                    Flexible(
+                                        child: Text(widget.message,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                                color: vita.subText,
+                                                fontSize: 12))),
                                   ],
                                 ],
                               ),
                             ),
-                          ),
+                          ]),
                         ),
                       ),
                     ),

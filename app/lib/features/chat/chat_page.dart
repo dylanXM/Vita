@@ -20,7 +20,7 @@ import '../../shared/widgets.dart';
 import '../shell/shell_page.dart';
 import 'chat_controller.dart';
 import '../auth/auth_controller.dart';
-import 'chat_info_page.dart';
+import '../life/life_detail_page.dart';
 import 'chat_message_content.dart';
 import 'companion_moment_page.dart';
 import 'companion_transfer_sheet.dart';
@@ -42,7 +42,7 @@ class ChatPage extends StatefulWidget {
   final String companionId;
   final String name;
 
-  /// Full companion profile map (from the list) — shown in the "more" sheet.
+  /// Full companion profile map used when opening the companion detail page.
   final Map<String, dynamic>? companion;
   final String? journeyVisitId;
   final String? journeyContext;
@@ -404,21 +404,16 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  Future<void> _openChatInfo() async {
-    final companion = Map<String, dynamic>.from(
-      widget.companion ??
-          <String, dynamic>{'id': widget.companionId, 'name': widget.name},
-    );
-    final deleted = await Get.to<bool>(
-      () => ChatInfoPage(
-        companion: companion,
-        onExperienceCompleted: ctrl.poll,
-        onExperienceResult: ctrl.experienceCompleted,
-      ),
+  void _openCompanionDetail() {
+    Get.to(
+      () => LifeDetailPage(companion: {
+        ...?widget.companion,
+        'id': widget.companionId,
+        'name': widget.name,
+      }),
       transition: Transition.cupertino,
       duration: const Duration(milliseconds: 300),
     );
-    if (deleted == true) Get.back(result: true);
   }
 
   @override
@@ -432,12 +427,6 @@ class _ChatPageState extends State<ChatPage> {
           onPressed: () => Get.back(),
         ),
         title: Text(widget.name),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.more_horiz, color: context.vita.subText),
-            onPressed: _openChatInfo,
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -630,16 +619,26 @@ class _ChatPageState extends State<ChatPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (!isUser) ...[
-                liveReply
-                    ? _CompanionGestureAvatar(
-                        name: widget.name,
-                        imageUrl: widget.companion?['portrait_url'] as String?,
-                        gesture: '${payload['gesture'] ?? 'smile'}')
-                    : VitaAvatar(
-                        name: widget.name,
-                        radius: 22,
-                        imageUrl: widget.companion?['portrait_url'] as String?,
-                        borderRadius: BorderRadius.circular(10)),
+                Semantics(
+                  button: true,
+                  label: 'contactDetail.title'.tr,
+                  child: GestureDetector(
+                    onTap: _openCompanionDetail,
+                    behavior: HitTestBehavior.opaque,
+                    child: liveReply
+                        ? _CompanionGestureAvatar(
+                            name: widget.name,
+                            imageUrl:
+                                widget.companion?['portrait_url'] as String?,
+                            gesture: '${payload['gesture'] ?? 'smile'}')
+                        : VitaAvatar(
+                            name: widget.name,
+                            radius: 22,
+                            imageUrl:
+                                widget.companion?['portrait_url'] as String?,
+                            borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
                 const SizedBox(width: 8),
               ],
               Flexible(

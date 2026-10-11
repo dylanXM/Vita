@@ -18,6 +18,7 @@ import '../chat/chat_list_controller.dart';
 import '../chat/chat_list_presentation.dart';
 import '../chat/chat_page.dart';
 import '../../shared/widgets.dart';
+import '../../shared/notification_surface.dart';
 
 /// Main shell for the world, journey, discover and account destinations.
 class ShellController extends GetxController {
@@ -198,12 +199,7 @@ class _UnreadMessageEntry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = '${companion['name'] ?? 'chat.companion'.tr}';
-    return Material(
-      color: context.vita.surface,
-      elevation: 4,
-      shadowColor: Colors.black.withValues(alpha: .14),
-      borderRadius: BorderRadius.circular(16),
-      clipBehavior: Clip.antiAlias,
+    return VitaNotificationSurface(
       child: InkWell(
         onTap: onTap,
         splashFactory: NoSplash.splashFactory,
@@ -212,10 +208,6 @@ class _UnreadMessageEntry extends StatelessWidget {
         child: Container(
           height: 62,
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: context.vita.green.withValues(alpha: .16)),
-          ),
           child: Row(children: [
             VitaAvatar(
               name: name,

@@ -411,15 +411,17 @@ func consumeVerificationCode(email, code string) (string, error) {
 // --- Current Account ---
 
 type ProfileResponse struct {
-	UserID     string    `json:"user_id"`
-	Email      string    `json:"email"`
-	Role       string    `json:"role"`
-	Timezone   string    `json:"timezone"`
-	InviteCode string    `json:"invite_code"`
-	Locale     string    `json:"locale"`
-	Nickname   string    `json:"nickname"`
-	AvatarURL  string    `json:"avatar_url"`
-	CreatedAt  time.Time `json:"created_at"`
+	BoundInviteCode         string    `json:"bound_invite_code"`
+	InvitationRewardPercent float64   `json:"invitation_reward_percent"`
+	UserID                  string    `json:"user_id"`
+	Email                   string    `json:"email"`
+	Role                    string    `json:"role"`
+	Timezone                string    `json:"timezone"`
+	InviteCode              string    `json:"invite_code"`
+	Locale                  string    `json:"locale"`
+	Nickname                string    `json:"nickname"`
+	AvatarURL               string    `json:"avatar_url"`
+	CreatedAt               time.Time `json:"created_at"`
 }
 
 // Me returns the account behind the bearer token. The dashboard uses it both to
@@ -433,8 +435,13 @@ func Me(c *gin.Context) {
 
 	var p ProfileResponse
 	err := db.Get().QueryRow(
-		`SELECT id, email, COALESCE(role_id, 'user'), COALESCE(timezone, 'UTC'), invite_code, preferred_locale, COALESCE(nickname, ''), COALESCE(avatar_url, ''), created_at FROM users WHERE id = $1`,
-		userID).Scan(&p.UserID, &p.Email, &p.Role, &p.Timezone, &p.InviteCode, &p.Locale, &p.Nickname, &p.AvatarURL, &p.CreatedAt)
+		`SELECT u.id, u.email, COALESCE(u.role_id, 'user'), COALESCE(u.timezone, 'UTC'), u.invite_code, u.preferred_locale, COALESCE(u.nickname, ''), COALESCE(u.avatar_url, ''), u.created_at,
+ COALESCE(inviter.invite_code, ''), COALESCE(s.reward_basis_points, 0)::double precision / 100
+ FROM users u
+ LEFT JOIN users inviter ON inviter.id=u.invited_by_user_id AND inviter.environment=u.environment
+ LEFT JOIN invitation_settings s ON s.environment=u.environment
+ WHERE u.id = $1`,
+		userID).Scan(&p.UserID, &p.Email, &p.Role, &p.Timezone, &p.InviteCode, &p.Locale, &p.Nickname, &p.AvatarURL, &p.CreatedAt, &p.BoundInviteCode, &p.InvitationRewardPercent)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "account not found"})
 		return
