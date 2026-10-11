@@ -22,10 +22,10 @@ func requestCompanionDate(c *gin.Context, userID, companionID, productKey string
 	ctx := c.Request.Context()
 	var product credits.Product
 	var metadataRaw string
-	err := db.Get().QueryRowContext(ctx, `SELECT product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata::text
+	err := db.Get().QueryRowContext(ctx, `SELECT product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata::text,subscription_only,is_launched
 		FROM credit_products WHERE environment=$1 AND product_key=$2 AND category='date' AND enabled=true`,
 		currentEnvironment(), productKey).Scan(&product.Key, &product.Category, &product.NameKey,
-		&product.DescriptionKey, &product.Emoji, &product.Coins, &product.Enabled, &product.SortOrder, &metadataRaw)
+		&product.DescriptionKey, &product.Emoji, &product.Coins, &product.Enabled, &product.SortOrder, &metadataRaw, &product.SubscriptionOnly, &product.IsLaunched)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeSpendError(c, credits.ErrProductNotFound)
 		return

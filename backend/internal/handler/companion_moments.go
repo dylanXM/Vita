@@ -289,7 +289,7 @@ func StartCompanionMoment(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "moment has ended", "code": "moment_ended"})
 		return
 	}
-	if !requireExperienceAccess(c, userID, companionID) {
+	if !requireExperienceAccess(c, userID, companionID, moment.ProductKey) {
 		return
 	}
 	if moment.Opening != "" {
@@ -415,7 +415,7 @@ func SaveCompanionMomentArtifact(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "open the moment before saving"})
 		return
 	}
-	if !requireExperienceAccess(c, userID, companionID) {
+	if !requireExperienceAccess(c, userID, companionID, moment.ProductKey) {
 		return
 	}
 	content := strings.TrimSpace(input.Text)

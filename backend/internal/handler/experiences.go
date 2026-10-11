@@ -29,12 +29,17 @@ var (
 func ListCompanionExperiences(c *gin.Context) {
 	userID := c.GetString("user_id")
 	companionID := c.Param("id")
-	if !requireExperienceAccess(c, userID, companionID) {
+	if !requireExperienceCompanion(c, userID, companionID) {
 		return
 	}
 	products, err := credits.ListProducts(c.Request.Context(), db.Get(), currentEnvironment(), c.Query("category"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load experiences"})
+		return
+	}
+	subscribed, err := userHasActiveSubscription(userID)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "failed to load subscription"})
 		return
 	}
 	var balance int
@@ -52,7 +57,7 @@ func ListCompanionExperiences(c *gin.Context) {
 	}
 	var equipped string
 	_ = db.Get().QueryRow(`SELECT equipped_outfit_key FROM companions WHERE id=$1 AND user_id=$2`, companionID, userID).Scan(&equipped)
-	c.JSON(http.StatusOK, gin.H{"balance": balance, "products": products, "owned_outfits": owned, "equipped_outfit": equipped})
+	c.JSON(http.StatusOK, gin.H{"balance": balance, "is_subscribed": subscribed, "products": products, "owned_outfits": owned, "equipped_outfit": equipped})
 }
 
 func PurchaseCompanionExperience(c *gin.Context) {
@@ -60,13 +65,38 @@ func PurchaseCompanionExperience(c *gin.Context) {
 	userID := c.GetString("user_id")
 	companionID := c.Param("id")
 	productKey := strings.TrimSpace(c.Param("product_key"))
-	if !requireExperienceAccess(c, userID, companionID) {
+	if !requireExperienceCompanion(c, userID, companionID) {
 		return
 	}
 	var input experienceRequest
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "idempotency_key is required", "code": "invalid_request"})
 		return
+	}
+	var subscriptionOnly, launched bool
+	err := db.Get().QueryRowContext(ctx, `SELECT subscription_only,is_launched FROM credit_products WHERE environment=$1 AND product_key=$2 AND enabled=true`, currentEnvironment(), productKey).Scan(&subscriptionOnly, &launched)
+	if errors.Is(err, sql.ErrNoRows) {
+		writeSpendError(c, credits.ErrProductNotFound)
+		return
+	}
+	if err != nil {
+		c.JSON(500, gin.H{"error": "failed to load experience"})
+		return
+	}
+	if !launched {
+		writeSpendError(c, credits.ErrNotLaunched)
+		return
+	}
+	if subscriptionOnly {
+		subscribed, err := userHasActiveSubscription(userID)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "failed to load subscription"})
+			return
+		}
+		if !subscribed {
+			writeSpendError(c, credits.ErrSubscriptionRequired)
+			return
+		}
 	}
 	if strings.HasPrefix(productKey, "outfit_") {
 		var owned bool
@@ -390,7 +420,21 @@ func nextAvailableExperienceTime(ctx context.Context, companionID string, candid
 	return candidate, rows.Err()
 }
 
-func requireExperienceAccess(c *gin.Context, userID, companionID string) bool {
+func requireExperienceCompanion(c *gin.Context, userID, companionID string) bool {
+	var exists bool
+	err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM companions WHERE id=$1 AND user_id=$2 AND active=true AND deleted_at IS NULL)`, companionID, userID).Scan(&exists)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "failed to load companion"})
+		return false
+	}
+	if !exists {
+		c.JSON(404, gin.H{"error": "companion not found"})
+		return false
+	}
+	return true
+}
+
+func requireExperienceAccess(c *gin.Context, userID, companionID string, productKeys ...string) bool {
 	var isDefault bool
 	err := db.Get().QueryRow(`SELECT is_default FROM companions WHERE id=$1 AND user_id=$2 AND active=true`, companionID, userID).Scan(&isDefault)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -400,6 +444,18 @@ func requireExperienceAccess(c *gin.Context, userID, companionID string) bool {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load companion"})
 		return false
+	}
+	// An already purchased non-exclusive date remains usable without a subscription.
+	if len(productKeys) > 0 && productKeys[0] != "" {
+		var subscriptionOnly bool
+		err := db.Get().QueryRow(`SELECT subscription_only FROM credit_products WHERE environment=$1 AND product_key=$2`, currentEnvironment(), productKeys[0]).Scan(&subscriptionOnly)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "failed to load experience"})
+			return false
+		}
+		if !subscriptionOnly {
+			return true
+		}
 	}
 	if isDefault {
 		allowed, _, err := defaultChatAccess(userID, false)
@@ -419,6 +475,10 @@ func requireExperienceAccess(c *gin.Context, userID, companionID string) bool {
 
 func writeSpendError(c *gin.Context, err error) {
 	switch {
+	case errors.Is(err, credits.ErrNotLaunched):
+		c.JSON(http.StatusConflict, gin.H{"error": "experience is coming soon", "code": "experience_not_launched"})
+	case errors.Is(err, credits.ErrSubscriptionRequired):
+		subscriptionRequired(c, "experience_requires_subscription", "Subscribe to use this experience")
 	case errors.Is(err, credits.ErrProductNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": "experience is unavailable", "code": "product_unavailable"})
 	case errors.Is(err, credits.ErrInsufficientCredit):
@@ -449,7 +509,7 @@ func metadataInt(metadata map[string]any, key string, fallback int) int {
 
 func AdminListCreditProducts(c *gin.Context) {
 	environment := currentEnvironment()
-	rows, err := db.Get().Query(`SELECT product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata::text
+	rows, err := db.Get().Query(`SELECT product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata::text,subscription_only,is_launched
 		FROM credit_products WHERE environment=$1
 		AND COALESCE((metadata->>'hidden_from_catalog')::boolean,false)=false
 		ORDER BY category,sort_order,product_key`, environment)
@@ -462,7 +522,7 @@ func AdminListCreditProducts(c *gin.Context) {
 	for rows.Next() {
 		var item credits.Product
 		var raw string
-		if err := rows.Scan(&item.Key, &item.Category, &item.NameKey, &item.DescriptionKey, &item.Emoji, &item.Coins, &item.Enabled, &item.SortOrder, &raw); err != nil {
+		if err := rows.Scan(&item.Key, &item.Category, &item.NameKey, &item.DescriptionKey, &item.Emoji, &item.Coins, &item.Enabled, &item.SortOrder, &raw, &item.SubscriptionOnly, &item.IsLaunched); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to scan credit products"})
 			return
 		}
@@ -475,9 +535,11 @@ func AdminListCreditProducts(c *gin.Context) {
 func AdminUpdateCreditProduct(c *gin.Context) {
 	environment := currentEnvironment()
 	var input struct {
-		Coins     int  `json:"coins" binding:"required,min=1,max=100000"`
-		Enabled   bool `json:"enabled"`
-		SortOrder int  `json:"sort_order"`
+		SubscriptionOnly *bool `json:"subscription_only"`
+		IsLaunched       *bool `json:"is_launched"`
+		Coins            int   `json:"coins" binding:"required,min=1,max=100000"`
+		Enabled          bool  `json:"enabled"`
+		SortOrder        int   `json:"sort_order"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid credit product"})
@@ -488,12 +550,12 @@ func AdminUpdateCreditProduct(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "credit product not found"})
 		return
 	}
-	if category == "call" && input.Enabled {
+	if category == "call" && input.Enabled && (input.IsLaunched == nil || *input.IsLaunched) {
 		c.JSON(http.StatusConflict, gin.H{"error": "configure a real-time calling provider before enabling call products"})
 		return
 	}
-	result, err := db.Get().Exec(`UPDATE credit_products SET coins=$3,enabled=$4,sort_order=$5,updated_at=CURRENT_TIMESTAMP
-		WHERE environment=$1 AND product_key=$2`, environment, c.Param("product_key"), input.Coins, input.Enabled, input.SortOrder)
+	result, err := db.Get().Exec(`UPDATE credit_products SET coins=$3,enabled=$4,sort_order=$5,subscription_only=COALESCE($6,subscription_only),is_launched=COALESCE($7,is_launched),updated_at=CURRENT_TIMESTAMP
+		WHERE environment=$1 AND product_key=$2`, environment, c.Param("product_key"), input.Coins, input.Enabled, input.SortOrder, input.SubscriptionOnly, input.IsLaunched)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update credit product"})
 		return

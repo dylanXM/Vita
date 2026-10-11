@@ -231,6 +231,8 @@ export interface CreditLedgerEntry {
 }
 
 export interface CreditProduct {
+  subscription_only: boolean;
+  is_launched: boolean;
   key: string;
   category: "gift" | "photo" | "voice" | "date" | "keepsake" | "outfit" | "call" | "pet";
   name_key: string;

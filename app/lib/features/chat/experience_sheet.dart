@@ -31,6 +31,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
   bool _loading = true;
   String? _buying;
   int _balance = 0;
+  bool _isSubscribed = false;
   List<Map<String, dynamic>> _products = const [];
   Map<String, bool> _owned = const {};
   String _equipped = '';
@@ -71,6 +72,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
           products.firstOrNull;
       setState(() {
         _balance = data['balance'] as int? ?? 0;
+        _isSubscribed = data['is_subscribed'] == true;
         _products = products;
         _owned = (data['owned_outfits'] as Map? ?? const {})
             .map((key, value) => MapEntry('$key', value == true));
@@ -92,6 +94,12 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
   }
 
   Future<void> _purchase(Map<String, dynamic> product) async {
+    if (product['is_launched'] == false) return;
+    if (product['subscription_only'] == true && !_isSubscribed) {
+      Navigator.of(context).pop();
+      Get.toNamed('/subscription');
+      return;
+    }
     final key = product['key'] as String? ?? '';
     final coins = product['coins'] as int? ?? 0;
     final owned = _owned[key] == true;
@@ -198,6 +206,9 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
       } else if (error.action == 'open_subscription') {
         Navigator.of(context).pop();
         Get.toNamed('/subscription');
+      } else if (error.code == 'experience_not_launched') {
+        VitaNotice.info('experience.title'.tr, 'experience.comingSoon'.tr);
+        await _load();
       } else if (error.code == 'invalid_appointment') {
         VitaNotice.error(
             'experience.failed'.tr, 'experience.appointmentInvalid'.tr);
@@ -454,7 +465,12 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
                   color: context.vita.text,
                   fontSize: 12,
                   fontWeight: FontWeight.w600)),
-          Text('gift.coins'.trParams({'coins': "${product['coins']}"}),
+          Text(
+              product['is_launched'] == false
+                  ? 'experience.comingSoon'.tr
+                  : product['subscription_only'] == true
+                      ? 'experience.subscriptionOnly'.tr
+                      : 'gift.coins'.trParams({'coins': "${product['coins']}"}),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: context.vita.subText, fontSize: 10.5)),
@@ -665,16 +681,23 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     final gift = _categoryFor(product) == 'gift';
     final date = _categoryFor(product) == 'date';
     final price = 'gift.coins'.trParams({'coins': "${product['coins']}"});
-    final label = equipped
-        ? 'experience.equipped'.tr
-        : owned
-            ? 'experience.equip'.tr
-            : gift
-                ? 'experience.gift.send'
-                    .trParams({'coins': "${product['coins']}"})
-                : date
-                    ? 'experience.date.request'.tr
-                    : "${'experience.use'.tr} · $price";
+    final comingSoon = product['is_launched'] == false;
+    final requiresSubscription =
+        product['subscription_only'] == true && !_isSubscribed;
+    final label = comingSoon
+        ? 'experience.comingSoon'.tr
+        : requiresSubscription
+            ? 'experience.subscribeToUse'.tr
+            : equipped
+                ? 'experience.equipped'.tr
+                : owned
+                    ? 'experience.equip'.tr
+                    : gift
+                        ? 'experience.gift.send'
+                            .trParams({'coins': "${product['coins']}"})
+                        : date
+                            ? 'experience.date.request'.tr
+                            : "${'experience.use'.tr} · $price";
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
       decoration: BoxDecoration(
@@ -682,7 +705,9 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
           border: Border(top: BorderSide(color: context.vita.divider))),
       child: ElevatedButton(
         onPressed:
-            _buying != null || equipped ? null : () => _purchase(product),
+            _buying != null || comingSoon || (equipped && !requiresSubscription)
+                ? null
+                : () => _purchase(product),
         style: ElevatedButton.styleFrom(
           minimumSize: const Size.fromHeight(52),
           shape:

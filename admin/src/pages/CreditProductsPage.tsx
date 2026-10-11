@@ -37,6 +37,8 @@ export function CreditProductsPage() {
             <TableHead>{t("creditProducts.category")}</TableHead>
             <TableHead className="w-32">{t("creditProducts.coins")}</TableHead>
             <TableHead className="w-28">{t("creditProducts.enabled")}</TableHead>
+            <TableHead>{t("creditProducts.subscriptionOnly")}</TableHead>
+            <TableHead>{t("creditProducts.isLaunched")}</TableHead>
             <TableHead className="w-24" />
           </TableRow></TableHeader>
           <TableBody>
@@ -54,14 +56,18 @@ function CreditProductRow({ product, saving, onSave }: { product: CreditProduct;
   const { t } = useTranslation();
   const [coins, setCoins] = useState(product.coins);
   const [enabled, setEnabled] = useState(product.enabled);
-  useEffect(() => { setCoins(product.coins); setEnabled(product.enabled); }, [product]);
+  const [subscriptionOnly, setSubscriptionOnly] = useState(product.subscription_only);
+  const [isLaunched, setIsLaunched] = useState(product.is_launched);
+  useEffect(() => { setCoins(product.coins); setEnabled(product.enabled); setSubscriptionOnly(product.subscription_only); setIsLaunched(product.is_launched); }, [product]);
   return (
     <TableRow>
       <TableCell><div className="font-medium">{product.emoji} {product.key}</div><div className="text-xs text-muted-foreground">{product.name_key}</div></TableCell>
       <TableCell>{product.category}</TableCell>
       <TableCell><Input type="number" min={1} value={coins} onChange={(event) => setCoins(Number(event.target.value))} /></TableCell>
       <TableCell><input aria-label={t("creditProducts.enabled")} type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /></TableCell>
-      <TableCell><Button size="sm" disabled={saving || coins < 1} onClick={() => onSave({ ...product, coins, enabled })}>{t("common.save")}</Button></TableCell>
+      <TableCell><input aria-label={t("creditProducts.subscriptionOnly")} type="checkbox" checked={subscriptionOnly} onChange={(event) => setSubscriptionOnly(event.target.checked)} /></TableCell>
+      <TableCell><input aria-label={t("creditProducts.isLaunched")} type="checkbox" checked={isLaunched} onChange={(event) => setIsLaunched(event.target.checked)} /></TableCell>
+      <TableCell><Button size="sm" disabled={saving || coins < 1} onClick={() => onSave({ ...product, coins, enabled, subscription_only: subscriptionOnly, is_launched: isLaunched })}>{t("common.save")}</Button></TableCell>
     </TableRow>
   );
 }

@@ -13,22 +13,37 @@ import (
 )
 
 var (
-	ErrProductNotFound    = errors.New("credit product not found")
-	ErrInsufficientCredit = errors.New("insufficient credits")
-	ErrSpendInProgress    = errors.New("credit spend is still processing")
-	ErrSpendRefunded      = errors.New("credit spend was refunded")
+	ErrNotLaunched          = errors.New("experience is not launched")
+	ErrSubscriptionRequired = errors.New("experience requires subscription")
+	ErrProductNotFound      = errors.New("credit product not found")
+	ErrInsufficientCredit   = errors.New("insufficient credits")
+	ErrSpendInProgress      = errors.New("credit spend is still processing")
+	ErrSpendRefunded        = errors.New("credit spend was refunded")
 )
 
 type Product struct {
-	Key            string         `json:"key"`
-	Category       string         `json:"category"`
-	NameKey        string         `json:"name_key"`
-	DescriptionKey string         `json:"description_key"`
-	Emoji          string         `json:"emoji"`
-	Coins          int            `json:"coins"`
-	Enabled        bool           `json:"enabled"`
-	SortOrder      int            `json:"sort_order"`
-	Metadata       map[string]any `json:"metadata"`
+	SubscriptionOnly bool           `json:"subscription_only"`
+	IsLaunched       bool           `json:"is_launched"`
+	Key              string         `json:"key"`
+	Category         string         `json:"category"`
+	NameKey          string         `json:"name_key"`
+	DescriptionKey   string         `json:"description_key"`
+	Emoji            string         `json:"emoji"`
+	Coins            int            `json:"coins"`
+	Enabled          bool           `json:"enabled"`
+	SortOrder        int            `json:"sort_order"`
+	Metadata         map[string]any `json:"metadata"`
+}
+
+// CheckAvailability applies catalog restrictions before a new purchase.
+func CheckAvailability(product Product, subscribed bool) error {
+	if !product.IsLaunched {
+		return ErrNotLaunched
+	}
+	if product.SubscriptionOnly && !subscribed {
+		return ErrSubscriptionRequired
+	}
+	return nil
 }
 
 type Reservation struct {
@@ -52,7 +67,7 @@ type ReserveParams struct {
 }
 
 func ListProducts(ctx context.Context, database *sql.DB, environment, category string) ([]Product, error) {
-	query := `SELECT product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata::text
+	query := `SELECT product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata::text,subscription_only,is_launched
 		FROM credit_products WHERE environment=$1 AND enabled=true
 		AND COALESCE((metadata->>'hidden_from_catalog')::boolean,false)=false`
 	args := []any{environment}
@@ -105,10 +120,10 @@ func Reserve(ctx context.Context, database *sql.DB, params ReserveParams) (*Rese
 
 	var product Product
 	var metadataRaw string
-	err = tx.QueryRowContext(ctx, `SELECT product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata::text
+	err = tx.QueryRowContext(ctx, `SELECT product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata::text,subscription_only,is_launched
 		FROM credit_products WHERE environment=$1 AND product_key=$2 AND enabled=true FOR SHARE`, params.Environment, params.ProductKey).Scan(
 		&product.Key, &product.Category, &product.NameKey, &product.DescriptionKey, &product.Emoji,
-		&product.Coins, &product.Enabled, &product.SortOrder, &metadataRaw)
+		&product.Coins, &product.Enabled, &product.SortOrder, &metadataRaw, &product.SubscriptionOnly, &product.IsLaunched)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrProductNotFound
 	}
@@ -116,6 +131,18 @@ func Reserve(ctx context.Context, database *sql.DB, params ReserveParams) (*Rese
 		return nil, err
 	}
 	_ = json.Unmarshal([]byte(metadataRaw), &product.Metadata)
+	if !product.IsLaunched {
+		return nil, ErrNotLaunched
+	}
+	subscribed := false
+	if product.SubscriptionOnly {
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM subscriptions WHERE user_id=$1 AND status='active' AND (current_period_end IS NULL OR current_period_end>CURRENT_TIMESTAMP))`, params.UserID).Scan(&subscribed); err != nil {
+			return nil, err
+		}
+	}
+	if err := CheckAvailability(product, subscribed); err != nil {
+		return nil, err
+	}
 
 	var balance int
 	if err := tx.QueryRowContext(ctx, `SELECT credits_balance FROM users WHERE id=$1 FOR UPDATE`, params.UserID).Scan(&balance); err != nil {
@@ -203,14 +230,14 @@ func loadReservation(ctx context.Context, tx *sql.Tx, userID, idempotencyKey str
 	var output Reservation
 	var metadataRaw, resultRaw string
 	err := tx.QueryRowContext(ctx, `SELECT s.id,s.status,s.coins,COALESCE(s.result,'{}'::jsonb)::text,
-		p.product_key,p.category,p.name_key,p.description_key,p.emoji,p.enabled,p.sort_order,p.metadata::text,
+		p.product_key,p.category,p.name_key,p.description_key,p.emoji,p.enabled,p.sort_order,p.metadata::text,p.subscription_only,p.is_launched,
 		u.credits_balance
 		FROM credit_spends s JOIN users u ON u.id=s.user_id
 		JOIN credit_products p ON p.environment=u.environment AND p.product_key=s.product_key
 		WHERE s.user_id=$1 AND s.idempotency_key=$2`, userID, idempotencyKey).Scan(
 		&output.ID, &output.Status, &output.Product.Coins, &resultRaw, &output.Product.Key,
 		&output.Product.Category, &output.Product.NameKey, &output.Product.DescriptionKey,
-		&output.Product.Emoji, &output.Product.Enabled, &output.Product.SortOrder, &metadataRaw, &output.Balance)
+		&output.Product.Emoji, &output.Product.Enabled, &output.Product.SortOrder, &metadataRaw, &output.Product.SubscriptionOnly, &output.Product.IsLaunched, &output.Balance)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, false, nil
 	}
@@ -230,7 +257,7 @@ func scanProduct(row rowScanner) (Product, error) {
 	var product Product
 	var metadataRaw string
 	err := row.Scan(&product.Key, &product.Category, &product.NameKey, &product.DescriptionKey,
-		&product.Emoji, &product.Coins, &product.Enabled, &product.SortOrder, &metadataRaw)
+		&product.Emoji, &product.Coins, &product.Enabled, &product.SortOrder, &metadataRaw, &product.SubscriptionOnly, &product.IsLaunched)
 	if err != nil {
 		return product, err
 	}
