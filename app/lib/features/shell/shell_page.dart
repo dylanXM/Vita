@@ -156,7 +156,7 @@ class VitaTabBar extends StatefulWidget {
   final int index;
   final ValueChanged<int> onTap;
 
-  static const double pillHeight = 60;
+  static const double pillHeight = 54;
   static const double edgeInset = 8;
   static const double reservedHeight = pillHeight + edgeInset * 2;
 
@@ -168,7 +168,7 @@ class _VitaTabBarState extends State<VitaTabBar>
     with SingleTickerProviderStateMixin {
   late final AnimationController _movement = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 320),
+    duration: const Duration(milliseconds: 460),
     value: 1,
   );
   late double _animationStartIndex = widget.index.toDouble();
@@ -203,7 +203,7 @@ class _VitaTabBarState extends State<VitaTabBar>
     final direction = Directionality.of(context);
     final rimColor =
         dark ? Colors.white.withValues(alpha: .35) : vita.glassRing;
-    const outerRadius = 30.0;
+    const outerRadius = VitaTabBar.pillHeight / 2;
     const indicatorInset = 4.0;
     const innerRadius = outerRadius - indicatorInset;
 
@@ -255,9 +255,11 @@ class _VitaTabBarState extends State<VitaTabBar>
                     _tabAlignment(widget.index.toDouble(), direction),
                     progress,
                   )!;
-                  final thickness =
+                  final pulse =
                       math.sin(math.pi * _movement.value).clamp(0.0, 1.0);
-                  final restOpacity = (1 - thickness / .15).clamp(0.0, 1.0);
+                  final thickness = .18 + .82 * pulse;
+                  final expansionScale = pulse / thickness;
+                  final restOpacity = (1 - pulse / .15).clamp(0.0, 1.0);
                   return Stack(
                     clipBehavior: Clip.none,
                     children: [
@@ -271,6 +273,11 @@ class _VitaTabBarState extends State<VitaTabBar>
                             vita.glass.withValues(alpha: dark ? .38 : .62),
                         isBackgroundIndicator: false,
                         padding: const EdgeInsets.all(indicatorInset),
+                        // Keep glass visible at rest; expand only during taps.
+                        expansion: EdgeInsets.symmetric(
+                          horizontal: 10 * expansionScale,
+                          vertical: 6 * expansionScale,
+                        ),
                         borderRadius: innerRadius,
                         innerBlur: 1.5,
                         settings: LiquidGlassSettings(
@@ -314,7 +321,17 @@ class _VitaTabBarState extends State<VitaTabBar>
                                 label: _kTabs[i].labelKey.tr,
                                 child: GestureDetector(
                                   behavior: HitTestBehavior.opaque,
-                                  onTap: () => widget.onTap(i),
+                                  onTap: () {
+                                    if (i == widget.index) {
+                                      final progress = Curves.easeOutCubic
+                                          .transform(_movement.value);
+                                      _animationStartIndex += (widget.index -
+                                              _animationStartIndex) *
+                                          progress;
+                                      _movement.forward(from: 0);
+                                    }
+                                    widget.onTap(i);
+                                  },
                                   child: Center(
                                     child: FittedBox(
                                       fit: BoxFit.scaleDown,

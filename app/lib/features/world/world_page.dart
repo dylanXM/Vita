@@ -324,7 +324,8 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
               : _companionAt(companions, _visiblePage);
           final currentId = current?['id'] as String? ?? '';
           final selectedId = ShellController.to.selectedCompanionId.value;
-          if (companions.length > 1 &&
+          if (_visiblePage < companions.length &&
+              companions.length > 1 &&
               selectedId != null &&
               selectedId != currentId &&
               companions.any((item) => item['id'] == selectedId)) {
@@ -401,76 +402,59 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
                         top: 14,
                         bottom: VitaTabBar.reservedHeight + 50,
                       ),
-                      child: companions.length == 1
-                          ? FractionallySizedBox(
-                              widthFactor: .84,
-                              child: _RelationshipCard(
-                                companion: current,
-                                scene: activeScene,
-                                onChat: () => _openChat(current),
-                                onJourney: () {
-                                  AnalyticsService.to.track(
-                                      'world_journey_opened',
-                                      category: 'life');
-                                  ShellController.to
-                                      .showJourneyForCompanion(currentId);
-                                },
-                                onGift: () => _openGift(current),
-                                onNote: () => _leaveNote(current),
-                                visitBusy: _visitBusy,
-                                visitResult: _visitResults[currentId],
-                                onVisitChoice: (choice) =>
-                                    _chooseVisit(current, choice),
-                              ),
-                            )
-                          : PageView.builder(
-                              controller: _pages,
-                              itemCount: companions.length,
-                              physics: const PageScrollPhysics(),
-                              onPageChanged: (page) {
-                                final next = _companionAt(companions, page);
-                                final id = next['id'] as String? ?? '';
-                                setState(() {
-                                  _visiblePage = page;
-                                  _scene = null;
-                                });
-                                ShellController.to.selectedCompanionId.value =
-                                    id;
-                                _loadScene(id);
-                              },
-                              itemBuilder: (context, page) {
-                                final item = _companionAt(companions, page);
-                                final id = item['id'] as String? ?? '';
-                                return AnimatedBuilder(
-                                  animation: _pages!,
-                                  builder: (context, child) {
-                                    final position = _pages!.hasClients
-                                        ? (_pages!.page ??
-                                            _visiblePage.toDouble())
-                                        : _visiblePage.toDouble();
-                                    final distance =
-                                        (page - position).clamp(-1.0, 1.0);
-                                    final depth = distance.abs();
-                                    return Transform(
-                                      alignment: Alignment.center,
-                                      transform: Matrix4.identity()
-                                        ..setEntry(3, 2, .001)
-                                        ..translateByDouble(0, depth * 24, 0, 1)
-                                        ..rotateY(-distance * .24)
-                                        ..scaleByDouble(1 - depth * .11,
-                                            1 - depth * .11, 1, 1),
-                                      child: child,
-                                    );
-                                  },
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.translucent,
-                                    onTap: page == _visiblePage
-                                        ? null
-                                        : () => _centerCard(page),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 5),
-                                      child: _RelationshipCard(
+                      child: PageView.builder(
+                        controller: _pages,
+                        itemCount: companions.length + 1,
+                        physics: const PageScrollPhysics(),
+                        onPageChanged: (page) {
+                          if (page == companions.length) {
+                            setState(() => _visiblePage = page);
+                            return;
+                          }
+                          final next = _companionAt(companions, page);
+                          final id = next['id'] as String? ?? '';
+                          setState(() {
+                            _visiblePage = page;
+                            _scene = null;
+                          });
+                          ShellController.to.selectedCompanionId.value = id;
+                          _loadScene(id);
+                        },
+                        itemBuilder: (context, page) {
+                          final item = _companionAt(companions, page);
+                          final id = item['id'] as String? ?? '';
+                          return AnimatedBuilder(
+                            animation: _pages!,
+                            builder: (context, child) {
+                              final position = _pages!.hasClients
+                                  ? (_pages!.page ?? _visiblePage.toDouble())
+                                  : _visiblePage.toDouble();
+                              final distance =
+                                  (page - position).clamp(-1.0, 1.0);
+                              final depth = distance.abs();
+                              return Transform(
+                                alignment: Alignment.center,
+                                transform: Matrix4.identity()
+                                  ..setEntry(3, 2, .001)
+                                  ..translateByDouble(0, depth * 24, 0, 1)
+                                  ..rotateY(-distance * .24)
+                                  ..scaleByDouble(
+                                      1 - depth * .11, 1 - depth * .11, 1, 1),
+                                child: child,
+                              );
+                            },
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.translucent,
+                              onTap: page == _visiblePage
+                                  ? null
+                                  : () => _centerCard(page),
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 5),
+                                child: page == companions.length
+                                    ? _AddCompanionCard(
+                                        onCreate: _createCompanion)
+                                    : _RelationshipCard(
                                         companion: item,
                                         scene: id == currentId
                                             ? activeScene
@@ -490,15 +474,66 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
                                         onVisitChoice: (choice) =>
                                             _chooseVisit(item, choice),
                                       ),
-                                    ),
-                                  ),
-                                );
-                              },
+                              ),
                             ),
+                          );
+                        },
+                      ),
                     ),
             ),
           ]);
         }),
+      ),
+    );
+  }
+}
+
+class _AddCompanionCard extends StatelessWidget {
+  const _AddCompanionCard({required this.onCreate});
+
+  final VoidCallback onCreate;
+
+  @override
+  Widget build(BuildContext context) {
+    final vita = context.vita;
+    return Material(
+      color: vita.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(30),
+        side: BorderSide(color: vita.green.withValues(alpha: .18)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onCreate,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: vita.green.withValues(alpha: .1),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Icon(Icons.add_rounded, size: 36, color: vita.green),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'world.create'.tr,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: vita.text,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
