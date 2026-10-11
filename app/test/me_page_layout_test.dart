@@ -16,12 +16,24 @@ class _Billing extends BillingController {
 
 void main() {
   tearDown(Get.reset);
+  test('account group labels exist in every locale', () {
+    for (final locale in VitaTranslations().keys.values) {
+      for (final key in [
+        'me.membershipWallet',
+        'me.invitationSection',
+        'me.accountSection',
+        'me.membershipActive'
+      ]) {
+        expect(locale[key], isNotEmpty);
+      }
+    }
+  });
   testWidgets('profile shows entry and billing values share trailing alignment',
       (tester) async {
     Get.testMode = true;
     Get.reset();
     final auth = Get.put(AuthController());
-    auth.profile.value = {'nickname': 'Ava'};
+    auth.profile.value = {'nickname': 'Ava', 'email': 'ava@example.com'};
     final billing = Get.put<BillingController>(_Billing());
     billing.balance.value = 40;
     billing.entitlements.add('PLUS_MONTHLY');
@@ -32,6 +44,11 @@ void main() {
         locale: const Locale('en'),
         home: const MePage()));
     await tester.pumpAndSettle();
+    expect(find.text('Membership & wallet'), findsOneWidget);
+    expect(find.text('Vita Plus & Premium'), findsOneWidget);
+    expect(find.text('Active'), findsOneWidget);
+    expect(find.text('ava@example.com'), findsOneWidget);
+    expect(find.text('Vita PLUS_MONTHLY'), findsNothing);
     final subscription = find.text('PLUS_MONTHLY');
     final credits = find.text('40');
     expect(subscription, findsOneWidget);

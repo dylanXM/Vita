@@ -70,26 +70,55 @@ class MePage extends StatelessWidget {
                       ? auth.nickname
                       : (auth.email.isEmpty ? 'me.account'.tr : auth.email),
                   avatarUrl: auth.avatarUrl,
-                  plan: billing.isSubscribed
-                      ? 'Vita ${billing.entitlements.join(' + ').toUpperCase()}'
-                      : 'me.free'.tr,
+                  email: auth.email,
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-                  child: Text('me.subscriptionSection'.tr,
-                      style: TextStyle(
-                          color: vita.subText,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600)),
-                ),
-                VitaCard(
-                  radius: 12,
+                _MeSectionTitle(title: 'me.membershipWallet'.tr),
+                Container(
                   margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: vita.green.withValues(alpha: .3)),
+                    gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [vita.greenTint, vita.surface]),
+                  ),
                   child: Column(children: [
+                    Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                        child: Row(children: [
+                          Expanded(
+                              child: Text('Vita Plus & Premium',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      color: vita.green,
+                                      fontSize: 19,
+                                      fontWeight: FontWeight.w700))),
+                          const SizedBox(width: 8),
+                          Flexible(
+                              child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                      color: vita.surface,
+                                      borderRadius: BorderRadius.circular(20)),
+                                  child: Text(
+                                      billing.isSubscribed
+                                          ? 'me.membershipActive'.tr
+                                          : 'me.free'.tr,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                          color: vita.green,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600)))),
+                        ])),
                     _MeAction(
                       icon: Icons.workspace_premium_rounded,
                       title: 'me.subscriptionLabel'.tr,
+                      emphasized: true,
                       value: billing.isSubscribed
                           ? 'me.plus.active'.trParams({
                               'ent':
@@ -117,6 +146,7 @@ class MePage extends StatelessWidget {
                     ),
                   ]),
                 ),
+                _MeSectionTitle(title: 'me.invitationSection'.tr),
                 VitaCard(
                   margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                   padding: const EdgeInsets.symmetric(vertical: 4),
@@ -127,14 +157,7 @@ class MePage extends StatelessWidget {
                         transition: Transition.cupertino),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-                  child: Text('me.services'.tr,
-                      style: TextStyle(
-                          color: vita.subText,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600)),
-                ),
+                _MeSectionTitle(title: 'me.services'.tr),
                 VitaCard(
                   radius: 12,
                   margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -156,32 +179,31 @@ class MePage extends StatelessWidget {
                   if (links.isEmpty) return const SizedBox.shrink();
                   return _SocialMediaCard(links: links);
                 }),
+                _MeSectionTitle(title: 'me.accountSection'.tr),
                 VitaCard(
                   radius: 12,
                   margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                   padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: _MeAction(
-                    icon: Icons.lock_outline_rounded,
-                    title: 'password.title'.tr,
-                    onTap: () => Get.to(() => const ChangePasswordPage(),
-                        transition: Transition.cupertino),
-                  ),
-                ),
-                VitaCard(
-                  radius: 12,
-                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: _MeAction(
-                    icon: Icons.settings_outlined,
-                    title: 'me.settings'.tr,
-                    onTap: () {
-                      AnalyticsService.to.track('profile_settings_opened',
-                          category: 'profile');
-                      Get.to(() => const SettingsPage(),
-                          transition: Transition.cupertino,
-                          duration: const Duration(milliseconds: 300));
-                    },
-                  ),
+                  child: Column(children: [
+                    _MeAction(
+                      icon: Icons.lock_outline_rounded,
+                      title: 'password.title'.tr,
+                      onTap: () => Get.to(() => const ChangePasswordPage(),
+                          transition: Transition.cupertino),
+                    ),
+                    const Divider(indent: 52, height: .5),
+                    _MeAction(
+                      icon: Icons.settings_outlined,
+                      title: 'me.settings'.tr,
+                      onTap: () {
+                        AnalyticsService.to.track('profile_settings_opened',
+                            category: 'profile');
+                        Get.to(() => const SettingsPage(),
+                            transition: Transition.cupertino,
+                            duration: const Duration(milliseconds: 300));
+                      },
+                    ),
+                  ]),
                 ),
                 Text(
                   'me.version'.tr,
@@ -198,16 +220,30 @@ class MePage extends StatelessWidget {
   }
 }
 
+class _MeSectionTitle extends StatelessWidget {
+  const _MeSectionTitle({required this.title});
+  final String title;
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+        child: Text(title,
+            style: TextStyle(
+                color: context.vita.subText,
+                fontSize: 12,
+                fontWeight: FontWeight.w600)),
+      );
+}
+
 class _LifePassport extends StatelessWidget {
   const _LifePassport({
     required this.name,
     required this.avatarUrl,
-    required this.plan,
+    required this.email,
   });
 
   final String name;
   final String avatarUrl;
-  final String plan;
+  final String email;
 
   @override
   Widget build(BuildContext context) {
@@ -281,7 +317,7 @@ class _LifePassport extends StatelessWidget {
                                   fontSize: 20,
                                   fontWeight: FontWeight.w700)),
                           const SizedBox(height: 4),
-                          Text(plan,
+                          Text(email,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style:
@@ -321,11 +357,13 @@ class _MeAction extends StatelessWidget {
       {required this.icon,
       required this.title,
       this.value,
+      this.emphasized = false,
       required this.onTap});
 
   final IconData icon;
   final String title;
   final String? value;
+  final bool emphasized;
   final VoidCallback? onTap;
 
   @override
@@ -342,8 +380,13 @@ class _MeAction extends StatelessWidget {
                   child: Text(title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style:
-                          TextStyle(color: context.vita.text, fontSize: 15))),
+                      style: TextStyle(
+                          color: emphasized
+                              ? context.vita.green
+                              : context.vita.text,
+                          fontSize: 15,
+                          fontWeight:
+                              emphasized ? FontWeight.w700 : FontWeight.w400))),
               if (value != null) ...[
                 const SizedBox(width: 8),
                 Expanded(
@@ -352,7 +395,13 @@ class _MeAction extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            color: context.vita.subText, fontSize: 12))),
+                            color: emphasized
+                                ? context.vita.green
+                                : context.vita.subText,
+                            fontSize: 12,
+                            fontWeight: emphasized
+                                ? FontWeight.w600
+                                : FontWeight.w400))),
               ],
               const SizedBox(width: 6),
               Icon(Icons.chevron_right_rounded,

@@ -106,6 +106,30 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+  testWidgets(
+      'original contact rows retain equal height and relocated add button',
+      (tester) async {
+    final contacts = Get.put<ChatListController>(_Contacts());
+    contacts.companions.assignAll([
+      {'id': 'a', 'name': 'Ava', 'last_message': 'Old chat'},
+      {
+        'id': 'b',
+        'name': 'Mimi',
+        'last_message': 'Hello 🌸',
+        'unread_count': 3
+      },
+    ]);
+    await tester.pumpWidget(host(const ChatListPage()));
+    expect(find.text('Old chat'), findsOneWidget);
+    expect(find.text('Hello 🌸'), findsOneWidget);
+    expect(
+        find.byWidgetPredicate((widget) =>
+            widget is Container && widget.constraints?.maxHeight == 72),
+        findsNWidgets(2));
+    expect(find.byIcon(Icons.add), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   test('contacts label exists in every locale', () {
     for (final entries in VitaTranslations().keys.values) {
       expect(entries['tab.contacts'], isNotEmpty);

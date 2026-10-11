@@ -357,11 +357,6 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
             VitaTabHeader(
               title: 'tab.world'.tr,
               showDivider: false,
-              actions: IconButton.filledTonal(
-                tooltip: 'world.create'.tr,
-                onPressed: _createCompanion,
-                icon: const Icon(Icons.add),
-              ),
             ),
             Expanded(
               child: current == null
@@ -775,15 +770,18 @@ class _RelationshipCard extends StatelessWidget {
                       Expanded(
                           child: _WorldUtilityAction(
                         label: 'world.cardChat'.tr,
+                        primary: true,
                         icon: Icons.chat_bubble_outline_rounded,
                         onTap: onChat,
                       )),
+                      const SizedBox(width: 8),
                       Expanded(
                           child: _WorldUtilityAction(
                         label: 'world.cardGift'.tr,
                         icon: Icons.card_giftcard_outlined,
                         onTap: onGift,
                       )),
+                      const SizedBox(width: 8),
                       Expanded(
                           child: _WorldUtilityAction(
                         label: 'world.cardJourney'.tr,
@@ -804,28 +802,59 @@ class _RelationshipCard extends StatelessWidget {
 
 class _WorldUtilityAction extends StatelessWidget {
   const _WorldUtilityAction(
-      {required this.label, required this.icon, required this.onTap});
-
+      {required this.label,
+      required this.icon,
+      required this.onTap,
+      this.primary = false});
   final String label;
   final IconData icon;
   final VoidCallback onTap;
+  final bool primary;
 
   @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: SizedBox(
-          height: 48,
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(icon, size: 17, color: context.vita.subText),
-            const SizedBox(height: 2),
-            Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: context.vita.subText, fontSize: 10)),
-          ]),
-        ),
-      );
+  Widget build(BuildContext context) {
+    final vita = context.vita;
+    final foreground = primary ? vita.green : vita.text;
+    return SizedBox(
+        height: 48,
+        child: Semantics(
+          button: true,
+          label: label,
+          child: Material(
+            color: primary ? vita.greenTint : vita.surface,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: BorderSide(
+                    color: primary
+                        ? vita.green.withValues(alpha: .22)
+                        : vita.divider)),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(icon,
+                            size: 16,
+                            color: primary ? vita.green : vita.subText),
+                        const SizedBox(width: 5),
+                        Flexible(
+                            child: Text(label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: foreground,
+                                    fontSize: 11,
+                                    fontWeight: primary
+                                        ? FontWeight.w700
+                                        : FontWeight.w500))),
+                      ])),
+            ),
+          ),
+        ));
+  }
 }
 
 class _EmptyRelationship extends StatelessWidget {

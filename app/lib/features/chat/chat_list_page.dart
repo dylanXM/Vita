@@ -27,7 +27,8 @@ class ChatListPage extends StatelessWidget {
             VitaTabHeader(
               title: 'tab.contacts'.tr,
               showDivider: false,
-              actions: IconButton(
+              actions: IconButton.filledTonal(
+                tooltip: 'world.create'.tr,
                 onPressed: () {
                   if (!BillingController.to.isSubscribed) {
                     VitaNotice.warning('subscription.required.title'.tr,
@@ -41,8 +42,7 @@ class ChatListPage extends StatelessWidget {
                     duration: const Duration(milliseconds: 300),
                   );
                 },
-                icon: Icon(Icons.add_circle_outline,
-                    color: context.vita.text, size: 26),
+                icon: const Icon(Icons.add),
               ),
             ),
             _ChatSearchBox(),
