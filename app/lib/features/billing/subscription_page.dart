@@ -69,6 +69,16 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
       padding: const EdgeInsets.only(bottom: 28),
       children: [
         _SubscriptionHero(active: ctrl.isSubscribed),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+          child: OutlinedButton.icon(
+            onPressed: () => Get.toNamed('/credits/buy'),
+            icon: const Icon(Icons.toll_outlined),
+            label: Text('credits.purchaseTitle'.tr),
+            style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48)),
+          ),
+        ),
         const SizedBox(height: 18),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),

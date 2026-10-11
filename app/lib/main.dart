@@ -15,6 +15,7 @@ import 'features/auth/register_page.dart';
 import 'features/auth/splash_page.dart';
 import 'features/onboarding/onboarding_page.dart';
 import 'features/billing/credits_page.dart';
+import 'features/billing/coin_purchase_page.dart';
 import 'features/billing/subscription_page.dart';
 import 'features/companion/companion_create_method_page.dart';
 import 'features/ai_pets/ai_pet_desktop_overlay.dart';
@@ -112,6 +113,11 @@ class _VitaAppState extends State<VitaApp> {
         GetPage(
           name: '/subscription',
           page: () => const SubscriptionPage(),
+          transition: Transition.cupertino,
+        ),
+        GetPage(
+          name: '/credits/buy',
+          page: () => const CoinPurchasePage(),
           transition: Transition.cupertino,
         ),
         GetPage(

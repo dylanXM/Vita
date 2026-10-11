@@ -58,6 +58,10 @@ void main() {
       locale: const Locale('en'),
       getPages: [
         GetPage(
+            name: '/credits/buy',
+            page: () =>
+                const Scaffold(body: Text('Coin purchase destination'))),
+        GetPage(
             name: '/subscription',
             page: () => const Scaffold(body: Text('Subscription destination')))
       ],
@@ -80,6 +84,7 @@ void main() {
     final translations = VitaTranslations().keys;
     for (final locale in translations.entries) {
       for (final key in [
+        'credits.purchaseTitle',
         'experience.insufficientCoins',
         'experience.comingSoon',
         'experience.subscriptionOnly',
@@ -89,15 +94,17 @@ void main() {
       }
     }
   });
-  testWidgets('date invitation is disabled when balance is below price',
+  testWidgets(
+      'insufficient date coins redirects to coin purchase without inviting',
       (tester) async {
     category = 'date';
     subscriptionOnly = false;
     balance = 19;
     await open(tester);
-    expect(tester.widget<ElevatedButton>(find.byType(ElevatedButton)).onPressed,
-        isNull);
     expect(find.text('Not enough coins'), findsOneWidget);
+    await tester.tap(find.byType(ElevatedButton));
+    await tester.pumpAndSettle();
+    expect(find.text('Coin purchase destination'), findsOneWidget);
     expect(purchases, isEmpty);
   });
   testWidgets('date invitation is enabled when balance equals price',

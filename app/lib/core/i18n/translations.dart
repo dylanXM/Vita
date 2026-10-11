@@ -404,7 +404,7 @@ class VitaTranslations extends Translations {
       'invitation.once':
           'An invitation code can only be bound once. You cannot bind your own code.',
       'invitation.rewardInfo':
-          'When you receive coins from a paid subscription or top-up, your inviter receives @percent% of those coins, rounded down, at the current reward rate. Admin gifts do not qualify.',
+          'When you receive coins from a paid subscription or top-up, your inviter receives @percent% of those coins, rounded down. Admin gifts do not qualify.',
       'invitation.boundSuccess': 'Invitation code bound',
       'invitation.bindFailed':
           'Binding failed. Check the code and your binding status, then try again.',
@@ -478,6 +478,11 @@ class VitaTranslations extends Translations {
       'billing.purchaseFailed': 'Purchase failed',
       'billing.restored': 'Purchases restored',
       'billing.restoreFailed': 'Restore failed',
+      'credits.purchaseTitle': 'Buy coins',
+      'credits.petFeed': 'Pet meal',
+      'credits.storyChapter': 'Story chapter',
+      'credits.storyboard': 'Storyboard',
+      'credits.refundLabel': 'Refund · @name',
       'credits.title': 'Credits',
       'credits.balance': 'Your balance',
       'credits.unit': 'credits',
@@ -1142,7 +1147,7 @@ class VitaTranslations extends Translations {
       'invitation.bind': '绑定邀请码',
       'invitation.once': '邀请码仅可绑定一次，不能绑定自己的邀请码。',
       'invitation.rewardInfo':
-          '通过付费订阅或充值获得金币时，邀请人按后台当前设置的 @percent% 获得金币，奖励向下取整；管理员赠予不参与奖励。',
+          '通过付费订阅或充值获得金币时，邀请人获得相应金币数量 @percent% 的奖励，奖励向下取整；管理员赠予不参与奖励。',
       'invitation.boundSuccess': '邀请码绑定成功',
       'invitation.bindFailed': '绑定失败，请检查邀请码和绑定状态后重试。',
       'invitation.copy': '复制邀请码',
@@ -1213,6 +1218,11 @@ class VitaTranslations extends Translations {
       'billing.purchaseFailed': '购买失败',
       'billing.restored': '购买记录已恢复',
       'billing.restoreFailed': '恢复购买失败',
+      'credits.purchaseTitle': '购买金币',
+      'credits.petFeed': '宠物喂食',
+      'credits.storyChapter': '故事章节',
+      'credits.storyboard': '故事板',
+      'credits.refundLabel': '退款 · @name',
       'credits.title': '金币',
       'credits.balance': '当前余额',
       'credits.unit': '金币',

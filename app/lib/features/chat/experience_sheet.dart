@@ -102,7 +102,11 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     }
     final key = product['key'] as String? ?? '';
     final coins = product['coins'] as int? ?? 0;
-    if (product['category'] == 'date' && _balance < coins) return;
+    if (product['category'] == 'date' && _balance < coins) {
+      Navigator.of(context).pop();
+      Get.toNamed('/credits/buy');
+      return;
+    }
     final owned = _owned[key] == true;
     final appointment =
         product['category'] == 'date' ? await _chooseAppointment() : null;
@@ -203,7 +207,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
       if (error.action == 'open_credits' ||
           error.code == 'insufficient_credits') {
         Navigator.of(context).pop();
-        Get.toNamed('/credits');
+        Get.toNamed('/credits/buy');
       } else if (error.action == 'open_subscription') {
         Navigator.of(context).pop();
         Get.toNamed('/subscription');
@@ -709,12 +713,10 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
           color: context.vita.surface,
           border: Border(top: BorderSide(color: context.vita.divider))),
       child: ElevatedButton(
-        onPressed: _buying != null ||
-                comingSoon ||
-                (insufficientDateCoins && !requiresSubscription) ||
-                (equipped && !requiresSubscription)
-            ? null
-            : () => _purchase(product),
+        onPressed:
+            _buying != null || comingSoon || (equipped && !requiresSubscription)
+                ? null
+                : () => _purchase(product),
         style: ElevatedButton.styleFrom(
           minimumSize: const Size.fromHeight(52),
           shape:
