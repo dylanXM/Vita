@@ -24,7 +24,7 @@ const newPage = (): OnboardingContentPage => ({
 export function OnboardingPage() {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const [platform, setPlatform] = useState<MobilePlatform>("ios");
+  const platform: MobilePlatform = "app";
   const activeEnv: Environment = "prod";
   const query = useQuery({
     queryKey: ["onboarding", activeEnv, platform],
@@ -60,7 +60,7 @@ export function OnboardingPage() {
     <div className="space-y-6">
       <PageHeader title={t("onboarding.title")} description={t("onboarding.desc")} actions={
         <div className="flex gap-2">
-          <Select value={platform} onValueChange={(v) => setPlatform(v as MobilePlatform)}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ios">iOS</SelectItem><SelectItem value="android">Android</SelectItem></SelectContent></Select>
+          <span className="inline-flex h-9 items-center px-3 text-sm">App</span>
         </div>
       } />
       <Card>

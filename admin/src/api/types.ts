@@ -319,7 +319,7 @@ export interface AdmobSettings {
   ios_interstitial_unit_id: string;
 }
 
-export type MobilePlatform = "ios" | "android";
+export type MobilePlatform = "app" | "ios" | "android";
 export type LocalizedCopy = Record<string, string>;
 
 export interface OnboardingContentPage {

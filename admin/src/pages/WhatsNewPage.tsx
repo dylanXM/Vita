@@ -22,7 +22,7 @@ const freshCampaign = (environment: Environment, platform: MobilePlatform): Camp
 export function WhatsNewPage() {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const [platform, setPlatform] = useState<MobilePlatform>("ios");
+  const platform: MobilePlatform = "app";
   const activeEnv: Environment = "prod";
   const query = useQuery({ queryKey: ["whats-new", activeEnv, platform], queryFn: ({ signal }) => whatsNewApi.list(activeEnv!, platform, signal), enabled: Boolean(activeEnv) });
   const [editing, setEditing] = useState<WhatsNewCampaign | null | undefined>(undefined);
@@ -31,7 +31,7 @@ export function WhatsNewPage() {
 
   return <div className="space-y-6">
     <PageHeader title={t("whatsNew.title")} description={t("whatsNew.desc")} actions={<div className="flex gap-2">
-      <Select value={platform} onValueChange={(v) => setPlatform(v as MobilePlatform)}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ios">iOS</SelectItem><SelectItem value="android">Android</SelectItem></SelectContent></Select>
+      <span className="inline-flex h-9 items-center px-3 text-sm">App</span>
       <Button disabled={!activeEnv} onClick={() => setEditing(null)}><Plus />{t("whatsNew.create")}</Button>
     </div>} />
     <Card><CardContent className="p-0"><Table><TableHeader><TableRow><TableHead>{t("content.name")}</TableHead><TableHead>{t("content.status")}</TableHead><TableHead>{t("whatsNew.version")}</TableHead><TableHead>{t("content.schedule")}</TableHead><TableHead>{t("content.operator")}</TableHead><TableHead className="text-right">{t("content.actions")}</TableHead></TableRow></TableHeader><TableBody>
@@ -44,8 +44,8 @@ export function WhatsNewPage() {
 
 function CampaignDialog({ campaign, environment, platform, onClose, onSaved }: { campaign: WhatsNewCampaign | null; environment: Environment; platform: MobilePlatform; onClose: () => void; onSaved: () => void }) {
   const { t } = useTranslation();
-  const [form, setForm] = useState<CampaignInput>(() => campaign ? { name: campaign.name, environment: campaign.environment, platform: campaign.platform, min_app_version: campaign.min_app_version, enabled: campaign.enabled, starts_at: campaign.starts_at, ends_at: campaign.ends_at, pages: campaign.pages } : freshCampaign(environment, platform));
-  useEffect(() => setForm(campaign ? { name: campaign.name, environment: campaign.environment, platform: campaign.platform, min_app_version: campaign.min_app_version, enabled: campaign.enabled, starts_at: campaign.starts_at, ends_at: campaign.ends_at, pages: campaign.pages } : freshCampaign(environment, platform)), [campaign, environment, platform]);
+  const [form, setForm] = useState<CampaignInput>(() => campaign ? { name: campaign.name, environment: campaign.environment, platform: "app", min_app_version: campaign.min_app_version, enabled: campaign.enabled, starts_at: campaign.starts_at, ends_at: campaign.ends_at, pages: campaign.pages } : freshCampaign(environment, platform));
+  useEffect(() => setForm(campaign ? { name: campaign.name, environment: campaign.environment, platform: "app", min_app_version: campaign.min_app_version, enabled: campaign.enabled, starts_at: campaign.starts_at, ends_at: campaign.ends_at, pages: campaign.pages } : freshCampaign(environment, platform)), [campaign, environment, platform]);
   const save = useMutation({ mutationFn: () => campaign ? whatsNewApi.update(campaign.id, form) : whatsNewApi.create(form), onSuccess: () => { toast.success(t("content.saved")); onSaved(); }, onError: (e) => toast.error(errorMessage(e)) });
   const patchPage = (index: number, patch: Partial<WhatsNewContentPage>) => setForm((v) => ({ ...v, pages: v.pages.map((p, i) => i === index ? { ...p, ...patch } : p) }));
   const patchCopy = (index: number, field: "title" | "body" | "cta_label", locale: "en" | "zh", value: string) => setForm((v) => ({ ...v, pages: v.pages.map((p, i) => i === index ? { ...p, [field]: { ...p[field], [locale]: value } } : p) }));

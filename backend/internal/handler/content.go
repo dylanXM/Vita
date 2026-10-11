@@ -119,12 +119,20 @@ func normalizeMobilePlatform(raw string) string {
 	}
 }
 
-func validMobilePlatform(value string) bool { return value == "ios" || value == "android" }
+// Content is shared by both mobile platforms. Keep legacy requests compatible.
+func contentPlatform(value string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "app", "ios", "android":
+		return "app", true
+	default:
+		return "", false
+	}
+}
 
 func adminContentScope(c *gin.Context) (string, string, bool) {
 	environment := currentEnvironment()
-	platform := strings.ToLower(strings.TrimSpace(c.Query("platform")))
-	if !validMobilePlatform(platform) {
+	platform, ok := contentPlatform(c.Query("platform"))
+	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "platform is required"})
 		return "", "", false
 	}
@@ -193,7 +201,7 @@ func readSocialMediaLinks(environment string) (socialMediaLinks, error) {
 // AppContent is public because onboarding must load before authentication.
 func AppContent(c *gin.Context) {
 	environment := currentEnvironment()
-	platform := normalizeMobilePlatform(c.GetHeader("X-Vita-Platform"))
+	platform := "app"
 	onboarding, err := readOnboarding(environment, platform)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load app content"})
@@ -212,7 +220,7 @@ func AppContent(c *gin.Context) {
 
 	var campaign *whatsNewCampaign
 	rows, err := db.Get().Query(`SELECT id,name,environment,platform,min_app_version,enabled,starts_at,ends_at,pages,updated_by,created_at,updated_at
-		FROM whats_new_campaigns WHERE environment=$1 AND platform=$2 AND enabled=true
+		FROM whats_new_campaigns WHERE environment=$1 AND platform IN ($2, 'ios', 'android') AND enabled=true
 		AND (starts_at IS NULL OR starts_at<=CURRENT_TIMESTAMP)
 		AND (ends_at IS NULL OR ends_at>CURRENT_TIMESTAMP)
 		ORDER BY starts_at DESC NULLS LAST,updated_at DESC`, environment, platform)
@@ -342,7 +350,7 @@ func AdminListWhatsNew(c *gin.Context) {
 		return
 	}
 	rows, err := db.Get().Query(`SELECT id,name,environment,platform,min_app_version,enabled,starts_at,ends_at,pages,updated_by,created_at,updated_at
-		FROM whats_new_campaigns WHERE environment=$1 AND platform=$2 ORDER BY updated_at DESC`, environment, platform)
+		FROM whats_new_campaigns WHERE environment=$1 AND platform IN ($2, 'ios', 'android') ORDER BY updated_at DESC`, environment, platform)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list campaigns"})
 		return
@@ -371,9 +379,10 @@ func saveWhatsNew(c *gin.Context, id string) {
 	}
 	input.Name = strings.TrimSpace(input.Name)
 	input.Environment = currentEnvironment()
-	input.Platform = strings.ToLower(strings.TrimSpace(input.Platform))
+	var validPlatform bool
+	input.Platform, validPlatform = contentPlatform(input.Platform)
 	input.MinAppVersion = strings.TrimSpace(input.MinAppVersion)
-	if input.Name == "" || !validMobilePlatform(input.Platform) || len(input.Pages) == 0 {
+	if input.Name == "" || !validPlatform || len(input.Pages) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name, scope, and at least one page are required"})
 		return
 	}

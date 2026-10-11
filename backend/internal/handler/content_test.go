@@ -2,6 +2,24 @@ package handler
 
 import "testing"
 
+func TestContentPlatform(t *testing.T) {
+	for _, input := range []string{"app", "ios", "android", " Android "} {
+		platform, ok := contentPlatform(input)
+		if !ok || platform != "app" {
+			t.Fatalf("contentPlatform(%q) = (%q, %v), want shared App scope", input, platform, ok)
+		}
+	}
+	for _, input := range []string{"", "web", "unknown"} {
+		if _, ok := contentPlatform(input); ok {
+			t.Fatalf("contentPlatform(%q) unexpectedly accepted", input)
+		}
+	}
+	// Analytics still records the actual device platform.
+	if normalizeMobilePlatform("android") != "android" || normalizeMobilePlatform("ios") != "ios" {
+		t.Fatal("content consolidation changed analytics device platforms")
+	}
+}
+
 func TestVersionAtLeast(t *testing.T) {
 	tests := []struct {
 		current string
