@@ -937,7 +937,7 @@ class _WorldUtilityActionState extends State<_WorldUtilityAction> {
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
         color: foreground,
-        fontSize: primary ? 13 : 11,
+        fontSize: primary ? 16 : 11,
         fontWeight: primary ? FontWeight.w700 : FontWeight.w500,
       ),
     );
