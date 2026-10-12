@@ -733,22 +733,7 @@ class _BackgroundTile extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(
-              width: 48,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const SizedBox(height: 48),
-                  IconButton(
-                      onPressed: onTap,
-                      icon: Icon(
-                          background['custom'] == true
-                              ? Icons.lock_outline
-                              : Icons.add_circle_outline_rounded,
-                          color: context.vita.text)),
-                ],
-              ),
-            ),
+            const SizedBox(width: 12),
           ]),
         ),
       ),

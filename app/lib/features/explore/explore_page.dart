@@ -291,7 +291,7 @@ class _FeaturedMoment extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: SizedBox(
-            height: 380,
+            height: 280,
             child: Stack(fit: StackFit.expand, children: [
               _FeaturedMomentArtwork(author: author),
               if (media.isNotEmpty)
@@ -328,8 +328,6 @@ class _FeaturedMoment extends StatelessWidget {
                             fontSize: 14,
                             fontWeight: FontWeight.w700)),
                   ),
-                  const Icon(Icons.arrow_outward_rounded,
-                      size: 18, color: Colors.white),
                 ]),
               ),
               Positioned(
@@ -389,18 +387,18 @@ class _FeaturedMomentArtwork extends StatelessWidget {
           colors: [Color(0xFF302945), Color(0xFF18171F)],
         ),
       ),
-      child: Stack(alignment: Alignment.center, children: [
+      child: Stack(alignment: const Alignment(0, -.15), children: [
         Container(
-          width: 245,
-          height: 245,
+          width: 174,
+          height: 174,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(color: const Color(0x30AC8BFF)),
           ),
         ),
         Container(
-          width: 185,
-          height: 185,
+          width: 132,
+          height: 132,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: const Color(0x224D3A70),
@@ -412,12 +410,12 @@ class _FeaturedMomentArtwork extends StatelessWidget {
         ),
         if (isPet)
           SizedBox(
-            width: 165,
-            height: 165,
+            width: 116,
+            height: 116,
             child: AIPetAvatar(name: name, imageUrl: portrait),
           )
         else
-          VitaAvatar(name: name, radius: 75, imageUrl: portrait),
+          VitaAvatar(name: name, radius: 52, imageUrl: portrait),
       ]),
     );
   }
