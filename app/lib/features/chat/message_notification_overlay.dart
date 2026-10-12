@@ -5,6 +5,7 @@ import '../../shared/widgets.dart';
 import '../../shared/notification_surface.dart';
 import '../auth/auth_controller.dart';
 import 'chat_list_controller.dart';
+import 'chat_controller.dart';
 import 'chat_list_presentation.dart';
 import 'chat_page.dart';
 
@@ -34,14 +35,22 @@ class _MessageNotificationOverlayState
                 if (!Get.isRegistered<ChatListController>()) {
                   return const SizedBox.shrink();
                 }
-                if (AuthController.to.profile.value == null ||
-                    ChatListController.to.currentRoute.value
-                        .contains('ChatPage')) {
+                // Re-evaluate visibility on navigation; generated route names
+                // do not reliably identify the companion chat page.
+                ChatListController.to.currentRoute.value;
+                if (AuthController.to.profile.value == null) {
                   return const SizedBox.shrink();
                 }
                 final unread = ChatListController.to.companions
-                    .where((item) =>
-                        ChatListPresentation.from(item).unreadCount > 0)
+                    .where((item) {
+                      if (ChatListPresentation.from(item).unreadCount <= 0) {
+                        return false;
+                      }
+                      final id = '${item['id'] ?? ''}';
+                      return !Get.isRegistered<ChatController>(tag: id) ||
+                          Get.find<ChatController>(tag: id).isVisible?.call() !=
+                              true;
+                    })
                     .toList();
                 if (unread.isEmpty) {
                   return const AnimatedSwitcher(

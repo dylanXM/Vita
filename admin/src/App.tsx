@@ -22,6 +22,7 @@ import { SocialLinksPage } from "@/pages/SocialLinksPage";
 import { CreditProductsPage } from "@/pages/CreditProductsPage";
 import { MediaModelsPage } from "@/pages/MediaModelsPage";
 import { ModelServicesPage } from "@/pages/ModelServicesPage";
+import { ModelUsagePage } from "@/pages/ModelUsagePage";
 import { LegalDocumentsPage } from "@/pages/LegalDocumentsPage";
 import { AIPetsPage } from "@/pages/AIPetsPage";
 import { StoryHubPage } from "@/pages/StoryHubPage";
@@ -72,6 +73,7 @@ const router = createBrowserRouter([
       { path: "agent", element: <AgentPage /> },
       { path: "media-models", element: <MediaModelsPage /> },
       { path: "model-services", element: <ModelServicesPage /> },
+      { path: "model-services/:id", element: <ModelUsagePage /> },
       { path: "storage", element: <StoragePage /> },
       { path: "subscription-plans", element: <SubscriptionPlansPage /> },
       { path: "coin-packs", element: <CoinPacksPage /> },

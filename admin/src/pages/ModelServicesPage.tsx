@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, MoreHorizontal, Plug, Pencil, Plus, RefreshCw, Settings2, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { ModelUsageDialog } from "./ModelUsageDialog";
+import { useNavigate } from "react-router-dom";
 import { agentApi } from "@/api/admin";
 import { type AIProvider, type AIModel, type AIModelScenario, type AIModelTestResult, type BillingProduct } from "@/api/types";
 import { errorMessage } from "@/api/client";
@@ -95,7 +95,7 @@ export function ModelServicesPage() {
     enabled: Boolean(activeEnv),
   });
 
-  const [details, setDetails] = useState<ServiceRow | null>(null);
+  const navigate = useNavigate();
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [scenariosTarget, setScenariosTarget] = useState<ServiceRow | null>(null);
@@ -267,12 +267,12 @@ export function ModelServicesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="font-mono text-xs">
-                      <button type="button" className="max-w-48 truncate text-left underline-offset-4 hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setDetails(row)} title={row.model.model_name}>
+                      <button type="button" className="max-w-48 truncate text-left underline-offset-4 hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => navigate(`/model-services/${encodeURIComponent(row.model.id)}`)} title={row.model.model_name}>
                         {row.model.model_name}
                       </button>
                     </TableCell>
                     <TableCell>
-                      <button type="button" className="max-w-48 truncate text-left font-medium underline-offset-4 hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setDetails(row)} title={row.model.display_name}>
+                      <button type="button" className="max-w-48 truncate text-left font-medium underline-offset-4 hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => navigate(`/model-services/${encodeURIComponent(row.model.id)}`)} title={row.model.display_name}>
                         {row.model.display_name}
                       </button>
                     </TableCell>
@@ -291,7 +291,7 @@ export function ModelServicesPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onSelect={() => setDetails(row)}>
+                          <DropdownMenuItem onSelect={() => navigate(`/model-services/${encodeURIComponent(row.model.id)}`)}>
                             <Eye /> {t("modelUsage.details")}
                           </DropdownMenuItem>
                           <DropdownMenuItem disabled={!row.model.enabled} title={row.model.enabled ? t("modelServices.configureScenarios") : t("modelServices.enableToConfigure")} onSelect={() => setScenariosTarget(row)}>
@@ -315,7 +315,6 @@ export function ModelServicesPage() {
         </CardContent>
       </Card>
 
-      {details && <ModelUsageDialog key={details.model.id} model={details.model} onClose={() => setDetails(null)} />}
 
       <EditorDialog
         editor={editor}

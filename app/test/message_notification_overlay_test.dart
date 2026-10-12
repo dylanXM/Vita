@@ -9,6 +9,7 @@ import 'package:vita/features/auth/auth_controller.dart';
 import 'package:vita/features/world/world_page.dart';
 import 'package:vita/features/shell/shell_page.dart';
 import 'package:vita/features/chat/chat_list_controller.dart';
+import 'package:vita/features/chat/chat_controller.dart';
 import 'package:vita/features/chat/message_notification_overlay.dart';
 
 class _ChatList extends ChatListController {
@@ -18,6 +19,12 @@ class _ChatList extends ChatListController {
   void onClose() {}
   @override
   Future<void> load({bool silent = false}) async {}
+}
+
+class _Chat extends ChatController {
+  _Chat() : super(companionId: 'companion', companionName: 'Mimi');
+  @override
+  void onInit() {}
 }
 
 void main() {
@@ -45,12 +52,27 @@ void main() {
     await tester.pump();
     expect(find.text('New message'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
-    list.currentRoute.value = '/ChatPage';
+    final chat = Get.put<ChatController>(_Chat(), tag: 'companion');
+    chat.isVisible = () => true;
+    list.currentRoute.value = '/generated-chat-route';
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('New message'), findsNothing);
+    list.companions.add({
+      'id': 'other',
+      'name': 'Lisa',
+      'last_message': 'Other companion message',
+      'unread_count': 1,
+    });
+    await tester.pump();
+    expect(find.text('Other companion message'), findsOneWidget);
+    chat.isVisible = () => false;
     list.currentRoute.value = '/settings';
+    await tester.pump();
+    expect(find.text('New message'), findsOneWidget);
     auth.profile.value = null;
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('New message'), findsNothing);
   });
 

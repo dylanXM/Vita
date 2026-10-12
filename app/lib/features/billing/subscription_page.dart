@@ -8,6 +8,7 @@ import '../../core/constants.dart';
 import '../../core/theme.dart';
 import 'billing_controller.dart';
 import 'billing_products.dart';
+import 'billing_sync_banner.dart';
 
 Future<void> showSubscriptionPrompt(BuildContext context, String reason) async {
   if (!context.mounted) return;
@@ -69,6 +70,7 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
       padding: const EdgeInsets.only(bottom: 28),
       children: [
         _SubscriptionHero(active: ctrl.isSubscribed),
+        const BillingSyncBanner(),
         const SizedBox(height: 18),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),

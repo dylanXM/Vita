@@ -183,6 +183,7 @@ export interface AdminUserInput {
 }
 
 export type BillingPlatform = "ios" | "android" | "web";
+export type BillingActivityPlatform = BillingPlatform | "app" | "system";
 export type BillingCatalogPlatform = "app" | "web";
 
 export interface BillingProduct {
@@ -211,7 +212,7 @@ export interface BillingPurchase {
   user_email: string;
   kind: "subscription" | "coin_pack";
   provider: string;
-  platform: BillingPlatform | "system";
+  platform: BillingActivityPlatform;
   environment: Environment;
   product_id: string;
   amount_minor: number | null;
@@ -229,7 +230,7 @@ export interface CreditLedgerEntry {
   balance_after: number;
   kind: string;
   description: string;
-  platform: BillingPlatform | "system";
+  platform: BillingActivityPlatform;
   environment: Environment;
   created_at: string;
 }

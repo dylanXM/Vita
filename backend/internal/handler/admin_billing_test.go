@@ -46,6 +46,7 @@ func TestPlatformFromRevenueCatStore(t *testing.T) {
 		"PLAY_STORE": "android",
 		"STRIPE":     "web",
 		"unknown":    "system",
+		"TEST_STORE": "app",
 	}
 	for store, want := range tests {
 		if got := platformFromRevenueCatStore(store); got != want {

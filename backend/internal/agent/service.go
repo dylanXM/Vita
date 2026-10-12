@@ -1430,14 +1430,14 @@ func (s *Service) generatePlan(ctx context.Context, profile companionContext, lo
 RESPONSE FORMAT: output ONLY a single JSON array. No prose, no explanation, no markdown fences.
 The very first character of your reply MUST be '[' and the very last character MUST be ']'. Do not write anything before or after the array.`
 	systemPrompt += "\nWrite every title, description, location and moment_text in the user's App language: " + s.preferredLocale(ctx, profile.UserID) + ". Keep identifiers and JSON keys unchanged."
-	request := GenerateRequest{System: systemPrompt, Messages: []ChatMessage{{Role: "user", Content: prompt}}, Temperature: 0.6, MaxTokens: 4096, Timeout: lifePlanRequestTimeout}
+	request := GenerateRequest{System: systemPrompt, Messages: []ChatMessage{{Role: "user", Content: prompt}}, Temperature: 0.6, MaxTokens: 8192, Timeout: lifePlanRequestTimeout}
 	var lastErr error
 	for _, model := range models {
 		messages := append([]ChatMessage{}, request.Messages...)
 		for attempt := 0; attempt < 2; attempt++ {
 			tryReq := request
 			tryReq.Messages = messages
-			text, generateErr := s.client.GenerateText(ctx, model, tryReq)
+			text, generateErr := s.client.generateLifePlanText(ctx, model, tryReq)
 			if generateErr != nil {
 				lastErr = generateErr
 				s.recordRun(ctx, profile.ID, "life_plan", model.ID, "failed", generateErr.Error())
@@ -1492,6 +1492,7 @@ Recent life from earlier days (do not repeat it unless continuity requires it): 
 
 Return only a JSON array with %d to %d objects. Fields: type, title, description, location, start (HH:MM), end (HH:MM), emotion, importance (0-100), user_relevance (0-100), share (boolean), moment (boolean), moment_text, media_urls.
 Rules:
+- Keep title and location short, description to one concise sentence (at most 80 characters), and moment_text to at most 100 characters; use empty moment_text when moment=false.
 - The subject is a pet, never a person. Use simple pet activities such as sleeping, eating, playing, exploring the home, waiting, learning, and noticing its owner.
 - Times must be valid, chronological, and non-overlapping. Keep events ordinary and warm; never invent illness, travel, purchases, or human employment.
 - No more than %d events may have share=true. At most 2 events may have moment=true. moment_text must sound like the pet's short, playful thought.
@@ -1508,6 +1509,7 @@ Recent life from earlier days (do not repeat it unless continuity requires it): 
 
 Return only a JSON array with %d to %d objects. Fields: type, title, description, location, start (HH:MM), end (HH:MM), emotion, importance (0-100), user_relevance (0-100), share (boolean), moment (boolean), moment_text, media_urls.
 Rules:
+- Keep title and location short, description to one concise sentence (at most 80 characters), and moment_text to at most 100 characters; use empty moment_text when moment=false.
 - Build a complete but ordinary waking-day timeline in local time. Times must be valid, chronological, non-overlapping, and start/end must be on this date; each event must last 15 minutes to 6 hours.
 - Respect the occupation, habits, city, commute time, meals, rest, and realistic travel distance. Do not place the person in two places at once.
 - Do not invent real-time weather, breaking news, holidays, appointments, purchases, illnesses, travel, or major life changes unless supplied above.

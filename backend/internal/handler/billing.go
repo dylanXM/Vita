@@ -161,26 +161,39 @@ func grantCreditsForPlatform(userID string, amount int, kind, dedupeKey, platfor
 		return bal, err
 	}
 
-	if dedupeKey != "" {
-		var exists bool
-		if err := db.Get().QueryRow(
-			`SELECT EXISTS(SELECT 1 FROM credit_transactions WHERE user_id = $1 AND description = $2)`,
-			userID, dedupeKey).Scan(&exists); err != nil {
-			return 0, err
-		}
-		if exists {
-			var bal int
-			err := db.Get().QueryRow(
-				`SELECT COALESCE(credits_balance, 0) FROM users WHERE id = $1`, userID).Scan(&bal)
-			return bal, err
-		}
-	}
-
 	tx, err := db.Get().Begin()
 	if err != nil {
 		return 0, err
 	}
 	defer tx.Rollback()
+	balance, err := grantCreditsInTx(tx, userID, amount, kind, dedupeKey, platform, rewardInviter)
+	if err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return balance, nil
+}
+
+// Claim the key inside the same transaction as the balance and invitation reward.
+// The unique key serializes concurrent deliveries without losing failed grants.
+func grantCreditsInTx(tx *sql.Tx, userID string, amount int, kind, dedupeKey, platform string, rewardInviter bool) (int, error) {
+	if dedupeKey != "" {
+		result, err := tx.Exec(`INSERT INTO billing_grant_keys(user_id,grant_key) VALUES($1,$2) ON CONFLICT DO NOTHING`, userID, dedupeKey)
+		if err != nil {
+			return 0, err
+		}
+		count, err := result.RowsAffected()
+		if err != nil {
+			return 0, err
+		}
+		if count == 0 {
+			var balance int
+			err := tx.QueryRow(`SELECT credits_balance FROM users WHERE id=$1`, userID).Scan(&balance)
+			return balance, err
+		}
+	}
 
 	var bal int
 	var environment string
@@ -233,9 +246,6 @@ func grantCreditsForPlatform(userID string, amount int, kind, dedupeKey, platfor
 				}
 			}
 		}
-	}
-	if err := tx.Commit(); err != nil {
-		return 0, err
 	}
 	return bal, nil
 }
@@ -324,29 +334,31 @@ func GetMySubscription(c *gin.Context) {
 	}
 
 	var s Subscription
+	var entitlementRaw string
 	err := db.Get().QueryRow(
 		`SELECT id, provider, provider_ref, COALESCE(product_id, ''), COALESCE(entitlement, ''),
-		        status, current_period_end, will_renew, created_at, updated_at
-		 FROM subscriptions WHERE user_id = $1
-		 ORDER BY updated_at DESC LIMIT 1`,
+                status, current_period_end, will_renew, created_at, updated_at,entitlement_ids::text
+         FROM subscriptions WHERE user_id = $1
+         ORDER BY (status='active' AND (current_period_end IS NULL OR current_period_end>CURRENT_TIMESTAMP)) DESC,updated_at DESC LIMIT 1`,
 		userID).
 		Scan(&s.ID, &s.Provider, &s.ProviderRef, &s.ProductID, &s.Entitlement,
-			&s.Status, &s.CurrentPeriodEnd, &s.WillRenew, &s.CreatedAt, &s.UpdatedAt)
+			&s.Status, &s.CurrentPeriodEnd, &s.WillRenew, &s.CreatedAt, &s.UpdatedAt, &entitlementRaw)
 
 	entitlements := []string{}
 	if err == nil && s.Status == "active" &&
 		(s.CurrentPeriodEnd == nil || s.CurrentPeriodEnd.After(time.Now())) {
-		if s.Entitlement != "" {
+		_ = json.Unmarshal([]byte(entitlementRaw), &entitlements)
+		if len(entitlements) == 0 && s.Entitlement != "" {
 			entitlements = append(entitlements, s.Entitlement)
 		}
-		c.JSON(http.StatusOK, gin.H{"subscription": s, "entitlements": entitlements})
+		c.JSON(http.StatusOK, gin.H{"subscription": s, "entitlements": entitlements, "is_subscribed": true})
 		return
 	}
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load subscription"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"subscription": nil, "entitlements": entitlements})
+	c.JSON(http.StatusOK, gin.H{"subscription": nil, "entitlements": entitlements, "is_subscribed": false})
 }
 
 // ============================= RevenueCat webhook =============================
@@ -362,151 +374,26 @@ type revenueCatWebhookPayload struct {
 }
 
 type revenueCatEvent struct {
-	Type                  string `json:"type"`
-	AppUserID             string `json:"app_user_id"`
-	ProductID             string `json:"product_id"`
-	EntitlementID         string `json:"entitlement_id"`
-	PeriodType            string `json:"period_type"`
-	PurchasedAtMS         int64  `json:"purchased_at_ms"`
-	ExpirationAtMS        int64  `json:"expiration_at_ms"`
-	OriginalTransactionID string `json:"original_transaction_id"`
-	Store                 string `json:"store"`
-	NewAppUserID          string `json:"new_app_user_id"`
+	ID                    string   `json:"id"`
+	TransactionID         string   `json:"transaction_id"`
+	EventTimestampMS      int64    `json:"event_timestamp_ms"`
+	EntitlementIDs        []string `json:"entitlement_ids"`
+	Aliases               []string `json:"aliases"`
+	TransferredFrom       []string `json:"transferred_from"`
+	TransferredTo         []string `json:"transferred_to"`
+	Type                  string   `json:"type"`
+	AppUserID             string   `json:"app_user_id"`
+	ProductID             string   `json:"product_id"`
+	EntitlementID         string   `json:"entitlement_id"`
+	PeriodType            string   `json:"period_type"`
+	PurchasedAtMS         int64    `json:"purchased_at_ms"`
+	ExpirationAtMS        int64    `json:"expiration_at_ms"`
+	OriginalTransactionID string   `json:"original_transaction_id"`
+	Store                 string   `json:"store"`
+	NewAppUserID          string   `json:"new_app_user_id"`
 }
 
 // RevenueCatWebhook processes RevenueCat server-to-server events.
-func RevenueCatWebhook(c *gin.Context) {
-	if billingCfg.RevenueCatWebhookSecret == "" {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "revenuecat webhook is not configured"})
-		return
-	}
-	auth := c.GetHeader("Authorization")
-	expected := "Bearer " + billingCfg.RevenueCatWebhookSecret
-	if !hmac.Equal([]byte(auth), []byte(expected)) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid webhook secret"})
-		return
-	}
-
-	var payload revenueCatWebhookPayload
-	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
-		return
-	}
-	ev := payload.Event
-	if ev == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing event"})
-		return
-	}
-	// RevenueCat expects a fast 2xx; processing errors are logged, not returned.
-	processRevenueCatEvent(ev)
-	c.JSON(http.StatusOK, gin.H{"received": true})
-}
-
-func processRevenueCatEvent(ev *revenueCatEvent) {
-	userID := ev.AppUserID
-	if userID == "" {
-		return
-	}
-
-	switch ev.Type {
-	case "TRANSFER":
-		// Ownership moved to another app user id.
-		if ev.NewAppUserID != "" {
-			_, _ = db.Get().Exec(
-				`UPDATE subscriptions SET app_user_id = $1, updated_at = CURRENT_TIMESTAMP WHERE app_user_id = $2`,
-				ev.NewAppUserID, userID)
-		}
-		return
-	}
-
-	platform := platformFromRevenueCatStore(ev.Store)
-	purchasedAt := time.Now()
-	if ev.PurchasedAtMS > 0 {
-		purchasedAt = time.UnixMilli(ev.PurchasedAtMS)
-	}
-	purchaseRef := fmt.Sprintf("%s:%d", ev.OriginalTransactionID, ev.PurchasedAtMS)
-
-	// Consumables: grant credits for product ids like "credits_500".
-	if ev.Type == "NON_RENEWING_PURCHASE" || ev.Type == "INITIAL_PURCHASE" {
-		amount, configured := configuredProductCredits("coin_packs", ev.ProductID, platform)
-		if !configured {
-			amount = creditsFromProductID(ev.ProductID)
-		}
-		if amount > 0 {
-			dedupe := fmt.Sprintf("rc-purchase:%s:%d", ev.OriginalTransactionID, ev.PurchasedAtMS)
-			if _, err := grantCreditsForPlatform(userID, amount, "purchase", dedupe, platform, true); err != nil {
-				fmt.Printf("revenuecat: failed to grant credits for %s: %v\n", userID, err)
-			}
-			recordPurchase(userID, purchaseRef, "coin_pack", "revenuecat", platform, ev.ProductID, nil, "", amount, "paid", purchasedAt)
-			return
-		}
-	}
-
-	// Subscription lifecycle.
-	if ev.OriginalTransactionID == "" {
-		return
-	}
-	ref := ev.OriginalTransactionID
-	entitlement := ev.EntitlementID
-	status := "active"
-	willRenew := true
-
-	switch ev.Type {
-	case "INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION", "PRODUCT_CHANGE":
-		status = "active"
-		willRenew = true
-		// Grant monthly credits on real (non-trial) purchase / renewal. A trial
-		// becomes a purchase on the RENEWAL that follows it.
-		credits, configured := configuredProductCredits("subscription_plans", ev.ProductID, platform)
-		if !configured {
-			credits = billingCfg.SubscriptionCreditsMonthly
-		}
-		if credits > 0 && ev.PeriodType != "TRIAL" {
-			dedupe := fmt.Sprintf("rc-subscription:%s:%d", ref, ev.PurchasedAtMS)
-			if _, err := grantCreditsForPlatform(userID, credits, "grant", dedupe, platform, true); err != nil {
-				fmt.Printf("revenuecat: failed to grant monthly credits for %s: %v\n", userID, err)
-			}
-		}
-	case "CANCELLATION":
-		// Store cancellation disables renewal but access and monthly annual-plan
-		// allowances continue until the paid period expires.
-		status = "active"
-		willRenew = false
-	case "EXPIRATION":
-		status = "expired"
-		willRenew = false
-	case "SUBSCRIPTION_PAUSED":
-		status = "paused"
-		willRenew = false
-	default:
-		// BILLING_ISSUES, PRODUCT_CHANGE and friends: keep current state.
-		return
-	}
-
-	var periodStart, periodEnd *time.Time
-	if ev.PurchasedAtMS > 0 {
-		t := time.UnixMilli(ev.PurchasedAtMS)
-		periodStart = &t
-	}
-	if ev.ExpirationAtMS > 0 {
-		t := time.UnixMilli(ev.ExpirationAtMS)
-		periodEnd = &t
-	}
-
-	if _, err := upsertSubscription(userID, "revenuecat", ref, ev.ProductID, entitlement,
-		status, platform, periodStart, periodEnd, willRenew); err != nil {
-		fmt.Printf("revenuecat: failed to upsert subscription for %s: %v\n", userID, err)
-	}
-	if ev.Type == "INITIAL_PURCHASE" || ev.Type == "RENEWAL" {
-		credits, configured := configuredProductCredits("subscription_plans", ev.ProductID, platform)
-		if !configured {
-			credits = billingCfg.SubscriptionCreditsMonthly
-		}
-		recordPurchase(userID, purchaseRef, "subscription", "revenuecat", platform, ev.ProductID,
-			nil, "", credits, "paid", purchasedAt)
-	}
-}
-
 func configuredProductCredits(table, productID, platform string) (int, bool) {
 	if productID == "" || (table != "coin_packs" && table != "subscription_plans") {
 		return 0, false
@@ -625,6 +512,8 @@ func platformFromRevenueCatStore(store string) string {
 		return "android"
 	case "STRIPE":
 		return "web"
+	case "TEST_STORE":
+		return "app"
 	default:
 		return "system"
 	}

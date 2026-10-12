@@ -6,6 +6,7 @@ import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import 'billing_controller.dart';
 import 'billing_products.dart';
+import 'billing_sync_banner.dart';
 import '../ads/admob_controller.dart';
 
 /// Coin balance, experience purchases and recent activity.
@@ -108,6 +109,7 @@ class _CreditsPageState extends State<CreditsPage> {
             ],
           ),
         ),
+        const BillingSyncBanner(),
         if (!widget.purchaseOnly) ...[
           const Padding(
             padding: EdgeInsets.only(top: 12),

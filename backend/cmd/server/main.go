@@ -102,6 +102,7 @@ func main() {
 		StripeWebhookSecret:        cfg.StripeWebhookSecret,
 		SubscriptionCreditsMonthly: cfg.SubscriptionCreditsMonthly,
 	})
+	go handler.RunRevenueCatFulfillment(agentCtx)
 	go func() {
 		if err := handler.GrantDueAnnualSubscriptionCredits(); err != nil {
 			log.Printf("annual subscription monthly credits: %v", err)
@@ -210,6 +211,7 @@ func main() {
 		api.POST("/ads/reward-sessions", middleware.RequireAuth(), handler.CreateAdmobRewardSession)
 		api.POST("/credits/consume", middleware.RequireAuth(), handler.ConsumeCredits)
 		api.GET("/me/subscription", middleware.RequireAuth(), handler.GetMySubscription)
+		api.POST("/me/billing/confirm", middleware.RequireAuth(), handler.ConfirmBillingPurchase)
 		api.GET("/subscription-plans/benefits", middleware.RequireAuth(), handler.ListSubscriptionPlanBenefits)
 		api.POST("/stripe/checkout", middleware.RequireAuth(), handler.CreateStripeCheckout)
 		api.POST("/webhooks/revenuecat", handler.RevenueCatWebhook)

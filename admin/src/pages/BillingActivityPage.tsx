@@ -10,10 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { creditLedgerApi, purchasesApi } from "@/api/admin";
-import { type BillingPlatform, type BillingPurchase, type CreditLedgerEntry } from "@/api/types";
+import { type BillingActivityPlatform, type BillingPurchase, type CreditLedgerEntry } from "@/api/types";
 import { formatDate } from "@/lib/format";
 
-type ActivityPlatform = BillingPlatform | "system" | "all";
+type ActivityPlatform = BillingActivityPlatform | "all";
 const PAGE_SIZE = 20;
 
 export function BillingActivityPage() {
@@ -47,7 +47,7 @@ export function BillingActivityPage() {
         <div className="flex flex-wrap gap-3">
           <Select value={platform} onValueChange={(v) => setPlatform(v as ActivityPlatform)}><SelectTrigger className="w-44"><SelectValue /></SelectTrigger><SelectContent>
             <SelectItem value="all">{t("billing.allPlatforms")}</SelectItem>
-            {(["ios","android","web","system"] as const).map((value) => <SelectItem key={value} value={value}>{t(`billing.platform.${value}`)}</SelectItem>)}
+            {(["app","ios","android","web","system"] as const).map((value) => <SelectItem key={value} value={value}>{t(`billing.platform.${value}`)}</SelectItem>)}
           </SelectContent></Select>
         </div>
       </div>

@@ -336,7 +336,7 @@ func appendScopeFilters(c *gin.Context, where []string, args []any, platformColu
 	args = append(args, environment)
 	where = append(where, environmentColumn+" = $"+strconv.Itoa(len(args)))
 	if platform := strings.ToLower(strings.TrimSpace(c.Query("platform"))); platform != "" {
-		if !validBillingPlatform(platform) && platform != "system" {
+		if !validBillingPlatform(platform) && platform != "app" && platform != "system" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid platform"})
 			return nil, nil, false
 		}

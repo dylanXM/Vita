@@ -13,6 +13,12 @@ class VitaTranslations extends Translations {
 
   static const Map<String, Map<String, String>> _keys = {
     'en': {
+      "billing.nothingToRestore": "No restorable purchases were found.",
+      "billing.fulfillmentPending": "Payment succeeded. Your coins or subscription are syncing. Please do not buy again while you wait.",
+      "billing.purchaseCancelled": "Purchase cancelled.",
+      "billing.purchaseErrorMessage": "The purchase could not be completed. Please try again later.",
+      "billing.identityNotReady": "Your purchase account could not be verified. Please sign in again or retry.",
+      "billing.retrySync": "Check delivery again",
       "feedback.title": "Feedback",
       "feedback.hint": "Tell us about your experience (up to 2000 characters).",
       "feedback.submit": "Submit",
@@ -832,6 +838,12 @@ class VitaTranslations extends Translations {
       'stage.partner': 'Partner',
     },
     'zh_CN': {
+      "billing.nothingToRestore": "未找到可恢复的购买。",
+      "billing.fulfillmentPending": "支付成功，金币或订阅权益正在同步。请勿重复购买。",
+      "billing.purchaseCancelled": "已取消购买。",
+      "billing.purchaseErrorMessage": "购买未完成，请稍后重试。",
+      "billing.identityNotReady": "购买账号校验未完成，请重新登录或重试。",
+      "billing.retrySync": "重新检查到账",
       "feedback.title": "意见反馈",
       "feedback.hint": "请描述你的问题或建议，最多2000字。",
       "feedback.submit": "提交反馈",

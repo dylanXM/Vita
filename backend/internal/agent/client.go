@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -19,6 +20,8 @@ import (
 // Life plans return a full day as one JSON response; they need a longer
 // deadline than short chat replies. The caller context still bounds retries.
 const lifePlanRequestTimeout = 120 * time.Second
+
+var errTextTokenLimit = errors.New("provider text was truncated by token limit")
 
 const maxProviderResponseBytes = 4 << 20
 const maxImageProviderResponseBytes = 16 << 20
@@ -231,7 +234,7 @@ func (c *Client) openAI(ctx context.Context, model Model, input GenerateRequest)
 		return "", fmt.Errorf("openai-compatible provider returned no choices")
 	}
 	if response.Choices[0].FinishReason == "length" {
-		return "", fmt.Errorf("provider text was truncated by token limit")
+		return "", errTextTokenLimit
 	}
 	msg := response.Choices[0].Message
 	if text := extractOpenAIText(msg.Content); text != "" {
@@ -303,7 +306,7 @@ func (c *Client) anthropic(ctx context.Context, model Model, input GenerateReque
 	}
 	_ = json.Unmarshal(raw, &anthro)
 	if anthro.StopReason == "max_tokens" {
-		return "", fmt.Errorf("provider text was truncated by token limit")
+		return "", errTextTokenLimit
 	}
 	for _, block := range anthro.Content {
 		if block.Type == "text" && strings.TrimSpace(block.Text) != "" {
@@ -315,13 +318,17 @@ func (c *Client) anthropic(ctx context.Context, model Model, input GenerateReque
 	// though the request was anthropic-flavoured.
 	var oai struct {
 		Choices []struct {
-			Message struct {
+			FinishReason string `json:"finish_reason"`
+			Message      struct {
 				Content string `json:"content"`
 			} `json:"message"`
 		} `json:"choices"`
 	}
 	_ = json.Unmarshal(raw, &oai)
 	for _, choice := range oai.Choices {
+		if choice.FinishReason == "length" {
+			return "", errTextTokenLimit
+		}
 		if strings.TrimSpace(choice.Message.Content) != "" {
 			return strings.TrimSpace(choice.Message.Content), nil
 		}
@@ -740,4 +747,16 @@ func kieCallbackURL() string {
 		return ""
 	}
 	return base + "/v1/providers/kie/callback"
+}
+
+// Only full-day structured output gets a larger-budget retry. Never expose
+// truncated JSON as a successful plan or retry unrelated provider failures.
+func (c *Client) generateLifePlanText(ctx context.Context, model Model, request GenerateRequest) (string, error) {
+	text, err := c.GenerateText(ctx, model, request)
+	if !errors.Is(err, errTextTokenLimit) || ctx.Err() != nil {
+		return text, err
+	}
+	request.MaxTokens = 16384
+	request.Messages = append(append([]ChatMessage(nil), request.Messages...), ChatMessage{Role: "user", Content: "The previous output hit the token limit. Generate the complete JSON array again from the beginning. Keep descriptions to one short sentence and moment_text concise; no explanations or markdown."})
+	return c.GenerateText(ctx, model, request)
 }

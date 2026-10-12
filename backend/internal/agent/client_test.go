@@ -379,3 +379,64 @@ func TestLifePlanTimeoutIsRequestScoped(t *testing.T) {
 		t.Fatal("life plan changed shared chat client timeout")
 	}
 }
+
+func TestLifePlanTokenLimitRecovery(t *testing.T) {
+	for _, kind := range []string{"openai", "anthropic"} {
+		t.Run(kind, func(t *testing.T) {
+			calls := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				var body struct {
+					MaxTokens int `json:"max_tokens"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				expected := 8192
+				if calls == 2 {
+					expected = 16384
+				}
+				if body.MaxTokens != expected {
+					t.Errorf("budget=%d want=%d", body.MaxTokens, expected)
+				}
+				// Some Anthropic gateways also return the OpenAI response shape.
+				if calls == 1 {
+					_, _ = w.Write([]byte(`{"choices":[{"finish_reason":"length","message":{"content":"[{"}}]}`))
+					return
+				}
+				_, _ = w.Write([]byte(`{"choices":[{"finish_reason":"stop","message":{"content":"[]"}}]}`))
+			}))
+			defer server.Close()
+			text, err := NewClient().generateLifePlanText(context.Background(), Model{Kind: kind, BaseURL: server.URL, ModelName: "test"}, GenerateRequest{MaxTokens: 8192})
+			if err != nil || text != "[]" || calls != 2 {
+				t.Fatalf("text=%q err=%v calls=%d", text, err, calls)
+			}
+		})
+	}
+}
+
+func TestLifePlanDoesNotRetryHTTPFailure(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	}))
+	defer server.Close()
+	_, err := NewClient().generateLifePlanText(context.Background(), Model{Kind: "openai", BaseURL: server.URL, ModelName: "test"}, GenerateRequest{MaxTokens: 8192})
+	if err == nil || calls != 1 {
+		t.Fatalf("err=%v calls=%d", err, calls)
+	}
+}
+
+func TestLifePlanTokenLimitRetryIsBounded(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		_, _ = w.Write([]byte(`{"stop_reason":"max_tokens","content":[{"type":"text","text":"[{"}]}`))
+	}))
+	defer server.Close()
+	text, err := NewClient().generateLifePlanText(context.Background(), Model{Kind: "anthropic", BaseURL: server.URL, ModelName: "test"}, GenerateRequest{MaxTokens: 8192})
+	if err != errTextTokenLimit || text != "" || calls != 2 {
+		t.Fatalf("text=%q err=%v calls=%d", text, err, calls)
+	}
+}

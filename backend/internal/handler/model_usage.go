@@ -52,11 +52,12 @@ func AdminModelUsage(c *gin.Context) {
 		return
 	}
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	if page < 1 || page > 2000 {
+	const pageSize = 10
+	if page < 1 || page > math.MaxInt/pageSize {
 		c.JSON(400, gin.H{"error": "invalid page"})
 		return
 	}
-	rows, err := db.Get().QueryContext(c.Request.Context(), `SELECT id,kind,status,request_summary,response_summary,error,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,usage_known,rates::text,estimated_cost_usd,started_at,finished_at FROM model_calls WHERE model_id=$1 ORDER BY started_at DESC,id DESC LIMIT 51 OFFSET $2`, id, (page-1)*50)
+	rows, err := db.Get().QueryContext(c.Request.Context(), `SELECT id,kind,status,request_summary,response_summary,error,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,usage_known,rates::text,estimated_cost_usd,started_at,finished_at FROM model_calls WHERE model_id=$1 ORDER BY started_at DESC,id DESC LIMIT 11 OFFSET $2`, id, (page-1)*pageSize)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "failed to read model history"})
 		return
@@ -94,9 +95,9 @@ func AdminModelUsage(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "failed to read history"})
 		return
 	}
-	more := len(items) > 50
+	more := len(items) > pageSize
 	if more {
-		items = items[:50]
+		items = items[:pageSize]
 	}
 	// Older agent_runs contain outcomes but not token usage or provider prices.
 	oldRows, err := db.Get().QueryContext(c.Request.Context(), `SELECT kind,status,error,COALESCE(input_summary,''),finished_at FROM agent_runs WHERE model_id=$1 AND finished_at < COALESCE((SELECT MIN(started_at) FROM model_calls WHERE model_id=$1),'infinity'::timestamptz) ORDER BY finished_at DESC LIMIT 50`, id)
