@@ -168,6 +168,7 @@ func SendCode(c *gin.Context) {
 
 	// Send the code by email (dev: printed to the server log)
 	if err := mailCfg.SendVerificationCode(req.Email, code); err != nil {
+		fmt.Printf("[MAIL] send-code failed: %s\n", strings.ReplaceAll(err.Error(), req.Email, "[recipient]"))
 		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to send verification code"})
 		return
 	}
@@ -782,6 +783,7 @@ func AppRegister(c *gin.Context) {
 	rdb.Set(ctx, cooldownKey, "1", registerCooldown)
 
 	if err := mailCfg.SendVerificationCode(req.Email, code); err != nil {
+		fmt.Printf("[MAIL] app-register failed: %s\n", strings.ReplaceAll(err.Error(), req.Email, "[recipient]"))
 		// Roll back so the user can retry immediately.
 		rdb.Del(ctx, pendingKey, verificationCodeKey(req.Email, code), cooldownKey)
 		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to send verification code"})

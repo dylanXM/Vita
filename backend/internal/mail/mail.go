@@ -15,6 +15,7 @@ import (
 	"net/smtp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Config holds the SMTP settings loaded from environment variables
@@ -53,6 +54,9 @@ func (c *Config) SendVerificationCode(to, code string) error {
 	if err := writeMessage(w, from, to, code); err != nil {
 		return fmt.Errorf("smtp write: %w", err)
 	}
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("smtp submit: %w", err)
+	}
 	if err := client.Quit(); err != nil {
 		return fmt.Errorf("smtp quit: %w", err)
 	}
@@ -66,24 +70,28 @@ func (c *Config) openData(to string) (*smtp.Client, io.WriteCloser, error) {
 	addr := net.JoinHostPort(c.Host, strconv.Itoa(c.Port))
 	tlsCfg := &tls.Config{ServerName: c.Host}
 
-	var client *smtp.Client
-	var err error
+	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
+	if err != nil {
+		return nil, nil, fmt.Errorf("smtp connect: %w", err)
+	}
+	if err := conn.SetDeadline(time.Now().Add(20 * time.Second)); err != nil {
+		conn.Close()
+		return nil, nil, fmt.Errorf("smtp deadline: %w", err)
+	}
 	if c.Port == 465 {
 		// Implicit TLS: wrap the TCP connection ourselves, then hand it to
 		// smtp.NewClient (net/smtp has no DialTLS helper).
-		conn, err := tls.Dial("tcp", addr, tlsCfg)
-		if err != nil {
+		tlsConn := tls.Client(conn, tlsCfg)
+		if err := tlsConn.Handshake(); err != nil {
+			conn.Close()
 			return nil, nil, fmt.Errorf("smtp connect: %w", err)
 		}
-		if client, err = smtp.NewClient(conn, c.Host); err != nil {
-			conn.Close()
-			return nil, nil, fmt.Errorf("smtp handshake: %w", err)
-		}
-	} else {
-		client, err = smtp.Dial(addr)
+		conn = tlsConn
 	}
+	client, err := smtp.NewClient(conn, c.Host)
 	if err != nil {
-		return nil, nil, fmt.Errorf("smtp connect: %w", err)
+		conn.Close()
+		return nil, nil, fmt.Errorf("smtp handshake: %w", err)
 	}
 	fail := func(err error) (*smtp.Client, io.WriteCloser, error) {
 		client.Close()
