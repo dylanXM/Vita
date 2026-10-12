@@ -897,7 +897,6 @@ class _RelationshipCard extends StatelessWidget {
                       onTap: onGift,
                     ),
                   ),
-                  const SizedBox(width: 12),
                   SizedBox(
                     width: 56,
                     child: _WorldUtilityAction(

@@ -133,6 +133,19 @@ func main() {
 
 	engine := gin.Default()
 	engine.Use(middleware.RequestID())
+	// Pool deltas are process-wide signals, not per-request query timings.
+	engine.Use(func(c *gin.Context) {
+		started := time.Now()
+		before := db.Get().Stats()
+		c.Next()
+		elapsed := time.Since(started)
+		if elapsed >= 100*time.Millisecond {
+			after := db.Get().Stats()
+			log.Printf("[SLOW_API] request_id=%s method=%s route=%s status=%d elapsed_ms=%.2f db_in_use=%d db_idle=%d pool_wait_count_delta=%d pool_wait_ms_delta=%.2f",
+				c.GetString("request_id"), c.Request.Method, c.FullPath(), c.Writer.Status(), float64(elapsed)/float64(time.Millisecond),
+				after.InUse, after.Idle, after.WaitCount-before.WaitCount, float64(after.WaitDuration-before.WaitDuration)/float64(time.Millisecond))
+		}
+	})
 	engine.Use(middleware.CORS(cfg.AllowedOrigins, cfg.Env == config.EnvDev))
 	engine.Use(middleware.AuthMiddleware(tokenManager, redisClient))
 
@@ -160,6 +173,7 @@ func main() {
 			companions.POST("/", handler.CreateCompanion)
 			companions.GET("/:id", handler.GetCompanion)
 			companions.GET("/", handler.ListCompanions)
+			companions.GET("/updates", handler.CompanionUpdates)
 			companions.PUT("/:id", handler.UpdateCompanion)
 			companions.DELETE("/:id", handler.DeleteCompanion)
 			companions.POST("/:id/restore", handler.RestoreCompanion)

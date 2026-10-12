@@ -28,7 +28,7 @@ func subscriptionRequired(c *gin.Context, code, message string) {
 
 func ensureDefaultCompanions(userID string) error {
 	if _, err := db.Get().Exec(`UPDATE companions SET active=false,updated_at=CURRENT_TIMESTAMP
-		WHERE user_id=$1 AND is_default=true AND portrait_id NOT IN
+		WHERE user_id=$1 AND is_default=true AND active=true AND portrait_id NOT IN
 		(SELECT id FROM companion_portraits WHERE enabled=true AND is_default=true)`, userID); err != nil {
 		return err
 	}
@@ -37,15 +37,28 @@ func ensureDefaultCompanions(userID string) error {
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	type defaultPortrait struct{ id, name, tags string }
+	var portraits []defaultPortrait
 	for rows.Next() {
-		var portraitID, name, tags string
-		if err := rows.Scan(&portraitID, &name, &tags); err != nil {
+		var portrait defaultPortrait
+		if err := rows.Scan(&portrait.id, &portrait.name, &portrait.tags); err != nil {
+			rows.Close()
 			return err
 		}
+		portraits = append(portraits, portrait)
+	}
+	readErr := rows.Err()
+	rows.Close()
+	if readErr != nil {
+		return readErr
+	}
+	for _, portrait := range portraits {
+		portraitID, name, tags := portrait.id, portrait.name, portrait.tags
 		companionID := uuid.New().String()
 		_, err = db.Get().Exec(`UPDATE companions SET name=$3,gender='friend',relationship_stage='acquaintance',personality_tags=$4,
-			active=true,updated_at=CURRENT_TIMESTAMP WHERE user_id=$1 AND portrait_id=$2 AND is_default=true`,
+			active=true,updated_at=CURRENT_TIMESTAMP WHERE user_id=$1 AND portrait_id=$2 AND is_default=true
+            AND (name,gender,relationship_stage,personality_tags,active)
+                IS DISTINCT FROM ($3::text,'friend'::text,'acquaintance'::text,$4::jsonb,true)`,
 			userID, portraitID, name, tags)
 		if err != nil {
 			return err
@@ -62,7 +75,7 @@ func ensureDefaultCompanions(userID string) error {
 		_, _ = db.Get().Exec(`INSERT INTO relationship_states (companion_id) SELECT $1
 			WHERE EXISTS(SELECT 1 FROM companions WHERE id=$1) ON CONFLICT DO NOTHING`, companionID)
 	}
-	return rows.Err()
+	return nil
 }
 
 func defaultChatAccess(userID string, _ bool) (bool, *time.Time, error) {

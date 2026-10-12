@@ -1191,7 +1191,17 @@ func ListCompanions(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to prepare default companions"})
 		return
 	}
-	rows, err := db.Get().Query(`SELECT c.id,c.user_id,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.appearance,''),COALESCE(c.city,''),COALESCE(c.occupation,''),COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.portrait_id,COALESCE(NULLIF(c.avatar_url,''),p.image_url,''),c.model_id,c.creation_source,c.proactive_enabled,c.active,c.is_default,c.life_enabled,c.friendship_active,c.created_at,c.updated_at,
+	subscribed, accessErr := userHasActiveSubscription(userID)
+	if accessErr != nil {
+		c.JSON(500, gin.H{"error": "failed to check subscription"})
+		return
+	}
+	allowed, expires, accessErr := defaultChatAccess(userID, false)
+	if accessErr != nil {
+		c.JSON(500, gin.H{"error": "failed to check free chat access"})
+		return
+	}
+	rows, err := db.Get().QueryContext(c.Request.Context(), `SELECT c.id,c.user_id,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.appearance,''),COALESCE(c.city,''),COALESCE(c.occupation,''),COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.portrait_id,COALESCE(NULLIF(c.avatar_url,''),p.image_url,''),c.model_id,c.creation_source,c.proactive_enabled,c.active,c.is_default,c.life_enabled,c.friendship_active,c.created_at,c.updated_at,
 		COALESCE(latest.content,''),COALESCE(latest.message_type,'text'),latest.created_at,COALESCE(unread.count,0)
 		FROM companions c
 		LEFT JOIN companion_portraits p ON p.id=c.portrait_id
@@ -1227,8 +1237,20 @@ func ListCompanions(c *gin.Context) {
 		comp.PortraitID = nullString(portraitID)
 		comp.ModelID = nullString(modelID)
 		comp.LastMessageAt = nullTime(lastMessageAt)
-		decorateCompanionAccess(userID, &comp)
+		if comp.IsDefault {
+			comp.CanChat = allowed
+			comp.RequiresSubscription = !allowed
+			comp.TrialExpiresAt = expires
+		} else {
+			comp.CanChat = subscribed
+			comp.RequiresSubscription = !subscribed
+			comp.FriendshipActive = subscribed && comp.FriendshipActive
+		}
 		companions = append(companions, comp)
+	}
+	if err := rows.Err(); err != nil {
+		c.JSON(500, gin.H{"error": "failed to read companions"})
+		return
 	}
 	c.JSON(http.StatusOK, companions)
 }
