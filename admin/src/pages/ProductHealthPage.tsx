@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Activity, HeartHandshake, MessageCircle, RefreshCw, ShoppingBag, UserRoundPlus } from "lucide-react";
 import { statsApi } from "@/api/admin";
 import type { ProductMetrics } from "@/api/types";
+import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +20,7 @@ function ratio(part: number | undefined, total: number | undefined): string {
   return `${formatNumber(part)} / ${formatNumber(total)}`;
 }
 
-export function ProductMetricsPanel() {
+export function ProductHealthPage() {
   const { t } = useTranslation();
   const [days, setDays] = useState<7 | 30>(7);
   const query = useQuery({
@@ -32,25 +33,25 @@ export function ProductMetricsPanel() {
 
   return (
     <section className="space-y-4" aria-label={t("productMetrics.title")}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">{t("productMetrics.title")}</h2>
-          <p className="text-sm text-muted-foreground">{t("productMetrics.description")}</p>
-          {data && <p className="mt-1 text-xs tabular-nums text-muted-foreground">{data.window_start} – {data.daily.at(-1)?.date}</p>}
-        </div>
-        <div className="flex gap-2">
-          {([7, 30] as const).map((n) => (
-            <Button key={n} size="sm" variant={days === n ? "default" : "outline"}
-              aria-pressed={days === n} onClick={() => setDays(n)}>
-              {t("productMetrics.days", { count: n })}
+      <PageHeader
+        title={t("productMetrics.title")}
+        description={t("productMetrics.description")}
+        actions={
+          <div className="flex gap-2">
+            {([7, 30] as const).map((n) => (
+              <Button key={n} size="sm" variant={days === n ? "default" : "outline"}
+                aria-pressed={days === n} onClick={() => setDays(n)}>
+                {t("productMetrics.days", { count: n })}
+              </Button>
+            ))}
+            <Button size="sm" variant="outline" onClick={() => void query.refetch()} disabled={query.isFetching}>
+              <RefreshCw className={query.isFetching ? "animate-spin" : undefined} />
+              {t("common.refresh")}
             </Button>
-          ))}
-          <Button size="sm" variant="outline" onClick={() => void query.refetch()} disabled={query.isFetching}>
-            <RefreshCw className={query.isFetching ? "animate-spin" : undefined} />
-            {t("common.refresh")}
-          </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
+      {data && <p className="text-xs tabular-nums text-muted-foreground">{data.window_start} – {data.daily.at(-1)?.date}</p>}
 
       {query.isError && <Card className="border-destructive/40"><CardContent className="p-5 text-sm text-destructive">{t("common.failedToLoad")}</CardContent></Card>}
 

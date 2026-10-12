@@ -47,7 +47,7 @@ help:
 	@echo "  make app-run-beta        运行 beta 环境"
 	@echo "  make app-run-prod        运行 prod 环境"
 	@echo "  make app-dev             运行应用（= app-run）"
-	@echo "  make app-build-apk-beta  构建 beta APK"
+	@echo "  make app-build-apk-beta  构建可安装的 beta Debug APK（无需 Release 签名）"
 	@echo "  make app-build-apk       构建 prod APK"
 	@echo "  make app-build-ios-beta  构建 beta iOS（no-codesign）"
 	@echo "  make app-build-ios       构建 prod iOS（no-codesign）"
@@ -328,7 +328,7 @@ app-dev: app-run
 
 app-build-apk-beta: app-prepare-dirs
 	@cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; }
-	cd app && $(FLUTTER_ENV) $(FLUTTER_CMD) build apk --release --dart-define-from-file=config/beta.json
+	cd app && $(FLUTTER_ENV) $(FLUTTER_CMD) build apk --debug --dart-define-from-file=config/beta.json
 
 app-build-apk: app-prepare-dirs
 	@cd app && command -v flutter >/dev/null 2>&1 || { echo "⚠️  Flutter not available"; exit 1; }

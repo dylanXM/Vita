@@ -19,7 +19,10 @@ export interface NavGroup {
 export const NAV: NavGroup[] = [
   {
     titleKey: "nav.overview",
-    items: [{ to: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard }],
+    items: [
+      { to: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
+      { to: "/product-health", labelKey: "nav.productHealth", icon: Activity },
+    ],
   },
   {
     titleKey: "nav.appContent",

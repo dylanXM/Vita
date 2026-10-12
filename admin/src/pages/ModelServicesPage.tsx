@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plug, Pencil, Plus, RefreshCw, Settings2, Trash2 } from "lucide-react";
+import { Eye, MoreHorizontal, Plug, Pencil, Plus, RefreshCw, Settings2, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { ModelUsageDialog } from "./ModelUsageDialog";
@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -265,8 +266,16 @@ export function ModelServicesPage() {
                         {row.provider.api_key_configured ? t("modelServices.keyConfigured") : t("modelServices.keyMissing")}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-mono text-xs">{row.model.model_name}</TableCell>
-                    <TableCell>{row.model.display_name}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      <button type="button" className="max-w-48 truncate text-left underline-offset-4 hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setDetails(row)} title={row.model.model_name}>
+                        {row.model.model_name}
+                      </button>
+                    </TableCell>
+                    <TableCell>
+                      <button type="button" className="max-w-48 truncate text-left font-medium underline-offset-4 hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setDetails(row)} title={row.model.display_name}>
+                        {row.model.display_name}
+                      </button>
+                    </TableCell>
                     <TableCell>
                       <Switch
                         checked={row.model.enabled}
@@ -275,24 +284,28 @@ export function ModelServicesPage() {
                       />
                     </TableCell>
                     <TableCell className="text-end">
-                      <div className="flex justify-end gap-1">
-                        <Button size="sm" variant="outline" onClick={() => setDetails(row)}>{t("modelUsage.details")}</Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={!row.model.enabled}
-                          title={row.model.enabled ? t("modelServices.configureScenarios") : t("modelServices.enableToConfigure")}
-                          onClick={() => setScenariosTarget(row)}
-                        >
-                          <Settings2 /> {t("modelServices.configureScenarios")}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => openEdit(row)}>
-                          <Pencil /> {t("users.edit")}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => remove.mutate(row)}>
-                          <Trash2 />
-                        </Button>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button type="button" size="icon" variant="ghost" aria-label={t("users.actions")}>
+                            <MoreHorizontal className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={() => setDetails(row)}>
+                            <Eye /> {t("modelUsage.details")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem disabled={!row.model.enabled} title={row.model.enabled ? t("modelServices.configureScenarios") : t("modelServices.enableToConfigure")} onSelect={() => setScenariosTarget(row)}>
+                            <Settings2 /> {t("modelServices.configureScenarios")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => openEdit(row)}>
+                            <Pencil /> {t("users.edit")}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem variant="destructive" disabled={remove.isPending} onSelect={() => remove.mutate(row)}>
+                            <Trash2 /> {t("common.delete")}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}

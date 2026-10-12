@@ -4,6 +4,7 @@ import { AdminLayout } from "@/layout/AdminLayout";
 import { RequireAuth } from "@/routes/guards";
 import { LoginPage } from "@/pages/LoginPage";
 import { DashboardPage } from "@/pages/DashboardPage";
+import { ProductHealthPage } from "@/pages/ProductHealthPage";
 import { UsersPage } from "@/pages/UsersPage";
 import { UserDetailPage } from "@/pages/UserDetailPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
@@ -61,6 +62,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: "dashboard", element: <DashboardPage /> },
+      { path: "product-health", element: <ProductHealthPage /> },
       { path: "users", element: <UsersPage /> },
       { path: "users/:id", element: <UserDetailPage /> },
       { path: "companions", element: <CompanionsPage /> },

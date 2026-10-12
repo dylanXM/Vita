@@ -19,6 +19,7 @@ const zhHans = {
   nav: {
     overview: "概览",
     dashboard: "仪表盘",
+    productHealth: "产品健康度",
     management: "管理",
     users: "用户",
     companions: "角色管理",

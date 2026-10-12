@@ -19,6 +19,7 @@ const en = {
   nav: {
     overview: "Overview",
     dashboard: "Dashboard",
+    productHealth: "Product health",
     management: "Management",
     users: "Users",
     companions: "Characters",
