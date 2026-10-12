@@ -915,7 +915,7 @@ class _RelationshipCard extends StatelessWidget {
   }
 }
 
-class _WorldUtilityAction extends StatelessWidget {
+class _WorldUtilityAction extends StatefulWidget {
   const _WorldUtilityAction(
       {required this.label,
       required this.icon,
@@ -927,17 +927,27 @@ class _WorldUtilityAction extends StatelessWidget {
   final bool primary;
 
   @override
+  State<_WorldUtilityAction> createState() => _WorldUtilityActionState();
+}
+
+class _WorldUtilityActionState extends State<_WorldUtilityAction> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
     final vita = context.vita;
+    final primary = widget.primary;
+    final label = widget.label;
+    final icon = widget.icon;
     final foreground =
-        primary ? Theme.of(context).colorScheme.onPrimary : vita.text;
+        primary ? vita.green : vita.text;
     final caption = Text(
       label,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
         color: foreground,
-        fontSize: primary ? 14 : 11,
+        fontSize: primary ? 13 : 11,
         fontWeight: primary ? FontWeight.w700 : FontWeight.w500,
       ),
     );
@@ -948,20 +958,35 @@ class _WorldUtilityAction extends StatelessWidget {
         label: label,
         child: ExcludeSemantics(
           child: Material(
-            color: primary ? vita.green : Colors.transparent,
-            borderRadius: BorderRadius.circular(primary ? 18 : 12),
+            color: primary
+                ? vita.green.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? .16 : .08)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
-              onTap: onTap,
+              onTap: widget.onTap,
+              onHighlightChanged: (pressed) => setState(() => _pressed = pressed),
+              highlightColor: vita.green.withValues(alpha: .10),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
+                padding: EdgeInsets.symmetric(horizontal: primary ? 8 : 4),
                 child: primary
                     ? Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(icon, size: 20, color: foreground),
-                          const SizedBox(width: 8),
-                          Flexible(child: caption),
+                          const SizedBox(width: 7),
+                          Expanded(child: caption),
+                          const SizedBox(width: 4),
+                          AnimatedSlide(
+                            offset: _pressed
+                                ? const Offset(.15, -.15)
+                                : Offset.zero,
+                            duration: MediaQuery.disableAnimationsOf(context)
+                                ? Duration.zero
+                                : const Duration(milliseconds: 140),
+                            child: Icon(Icons.north_east_rounded,
+                                size: 15, color: foreground),
+                          ),
                         ],
                       )
                     : Column(

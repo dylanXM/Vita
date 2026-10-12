@@ -528,6 +528,82 @@ class _SectionHeader extends StatelessWidget {
       ]));
 }
 
+class _StoryCover extends StatelessWidget {
+  const _StoryCover({required this.url, required this.title});
+  final String url;
+  final String title;
+
+  Widget _designedCover({bool loading = false, bool failed = false}) =>
+      DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF728BA7), Color(0xFF3C4263)],
+          ),
+        ),
+        child: Stack(children: [
+          Positioned(
+              right: -12,
+              top: -12,
+              child: Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white24, width: 1)),
+              )),
+          Positioned(
+              left: 5,
+              top: 0,
+              bottom: 0,
+              child: Container(width: 1, color: Colors.white24)),
+          Padding(
+              padding: const EdgeInsets.fromLTRB(12, 14, 9, 12),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Spacer(),
+                    Text(title.isEmpty ? 'storyHub.story'.tr : title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            height: 1.3)),
+                  ])),
+          if (loading)
+            const Positioned(
+                top: 8,
+                right: 8,
+                child: SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 1.5, color: Colors.white70))),
+          if (failed)
+            const Positioned(
+                top: 8,
+                right: 8,
+                child: Icon(Icons.broken_image_outlined,
+                    size: 13, color: Colors.white70)),
+        ]),
+      );
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: url.isEmpty
+            ? _designedCover()
+            : VitaMediaImage(
+                url: url,
+                placeholderBuilder: (_) => _designedCover(loading: true),
+                errorBuilder: (_, __, ___) => _designedCover(failed: true),
+              ),
+      );
+}
+
 class _StoryBookTile extends StatelessWidget {
   const _StoryBookTile({required this.story, required this.onTap});
 
@@ -541,45 +617,31 @@ class _StoryBookTile extends StatelessWidget {
     return SizedBox(
       height: 128,
       child: Material(
-        color: const Color(0xFF3E3654),
-        borderRadius: BorderRadius.circular(12),
+        color: context.vita.surface,
+        borderRadius: BorderRadius.circular(18),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
           child: Row(children: [
-            SizedBox(
-              width: 96,
-              height: double.infinity,
-              child: Stack(fit: StackFit.expand, children: [
-                if (cover.isNotEmpty)
-                  VitaMediaImage(
-                    url: cover,
-                    errorBuilder: (_, __, ___) => const SizedBox.expand(),
-                  ),
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 8,
-                    color: const Color(0xAA21192F),
-                    alignment: Alignment.centerRight,
-                    child: Container(width: 1, color: Colors.white24),
-                  ),
-                ),
-              ]),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: SizedBox(
+                width: 80,
+                height: 104,
+                child: _StoryCover(url: cover, title: title),
+              ),
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
+                padding: const EdgeInsets.fromLTRB(2, 16, 16, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(title.isEmpty ? 'storyHub.story'.tr : title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: context.vita.text,
                           fontSize: 17,
                           height: 1.2,
                           fontWeight: FontWeight.w700,
@@ -591,7 +653,7 @@ class _StoryBookTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style:
-                          const TextStyle(color: Colors.white70, fontSize: 11),
+                          TextStyle(color: context.vita.subText, fontSize: 12),
                     ),
                     const Spacer(),
                     Row(children: [
@@ -599,12 +661,12 @@ class _StoryBookTile extends StatelessWidget {
                         child: Text('storyHub.continue'.tr,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 12)),
+                            style: TextStyle(
+                                color: context.vita.green, fontSize: 12)),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.arrow_forward_rounded,
-                          size: 13, color: Colors.white),
+                      Icon(Icons.north_east_rounded,
+                          size: 15, color: context.vita.green),
                     ]),
                   ],
                 ),
@@ -629,29 +691,24 @@ class _BackgroundTile extends StatelessWidget {
     return SizedBox(
       height: 112,
       child: Material(
-        color: const Color(0xFF51456E),
+        color: context.vita.surface,
         borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
           child: Row(children: [
-            SizedBox(
-              width: 88,
-              height: double.infinity,
-              child: cover.trim().isNotEmpty
-                  ? VitaMediaImage(
-                      url: cover.trim(),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Center(
-                          child: Icon(Icons.auto_stories_outlined,
-                              color: Colors.white54)))
-                  : const Center(
-                      child: Icon(Icons.auto_stories_outlined,
-                          size: 30, color: Colors.white54)),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: SizedBox(
+                width: 68,
+                height: 88,
+                child: _StoryCover(
+                    url: cover.trim(), title: '${background['title'] ?? ''}'),
+              ),
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 0, 12),
+                padding: const EdgeInsets.fromLTRB(0, 12, 0, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -659,17 +716,19 @@ class _BackgroundTile extends StatelessWidget {
                     Text('${background['title'] ?? ''}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
-                            color: Colors.white)),
+                            color: context.vita.text)),
                     const SizedBox(height: 8),
                     Text(
                         '${background['synopsis'] ?? background['world_setting'] ?? ''}',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 12, height: 1.35, color: Colors.white70)),
+                        style: TextStyle(
+                            fontSize: 12,
+                            height: 1.35,
+                            color: context.vita.subText)),
                   ],
                 ),
               ),
@@ -679,17 +738,14 @@ class _BackgroundTile extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  IconButton(
-                      onPressed: onInfo,
-                      icon: const Icon(Icons.info_outline_rounded,
-                          color: Colors.white)),
+                  const SizedBox(height: 48),
                   IconButton(
                       onPressed: onTap,
                       icon: Icon(
                           background['custom'] == true
                               ? Icons.lock_outline
                               : Icons.add_circle_outline_rounded,
-                          color: Colors.white)),
+                          color: context.vita.text)),
                 ],
               ),
             ),

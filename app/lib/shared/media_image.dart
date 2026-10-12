@@ -11,11 +11,19 @@ class VitaMediaImage extends StatelessWidget {
     required this.url,
     this.fit = BoxFit.cover,
     this.errorBuilder,
+    this.placeholderBuilder,
   });
 
   final String url;
   final BoxFit fit;
   final ImageErrorWidgetBuilder? errorBuilder;
+  final WidgetBuilder? placeholderBuilder;
+
+  Widget _frame(
+          BuildContext context, Widget child, int? frame, bool synchronous) =>
+      synchronous || frame != null || placeholderBuilder == null
+          ? child
+          : placeholderBuilder!(context);
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +32,7 @@ class VitaMediaImage extends StatelessWidget {
         url.substring('asset://'.length),
         fit: fit,
         errorBuilder: errorBuilder,
+        frameBuilder: _frame,
       );
     }
     if (url.startsWith('data:image/') && url.contains(',')) {
@@ -31,6 +40,7 @@ class VitaMediaImage extends StatelessWidget {
         base64Decode(url.substring(url.indexOf(',') + 1)),
         fit: fit,
         errorBuilder: errorBuilder,
+        frameBuilder: _frame,
       );
     }
     final resolved = url.startsWith('http')
@@ -39,13 +49,14 @@ class VitaMediaImage extends StatelessWidget {
     final needsAuthentication =
         Uri.tryParse(resolved)?.path.startsWith('/v1/media/') == true;
     if (!needsAuthentication) {
-      return Image.network(resolved, fit: fit, errorBuilder: errorBuilder);
+      return Image.network(resolved,
+          fit: fit, errorBuilder: errorBuilder, frameBuilder: _frame);
     }
     return FutureBuilder<String?>(
       future: TokenStorage.read(),
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const SizedBox.expand();
+          return placeholderBuilder?.call(context) ?? const SizedBox.expand();
         }
         return Image.network(
           resolved,
@@ -54,6 +65,7 @@ class VitaMediaImage extends StatelessWidget {
               ? {'Authorization': 'Bearer ${snapshot.data}'}
               : const {},
           errorBuilder: errorBuilder,
+          frameBuilder: _frame,
         );
       },
     );
