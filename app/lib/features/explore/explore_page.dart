@@ -446,7 +446,7 @@ class _DiscoveryLead extends StatelessWidget {
           child: InkWell(
             onTap: onTap,
             child: Ink(
-              height: 380,
+              height: 280,
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
