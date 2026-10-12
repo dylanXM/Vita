@@ -133,7 +133,7 @@ func NewService(db *sql.DB, secret string, mock bool, push *FCMClient) (*Service
 	if err != nil {
 		return nil, err
 	}
-	return &Service{db: db, box: box, client: NewClient(), push: push, mock: mock}, nil
+	return &Service{db: db, box: box, client: NewMeteredClient(db), push: push, mock: mock}, nil
 }
 
 func (s *Service) EncryptSecret(value string) (string, error) { return s.box.Encrypt(value) }
@@ -1417,7 +1417,7 @@ func (s *Service) generatePlan(ctx context.Context, profile companionContext, lo
 RESPONSE FORMAT: output ONLY a single JSON array. No prose, no explanation, no markdown fences.
 The very first character of your reply MUST be '[' and the very last character MUST be ']'. Do not write anything before or after the array.`
 	systemPrompt += "\nWrite every title, description, location and moment_text in the user's App language: " + s.preferredLocale(ctx, profile.UserID) + ". Keep identifiers and JSON keys unchanged."
-	request := GenerateRequest{System: systemPrompt, Messages: []ChatMessage{{Role: "user", Content: prompt}}, Temperature: 0.6, MaxTokens: 4096}
+	request := GenerateRequest{System: systemPrompt, Messages: []ChatMessage{{Role: "user", Content: prompt}}, Temperature: 0.6, MaxTokens: 4096, Timeout: lifePlanRequestTimeout}
 	var lastErr error
 	for _, model := range models {
 		messages := append([]ChatMessage{}, request.Messages...)

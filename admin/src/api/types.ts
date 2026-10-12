@@ -24,6 +24,7 @@ export interface HealthResponse {
 
 /** `GET /v1/admin/stats` — live counts for the dashboard tiles. */
 export interface AdminStats {
+  model_cost?: ModelCostTotals;
   total_users: number;
   admin_users: number;
   new_users_7d: number;
@@ -770,3 +771,22 @@ export interface ContactPreferences {
   quiet_end: number;
 }
 export interface ContactPreferencesResponse { preferences: ContactPreferences; timezone: string }
+
+export interface ModelRates {
+  unit: "tokens" | "call";
+  input: number | null;
+  output: number | null;
+  cache_read: number | null;
+  cache_write: number | null;
+  call: number | null;
+}
+export interface ModelCostTotals { today_usd: number; total_usd: number; calls: number; unpriced_calls: number }
+export interface ModelCall {
+  id: string; kind: string; status: string; request: string; response: string; error: string;
+  input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_write_tokens: number;
+  usage_known: boolean; rates: ModelRates; estimated_cost_usd: number | null; started_at: string; finished_at: string;
+}
+export interface ModelUsage {
+  rates: ModelRates; totals: ModelCostTotals; items: ModelCall[]; has_more: boolean;
+  legacy_runs: { kind: string; status: string; error: string; response: string; finished_at: string }[];
+}

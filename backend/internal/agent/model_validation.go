@@ -58,7 +58,7 @@ func TestModelScenario(ctx context.Context, client *Client, model Model, scenari
 		req := GenerateRequest{
 			System:      "You create editable fictional AI character profiles. Output strict JSON only.",
 			Messages:    []ChatMessage{{Role: "user", Content: `Return a JSON object for a fictional character named Mina with all fields: name, gender, persona, appearance, city, occupation, interests, personality_tags, speaking_style, likes, dislikes, life_habits, life_goal, backstory. Use strings for all fields except personality_tags, which must be an array of strings.`}},
-			Temperature: 0.2, MaxTokens: 2048,
+			Temperature: 0.2, MaxTokens: 2048, Timeout: lifePlanRequestTimeout,
 		}
 		out, err := client.GenerateText(ctx, model, req)
 		if err != nil {

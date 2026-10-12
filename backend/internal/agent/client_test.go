@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestOpenAICompatibleClient(t *testing.T) {
@@ -184,13 +185,13 @@ func TestKieSpeechClient(t *testing.T) {
 }
 
 func TestKieTestConnection(t *testing.T) {
-	// Valid key: recordInfo probe returns 404 (task not found) but HTTP 200-ish.
+	// Valid key: authenticated credit API, including zero balance.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/jobs/recordInfo" {
+		if r.URL.Path != "/api/v1/chat/credit" {
 			t.Fatalf("path = %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"code": 404, "msg": "task not found"})
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": 200, "msg": "success", "data": 0})
 	}))
 	defer server.Close()
 	_, raw, err := NewClient().TestConnection(context.Background(), Model{
@@ -211,6 +212,17 @@ func TestKieTestConnection(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected auth error for bad key")
+	}
+}
+
+func TestKieConnectionBusinessError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": 401, "msg": "invalid API key"})
+	}))
+	defer server.Close()
+	_, _, err := NewClient().TestConnection(context.Background(), Model{Kind: "kie", BaseURL: server.URL + "/api/v1", APIKey: "bad"})
+	if err == nil {
+		t.Fatal("HTTP 200 business error was accepted")
 	}
 }
 
@@ -352,5 +364,18 @@ func TestKieCallbackSignalsOnlyPendingTask(t *testing.T) {
 	case <-ch:
 	default:
 		t.Fatal("missing callback notification")
+	}
+}
+
+func TestLifePlanTimeoutIsRequestScoped(t *testing.T) {
+	client := NewClient()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := client.GenerateText(ctx, Model{Kind: "openai", BaseURL: "http://127.0.0.1:1", ModelName: "test"}, GenerateRequest{MaxTokens: 10, Timeout: lifePlanRequestTimeout})
+	if err == nil {
+		t.Fatal("request deadline ignored caller cancellation")
+	}
+	if client.httpClient.Timeout != 45*time.Second {
+		t.Fatal("life plan changed shared chat client timeout")
 	}
 }

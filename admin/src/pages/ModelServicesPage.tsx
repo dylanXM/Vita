@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plug, Pencil, Plus, RefreshCw, Settings2, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { ModelUsageDialog } from "./ModelUsageDialog";
 import { agentApi } from "@/api/admin";
 import { type AIProvider, type AIModel, type AIModelScenario, type AIModelTestResult, type BillingProduct } from "@/api/types";
 import { errorMessage } from "@/api/client";
@@ -93,6 +94,7 @@ export function ModelServicesPage() {
     enabled: Boolean(activeEnv),
   });
 
+  const [details, setDetails] = useState<ServiceRow | null>(null);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [scenariosTarget, setScenariosTarget] = useState<ServiceRow | null>(null);
@@ -274,6 +276,7 @@ export function ModelServicesPage() {
                     </TableCell>
                     <TableCell className="text-end">
                       <div className="flex justify-end gap-1">
+                        <Button size="sm" variant="outline" onClick={() => setDetails(row)}>{t("modelUsage.details")}</Button>
                         <Button
                           size="sm"
                           variant="outline"
@@ -298,6 +301,8 @@ export function ModelServicesPage() {
           )}
         </CardContent>
       </Card>
+
+      {details && <ModelUsageDialog key={details.model.id} model={details.model} onClose={() => setDetails(null)} />}
 
       <EditorDialog
         editor={editor}

@@ -356,6 +356,8 @@ func main() {
 				agentAdmin.DELETE("/providers/:id", handler.AdminDeleteProvider)
 				agentAdmin.POST("/models", handler.AdminCreateModel)
 				agentAdmin.POST("/models/test", handler.AdminTestModel)
+				agentAdmin.GET("/models/:id/usage", handler.AdminModelUsage)
+				agentAdmin.PUT("/models/:id/rates", handler.AdminUpdateModelRates)
 				agentAdmin.PUT("/models/:id", handler.AdminUpdateModel)
 				agentAdmin.DELETE("/models/:id", handler.AdminDeleteModel)
 				agentAdmin.GET("/media-routes", handler.AdminListMediaModelRoutes)
@@ -395,9 +397,13 @@ func main() {
 		Addr: cfg.HTTPAddr,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost && (r.URL.Path == "/v1/admin/life-engine/trigger-plan" || r.URL.Path == "/v1/admin/life-engine/trigger-proactive") {
-				// These passes have a 120s work budget. Allow cleanup and the JSON
-				// response to finish without changing other endpoints' deadlines.
-				if err := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(140 * time.Second)); err != nil {
+				// Match the plan batch's 10-minute budget, leaving time for
+				// failure cleanup and JSON output. Other routes stay bounded.
+				deadline := 140 * time.Second
+				if r.URL.Path == "/v1/admin/life-engine/trigger-plan" {
+					deadline = 650 * time.Second
+				}
+				if err := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(deadline)); err != nil {
 					log.Printf("set life engine response deadline: %v", err)
 				}
 			}

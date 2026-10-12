@@ -69,6 +69,12 @@ export function DashboardPage() {
         </Card>
       )}
 
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <StatCard label={t("modelUsage.today")} value={data?.model_cost ? `$${data.model_cost.today_usd.toFixed(6)}` : "—"} sub={t("modelUsage.currency")} loading={loading} />
+        <StatCard label={t("modelUsage.total")} value={data?.model_cost ? `$${data.model_cost.total_usd.toFixed(6)}` : "—"} sub={data?.model_cost ? t("modelUsage.unpricedCount", { count: data.model_cost.unpriced_calls }) : t("modelUsage.currency")} loading={loading} />
+      </div>
+      <p className="text-xs text-muted-foreground">{t("modelUsage.scope")}</p>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
           label={t("dashboard.users")}

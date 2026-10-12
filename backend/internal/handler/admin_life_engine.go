@@ -397,7 +397,7 @@ func AdminLifeEngineTriggerPlan(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Minute)
 	defer cancel()
 	if err := companionAgent.EnsureDailyPlansWithForce(ctx, force); err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})

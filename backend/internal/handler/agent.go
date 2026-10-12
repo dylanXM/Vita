@@ -438,7 +438,10 @@ func AdminTestModel(c *gin.Context) {
 	if slices.Contains(scenarios, "audio_transcription") {
 		testAudio, audioErr = readModelTestAudio(c)
 	}
-	client := agent.NewClient()
+	if model.ID == "" && providerID != "" {
+		_ = db.Get().QueryRowContext(c.Request.Context(), `SELECT id FROM ai_models WHERE provider_id=$1 AND model_name=$2`, providerID, modelName).Scan(&model.ID)
+	}
+	client := agent.NewMeteredClient(db.Get())
 	results := collectModelTestResults(scenarios, func(scenario string) (agent.ModelScenarioTest, error) {
 		testErr := loadErr
 		if testErr == nil && scenario == "audio_transcription" && audioErr != nil {
@@ -639,8 +642,8 @@ func normalizeModelScenarios(input []string) ([]string, []string, error) {
 func loadModelForValidation(providerID, modelName string) (agent.Model, error) {
 	var model agent.Model
 	var encryptedKey string
-	if err := db.Get().QueryRow(`SELECT id,kind,base_url,api_key_ciphertext FROM ai_providers WHERE id=$1 AND enabled=true AND api_key_ciphertext <> ''`, providerID).
-		Scan(&model.ID, &model.Kind, &model.BaseURL, &encryptedKey); err != nil {
+	if err := db.Get().QueryRow(`SELECT kind,base_url,api_key_ciphertext FROM ai_providers WHERE id=$1 AND enabled=true AND api_key_ciphertext <> ''`, providerID).
+		Scan(&model.Kind, &model.BaseURL, &encryptedKey); err != nil {
 		return model, err
 	}
 	apiKey, err := companionAgent.DecryptSecret(encryptedKey)
@@ -649,6 +652,7 @@ func loadModelForValidation(providerID, modelName string) (agent.Model, error) {
 	}
 	model.APIKey = apiKey
 	model.ModelName = modelName
+	_ = db.Get().QueryRow(`SELECT id FROM ai_models WHERE provider_id=$1 AND model_name=$2`, providerID, modelName).Scan(&model.ID)
 	return model, nil
 }
 

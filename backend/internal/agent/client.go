@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +15,10 @@ import (
 	"sync"
 	"time"
 )
+
+// Life plans return a full day as one JSON response; they need a longer
+// deadline than short chat replies. The caller context still bounds retries.
+const lifePlanRequestTimeout = 120 * time.Second
 
 const maxProviderResponseBytes = 4 << 20
 const maxImageProviderResponseBytes = 16 << 20
@@ -36,6 +41,7 @@ type GenerateRequest struct {
 	Messages    []ChatMessage
 	Temperature float64
 	MaxTokens   int
+	Timeout     time.Duration `json:"-"`
 }
 
 type GenerateImageRequest struct {
@@ -43,7 +49,7 @@ type GenerateImageRequest struct {
 	Size   string
 }
 
-func (c *Client) TranscribeAudio(ctx context.Context, model Model, filename, mimeType string, audio []byte) (string, error) {
+func (c *Client) transcribeAudio(ctx context.Context, model Model, filename, mimeType string, audio []byte) (string, error) {
 	if model.Kind != "openai" {
 		return "", fmt.Errorf("audio transcription is unsupported for provider kind %q", model.Kind)
 	}
@@ -80,7 +86,14 @@ func (c *Client) TranscribeAudio(ctx context.Context, model Model, filename, mim
 	var output struct {
 		Text string `json:"text"`
 	}
-	if err := json.NewDecoder(reader).Decode(&output); err != nil {
+	raw, err := io.ReadAll(reader)
+	if err != nil {
+		return "", fmt.Errorf("read transcription response: %w", err)
+	}
+	if trace, ok := ctx.Value(callTraceKey{}).(*callTrace); ok {
+		trace.readUsage(raw)
+	}
+	if err := json.Unmarshal(raw, &output); err != nil {
 		return "", fmt.Errorf("decode transcription response: %w", err)
 	}
 	if strings.TrimSpace(output.Text) == "" {
@@ -89,7 +102,7 @@ func (c *Client) TranscribeAudio(ctx context.Context, model Model, filename, mim
 	return strings.TrimSpace(output.Text), nil
 }
 
-func (c *Client) GenerateSpeech(ctx context.Context, model Model, text, voice string) ([]byte, string, error) {
+func (c *Client) generateSpeech(ctx context.Context, model Model, text, voice string) ([]byte, string, error) {
 	if model.Kind == "kie" {
 		return c.kieGenerateSpeech(ctx, model, text, voice)
 	}
@@ -130,13 +143,21 @@ func (c *Client) GenerateSpeech(ctx context.Context, model Model, text, voice st
 
 type Client struct {
 	httpClient *http.Client
+	recorder   *sql.DB
 }
 
 func NewClient() *Client {
 	return &Client{httpClient: &http.Client{Timeout: 45 * time.Second}}
 }
 
-func (c *Client) GenerateText(ctx context.Context, model Model, input GenerateRequest) (string, error) {
+func (c *Client) generateText(ctx context.Context, model Model, input GenerateRequest) (string, error) {
+	if input.Timeout > 0 {
+		copyClient := *c
+		httpClient := *c.httpClient
+		httpClient.Timeout = input.Timeout
+		copyClient.httpClient = &httpClient
+		c = &copyClient
+	}
 	switch model.Kind {
 	case "openai":
 		return c.openAI(ctx, model, input)
@@ -147,7 +168,7 @@ func (c *Client) GenerateText(ctx context.Context, model Model, input GenerateRe
 	}
 }
 
-func (c *Client) GenerateImage(ctx context.Context, model Model, input GenerateImageRequest) (string, error) {
+func (c *Client) generateImage(ctx context.Context, model Model, input GenerateImageRequest) (string, error) {
 	if model.Kind == "kie" {
 		return c.kieGenerateImage(ctx, model, input)
 	}
@@ -349,7 +370,14 @@ func (c *Client) doJSONWithLimit(ctx context.Context, endpoint, apiKey, anthropi
 		raw, _ := io.ReadAll(reader)
 		return fmt.Errorf("provider returned %s: %s", resp.Status, strings.TrimSpace(string(raw)))
 	}
-	if err := json.NewDecoder(reader).Decode(output); err != nil {
+	raw, err := io.ReadAll(reader)
+	if err != nil {
+		return fmt.Errorf("read provider response: %w", err)
+	}
+	if trace, ok := ctx.Value(callTraceKey{}).(*callTrace); ok {
+		trace.readUsage(raw)
+	}
+	if err := json.Unmarshal(raw, output); err != nil {
 		return fmt.Errorf("decode provider response: %w", err)
 	}
 	return nil
@@ -452,7 +480,7 @@ func kieBase(model Model) string {
 	if b == "" {
 		return "https://api.kie.ai"
 	}
-	for _, suffix := range []string{"/api/v1/jobs/createTask", "/api/v1/jobs/recordInfo", "/api/v1/jobs", "/api/v1"} {
+	for _, suffix := range []string{"/api/v1/chat/credit", "/api/v1/jobs/createTask", "/api/v1/jobs/recordInfo", "/api/v1/jobs", "/api/v1"} {
 		b = strings.TrimSuffix(b, suffix)
 	}
 	return b
@@ -627,25 +655,42 @@ func (c *Client) kieGenerateSpeech(ctx context.Context, model Model, text, voice
 	return audio, mimeType, nil
 }
 
-// kieTestConnection validates the API key against the unified recordInfo probe.
-// Any non-401/403 response means the key was accepted (the probe taskId does not
-// need to exist; a 404/501 is expected but proves authentication succeeded).
+// kieTestConnection uses the authenticated, non-billable account credit API.
+// KIE can return HTTP 200 with an error code in the JSON body.
 func (c *Client) kieTestConnection(ctx context.Context, model Model) ([]string, string, error) {
-	endpoint := kieBase(model) + "/api/v1/jobs/recordInfo?taskId=kie-connectivity-probe"
+	endpoint := kieBase(model) + "/api/v1/chat/credit"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, "", fmt.Errorf("kie test connection request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+model.APIKey)
+	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, "", fmt.Errorf("kie test connection: %w", err)
 	}
 	defer resp.Body.Close()
-	raw, _ := io.ReadAll(io.LimitReader(resp.Body, maxProviderResponseBytes))
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxProviderResponseBytes))
 	rawText := strings.TrimSpace(string(raw))
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		return nil, rawText, fmt.Errorf("kie rejected the API key (HTTP %d)", resp.StatusCode)
+	if err != nil {
+		return nil, rawText, fmt.Errorf("read kie response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, rawText, fmt.Errorf("kie returned HTTP %d", resp.StatusCode)
+	}
+	var result struct {
+		Code    int      `json:"code"`
+		Message string   `json:"msg"`
+		Data    *float64 `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return nil, rawText, fmt.Errorf("decode kie credit response: %w", err)
+	}
+	if result.Code != 200 {
+		return nil, rawText, fmt.Errorf("kie rejected connection (code %d): %s", result.Code, result.Message)
+	}
+	if result.Data == nil {
+		return nil, rawText, fmt.Errorf("kie credit response is missing balance")
 	}
 	return nil, rawText, nil
 }

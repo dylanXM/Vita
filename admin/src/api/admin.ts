@@ -18,6 +18,8 @@ import type {
   AgentConfig,
   AgentSettings,
   AIModel,
+  ModelRates,
+  ModelUsage,
   AIModelCreateInput,
   AIModelInput,
   AIModelTestInput,
@@ -245,6 +247,10 @@ export const agentApi = {
   updateProvider: (id: string, body: AIProviderInput) =>
     http.put<AIProvider>(`/admin/agent/providers/${id}`, body),
   removeProvider: (id: string) => http.del<{ message: string }>(`/admin/agent/providers/${id}`),
+  modelUsage: (id: string, page: number, signal?: AbortSignal) =>
+    http.get<ModelUsage>(`/admin/agent/models/${id}/usage`, { signal, params: { page } }),
+  saveModelRates: (id: string, body: ModelRates) =>
+    http.put<ModelRates>(`/admin/agent/models/${id}/rates`, body),
   createModel: (body: AIModelCreateInput) => http.post<AIModel>("/admin/agent/models", body),
   testModel: (body: AIModelTestInput) => {
     const form = new FormData();
@@ -331,7 +337,7 @@ export const lifeEngineApi = {
     http.del<{ message: string }>(`/admin/life-engine/companions/${companionID}/takeover`),
   triggerPlan: (force = false) =>
     http.post<{ message: string; scanned: number; newly_completed: number; failed_after: number; diagnostics: Array<{ name: string; active: boolean; life_enabled: boolean; admin_takeover: boolean; active_subscription: boolean; today_status: string; last_error: string }> }>(
-      "/admin/life-engine/trigger-plan", undefined, { params: force ? { force: "true" } : undefined, timeout: 150_000 }),
+      "/admin/life-engine/trigger-plan", undefined, { params: force ? { force: "true" } : undefined, timeout: 660_000 }),
   triggerProactive: () =>
     http.post<{ message: string; due_before: number; dispatched: number; shared_after: number }>(
       "/admin/life-engine/trigger-proactive", undefined, { timeout: 150_000 }),

@@ -566,23 +566,24 @@ func UpdateMyProfile(c *gin.Context) {
 // --- Admin Stats ---
 
 type AdminStatsResponse struct {
-	TotalUsers         int       `json:"total_users"`
-	AdminUsers         int       `json:"admin_users"`
-	NewUsers7d         int       `json:"new_users_7d"`
-	TotalCompanions    int       `json:"total_companions"`
-	NewCompanions7d    int       `json:"new_companions_7d"`
-	TotalConversations int       `json:"total_conversations"`
-	NewConversations7d int       `json:"new_conversations_7d"`
-	TotalMessages      int       `json:"total_messages"`
-	NewMessages7d      int       `json:"new_messages_7d"`
-	TotalMemories      int       `json:"total_memories"`
-	TotalLifeEvents    int       `json:"total_life_events"`
-	TodayLifeEvents    int       `json:"today_life_events"`
-	GeneratedAt        time.Time `json:"generated_at"`
+	ModelCost          modelCostTotals `json:"model_cost"`
+	TotalUsers         int             `json:"total_users"`
+	AdminUsers         int             `json:"admin_users"`
+	NewUsers7d         int             `json:"new_users_7d"`
+	TotalCompanions    int             `json:"total_companions"`
+	NewCompanions7d    int             `json:"new_companions_7d"`
+	TotalConversations int             `json:"total_conversations"`
+	NewConversations7d int             `json:"new_conversations_7d"`
+	TotalMessages      int             `json:"total_messages"`
+	NewMessages7d      int             `json:"new_messages_7d"`
+	TotalMemories      int             `json:"total_memories"`
+	TotalLifeEvents    int             `json:"total_life_events"`
+	TodayLifeEvents    int             `json:"today_life_events"`
+	GeneratedAt        time.Time       `json:"generated_at"`
 }
 
-// AdminStats powers the dashboard tiles. Everything is counted straight from
-// the live tables in one round trip — no cached or estimated figures.
+// AdminStats powers dashboard counters from live tables and model cost
+// estimates from recorded provider usage and rate snapshots.
 func AdminStats(c *gin.Context) {
 	var s AdminStatsResponse
 	err := db.Get().QueryRow(`
@@ -612,6 +613,12 @@ func AdminStats(c *gin.Context) {
 		return
 	}
 
+	cost, costErr := collectModelCost(c.Request.Context(), "")
+	if costErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to collect model cost"})
+		return
+	}
+	s.ModelCost = cost
 	s.GeneratedAt = time.Now().UTC()
 	c.JSON(http.StatusOK, s)
 }
