@@ -47,7 +47,10 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
       final data = await ApiClient.instance.get('/v1/companions/updates',
           query: {if (_cursor != null) 'cursor': _cursor});
       if (generation != _requestId || !_signedIn || !_foreground || data is! Map) return;
-      final updates = (data['items'] as List? ?? const []).whereType<Map>();
+      final updates = (data['items'] as List? ?? const [])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
       if (updates.any((item) => !companions.any((companion) => companion['id'] == item['id']))) {
         await load(silent: true);
         return;
@@ -56,7 +59,10 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
       final changed = {for (final item in updates) item['id']: item};
       if (changed.isNotEmpty || removed.isNotEmpty) {
         companions.assignAll(companions.where((item) => !removed.contains(item['id']))
-            .map((item) => {...item, ...?changed[item['id']]}).toList());
+            .map((item) => <String, dynamic>{
+                  ...item,
+                  ...?changed[item['id']],
+                }).toList());
       }
       _cursor = data['cursor'] as String?;
     } on ApiException catch (error) {
