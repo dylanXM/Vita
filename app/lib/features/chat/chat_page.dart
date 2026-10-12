@@ -344,8 +344,13 @@ class _ChatPageState extends State<ChatPage> {
 
   void _scrollToBottom() {
     if (!mounted || !_scroll.hasClients) return;
-    // The reversed list starts at the newest message; no animated traversal.
-    _scroll.jumpTo(_scroll.position.minScrollExtent);
+    final position = _scroll.position;
+    if (!position.hasContentDimensions) return;
+    // Short conversations stay at the top. Overflowing conversations show
+    // the latest message after layout has established the content height.
+    if (position.maxScrollExtent > position.minScrollExtent) {
+      _scroll.jumpTo(position.maxScrollExtent);
+    }
   }
 
   void _insertEmoji(String emoji) {
@@ -696,11 +701,13 @@ class _ChatPageState extends State<ChatPage> {
       );
     }
 
-    return ListView(
+    return SingleChildScrollView(
       controller: _scroll,
-      reverse: true,
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      children: items.reversed.toList(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: items,
+      ),
     );
   }
 
