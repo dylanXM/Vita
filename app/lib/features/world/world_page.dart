@@ -878,10 +878,9 @@ class _RelationshipCard extends StatelessWidget {
             child: ColoredBox(
               color: vita.surface,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                padding: const EdgeInsets.all(12),
                 child: Row(children: [
                   Expanded(
-                    flex: 2,
                     child: _WorldUtilityAction(
                       label: 'world.cardChat'.tr,
                       primary: true,
@@ -890,15 +889,17 @@ class _RelationshipCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
+                  SizedBox(
+                    width: 56,
                     child: _WorldUtilityAction(
                       label: 'world.cardGift'.tr,
                       icon: Icons.card_giftcard_outlined,
                       onTap: onGift,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 56,
                     child: _WorldUtilityAction(
                       label: 'world.cardJourney'.tr,
                       icon: Icons.auto_stories_outlined,

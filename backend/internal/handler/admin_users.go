@@ -378,7 +378,7 @@ func AdminDeleteUser(c *gin.Context) {
 		return
 	}
 
-	tx, err := db.Get().Begin()
+	tx, err := db.Get().BeginTx(c.Request.Context(), nil)
 	if err != nil {
 		logAdminUserDeletionFailure(c, id, "begin", "", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start transaction"})
@@ -388,28 +388,29 @@ func AdminDeleteUser(c *gin.Context) {
 
 	// Delete children in FK order: messages → conversations, memories/life/
 	// states → companions, companions → user, then the account itself.
-	steps := []string{
-		`DELETE FROM invitation_rewards WHERE inviter_user_id = $1 OR invited_user_id = $1`,
-		`DELETE FROM billing_purchases WHERE user_id = $1`,
-		`DELETE FROM subscriptions WHERE user_id = $1`,
-		`DELETE FROM credit_transactions WHERE user_id = $1`,
-		`DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id = $1)`,
-		`DELETE FROM conversations WHERE user_id = $1`,
-		`DELETE FROM memories WHERE companion_id IN (SELECT id FROM companions WHERE user_id = $1)`,
-		`DELETE FROM life_events WHERE companion_id IN (SELECT id FROM companions WHERE user_id = $1)`,
-		`DELETE FROM relationship_states WHERE companion_id IN (SELECT id FROM companions WHERE user_id = $1)`,
-		`DELETE FROM companion_states WHERE companion_id IN (SELECT id FROM companions WHERE user_id = $1)`,
-		`DELETE FROM companions WHERE user_id = $1`,
-		`DELETE FROM verification_codes WHERE email = $2`,
-		`DELETE FROM users WHERE id = $1`,
+	steps := []struct {
+		name  string
+		query string
+		args  []any
+	}{
+		{"invitation_rewards", `DELETE FROM invitation_rewards WHERE inviter_user_id = $1 OR invited_user_id = $1`, []any{id}},
+		{"billing_purchases", `DELETE FROM billing_purchases WHERE user_id = $1`, []any{id}},
+		{"subscriptions", `DELETE FROM subscriptions WHERE user_id = $1`, []any{id}},
+		{"credit_transactions", `DELETE FROM credit_transactions WHERE user_id = $1`, []any{id}},
+		{"messages", `DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id = $1)`, []any{id}},
+		{"conversations", `DELETE FROM conversations WHERE user_id = $1`, []any{id}},
+		{"memories", `DELETE FROM memories WHERE companion_id IN (SELECT id FROM companions WHERE user_id = $1)`, []any{id}},
+		{"life_events", `DELETE FROM life_events WHERE companion_id IN (SELECT id FROM companions WHERE user_id = $1)`, []any{id}},
+		{"relationship_states", `DELETE FROM relationship_states WHERE companion_id IN (SELECT id FROM companions WHERE user_id = $1)`, []any{id}},
+		{"companion_states", `DELETE FROM companion_states WHERE companion_id IN (SELECT id FROM companions WHERE user_id = $1)`, []any{id}},
+		{"companions", `DELETE FROM companions WHERE user_id = $1`, []any{id}},
+		{"verification_codes", `DELETE FROM verification_codes WHERE email = $1`, []any{u.Email}},
+		{"media_assets", `DELETE FROM media_assets WHERE user_id=$1`, []any{id}},
+		{"users", `DELETE FROM users WHERE id = $1`, []any{id}},
 	}
-	for index, q := range steps {
-		args := []any{id}
-		if strings.Contains(q, "$2") {
-			args = append(args, u.Email)
-		}
-		if _, err := tx.Exec(q, args...); err != nil {
-			logAdminUserDeletionFailure(c, id, fmt.Sprintf("cleanup_%d", index+1), q, err)
+	for _, step := range steps {
+		if _, err := tx.ExecContext(c.Request.Context(), step.query, step.args...); err != nil {
+			logAdminUserDeletionFailure(c, id, "delete_"+step.name, step.query, err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete user data"})
 			return
 		}
