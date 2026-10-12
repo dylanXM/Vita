@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 type ModelTestAudio struct {
@@ -44,6 +45,14 @@ func TestModelScenario(ctx context.Context, client *Client, model Model, scenari
 			Temperature: 0.2, MaxTokens: 512,
 		}
 		out, err := client.GenerateText(ctx, model, req)
+		return textTranscript(model, req, out), err
+	case "text_memory":
+		now := time.Now().UTC()
+		req := GenerateRequest{System: memoryExtractionPolicy, Messages: []ChatMessage{{Role: "user", Content: `The user explicitly says: "I like tea, please do not call me darling." Extract the preference and boundary with no scheduled follow-up; existing_memories is empty.`}}, Temperature: 0.2, MaxTokens: 1500}
+		out, err := client.GenerateText(ctx, model, req)
+		if err == nil {
+			_, err = parseMemoryExtraction(out, map[string]bool{}, now)
+		}
 		return textTranscript(model, req, out), err
 	case "text_character_profile":
 		req := GenerateRequest{

@@ -40,16 +40,5 @@ func alignCompanionRelationship(ctx context.Context, req *CreateCompanionRequest
 	if req.RelationshipStage == "" {
 		req.RelationshipStage = "stranger"
 	}
-	switch req.Gender {
-	case "girlfriend", "boyfriend":
-		req.RelationshipStage = "partner"
-	case "friend":
-		switch req.RelationshipStage {
-		case "stranger":
-			req.RelationshipStage = "acquaintance"
-		case "partner":
-			req.RelationshipStage = "close"
-		}
-	}
 	return nil
 }

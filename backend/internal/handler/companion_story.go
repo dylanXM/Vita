@@ -34,7 +34,7 @@ func GetCompanionStory(c *gin.Context) {
 		SELECT kind,id,title,description,occurred_at,source,is_favorite FROM (
 			SELECT 'memory' AS kind,m.id,'' AS title,COALESCE(m.content,'') AS description,
 				COALESCE(m.event_time,m.created_at) AS occurred_at,COALESCE(m.type,'') AS source,m.is_favorite
-			FROM memories m WHERE m.companion_id=$1 AND COALESCE(m.content,'')<>''
+			FROM memories m WHERE m.companion_id=$1 AND m.status NOT IN ('superseded','cancelled') AND COALESCE(m.content,'')<>''
 			UNION ALL
 			SELECT 'event',e.id,COALESCE(e.title,''),COALESCE(e.description,''),e.start_time,
 				COALESCE(e.generation_source,''),false

@@ -183,10 +183,10 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
       final result = await ApiClient.instance.post('/v1/companions/', data: {
         'name': _name.text.trim(),
         'gender': _gender,
+        'relationship_stage': _relationship,
         'city': _city.text.trim(),
         'occupation': _occupation.text.trim(),
         'interests': _interests.text.trim(),
-        'relationship_stage': _relationship,
         'personality_tags': _personalityTags.toList(),
         'portrait_id': _portraitId,
         if (_portraitId == null && _avatarMediaId != null)
@@ -195,7 +195,6 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
       AnalyticsService.to
           .track('companion_created', category: 'companion', properties: {
         'companion_id': result is Map ? '${result['id'] ?? ''}' : '',
-        'relationship_stage': _relationship,
         'personality_tag_count': _personalityTags.length,
         'has_portrait': _portraitId != null || _avatarMediaId != null,
       });

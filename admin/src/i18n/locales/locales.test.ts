@@ -16,8 +16,16 @@ describe("admin translations", () => {
     }
   });
 
+  it("exposes contact preference labels at the paths used by the UI", () => {
+    for (const translations of [en, zhHans]) {
+      expect(translations.contact.title).not.toBe("");
+      expect(translations.contact.dailyLimit).not.toBe("");
+    }
+  });
+
   it("contains labels for every media route", () => {
     for (const key of [
+      "route.text_memory",
       "route.text_character_profile",
       "route.text_story_chapter",
       "route.text_storyboard",

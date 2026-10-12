@@ -442,6 +442,7 @@ export interface AIModelTestResult {
 export type AIModelScenario =
   | "text_chat"
   | "text_life_plan"
+  | "text_memory"
   | "text_proactive"
   | "text_character_profile"
   | "text_story_chapter"
@@ -527,7 +528,7 @@ export interface AgentConfig {
 export type MediaModelType = "text" | "image" | "audio" | "video";
 
 export interface MediaModelRoute {
-  route_key: "text_chat" | "text_life_plan" | "text_proactive" | "text_character_profile" | "text_story_chapter" | "text_storyboard" | "image_life_photo" | "image_requested_photo" | "image_storyboard_sheet" | "audio_transcription" | "audio_speech" | "video_life_clip" | "video_realtime_avatar";
+  route_key: "text_chat" | "text_life_plan" | "text_memory" | "text_proactive" | "text_character_profile" | "text_story_chapter" | "text_storyboard" | "image_life_photo" | "image_requested_photo" | "image_storyboard_sheet" | "audio_transcription" | "audio_speech" | "video_life_clip" | "video_realtime_avatar";
   media_type: MediaModelType;
   enabled: boolean;
   primary_model_id: string | null;
@@ -760,3 +761,12 @@ export interface LifeEngineEventInput {
   shareability?: boolean;
   event_type?: string;
 }
+
+export interface ContactPreferences {
+  daily_limit: number;
+  minimum_gap_minutes: number;
+  quiet_enabled: boolean;
+  quiet_start: number;
+  quiet_end: number;
+}
+export interface ContactPreferencesResponse { preferences: ContactPreferences; timezone: string }

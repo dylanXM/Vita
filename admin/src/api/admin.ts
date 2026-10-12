@@ -1,5 +1,7 @@
 import { http } from "./client";
 import type {
+  ContactPreferences,
+  ContactPreferencesResponse,
   AdminLoginResult,
   AdminStats,
   AdminUser,
@@ -76,6 +78,8 @@ export const statsApi = {
 
 /** Admin user management — every call is admin-only on the server. */
 export const usersApi = {
+  contactPreferences: (id: string, signal?: AbortSignal) => http.get<ContactPreferencesResponse>(`/admin/users/${id}/contact-preferences`, { signal }),
+  saveContactPreferences: (id: string, body: ContactPreferences) => http.put<ContactPreferencesResponse>(`/admin/users/${id}/contact-preferences`, body),
   list: (params: AdminUserListParams, signal?: AbortSignal) =>
     http.get<AdminUserList>("/admin/users", { params, signal }),
   get: (id: string, signal?: AbortSignal) =>

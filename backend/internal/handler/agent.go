@@ -297,6 +297,7 @@ var modelScenarioCapabilities = map[string]string{
 	"text_chat":              "text",
 	"text_life_plan":         "text",
 	"text_proactive":         "text",
+	"text_memory":            "text",
 	"text_character_profile": "text",
 	"text_story_chapter":     "text",
 	"text_storyboard":        "text",
@@ -310,7 +311,7 @@ var modelScenarioCapabilities = map[string]string{
 }
 
 var orderedModelScenarios = []string{
-	"text_chat", "text_life_plan", "text_proactive", "text_character_profile", "text_story_chapter", "text_storyboard",
+	"text_chat", "text_life_plan", "text_proactive", "text_memory", "text_character_profile", "text_story_chapter", "text_storyboard",
 	"image_life_photo", "image_requested_photo", "image_storyboard_sheet",
 	"audio_transcription", "audio_speech",
 	"video_life_clip", "video_realtime_avatar",
@@ -699,6 +700,7 @@ var mediaRouteTypes = map[string]string{
 	"text_chat":              "text",
 	"text_life_plan":         "text",
 	"text_proactive":         "text",
+	"text_memory":            "text",
 	"text_character_profile": "text",
 	"text_story_chapter":     "text",
 	"text_storyboard":        "text",
@@ -1185,8 +1187,8 @@ func saveAdminCompanion(c *gin.Context, id string) {
 		if len(input.VoiceConfig) > 0 {
 			voiceConfig = input.VoiceConfig
 		}
-		result, err := db.Get().Exec(`UPDATE companions SET name=$2,gender=$3,persona=$4,city=$5,occupation=$6,interests=$7,relationship_stage=$8,personality_tags=$9,speaking_style=$10,likes=$11,dislikes=$12,life_habits=$13,life_goal=$14,backstory=$15,portrait_id=$16,model_id=$17,proactive_enabled=$18,active=$19,voice_enabled=COALESCE($20,voice_enabled),voice_config=COALESCE($21,voice_config),avatar_url=COALESCE($22,avatar_url),updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
-			id, input.Name, input.Gender, input.Persona, input.City, input.Occupation, input.Interests, input.RelationshipStage, tags, input.SpeakingStyle, input.Likes, input.Dislikes, input.LifeHabits, input.LifeGoal, input.Backstory, input.PortraitID, input.ModelID, proactive, active, input.VoiceEnabled, voiceConfig, input.AvatarURL)
+		result, err := db.Get().Exec(`UPDATE companions SET name=$2,gender=$3,persona=$4,city=$5,occupation=$6,interests=$7,personality_tags=$8,speaking_style=$9,likes=$10,dislikes=$11,life_habits=$12,life_goal=$13,backstory=$14,portrait_id=$15,model_id=$16,proactive_enabled=$17,active=$18,voice_enabled=COALESCE($19,voice_enabled),voice_config=COALESCE($20,voice_config),avatar_url=COALESCE($21,avatar_url),updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
+			id, input.Name, input.Gender, input.Persona, input.City, input.Occupation, input.Interests, tags, input.SpeakingStyle, input.Likes, input.Dislikes, input.LifeHabits, input.LifeGoal, input.Backstory, input.PortraitID, input.ModelID, proactive, active, input.VoiceEnabled, voiceConfig, input.AvatarURL)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to update companion"})
 			return

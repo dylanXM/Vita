@@ -13,6 +13,7 @@ func TestModelScenarioCallsTheSelectedRuntimeEndpoint(t *testing.T) {
 		"text_chat":              "/v1/chat/completions",
 		"text_life_plan":         "/v1/chat/completions",
 		"text_proactive":         "/v1/chat/completions",
+		"text_memory":            "/v1/chat/completions",
 		"text_story_chapter":     "/v1/chat/completions",
 		"text_storyboard":        "/v1/chat/completions",
 		"image_life_photo":       "/v1/images/generations",
@@ -30,6 +31,9 @@ func TestModelScenarioCallsTheSelectedRuntimeEndpoint(t *testing.T) {
 				switch expectedPath {
 				case "/v1/chat/completions":
 					content := "ok"
+					if scenario == "text_memory" {
+						content = `{"memories":[],"updates":[],"relationship":null}`
+					}
 					if scenario == "text_life_plan" {
 						content = `[{"type":"routine","title":"Lunch","description":"Makes lunch at home","location":"home","start":"12:00","end":"12:30","emotion":"calm","importance":40,"user_relevance":10,"share":false,"moment":false,"moment_text":"","media_urls":[]}]`
 					}

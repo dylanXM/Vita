@@ -41,6 +41,8 @@ import type { AdminGrantOperation, AdminUser, AdminUserDetail, UserBehaviorCateg
 import { formatDate } from "@/lib/format";
 import { RoleBadge, StatusBadge, UserFormDialog } from "./UsersPage";
 
+import { UserContactPreferences } from "./UserContactPreferences";
+
 export function UserDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -237,6 +239,8 @@ export function UserDetailPage() {
           <StatCard label={t("users.memories")} value={u.memories} icon={Brain} />
         </div>
       </div>
+
+      <UserContactPreferences userID={u.id} />
 
       <UserGrants user={u} />
 

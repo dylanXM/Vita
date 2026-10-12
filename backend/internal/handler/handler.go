@@ -1243,7 +1243,7 @@ func UpdateCompanion(c *gin.Context) {
 		return
 	}
 	tags, _ := json.Marshal(req.PersonalityTags)
-	result, err := db.Get().Exec(`UPDATE companions SET name=$3,gender=$4,persona=$5,appearance=$6,city=$7,occupation=$8,interests=$9,relationship_stage=$10,personality_tags=$11,speaking_style=$12,likes=$13,dislikes=$14,life_habits=$15,life_goal=$16,backstory=$17,portrait_id=$18,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$2`, id, c.GetString("user_id"), req.Name, req.Gender, req.Persona, req.Appearance, req.City, req.Occupation, req.Interests, req.RelationshipStage, tags, req.SpeakingStyle, req.Likes, req.Dislikes, req.LifeHabits, req.LifeGoal, req.Backstory, req.PortraitID)
+	result, err := db.Get().Exec(`UPDATE companions SET name=$3,gender=$4,persona=$5,appearance=$6,city=$7,occupation=$8,interests=$9,personality_tags=$10,speaking_style=$11,likes=$12,dislikes=$13,life_habits=$14,life_goal=$15,backstory=$16,portrait_id=$17,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$2`, id, c.GetString("user_id"), req.Name, req.Gender, req.Persona, req.Appearance, req.City, req.Occupation, req.Interests, tags, req.SpeakingStyle, req.Likes, req.Dislikes, req.LifeHabits, req.LifeGoal, req.Backstory, req.PortraitID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to update companion"})
 		return
@@ -1430,6 +1430,12 @@ func SendMessage(c *gin.Context) {
 	_, err = tx.ExecContext(c.Request.Context(), query, msgID, conversationID, req.MessageType, req.Content, mediaURL, createdAt, activeLifeID.String, string(payloadJSON))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send message"})
+		return
+	}
+	if _, err = tx.ExecContext(c.Request.Context(), `INSERT INTO companion_memory_jobs(message_id)
+        SELECT $1 WHERE EXISTS(SELECT 1 FROM agent_media_routes WHERE route_key='text_memory' AND enabled=true)
+        ON CONFLICT DO NOTHING`, msgID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to queue memory analysis"})
 		return
 	}
 	if !isDefault {
@@ -1931,7 +1937,7 @@ func GetLifeEvent(c *gin.Context) {
 }
 
 func GetMemories(c *gin.Context) {
-	rows, err := db.Get().Query(`SELECT m.id,COALESCE(m.type,''),COALESCE(m.content,''),m.importance,m.event_time,COALESCE(m.metadata,''),m.created_at,m.is_favorite FROM memories m JOIN companions c ON c.id=m.companion_id WHERE m.companion_id=$1 AND c.user_id=$2 ORDER BY m.importance DESC,m.created_at DESC`, c.Param("id"), c.GetString("user_id"))
+	rows, err := db.Get().Query(`SELECT m.id,COALESCE(m.type,''),COALESCE(m.content,''),m.importance,m.event_time,COALESCE(m.metadata,''),m.created_at,m.is_favorite FROM memories m JOIN companions c ON c.id=m.companion_id WHERE m.companion_id=$1 AND c.user_id=$2 AND m.status NOT IN ('superseded','cancelled') ORDER BY m.importance DESC,m.created_at DESC`, c.Param("id"), c.GetString("user_id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get memories"})
 		return

@@ -148,8 +148,8 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
       key: TextEditingController(),
   };
   String _gender = 'custom';
-  String? _profileGender;
   String _relationship = 'stranger';
+  String? _profileGender;
   String? _imagePath;
   String? _documentPath;
   String? _avatarMediaId;

@@ -36,6 +36,7 @@ const ALL_SCENARIOS: AIModelScenario[] = [
   "text_chat",
   "text_life_plan",
   "text_proactive",
+  "text_memory",
   "text_character_profile",
   "text_story_chapter",
   "text_storyboard",

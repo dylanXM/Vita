@@ -13,6 +13,7 @@ func mediaRouteFixture() []mediaModelRoute {
 		{RouteKey: "text_chat", MediaType: "text"},
 		{RouteKey: "text_life_plan", MediaType: "text"},
 		{RouteKey: "text_proactive", MediaType: "text"},
+		{RouteKey: "text_memory", MediaType: "text"},
 		{RouteKey: "text_character_profile", MediaType: "text"},
 		{RouteKey: "text_story_chapter", MediaType: "text"},
 		{RouteKey: "text_storyboard", MediaType: "text"},
