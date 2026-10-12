@@ -340,6 +340,8 @@ Features may change, be suspended or end. You may stop using Vita or delete your
  END IF; END $$`,
 		`CREATE INDEX IF NOT EXISTS idx_coin_packs_scope ON coin_packs(environment, platform, sort_order)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_coin_packs_product ON coin_packs(environment, platform, product_id) WHERE product_id <> ''`,
+		// Catalog entries can be edited in Admin while retaining their seeded ID.
+		// Preserve existing entries on any unique conflict (ID, key or product ID).
 		`INSERT INTO subscription_plans
 			(id,key,name,environment,platform,coins_granted,price_usd,period,product_id,enabled,sort_order)
 		 SELECT 'catalog-' || env || '-' || platform || '-' || key,key,name,env,platform,coins,price,period,product_id,true,sort_order
@@ -351,7 +353,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		 ) AS products(key,name,coins,price,period,product_id,sort_order)
 		 CROSS JOIN (VALUES('prod')) AS environments(env)
 		 CROSS JOIN (VALUES('app')) AS platforms(platform)
-		 ON CONFLICT(environment,platform,key) DO NOTHING`,
+		 ON CONFLICT DO NOTHING`,
 		`INSERT INTO coin_packs
 			(id,key,name,environment,platform,coins,price_usd,product_id,popular,enabled,sort_order)
 		 SELECT 'catalog-' || env || '-' || platform || '-' || key,key,name,env,platform,coins,price,product_id,popular,true,sort_order
@@ -362,7 +364,7 @@ Features may change, be suspended or end. You may stop using Vita or delete your
 		 ) AS products(key,name,coins,price,product_id,popular,sort_order)
 		 CROSS JOIN (VALUES('prod')) AS environments(env)
 		 CROSS JOIN (VALUES('app')) AS platforms(platform)
-		 ON CONFLICT(environment,platform,key) DO NOTHING`,
+		 ON CONFLICT DO NOTHING`,
 		`CREATE TABLE IF NOT EXISTS billing_purchases (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL REFERENCES users(id),
