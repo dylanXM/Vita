@@ -78,9 +78,11 @@ async function refreshAccessToken(failedToken: string): Promise<string> {
       throw error;
     }
   };
-  const operation = navigator.locks
+  // Web Locks typings can infer Promise<Promise<string>> for an async callback.
+  // Promise.resolve flattens it while retaining the shared operation identity.
+  const operation: Promise<string> = Promise.resolve(navigator.locks
     ? navigator.locks.request("vita-admin-token-refresh", perform)
-    : perform();
+    : perform());
   refreshing = operation;
   try { return await operation; } finally { if (refreshing === operation) refreshing = null; }
 }
