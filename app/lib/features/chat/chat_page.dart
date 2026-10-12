@@ -37,7 +37,9 @@ class ChatPage extends StatefulWidget {
       this.companion,
       this.journeyVisitId,
       this.journeyContext,
-      this.journeyDraft});
+      this.journeyDraft,
+      this.lifeEventContextId,
+      this.lifeEventContextTitle});
 
   final String companionId;
   final String name;
@@ -47,6 +49,8 @@ class ChatPage extends StatefulWidget {
   final String? journeyVisitId;
   final String? journeyContext;
   final String? journeyDraft;
+  final String? lifeEventContextId;
+  final String? lifeEventContextTitle;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -116,6 +120,8 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
+    _lifeEventContextId = widget.lifeEventContextId;
+    _lifeEventContextTitle = widget.lifeEventContextTitle;
     if (widget.journeyDraft case final draft?) {
       _input.text = draft;
       _input.selection = TextSelection.collapsed(offset: draft.length);

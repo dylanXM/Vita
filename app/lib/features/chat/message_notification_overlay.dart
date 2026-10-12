@@ -8,12 +8,22 @@ import 'chat_list_controller.dart';
 import 'chat_list_presentation.dart';
 import 'chat_page.dart';
 
-class MessageNotificationOverlay extends StatelessWidget {
+class MessageNotificationOverlay extends StatefulWidget {
   const MessageNotificationOverlay({super.key, required this.child});
   final Widget child;
+
+  @override
+  State<MessageNotificationOverlay> createState() =>
+      _MessageNotificationOverlayState();
+}
+
+class _MessageNotificationOverlayState
+    extends State<MessageNotificationOverlay> {
+  final Set<String> _hiddenNotifications = <String>{};
+
   @override
   Widget build(BuildContext context) => Stack(fit: StackFit.expand, children: [
-        child,
+        widget.child,
         Positioned(
           left: 22,
           right: 22,
@@ -46,6 +56,11 @@ class MessageNotificationOverlay extends StatelessWidget {
                 });
                 final companion = unread.first;
                 final presentation = ChatListPresentation.from(companion);
+                final notificationKey =
+                    '${AuthController.to.profile.value?['user_id']}:${companion['id']}:${companion['last_message_at']}:${presentation.unreadCount}';
+                if (_hiddenNotifications.contains(notificationKey)) {
+                  return const SizedBox.shrink();
+                }
                 return AnimatedSwitcher(
                   duration: const Duration(milliseconds: 240),
                   transitionBuilder: (child, animation) => FadeTransition(
@@ -58,21 +73,28 @@ class MessageNotificationOverlay extends StatelessWidget {
                       child: child,
                     ),
                   ),
-                  child: _UnreadMessageEntry(
-                    key: ValueKey(
-                        '${companion['id']}:${companion['last_message_at']}'),
-                    companion: companion,
-                    presentation: presentation,
-                    onTap: () async {
-                      final id = '${companion['id'] ?? ''}';
-                      if (id.isEmpty) return;
-                      await Get.to(() => ChatPage(
-                            companionId: id,
-                            name: '${companion['name'] ?? 'chat.companion'.tr}',
-                            companion: companion,
-                          ));
-                      await ChatListController.to.load(silent: true);
-                    },
+                  child: Dismissible(
+                    key: ValueKey(notificationKey),
+                    direction: DismissDirection.up,
+                    resizeDuration: null,
+                    onDismissed: (_) => setState(() {
+                      _hiddenNotifications.add(notificationKey);
+                    }),
+                    child: _UnreadMessageEntry(
+                      companion: companion,
+                      presentation: presentation,
+                      onTap: () async {
+                        final id = '${companion['id'] ?? ''}';
+                        if (id.isEmpty) return;
+                        await Get.to(() => ChatPage(
+                              companionId: id,
+                              name:
+                                  '${companion['name'] ?? 'chat.companion'.tr}',
+                              companion: companion,
+                            ));
+                        await ChatListController.to.load(silent: true);
+                      },
+                    ),
                   ),
                 );
               })),

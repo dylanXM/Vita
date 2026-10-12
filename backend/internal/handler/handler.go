@@ -2049,7 +2049,7 @@ func GetExplorePosts(c *gin.Context) {
 			FROM companion_relationships r JOIN owned o ON o.id IN (r.companion_a_id,r.companion_b_id)
 			WHERE r.status='active'
 		)
-		SELECT p.id,p.post_type,p.content,p.media_urls::text,p.payload::text,p.published_at,
+		SELECT p.id,p.post_type,p.content,p.media_urls::text,p.payload::text,p.published_at,COALESCE(p.life_event_id,''),
 		       author.id,author.name,COALESCE(NULLIF(author.avatar_url,''),ap.image_url,''),
 		       COALESCE(author.creation_source,''),COALESCE(pet_breed.species,''),
 		       related.id,related.name,COALESCE(NULLIF(related.avatar_url,''),rp.image_url,''),
@@ -2071,12 +2071,12 @@ func GetExplorePosts(c *gin.Context) {
 	defer rows.Close()
 	posts := make([]gin.H, 0)
 	for rows.Next() {
-		var id, postType, content, mediaRaw, payloadRaw string
+		var id, postType, content, mediaRaw, payloadRaw, lifeEventID string
 		var published time.Time
 		var authorID, authorName, authorPortrait, authorSource, authorSpecies string
 		var relatedID, relatedName, relatedPortrait sql.NullString
 		var own bool
-		if err := rows.Scan(&id, &postType, &content, &mediaRaw, &payloadRaw, &published, &authorID, &authorName, &authorPortrait, &authorSource, &authorSpecies, &relatedID, &relatedName, &relatedPortrait, &own); err != nil {
+		if err := rows.Scan(&id, &postType, &content, &mediaRaw, &payloadRaw, &published, &lifeEventID, &authorID, &authorName, &authorPortrait, &authorSource, &authorSpecies, &relatedID, &relatedName, &relatedPortrait, &own); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read explore posts"})
 			return
 		}
@@ -2090,7 +2090,8 @@ func GetExplorePosts(c *gin.Context) {
 		}
 		posts = append(posts, gin.H{
 			"id": id, "post_type": postType, "content": content, "media_urls": media,
-			"payload": payload, "published_at": published, "is_own_companion": own,
+			"life_event_id": lifeEventID,
+			"payload":       payload, "published_at": published, "is_own_companion": own,
 			"author":            gin.H{"id": authorID, "name": authorName, "portrait_url": authorPortrait, "creation_source": authorSource, "species": authorSpecies},
 			"related_companion": related,
 		})

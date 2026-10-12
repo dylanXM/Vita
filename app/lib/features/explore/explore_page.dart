@@ -637,53 +637,53 @@ class _MomentsPageState extends State<MomentsPage> {
               bottom: false,
               child: SizedBox(
                 height: 56,
-                child: Row(
-                  children: [
-                    IconButton(
-                      tooltip:
-                          MaterialLocalizations.of(context).backButtonTooltip,
-                      icon: Icon(Icons.arrow_back_ios_new,
-                          size: 20,
-                          color:
-                              _showTimeline ? context.vita.text : Colors.white),
-                      onPressed: () => Get.back(),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'explore.moments'.tr,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color:
-                              _showTimeline ? context.vita.text : Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
+                child: Obx(() {
+                  final hasPosts = controller.posts.isNotEmpty;
+                  final headerColor = !_showTimeline && hasPosts
+                      ? Colors.white
+                      : context.vita.text;
+                  return Row(
+                    children: [
+                      IconButton(
+                        tooltip:
+                            MaterialLocalizations.of(context).backButtonTooltip,
+                        icon: Icon(Icons.arrow_back_ios_new,
+                            size: 20, color: headerColor),
+                        onPressed: () => Get.back(),
+                      ),
+                      Expanded(
+                        child: Text(
+                          'explore.moments'.tr,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: headerColor,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      tooltip: _showTimeline
-                          ? 'explore.universeView'.tr
-                          : 'explore.timelineView'.tr,
-                      icon: Icon(
-                          _showTimeline
-                              ? Icons.blur_on_rounded
-                              : Icons.view_timeline_outlined,
-                          color:
-                              _showTimeline ? context.vita.text : Colors.white),
-                      onPressed: () =>
-                          setState(() => _showTimeline = !_showTimeline),
-                    ),
-                    IconButton(
-                      tooltip: 'common.retry'.tr,
-                      icon: Icon(Icons.refresh_rounded,
-                          color:
-                              _showTimeline ? context.vita.text : Colors.white),
-                      onPressed: controller.loadPosts,
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                ),
+                      IconButton(
+                        tooltip: _showTimeline
+                            ? 'explore.universeView'.tr
+                            : 'explore.timelineView'.tr,
+                        icon: Icon(
+                            _showTimeline
+                                ? Icons.blur_on_rounded
+                                : Icons.view_timeline_outlined,
+                            color: headerColor),
+                        onPressed: () =>
+                            setState(() => _showTimeline = !_showTimeline),
+                      ),
+                      IconButton(
+                        tooltip: 'common.retry'.tr,
+                        icon: Icon(Icons.refresh_rounded, color: headerColor),
+                        onPressed: controller.loadPosts,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                  );
+                }),
               ),
             ),
           ],
@@ -1212,6 +1212,12 @@ class _SignalFocusDialog extends StatelessWidget {
                                   companionId: '${author['id']}',
                                   name: '${author['name'] ?? ''}',
                                   companion: author,
+                                  lifeEventContextId:
+                                      '${post['life_event_id'] ?? ''}'.isEmpty
+                                          ? null
+                                          : '${post['life_event_id']}',
+                                  lifeEventContextTitle:
+                                      '${post['content'] ?? ''}',
                                 ),
                           transition: Transition.cupertino,
                         );
