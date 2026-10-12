@@ -878,36 +878,34 @@ class _RelationshipCard extends StatelessWidget {
             child: ColoredBox(
               color: vita.surface,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(19, 12, 19, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(children: [
-                      Expanded(
-                          child: _WorldUtilityAction(
-                        label: 'world.cardChat'.tr,
-                        primary: true,
-                        icon: Icons.chat_bubble_outline_rounded,
-                        onTap: onChat,
-                      )),
-                      const SizedBox(width: 8),
-                      Expanded(
-                          child: _WorldUtilityAction(
-                        label: 'world.cardGift'.tr,
-                        icon: Icons.card_giftcard_outlined,
-                        onTap: onGift,
-                      )),
-                      const SizedBox(width: 8),
-                      Expanded(
-                          child: _WorldUtilityAction(
-                        label: 'world.cardJourney'.tr,
-                        icon: Icons.auto_stories_outlined,
-                        onTap: onJourney,
-                      )),
-                    ]),
-                  ],
-                ),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: Row(children: [
+                  Expanded(
+                    flex: 2,
+                    child: _WorldUtilityAction(
+                      label: 'world.cardChat'.tr,
+                      primary: true,
+                      icon: Icons.chat_bubble_outline_rounded,
+                      onTap: onChat,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _WorldUtilityAction(
+                      label: 'world.cardGift'.tr,
+                      icon: Icons.card_giftcard_outlined,
+                      onTap: onGift,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _WorldUtilityAction(
+                      label: 'world.cardJourney'.tr,
+                      icon: Icons.auto_stories_outlined,
+                      onTap: onJourney,
+                    ),
+                  ),
+                ]),
               ),
             ),
           ),
@@ -933,42 +931,53 @@ class _WorldUtilityAction extends StatelessWidget {
     final vita = context.vita;
     final foreground =
         primary ? Theme.of(context).colorScheme.onPrimary : vita.text;
+    final caption = Text(
+      label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: foreground,
+        fontSize: primary ? 14 : 11,
+        fontWeight: primary ? FontWeight.w700 : FontWeight.w500,
+      ),
+    );
     return SizedBox(
-        height: 48,
-        child: Semantics(
-          button: true,
-          label: label,
+      height: 56,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: ExcludeSemantics(
           child: Material(
-            color: primary ? vita.green : vita.surface,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-                side: BorderSide(color: primary ? vita.green : vita.divider)),
+            color: primary ? vita.green : Colors.transparent,
+            borderRadius: BorderRadius.circular(primary ? 18 : 12),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: onTap,
               child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(icon,
-                            size: 16,
-                            color: primary ? foreground : vita.subText),
-                        const SizedBox(width: 5),
-                        Flexible(
-                            child: Text(label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    color: foreground,
-                                    fontSize: 11,
-                                    fontWeight: primary
-                                        ? FontWeight.w700
-                                        : FontWeight.w500))),
-                      ])),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: primary
+                    ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(icon, size: 20, color: foreground),
+                          const SizedBox(width: 8),
+                          Flexible(child: caption),
+                        ],
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(icon, size: 22, color: vita.subText),
+                          const SizedBox(height: 4),
+                          Flexible(child: caption),
+                        ],
+                      ),
+              ),
             ),
           ),
-        ));
+        ),
+      ),
+    );
   }
 }
 

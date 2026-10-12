@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 
 	"vita/internal/auth"
 	"vita/internal/db"
@@ -364,6 +366,7 @@ func AdminDeleteUser(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load user"})
+		logAdminUserDeletionFailure(c, id, "load_user", "", err)
 		return
 	}
 	if u.Role == "admin" {
@@ -377,6 +380,7 @@ func AdminDeleteUser(c *gin.Context) {
 
 	tx, err := db.Get().Begin()
 	if err != nil {
+		logAdminUserDeletionFailure(c, id, "begin", "", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start transaction"})
 		return
 	}
@@ -399,22 +403,38 @@ func AdminDeleteUser(c *gin.Context) {
 		`DELETE FROM verification_codes WHERE email = $2`,
 		`DELETE FROM users WHERE id = $1`,
 	}
-	for _, q := range steps {
+	for index, q := range steps {
 		args := []any{id}
 		if strings.Contains(q, "$2") {
 			args = append(args, u.Email)
 		}
 		if _, err := tx.Exec(q, args...); err != nil {
+			logAdminUserDeletionFailure(c, id, fmt.Sprintf("cleanup_%d", index+1), q, err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete user data"})
 			return
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
+		logAdminUserDeletionFailure(c, id, "commit", "", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to commit deletion"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "user deleted"})
+}
+
+// Log statement templates and database metadata, never bound values or the
+// PostgreSQL Detail field (which can contain private row contents).
+func logAdminUserDeletionFailure(c *gin.Context, userID, stage, statement string, err error) {
+	var pgErr *pq.Error
+	if errors.As(err, &pgErr) {
+		log.Printf("[ADMIN_USER_DELETE] request_id=%q actor_id=%q target_id=%q stage=%q sql=%q sqlstate=%q schema=%q table=%q column=%q constraint=%q message=%q",
+			c.GetString("request_id"), c.GetString("user_id"), userID, stage, statement,
+			string(pgErr.Code), pgErr.Schema, pgErr.Table, pgErr.Column, pgErr.Constraint, pgErr.Message)
+		return
+	}
+	log.Printf("[ADMIN_USER_DELETE] request_id=%q actor_id=%q target_id=%q stage=%q sql=%q error=%q",
+		c.GetString("request_id"), c.GetString("user_id"), userID, stage, statement, err.Error())
 }
 
 // --- Ban / Unban ---
