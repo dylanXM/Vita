@@ -65,7 +65,7 @@ func ensureDefaultCompanions(userID string) error {
 	return rows.Err()
 }
 
-func defaultChatAccess(userID string, startTrial bool) (bool, *time.Time, error) {
+func defaultChatAccess(userID string, _ bool) (bool, *time.Time, error) {
 	subscribed, err := userHasActiveSubscription(userID)
 	if err != nil || subscribed {
 		return subscribed, nil, err
@@ -75,25 +75,18 @@ func defaultChatAccess(userID string, startTrial bool) (bool, *time.Time, error)
 	if err == nil {
 		return time.Now().Before(expires), &expires, nil
 	}
-	if err == sql.ErrNoRows && !startTrial {
-		return true, nil, nil
-	}
 	if err != sql.ErrNoRows {
 		return false, nil, err
 	}
-	var hours int
-	if err := db.Get().QueryRow(`SELECT free_default_chat_hours FROM agent_settings WHERE id='default'`).Scan(&hours); err != nil {
+	// Registration is the authoritative start, including accounts created
+	// before the registration-time trial migration.
+	if _, err = db.Get().Exec(`INSERT INTO default_companion_trials(user_id,started_at,expires_at)
+		SELECT u.id,u.created_at,u.created_at + GREATEST(s.free_default_chat_hours,1) * INTERVAL '1 hour'
+		FROM users u CROSS JOIN agent_settings s WHERE u.id=$1 AND s.id='default'
+		ON CONFLICT(user_id) DO NOTHING`, userID); err != nil {
 		return false, nil, err
 	}
-	if hours < 1 {
-		hours = 1
-	}
-	expires = time.Now().Add(time.Duration(hours) * time.Hour)
-	if _, err = db.Get().Exec(`INSERT INTO default_companion_trials(user_id,expires_at) VALUES($1,$2)
-		ON CONFLICT(user_id) DO NOTHING`, userID, expires); err != nil {
-		return false, nil, err
-	}
-	// A second device may start the same trial concurrently. Always read back
+	// Concurrent access may insert the same trial. Always read back
 	// the persisted deadline so every device observes the same window.
 	if err = db.Get().QueryRow(`SELECT expires_at FROM default_companion_trials WHERE user_id=$1`, userID).Scan(&expires); err != nil {
 		return false, nil, err

@@ -179,7 +179,7 @@ class VitaTranslations extends Translations {
           'You are no longer friends, so messages cannot be sent.',
       'chat.trialExpired': 'Your free chat period has ended.',
       'chat.trialNotStarted':
-          'Your free chat starts when you send your first message.',
+          'Your free chat starts when registration is completed.',
       'chat.trialUntil': 'Free chat available until @time',
       'chat.cannotSend': 'Subscribe to continue chatting',
       'chat.city': 'City',
@@ -977,7 +977,7 @@ class VitaTranslations extends Translations {
       'chat.notFriends': '已解除好友 · 订阅已暂停',
       'chat.notFriendsDetail': '双方尚未成为好友，暂时不能发送消息。',
       'chat.trialExpired': '默认角色的免费聊天体验已结束。',
-      'chat.trialNotStarted': '发送第一条消息后，免费聊天体验才开始计时。',
+      'chat.trialNotStarted': '注册成功后，免费聊天体验即开始计时。',
       'chat.trialUntil': '免费聊天体验持续至 @time',
       'chat.cannotSend': '继续订阅后即可发送消息',
       'chat.city': '城市',
