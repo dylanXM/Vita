@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_client.dart';
 import 'legal_documents.dart';
+import 'supported_locales.dart';
 
 class LocalizedCopy {
   const LocalizedCopy(this.values);
@@ -18,9 +19,19 @@ class LocalizedCopy {
     final lang = locale?.languageCode ?? 'en';
     final regional =
         locale?.countryCode == null ? null : '${lang}_${locale!.countryCode}';
-    final fallback = values.isEmpty ? '' : values.values.first;
-    return (values[regional] ?? values[lang] ?? values['en'] ?? fallback)
-        .trim();
+    final canonical = locale == null ? 'en' : vitaLocaleTag(locale);
+    for (final candidate in [
+      values[canonical],
+      values[regional],
+      values[lang],
+      values['en'],
+      ...values.values,
+    ]) {
+      if (candidate != null && candidate.trim().isNotEmpty) {
+        return candidate.trim();
+      }
+    }
+    return '';
   }
 }
 

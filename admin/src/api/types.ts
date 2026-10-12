@@ -194,6 +194,7 @@ export interface BillingProduct {
   period?: "week" | "month" | "year";
   product_id: string;
   benefits?: string[];
+  benefits_i18n?: Record<string, string[]>;
   popular?: boolean;
   enabled: boolean;
   sort_order: number;

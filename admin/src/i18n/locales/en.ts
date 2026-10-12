@@ -289,6 +289,8 @@ const en = {
   },
 
   billing: {
+    legacyBenefits: 'Legacy fallback benefits',
+    translationFallback: 'Untranslated languages fall back to English, then this existing copy.',
     plansTitle: "Subscription plans", plansDesc: "Configure shared App subscriptions and Web subscriptions.",
     packsTitle: "Coin packs", packsDesc: "Configure shared App coin packs and Web coin packs.",
     activityTitle: "Purchases & ledger", activityDesc: "Review purchases and coin movements within the selected platform.",
@@ -328,7 +330,8 @@ const en = {
     hoursAgo: "{{n}}h ago",
     daysAgo: "{{n}}d ago",
   },
-  content: { enabled: "Enabled", disabled: "Disabled", save: "Save", saved: "Saved", cancel: "Cancel", deleted: "Deleted", name: "Name", status: "Status", schedule: "Schedule", operator: "Operator", actions: "Actions", identifier: "Identifier", icon: "Icon", imageUrl: "Image URL", title: "Title", body: "Description", startsAt: "Starts at", endsAt: "Ends at" },
+  content: {
+    translations: 'Translations', enabled: "Enabled", disabled: "Disabled", save: "Save", saved: "Saved", cancel: "Cancel", deleted: "Deleted", name: "Name", status: "Status", schedule: "Schedule", operator: "Operator", actions: "Actions", identifier: "Identifier", icon: "Icon", imageUrl: "Image URL", title: "Title", body: "Description", startsAt: "Starts at", endsAt: "Ends at" },
   onboarding: { title: "Onboarding", desc: "Configure the shared first-run introduction for iOS and Android.", settings: "Delivery settings", settingsDesc: "Revision is recorded for QA and content coordination; each install completes onboarding only once.", revision: "Revision", page: "Page {{n}}", addPage: "Add page" },
   social: { title: "Social media links", desc: "Configure the official accounts shown in the Vita app.", cardTitle: "Follow Vita", cardDesc: "Configured links appear in the Me tab.", hint: "Use a complete http or https URL. Leave a field empty to hide that platform.", save: "Save links", saved: "Social media links saved" },
 

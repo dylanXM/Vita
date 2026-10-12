@@ -1,3 +1,4 @@
+import { AppTranslationsEditor } from "@/components/app-translations-editor";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -36,7 +37,7 @@ export function CoinPacksPage() {
 }
 
 function BillingProductsPage({ plan }: { plan: boolean }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const [platform, setPlatform] = useState<BillingCatalogPlatform | "all">("all");
   const [editing, setEditing] = useState<BillingProduct | null>(null);
@@ -97,7 +98,7 @@ function BillingProductsPage({ plan }: { plan: boolean }) {
               {plan && <TableCell>{t(`billing.periods.${item.period}`)}</TableCell>}
               <TableCell className="max-w-48 truncate font-mono text-xs">{item.product_id || "—"}</TableCell>
               <TableCell><Badge variant={item.enabled ? "success" : "muted"}>{t(item.enabled ? "billing.enabled" : "billing.disabled")}</Badge></TableCell>
-              {plan && <TableCell className="max-w-64 text-xs text-muted-foreground">{item.benefits?.join(" · ") || "—"}</TableCell>}
+              {plan && <TableCell className="max-w-64 text-xs text-muted-foreground">{(item.benefits_i18n?.[i18n.resolvedLanguage ?? "en"]?.join(" · ") || item.benefits_i18n?.en?.join(" · ") || item.benefits?.join(" · ") || "—")}</TableCell>}
               <TableCell className="text-end"><div className="inline-flex gap-1">
                 <Button variant="ghost" size="icon" onClick={() => { setEditing(item); setDialogOpen(true); }} aria-label={t("billing.edit")}><Pencil /></Button>
                 <Button variant="ghost" size="icon" onClick={() => { if (window.confirm(t("billing.deleteConfirm", { name: item.name }))) remove.mutate(item.id); }} aria-label={t("billing.delete")}><Trash2 /></Button>
@@ -121,17 +122,21 @@ function ProductDialog({ open, onOpenChange, product, environment, plan, onSaved
   const save = useMutation({
     mutationFn: () => {
       const { id: _id, ...body } = form;
-      if (plan) body.benefits = (body.benefits ?? []).map((line) => line.trim()).filter(Boolean);
+      if (plan) {
+        body.benefits = (body.benefits ?? []).map((line) => line.trim()).filter(Boolean);
+        body.benefits_i18n = Object.fromEntries(Object.entries(body.benefits_i18n ?? {}).map(([locale, lines]) => [locale, lines.map(line => line.trim()).filter(Boolean)]));
+      }
       return product ? api.update(product.id, body) : api.create(body);
     },
     onSuccess: () => { toast.success(t("billing.saved")); onOpenChange(false); onSaved(); },
     onError: (err) => toast.error(errorMessage(err, t("common.failedToLoad"))),
   });
   const set = <K extends keyof BillingProduct>(key: K, value: BillingProduct[K]) => setForm((old) => ({ ...old, [key]: value }));
-  const benefitText = form.benefits?.join("\n") ?? "";
+  const benefitTranslations = form.benefits_i18n ?? {};
+  const benefitValues = Object.fromEntries(Object.entries(benefitTranslations).map(([locale, lines]) => [locale, lines.join("\n")]));
   const benefitLines = (form.benefits ?? []).map((line) => line.trim()).filter(Boolean);
   const valid = form.key.trim() && form.name.trim() && form.coins >= (plan ? 0 : 1) && form.price_usd >= 0 &&
-    (!plan || (benefitLines.length > 0 && benefitLines.length <= 12 && benefitLines.every((line) => [...line].length <= 160)));
+    (!plan || ([benefitLines, ...Object.values(benefitTranslations)].every(lines => lines.filter(line => line.trim()).length <= 12 && lines.every(line => [...line.trim()].length <= 160)) && (benefitLines.length > 0 || Object.values(benefitTranslations).some(lines => lines.some(line => line.trim())))));
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[90vh] overflow-y-auto">
     <DialogHeader><DialogTitle>{t(product ? "billing.edit" : plan ? "billing.addPlan" : "billing.addPack")}</DialogTitle>
       <DialogDescription>{t("billing.formDesc")}</DialogDescription></DialogHeader>
@@ -144,7 +149,8 @@ function ProductDialog({ open, onOpenChange, product, environment, plan, onSaved
       {plan && <Field label={t("billing.period")}><Select value={form.period} onValueChange={(v) => set("period", v as BillingProduct["period"])}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{["week","month","year"].map((v) => <SelectItem key={v} value={v}>{t(`billing.periods.${v}`)}</SelectItem>)}</SelectContent></Select></Field>}
       <Field label={t("billing.sortOrder")}><Input type="number" min="0" value={form.sort_order} onChange={(e) => set("sort_order", Number(e.target.value))} /></Field>
       <Field label={t("billing.productId")} wide><Input value={form.product_id} onChange={(e) => set("product_id", e.target.value)} placeholder={form.platform === "web" ? "price_..." : "com.vita..."} /></Field>
-      {plan && <Field label={t("billing.benefits")} wide><textarea className="min-h-28 w-full rounded-md border bg-background px-3 py-2 text-sm" value={benefitText} onChange={(e) => set("benefits", e.target.value.split("\n"))} placeholder={t("billing.benefitsHint")} /><p className="text-xs text-muted-foreground">{t("billing.benefitsHint")}</p></Field>}
+      {plan && <AppTranslationsEditor fields={[{ key: "benefits", label: t("billing.benefits"), values: benefitValues, multiline: true, placeholder: t("billing.benefitsHint") }]} onChange={(_, locale, value) => set("benefits_i18n", { ...benefitTranslations, [locale]: value.split("\n") })} />}
+      {plan && <Field label={t("billing.legacyBenefits")} wide><textarea className="min-h-20 w-full rounded-md border bg-background px-3 py-2 text-sm" value={form.benefits?.join("\n") ?? ""} onChange={e => set("benefits", e.target.value.split("\n"))} /><p className="text-xs text-muted-foreground">{t("billing.translationFallback")}</p></Field>}
       {!plan && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(form.popular)} onChange={(e) => set("popular", e.target.checked)} />{t("billing.popular")}</label>}
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(e) => set("enabled", e.target.checked)} />{t("billing.enabled")}</label>
     </div>

@@ -289,6 +289,8 @@ const zhHans = {
   },
 
   billing: {
+    legacyBenefits: '原有权益（兼容回退）',
+    translationFallback: '未配置的语言优先使用英文，其次使用原有权益。',
     plansTitle: "订阅计划", plansDesc: "统一配置 App 订阅商品，保留独立的 Web 订阅。",
     packsTitle: "金币包", packsDesc: "统一配置 App 金币包，保留独立的 Web 金币包。",
     activityTitle: "购买与流水", activityDesc: "查看指定平台中的购买记录和金币变动。",
@@ -328,7 +330,8 @@ const zhHans = {
     hoursAgo: "{{n}} 小时前",
     daysAgo: "{{n}} 天前",
   },
-  content: { enabled: "已启用", disabled: "已停用", save: "保存", saved: "已保存", cancel: "取消", deleted: "已删除", name: "名称", status: "状态", schedule: "投放时间", operator: "操作人", actions: "操作", identifier: "页面标识", icon: "图标", imageUrl: "图片地址", title: "标题", body: "说明", startsAt: "开始时间", endsAt: "结束时间" },
+  content: {
+    translations: '多语言翻译', enabled: "已启用", disabled: "已停用", save: "保存", saved: "已保存", cancel: "取消", deleted: "已删除", name: "名称", status: "状态", schedule: "投放时间", operator: "操作人", actions: "操作", identifier: "页面标识", icon: "图标", imageUrl: "图片地址", title: "标题", body: "说明", startsAt: "开始时间", endsAt: "结束时间" },
   onboarding: { title: "引导页", desc: "统一配置 iOS 和 Android App 的首次启动引导内容。", settings: "投放设置", settingsDesc: "版本号用于测试和内容协作；每台设备只会完成一次首次引导。", revision: "内容版本", page: "第 {{n}} 页", addPage: "添加页面" },
   social: { title: "社交媒体链接", desc: "配置 Vita App 中展示的官方社交账号。", cardTitle: "关注 Vita", cardDesc: "仅在“我的”页面展示已配置的平台。", hint: "请填写完整的 http 或 https 链接；留空即可隐藏对应平台。", save: "保存链接", saved: "社交媒体链接已保存" },
 

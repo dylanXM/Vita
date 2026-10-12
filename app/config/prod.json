@@ -1,6 +1,6 @@
 {
   "VITA_ENV": "prod",
-  "VITA_API_BASE_URL": "https://api.vita.ai",
+  "VITA_API_BASE_URL": "https://vita-api.sweetai.work",
   "VITA_ENABLE_LOG": "false",
   "VITA_SUPPORT_EMAIL": "dylan_xm@163.com",
   "VITA_APP_STORE_URL": "",

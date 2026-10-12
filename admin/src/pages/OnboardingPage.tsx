@@ -1,3 +1,4 @@
+import { AppTranslationsEditor } from "@/components/app-translations-editor";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
@@ -53,8 +54,8 @@ export function OnboardingPage() {
 
   const patchPage = (index: number, patch: Partial<OnboardingContentPage>) =>
     setPages((current) => current.map((page, i) => (i === index ? { ...page, ...patch } : page)));
-  const patchCopy = (index: number, field: "title" | "body", locale: "en" | "zh", value: string) =>
-    setPages((current) => current.map((page, i) => i === index ? { ...page, [field]: { ...page[field], [locale]: value } } : page));
+  const patchCopy = (index: number, field: "title" | "body", locale: string, value: string) =>
+    setPages((current) => current.map((page, i) => i === index ? { ...page, [field]: { ...page[field], [locale]: value, ...(locale === "zh-Hans" ? {zh: value} : locale === "zh-Hant" ? {zh_TW: value} : {}) } } : page));
 
   return (
     <div className="space-y-6">
@@ -77,10 +78,7 @@ export function OnboardingPage() {
             <Field label={t("content.identifier")}><Input value={page.id} onChange={(e) => patchPage(index, { id: e.target.value })} /></Field>
             <Field label={t("content.icon")}><Select value={page.icon || "chat"} onValueChange={(icon) => patchPage(index, { icon })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{["chat", "life", "infinity", "memory"].map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></Field>
             <Field label={t("content.imageUrl")} wide><Input value={page.image_url} onChange={(e) => patchPage(index, { image_url: e.target.value })} placeholder="https://…" /></Field>
-            <Field label={`${t("content.title")} · English`}><Input value={page.title.en ?? ""} onChange={(e) => patchCopy(index, "title", "en", e.target.value)} /></Field>
-            <Field label={`${t("content.title")} · 简体中文`}><Input value={page.title.zh ?? ""} onChange={(e) => patchCopy(index, "title", "zh", e.target.value)} /></Field>
-            <Field label={`${t("content.body")} · English`}><textarea className="min-h-24 w-full rounded-md border bg-background p-3 text-sm" value={page.body.en ?? ""} onChange={(e) => patchCopy(index, "body", "en", e.target.value)} /></Field>
-            <Field label={`${t("content.body")} · 简体中文`}><textarea className="min-h-24 w-full rounded-md border bg-background p-3 text-sm" value={page.body.zh ?? ""} onChange={(e) => patchCopy(index, "body", "zh", e.target.value)} /></Field>
+            <AppTranslationsEditor fields={[{key: "title", label: t("content.title"), values: page.title}, {key: "body", label: t("content.body"), values: page.body, multiline: true}]} onChange={(field, locale, value) => patchCopy(index, field as "title" | "body", locale, value)} />
           </CardContent>
         </Card>
       ))}

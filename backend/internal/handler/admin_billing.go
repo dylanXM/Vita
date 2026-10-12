@@ -2,6 +2,7 @@ package handler
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -13,24 +14,26 @@ import (
 	"github.com/lib/pq"
 
 	"vita/internal/db"
+	"vita/internal/language"
 )
 
 type adminProduct struct {
-	ID          string    `json:"id"`
-	Key         string    `json:"key"`
-	Name        string    `json:"name"`
-	Environment string    `json:"environment"`
-	Platform    string    `json:"platform"`
-	Coins       int       `json:"coins"`
-	PriceUSD    float64   `json:"price_usd"`
-	Period      string    `json:"period,omitempty"`
-	ProductID   string    `json:"product_id"`
-	Popular     bool      `json:"popular,omitempty"`
-	Enabled     bool      `json:"enabled"`
-	SortOrder   int       `json:"sort_order"`
-	Benefits    []string  `json:"benefits,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID           string              `json:"id"`
+	Key          string              `json:"key"`
+	Name         string              `json:"name"`
+	Environment  string              `json:"environment"`
+	Platform     string              `json:"platform"`
+	Coins        int                 `json:"coins"`
+	PriceUSD     float64             `json:"price_usd"`
+	Period       string              `json:"period,omitempty"`
+	ProductID    string              `json:"product_id"`
+	Popular      bool                `json:"popular,omitempty"`
+	Enabled      bool                `json:"enabled"`
+	SortOrder    int                 `json:"sort_order"`
+	BenefitsI18n map[string][]string `json:"benefits_i18n,omitempty"`
+	Benefits     []string            `json:"benefits,omitempty"`
+	CreatedAt    time.Time           `json:"created_at"`
+	UpdatedAt    time.Time           `json:"updated_at"`
 }
 
 func billingCatalogPlatform(value string) string {
@@ -76,6 +79,19 @@ func validateAdminProduct(c *gin.Context, item *adminProduct, plan bool) bool {
 				return false
 			}
 		}
+		for locale, benefits := range item.BenefitsI18n {
+			if language.Normalize(locale) != locale || len(benefits) > 12 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid benefit translations"})
+				return false
+			}
+			for i, benefit := range benefits {
+				benefits[i] = strings.TrimSpace(benefit)
+				if benefits[i] == "" || len([]rune(benefits[i])) > 160 {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "invalid translated benefit"})
+					return false
+				}
+			}
+		}
 		if item.Period != "week" && item.Period != "month" && item.Period != "year" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "period must be week, month, or year"})
 			return false
@@ -94,7 +110,7 @@ func AdminListSubscriptionPlans(c *gin.Context) {
 	}
 	platform := strings.ToLower(strings.TrimSpace(c.Query("platform")))
 	query := `SELECT id, key, name, environment, platform, coins_granted, price_usd, period,
-	                 product_id, enabled, sort_order, benefits, created_at, updated_at
+	                 product_id, enabled, sort_order, benefits, benefits_i18n, created_at, updated_at
 	          FROM subscription_plans WHERE environment = $1`
 	args := []any{environment}
 	if platform != "" {
@@ -115,10 +131,15 @@ func AdminListSubscriptionPlans(c *gin.Context) {
 	items := []adminProduct{}
 	for rows.Next() {
 		var item adminProduct
+		var translations []byte
 		if err := rows.Scan(&item.ID, &item.Key, &item.Name, &item.Environment, &item.Platform,
 			&item.Coins, &item.PriceUSD, &item.Period, &item.ProductID, &item.Enabled,
-			&item.SortOrder, pq.Array(&item.Benefits), &item.CreatedAt, &item.UpdatedAt); err != nil {
+			&item.SortOrder, pq.Array(&item.Benefits), &translations, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to scan subscription plans"})
+			return
+		}
+		if err := json.Unmarshal(translations, &item.BenefitsI18n); err != nil {
+			c.JSON(500, gin.H{"error": "invalid stored benefit translations"})
 			return
 		}
 		items = append(items, item)
@@ -134,7 +155,7 @@ func ListSubscriptionPlanBenefits(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid platform"})
 		return
 	}
-	rows, err := db.Get().Query(`SELECT product_id, benefits FROM subscription_plans
+	rows, err := db.Get().Query(`SELECT product_id, benefits, benefits_i18n FROM subscription_plans
 		WHERE environment=$1 AND platform=$2 AND enabled=true AND product_id<>''
 		ORDER BY sort_order, key`, currentEnvironment(), platform)
 	if err != nil {
@@ -146,9 +167,21 @@ func ListSubscriptionPlanBenefits(c *gin.Context) {
 	for rows.Next() {
 		var productID string
 		var benefits []string
-		if err := rows.Scan(&productID, pq.Array(&benefits)); err != nil {
+		var raw []byte
+		if err := rows.Scan(&productID, pq.Array(&benefits), &raw); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to scan subscription benefits"})
 			return
+		}
+		var translations map[string][]string
+		if err := json.Unmarshal(raw, &translations); err != nil {
+			c.JSON(500, gin.H{"error": "invalid stored benefit translations"})
+			return
+		}
+		locale := language.Normalize(c.GetHeader("Accept-Language"))
+		if localized := translations[locale]; len(localized) > 0 {
+			benefits = localized
+		} else if english := translations["en"]; len(english) > 0 {
+			benefits = english
 		}
 		items = append(items, gin.H{"product_id": productID, "benefits": benefits})
 	}
@@ -180,18 +213,23 @@ func adminSaveProduct(c *gin.Context, plan, update bool) {
 	}
 
 	var err error
+	var translations any
+	if item.BenefitsI18n != nil {
+		raw, _ := json.Marshal(item.BenefitsI18n)
+		translations = string(raw)
+	}
 	if plan {
 		if update {
 			_, err = db.Get().Exec(`UPDATE subscription_plans SET key=$1, name=$2, environment=$3, platform=$4,
 				coins_granted=$5, price_usd=$6, period=$7, product_id=$8, enabled=$9, sort_order=$10,
-				benefits=$11, updated_at=CURRENT_TIMESTAMP WHERE id=$12`, item.Key, item.Name, item.Environment, item.Platform,
-				item.Coins, item.PriceUSD, item.Period, item.ProductID, item.Enabled, item.SortOrder, pq.Array(item.Benefits), item.ID)
+				benefits=$11, benefits_i18n=COALESCE($13::jsonb,benefits_i18n), updated_at=CURRENT_TIMESTAMP WHERE id=$12`, item.Key, item.Name, item.Environment, item.Platform,
+				item.Coins, item.PriceUSD, item.Period, item.ProductID, item.Enabled, item.SortOrder, pq.Array(item.Benefits), item.ID, translations)
 		} else {
 			_, err = db.Get().Exec(`INSERT INTO subscription_plans
-				(id,key,name,environment,platform,coins_granted,price_usd,period,product_id,enabled,sort_order,benefits)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, item.ID, item.Key, item.Name,
+				(id,key,name,environment,platform,coins_granted,price_usd,period,product_id,enabled,sort_order,benefits,benefits_i18n)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,COALESCE($13::jsonb,'{}'::jsonb))`, item.ID, item.Key, item.Name,
 				item.Environment, item.Platform, item.Coins, item.PriceUSD, item.Period, item.ProductID,
-				item.Enabled, item.SortOrder, pq.Array(item.Benefits))
+				item.Enabled, item.SortOrder, pq.Array(item.Benefits), translations)
 		}
 	} else {
 		if update {
