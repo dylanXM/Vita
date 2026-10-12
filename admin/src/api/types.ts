@@ -4,6 +4,8 @@
 export interface AdminLoginResult {
   user_id: string;
   token: string;
+  refresh_token: string;
+  expires_in: number;
   role: string;
 }
 

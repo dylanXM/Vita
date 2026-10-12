@@ -1,12 +1,13 @@
+import axios from "axios";
 import { create } from "zustand";
 import { authApi } from "@/api/admin";
-import { getToken, setToken, errorMessage } from "@/api/client";
+import { getToken, setToken, setSession, errorMessage } from "@/api/client";
 import type { Profile } from "@/api/types";
 
 interface AuthState {
   user: Profile | null;
   /** "loading" until the initial /me check resolves. */
-  status: "loading" | "authed" | "anon";
+  status: "loading" | "authed" | "anon" | "error";
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   /** Rehydrate the session from a stored token at startup. */
@@ -21,22 +22,29 @@ export class NotAdminError extends Error {
   }
 }
 
+let authEpoch = 0;
+
 export const useAuth = create<AuthState>((set) => ({
   user: null,
   status: "loading",
 
   login: async (email, password) => {
+    const epoch = ++authEpoch;
     const res = await authApi.login(email, password);
-    setToken(res.token);
+    if (epoch !== authEpoch) return;
+    setSession(res);
     try {
       const me = await authApi.me();
+      if (epoch !== authEpoch) return;
       if (me.role !== "admin") {
         setToken(null);
         throw new NotAdminError();
       }
       set({ user: me, status: "authed" });
     } catch (err) {
-      setToken(null);
+      if (epoch !== authEpoch) return;
+      if (err instanceof NotAdminError ||
+          (axios.isAxiosError(err) && err.response?.status === 401)) setToken(null);
       set({ user: null, status: "anon" });
       if (err instanceof NotAdminError) throw err;
       throw new Error(errorMessage(err, "Sign-in failed"));
@@ -44,25 +52,31 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   logout: () => {
+    ++authEpoch;
     setToken(null);
     set({ user: null, status: "anon" });
   },
 
   bootstrap: async () => {
-    if (!getToken()) {
+    const epoch = ++authEpoch;
+    set({ status: "loading" });
+    const initialToken = getToken();
+    if (!initialToken) {
       set({ status: "anon" });
       return;
     }
     try {
       const me = await authApi.me();
+      if (epoch !== authEpoch || !getToken()) return;
       if (me.role === "admin") set({ user: me, status: "authed" });
       else {
         setToken(null);
         set({ user: null, status: "anon" });
       }
     } catch {
-      setToken(null);
-      set({ user: null, status: "anon" });
+      if (epoch !== authEpoch) return;
+      // A network/5xx failure is not evidence that saved credentials expired.
+      set({ user: null, status: getToken() ? "error" : "anon" });
     }
   },
 }));

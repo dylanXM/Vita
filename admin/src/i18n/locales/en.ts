@@ -53,6 +53,8 @@ const en = {
   },
 
   login: {
+    sessionUnavailable: 'Cannot verify your session right now. Your saved sign-in has been retained.',
+    retrySession: 'Retry',
     subtitle: "Sign in with an administrator account",
     email: "Email",
     password: "Password",

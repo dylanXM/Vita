@@ -53,6 +53,8 @@ const zhHans = {
   },
 
   login: {
+    sessionUnavailable: '暂时无法验证登录状态，已保留登录信息。',
+    retrySession: '重试',
     subtitle: "使用管理员账号登录",
     email: "邮箱",
     password: "密码",

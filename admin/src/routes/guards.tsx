@@ -15,12 +15,21 @@ function FullScreenLoader() {
   );
 }
 
+function SessionRetry() {
+  const { t } = useTranslation();
+  return <div className="flex min-h-64 flex-col items-center justify-center gap-4 p-8">
+    <p role="alert" className="text-sm text-muted-foreground">{t("login.sessionUnavailable")}</p>
+    <button className="rounded-md bg-primary px-4 py-2 text-primary-foreground" onClick={() => void useAuth.getState().bootstrap()}>{t("login.retrySession")}</button>
+  </div>;
+}
+
 /** Gate for admin-only routes: bounces anon users to /login. */
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const status = useAuth((s) => s.status);
   const location = useLocation();
 
   if (status === "loading") return <FullScreenLoader />;
+  if (status === "error") return <SessionRetry />;
   if (status === "anon") {
     const redirect = encodeURIComponent(location.pathname + location.search);
     return <Navigate to={`/login?redirect=${redirect}`} replace />;
