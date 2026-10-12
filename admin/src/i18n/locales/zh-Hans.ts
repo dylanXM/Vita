@@ -2,6 +2,19 @@
 const zhHans = {
   brand: "Vita Admin",
 
+  feedback: {
+    title: "意见反馈",
+    description: "查看用户提交的反馈，按时间倒序排列。",
+    user: "用户",
+    environment: "环境",
+    time: "提交时间",
+    content: "反馈内容",
+    details: "详情",
+    empty: "暂无反馈",
+    previous: "上一页",
+    next: "下一页",
+  },
+
   common: {
     loading: "加载中…",
     language: "语言",
@@ -17,6 +30,7 @@ const zhHans = {
   },
 
   nav: {
+    feedback: "意见反馈",
     overview: "概览",
     dashboard: "仪表盘",
     productHealth: "产品健康度",

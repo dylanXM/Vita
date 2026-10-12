@@ -1,5 +1,13 @@
 const Map<String, Map<String, String>> additionalVitaTranslations = {
   'es': {
+      "feedback.title": "Comentarios",
+      "feedback.hint": "Describe tu experiencia (hasta 2000 caracteres).",
+      "feedback.submit": "Enviar",
+      "feedback.sending": "Enviando…",
+      "feedback.success": "Gracias. Tus comentarios se han enviado.",
+      "feedback.failed": "No se pudo enviar. Inténtalo de nuevo.",
+      "feedback.invalid": "Introduce entre 1 y 2000 caracteres.",
+
     "relation.wife": "Esposa",
     "relation.husband": "Esposo",
     "relation.crush": "Interés romántico",
@@ -787,6 +795,14 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'Sin configurar',
   },
   'pt': {
+      "feedback.title": "Feedback",
+      "feedback.hint": "Descreva sua experiência (até 2000 caracteres).",
+      "feedback.submit": "Enviar",
+      "feedback.sending": "Enviando…",
+      "feedback.success": "Obrigado. Seu feedback foi enviado.",
+      "feedback.failed": "Não foi possível enviar. Tente novamente.",
+      "feedback.invalid": "Digite de 1 a 2000 caracteres.",
+
     "relation.wife": "Esposa",
     "relation.husband": "Marido",
     "relation.crush": "Interesse romântico",
@@ -1575,6 +1591,14 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'Não definido',
   },
   'ja': {
+      "feedback.title": "フィードバック",
+      "feedback.hint": "ご意見や問題を入力してください（2000文字以内）。",
+      "feedback.submit": "送信",
+      "feedback.sending": "送信中…",
+      "feedback.success": "フィードバックを送信しました。",
+      "feedback.failed": "送信できませんでした。再試行してください。",
+      "feedback.invalid": "1〜2000文字で入力してください。",
+
     "relation.wife": "妻",
     "relation.husband": "夫",
     "relation.crush": "気になる相手",
@@ -2307,6 +2331,14 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': '未設定',
   },
   'ko': {
+      "feedback.title": "의견 보내기",
+      "feedback.hint": "문제나 의견을 입력하세요 (최대 2000자).",
+      "feedback.submit": "보내기",
+      "feedback.sending": "전송 중…",
+      "feedback.success": "의견이 전송되었습니다. 감사합니다.",
+      "feedback.failed": "전송하지 못했습니다. 다시 시도하세요.",
+      "feedback.invalid": "1~2000자를 입력하세요.",
+
     "relation.wife": "아내",
     "relation.husband": "남편",
     "relation.crush": "썸 상대",
@@ -3038,6 +3070,14 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': '미설정',
   },
   'ar': {
+      "feedback.title": "الملاحظات",
+      "feedback.hint": "اكتب مشكلتك أو اقتراحك (حتى 2000 حرف).",
+      "feedback.submit": "إرسال",
+      "feedback.sending": "جارٍ الإرسال…",
+      "feedback.success": "شكرًا لك. تم إرسال ملاحظاتك.",
+      "feedback.failed": "تعذر الإرسال. حاول مجددًا.",
+      "feedback.invalid": "أدخل من 1 إلى 2000 حرف.",
+
     "relation.wife": "زوجة",
     "relation.husband": "زوج",
     "relation.crush": "اهتمام عاطفي",
@@ -3790,6 +3830,14 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'غير محدد',
   },
   'zh_TW': {
+      "feedback.title": "意見回饋",
+      "feedback.hint": "請描述你的問題或建議，最多2000字。",
+      "feedback.submit": "提交回饋",
+      "feedback.sending": "提交中…",
+      "feedback.success": "感謝回饋，已提交成功。",
+      "feedback.failed": "提交失敗，請重試。",
+      "feedback.invalid": "請輸入1–2000字。",
+
     "relation.wife": "妻子",
     "relation.husband": "丈夫",
     "relation.crush": "曖昧對象",

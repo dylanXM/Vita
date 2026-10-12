@@ -137,6 +137,7 @@ func main() {
 	engine.Use(middleware.AuthMiddleware(tokenManager, redisClient))
 
 	api := engine.Group("/v1")
+	api.POST("/feedback", middleware.RequireAuth(), middleware.RateLimit(5, time.Minute), handler.SubmitFeedback)
 	{
 		auth := api.Group("/auth")
 		{
@@ -272,6 +273,7 @@ func main() {
 		api.DELETE("/me", middleware.RequireAuth(), handler.DeleteMe)
 
 		admin := api.Group("/admin", middleware.RequireAdmin())
+		admin.GET("/feedback", handler.AdminListFeedback)
 		{
 			admin.POST("/images", handler.AdminUploadImage)
 			admin.GET("/stats", handler.AdminStats)

@@ -13,6 +13,14 @@ class VitaTranslations extends Translations {
 
   static const Map<String, Map<String, String>> _keys = {
     'en': {
+      "feedback.title": "Feedback",
+      "feedback.hint": "Tell us about your experience (up to 2000 characters).",
+      "feedback.submit": "Submit",
+      "feedback.sending": "Submitting…",
+      "feedback.success": "Thank you. Your feedback has been submitted.",
+      "feedback.failed": "Could not submit feedback. Please retry.",
+      "feedback.invalid": "Enter 1–2000 characters.",
+
       "relation.wife": "Wife",
       "relation.husband": "Husband",
       "relation.crush": "Crush",
@@ -824,6 +832,14 @@ class VitaTranslations extends Translations {
       'stage.partner': 'Partner',
     },
     'zh_CN': {
+      "feedback.title": "意见反馈",
+      "feedback.hint": "请描述你的问题或建议，最多2000字。",
+      "feedback.submit": "提交反馈",
+      "feedback.sending": "提交中…",
+      "feedback.success": "感谢反馈，已提交成功。",
+      "feedback.failed": "提交失败，请重试。",
+      "feedback.invalid": "请输入1–2000字。",
+
       "relation.wife": "妻子",
       "relation.husband": "丈夫",
       "relation.crush": "暧昧对象",

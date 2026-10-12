@@ -1,3 +1,4 @@
+import { FeedbackPage } from "@/pages/FeedbackPage";
 import { createBrowserRouter, Navigate, RouterProvider, useRouteError, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AdminLayout } from "@/layout/AdminLayout";
@@ -64,6 +65,7 @@ const router = createBrowserRouter([
       { path: "dashboard", element: <DashboardPage /> },
       { path: "product-health", element: <ProductHealthPage /> },
       { path: "users", element: <UsersPage /> },
+      { path: "feedback", element: <FeedbackPage /> },
       { path: "users/:id", element: <UserDetailPage /> },
       { path: "companions", element: <CompanionsPage /> },
       { path: "companions/:id", element: <CompanionDetailPage /> },

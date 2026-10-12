@@ -39,6 +39,7 @@ export const NAV: NavGroup[] = [
     titleKey: "nav.management",
     items: [
       { to: "/users", labelKey: "nav.users", icon: Users },
+      { to: "/feedback", labelKey: "nav.feedback", icon: ScrollText },
       { to: "/companions", labelKey: "nav.companions", icon: HeartHandshake },
       { to: "/agent", labelKey: "nav.agent", icon: Bot },
       { to: "/life-engine", labelKey: "nav.lifeEngine", icon: Activity },

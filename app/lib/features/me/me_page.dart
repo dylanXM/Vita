@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/notice.dart';
+import 'feedback_page.dart';
 import '../../core/constants.dart';
 import '../../core/app_content_controller.dart';
 import '../../core/analytics_service.dart';
@@ -163,6 +164,12 @@ class MePage extends StatelessWidget {
                   margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Column(children: [
+                    _MeAction(
+                        icon: Icons.feedback_outlined,
+                        title: 'feedback.title'.tr,
+                        onTap: () => Get.to(() => const FeedbackPage(),
+                            transition: Transition.cupertino)),
+                    const Divider(indent: 52, height: 0.5),
                     _MeAction(
                         icon: Icons.mail_outline_rounded,
                         title: 'me.contact'.tr,

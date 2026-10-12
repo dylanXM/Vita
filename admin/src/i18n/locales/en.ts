@@ -2,6 +2,19 @@
 const en = {
   brand: "Vita Admin",
 
+  feedback: {
+    title: "Feedback",
+    description: "User feedback, newest first.",
+    user: "User",
+    environment: "Environment",
+    time: "Submitted at",
+    content: "Content",
+    details: "Details",
+    empty: "No feedback yet.",
+    previous: "Previous",
+    next: "Next",
+  },
+
   common: {
     loading: "Loading…",
     language: "Language",
@@ -17,6 +30,7 @@ const en = {
   },
 
   nav: {
+    feedback: "Feedback",
     overview: "Overview",
     dashboard: "Dashboard",
     productHealth: "Product health",
