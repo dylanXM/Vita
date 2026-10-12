@@ -2,7 +2,7 @@
 	init init-backend init-admin init-webapp init-app init-website init-deploy \
 	install-deps admin-install webapp-install website-install \
 	infra-up infra-down db-psql redis-cli \
-	dev dev-mock be-run be-mock be-build be-test be-gen be-openapi be-fmt be-migrate be-rehash-migrations \
+	dev dev-mock be-run be-mock be-build be-image be-test be-gen be-openapi be-fmt be-migrate be-rehash-migrations \
 	up down logs \
 	deploy-docker deploy-docker-individual docker-api docker-admin docker-webapp docker-website \
 	deploy-up deploy-down deploy-logs deploy-build deploy-check deploy-clean deploy-beta deploy-prod \
@@ -21,6 +21,7 @@ help:
 	@echo "  make be-run              宿主机运行 API（对接 Docker 中的 Postgres+Redis）"
 	@echo "  make be-mock             be-run 的离线模拟版本"
 	@echo "  make be-build            构建后端"
+	@echo "  make be-image            本地构建 linux/amd64 后端镜像并导出上传包（dist/images）"
 	@echo "  make be-test             运行后端测试"
 	@echo "  make be-gen              重新生成 Ent 代码"
 	@echo "  make be-openapi          重新生成 openapi.json"
@@ -169,6 +170,9 @@ be-mock:
 
 be-build:
 	cd backend && go build ./...
+
+be-image:
+	@bash deploy/production/build-backend-image.sh
 
 be-test:
 	cd backend && go test ./...
