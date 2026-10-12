@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 
@@ -39,22 +40,55 @@ class BillingController extends GetxController {
   }
 
   Future<void> init() async {
+    if (kDebugMode) {
+      debugPrint('[Billing] RevenueCat init: '
+          'keyPresent=${revenueCatApiKey.isNotEmpty}, '
+          'testStore=${revenueCatApiKey.startsWith('test_')}');
+    }
     if (revenueCatApiKey.isNotEmpty) {
       try {
+        if (kDebugMode) await Purchases.setLogLevel(LogLevel.debug);
         await Purchases.configure(PurchasesConfiguration(revenueCatApiKey));
         Purchases.addCustomerInfoUpdateListener((_) {
           refreshSubscription();
           refreshCredits();
         });
         rcReady.value = true;
-        offerings.value = await Purchases.getOfferings();
-      } catch (_) {
+        await _loadOfferings('init');
+      } catch (error, stackTrace) {
+        if (kDebugMode) {
+          debugPrint('[Billing] RevenueCat init failed: $error\n$stackTrace');
+        }
         rcReady.value = false;
       }
     }
     await refreshSubscription();
     await refreshCredits();
     await refreshPlanBenefits();
+  }
+
+  Future<void> _loadOfferings(String source) async {
+    try {
+      final loaded = await Purchases.getOfferings();
+      offerings.value = loaded;
+      if (kDebugMode) {
+        debugPrint('[Billing] Offerings loaded ($source): '
+            'current=${loaded.current?.identifier}, count=${loaded.all.length}');
+        for (final offering in loaded.all.values) {
+          debugPrint('[Billing] Offering ${offering.identifier}: '
+              'packages=${offering.availablePackages.length}');
+          for (final package in offering.availablePackages) {
+            debugPrint('[Billing] Package ${package.identifier}: '
+                'product=${package.storeProduct.identifier}');
+          }
+        }
+      }
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('[Billing] Offerings failed ($source): $error\n$stackTrace');
+      }
+      rethrow;
+    }
   }
 
   Future<void> refreshPlanBenefits() async {
@@ -83,8 +117,11 @@ class BillingController extends GetxController {
     try {
       await Purchases.logIn(userID);
       _identifiedUserID = userID;
-      offerings.value = await Purchases.getOfferings();
-    } catch (_) {
+      await _loadOfferings('syncUser');
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('[Billing] RevenueCat sync failed: $error\n$stackTrace');
+      }
       _identifiedUserID = null;
     }
   }

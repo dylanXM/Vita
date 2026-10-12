@@ -140,7 +140,7 @@ class _CreditsPageState extends State<CreditsPage> {
         if (packs.isEmpty)
           const _PacksHint()
         else
-          _GroupedSurface(
+          Column(
             children: [
               for (final package in packs)
                 Padding(
@@ -188,6 +188,11 @@ class _CreditsPageState extends State<CreditsPage> {
 
     collect(offerings.current);
     offerings.all.forEach((_, offering) => collect(offering));
+    packs.sort((a, b) {
+      final aCoins = vitaCoinProductIds[a.storeProduct.identifier.toLowerCase()]!;
+      final bCoins = vitaCoinProductIds[b.storeProduct.identifier.toLowerCase()]!;
+      return aCoins.compareTo(bCoins);
+    });
     return packs;
   }
 }
@@ -241,61 +246,72 @@ class _PackRow extends StatelessWidget {
     final store = package.storeProduct;
     final price =
         store.priceString.isEmpty ? 'credits.buy'.tr : store.priceString;
-    return ConstrainedBox(
-      constraints: const BoxConstraints.tightFor(height: 100),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: Row(children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-                color: context.vita.greenTint,
-                borderRadius: BorderRadius.circular(14)),
-            child:
-                Icon(Icons.toll_outlined, size: 22, color: context.vita.green),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(store.title.isNotEmpty ? store.title : package.identifier,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w500,
-                        color: context.vita.text)),
-                if (store.description.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(store.description,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: 12.5, color: context.vita.subText)),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          SizedBox(
-            height: 44,
-            child: OutlinedButton(
-              onPressed:
-                  ctrl.busy.value ? null : () => ctrl.purchasePackage(package),
-              style: OutlinedButton.styleFrom(
-                  foregroundColor: context.vita.green,
-                  side: BorderSide(color: context.vita.green),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  minimumSize: const Size(64, 44)),
-              child: Text(price,
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-            ),
-          ),
-        ]),
+    final coins = vitaCoinProductIds[store.identifier.toLowerCase()]!;
+    final quantity = MaterialLocalizations.of(context).formatDecimal(coins);
+    return Container(
+      height: 88,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: context.vita.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: context.vita.green.withValues(alpha: .14)),
       ),
+      child: Row(children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: context.vita.greenTint,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Icon(Icons.toll_rounded, size: 25, color: context.vita.green),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(child: Text(quantity,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 25,
+                      height: 1.1,
+                      fontWeight: FontWeight.w700,
+                      color: context.vita.text))),
+              const SizedBox(height: 4),
+              Flexible(child: Text('credits.unit'.tr,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: context.vita.subText))),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 110,
+          height: 44,
+          child: FilledButton(
+            onPressed:
+                ctrl.busy.value ? null : () => ctrl.purchasePackage(package),
+            style: FilledButton.styleFrom(
+              backgroundColor: context.vita.green,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+            ),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(price,
+                  maxLines: 1,
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ),
+      ]),
     );
   }
 }

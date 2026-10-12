@@ -14,6 +14,9 @@ void main() {
   });
 
   test('recognizes configured coin product IDs', () {
+    expect(isCoinProduct('coins_100', 'vita.coins.100'), isTrue);
+    expect(isCoinProduct('coins_500', 'vita.coins.500'), isTrue);
+    expect(isCoinProduct('coins_1000', 'vita.coins.1000'), isTrue);
     expect(isCoinProduct('coin_pack', 'vita.coins.1200'), isTrue);
     expect(isCoinProduct('coins_500', 'vita.unknown'), isFalse);
     expect(isCoinProduct(r'$rc_monthly', 'vita.plus.monthly'), isFalse);

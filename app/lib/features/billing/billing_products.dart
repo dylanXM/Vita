@@ -8,6 +8,7 @@ const vitaSubscriptionProductIds = <String>{
 const vitaCoinProductIds = <String, int>{
   'vita.coins.100': 100,
   'vita.coins.500': 500,
+  'vita.coins.1000': 1000,
   'vita.coins.1200': 1200,
 };
 
