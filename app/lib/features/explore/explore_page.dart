@@ -774,12 +774,12 @@ class _MomentsUniverseState extends State<_MomentsUniverse>
 const _signalPositions = <List<Offset>>[
   [Offset(.5, .48)],
   [Offset(.30, .38), Offset(.70, .64)],
-  [Offset(.28, .32), Offset(.72, .40), Offset(.50, .72)],
+  [Offset(.28, .28), Offset(.72, .47), Offset(.36, .72)],
   [
-    Offset(.28, .29),
-    Offset(.72, .29),
-    Offset(.28, .67),
-    Offset(.72, .67),
+    Offset(.27, .28),
+    Offset(.73, .43),
+    Offset(.29, .63),
+    Offset(.70, .78),
   ],
 ];
 
