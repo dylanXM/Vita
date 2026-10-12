@@ -681,232 +681,224 @@ class _RelationshipCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(30),
       child: ColoredBox(
         color: vita.surface,
-        child: Column(children: [
-          Expanded(
-            child: ClipRect(
-                child: Stack(fit: StackFit.expand, children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 900),
-                curve: Curves.easeInOutCubic,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: visited
-                        ? [glow.withValues(alpha: .85), sky]
-                        : [sky, glow],
-                  ),
-                ),
+        child: Stack(fit: StackFit.expand, children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 900),
+            curve: Curves.easeInOutCubic,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors:
+                    visited ? [glow.withValues(alpha: .85), sky] : [sky, glow],
               ),
-              if (imageUrl.isNotEmpty)
-                AnimatedSlide(
-                  duration: const Duration(milliseconds: 850),
-                  curve: Curves.easeOutCubic,
-                  offset: !visited
-                      ? Offset.zero
+            ),
+          ),
+          if (imageUrl.isNotEmpty)
+            AnimatedSlide(
+              duration: const Duration(milliseconds: 850),
+              curve: Curves.easeOutCubic,
+              offset: !visited
+                  ? Offset.zero
+                  : asking
+                      ? const Offset(-.035, 0)
+                      : const Offset(.025, 0),
+              child: AnimatedScale(
+                duration: const Duration(milliseconds: 1100),
+                curve: Curves.easeOutCubic,
+                scale: !visited
+                    ? 1
+                    : asking
+                        ? 1.18
+                        : 1.10,
+                child: AnimatedRotation(
+                  turns: !visited
+                      ? 0
                       : asking
-                          ? const Offset(-.035, 0)
-                          : const Offset(.025, 0),
-                  child: AnimatedScale(
-                    duration: const Duration(milliseconds: 1100),
-                    curve: Curves.easeOutCubic,
-                    scale: !visited
-                        ? 1
-                        : asking
-                            ? 1.18
-                            : 1.10,
-                    child: AnimatedRotation(
-                      turns: !visited
-                          ? 0
-                          : asking
-                              ? -.006
-                              : .006,
-                      duration: const Duration(milliseconds: 1100),
-                      curve: Curves.easeOutCubic,
-                      child: VitaMediaImage(
-                        url: imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const SizedBox.expand(),
-                      ),
-                    ),
-                  ),
-                ),
-              AnimatedOpacity(
-                duration: const Duration(milliseconds: 850),
-                opacity: visited ? 1 : 0,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: asking
-                          ? const Alignment(.85, -.35)
-                          : const Alignment(-.8, .25),
-                      radius: 1.15,
-                      colors: [
-                        (asking ? const Color(0xFFB6A0FF) : glow)
-                            .withValues(alpha: .28),
-                        Colors.transparent,
-                      ],
-                    ),
+                          ? -.006
+                          : .006,
+                  duration: const Duration(milliseconds: 1100),
+                  curve: Curves.easeOutCubic,
+                  child: VitaMediaImage(
+                    url: imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.expand(),
                   ),
                 ),
               ),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      sky.withValues(alpha: .20),
-                      Colors.transparent,
-                      const Color(0xFF17141F).withValues(alpha: .85),
-                    ],
-                    stops: const [0, .47, 1],
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 18,
-                left: 18,
-                right: 18,
-                child: Row(children: [
-                  const Icon(Icons.circle, size: 7, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      placeTitle.isEmpty ? 'world.ready'.tr : placeTitle.tr,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    '${hour.toString().padLeft(2, '0')}:00',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                ]),
-              ),
-              if (showRecentGift)
-                Positioned(
-                  top: 56,
-                  right: 18,
-                  child: Semantics(
-                    label: '${recentGift?['name_key'] ?? 'world.giveGift'}'.tr,
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: const Color(0xCC17141F),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.white24),
-                      ),
-                      child: Icon(
-                        giftVisualIcon('${recentGift?['product_key'] ?? ''}'),
-                        color: Colors.white,
-                        size: 22,
-                      ),
-                    ),
-                  ),
-                ),
-              Positioned(
-                left: 20,
-                right: 20,
-                bottom: 19,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      height: 23,
-                      child: visited
-                          ? Row(children: [
-                              Icon(
-                                  asking
-                                      ? Icons.record_voice_over_rounded
-                                      : Icons.favorite_rounded,
-                                  size: 15,
-                                  color: Colors.white),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                  child: Text(
-                                asking
-                                    ? 'world.sceneAsk'.tr
-                                    : 'world.sceneStay'.tr,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600),
-                              )),
-                            ])
-                          : const SizedBox.shrink(),
-                    ),
-                    Text(name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 30,
-                            fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 6),
-                    SizedBox(
-                      height: 36,
-                      child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 350),
-                          child: Text(momentLine,
-                              key: ValueKey(momentLine),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  height: 1.3,
-                                  fontWeight: FontWeight.w500))),
-                    ),
+            ),
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 850),
+            opacity: visited ? 1 : 0,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: asking
+                      ? const Alignment(.85, -.35)
+                      : const Alignment(-.8, .25),
+                  radius: 1.15,
+                  colors: [
+                    (asking ? const Color(0xFFB6A0FF) : glow)
+                        .withValues(alpha: .28),
+                    Colors.transparent,
                   ],
                 ),
               ),
-            ])),
+            ),
           ),
-          SizedBox(
-            height: 80,
-            child: ColoredBox(
-              color: vita.surface,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(children: [
-                  Expanded(
-                    child: _WorldUtilityAction(
-                      label: 'world.cardChat'.tr,
-                      primary: true,
-                      icon: Icons.chat_bubble_outline_rounded,
-                      onTap: onChat,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    width: 56,
-                    child: _WorldUtilityAction(
-                      label: 'world.cardGift'.tr,
-                      icon: Icons.card_giftcard_outlined,
-                      onTap: onGift,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 56,
-                    child: _WorldUtilityAction(
-                      label: 'world.cardJourney'.tr,
-                      icon: Icons.auto_stories_outlined,
-                      onTap: onJourney,
-                    ),
-                  ),
-                ]),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  sky.withValues(alpha: .20),
+                  Colors.transparent,
+                  const Color(0xFF17141F).withValues(alpha: .96),
+                ],
+                stops: const [0, .47, 1],
               ),
+            ),
+          ),
+          Positioned(
+            top: 18,
+            left: 18,
+            right: 18,
+            child: Row(children: [
+              const Icon(Icons.circle, size: 7, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  placeTitle.isEmpty ? 'world.ready'.tr : placeTitle.tr,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                '${hour.toString().padLeft(2, '0')}:00',
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ]),
+          ),
+          if (showRecentGift)
+            Positioned(
+              top: 56,
+              right: 18,
+              child: Semantics(
+                label: '${recentGift?['name_key'] ?? 'world.giveGift'}'.tr,
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xCC17141F),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: Icon(
+                    giftVisualIcon('${recentGift?['product_key'] ?? ''}'),
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                ),
+              ),
+            ),
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 90,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 23,
+                  child: visited
+                      ? Row(children: [
+                          Icon(
+                              asking
+                                  ? Icons.record_voice_over_rounded
+                                  : Icons.favorite_rounded,
+                              size: 15,
+                              color: Colors.white),
+                          const SizedBox(width: 6),
+                          Expanded(
+                              child: Text(
+                            asking ? 'world.sceneAsk'.tr : 'world.sceneStay'.tr,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600),
+                          )),
+                        ])
+                      : const SizedBox.shrink(),
+                ),
+                Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 30,
+                        fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                SizedBox(
+                  height: 36,
+                  child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 350),
+                      child: Text(momentLine,
+                          key: ValueKey(momentLine),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              height: 1.3,
+                              fontWeight: FontWeight.w500))),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 12,
+            height: 56,
+            child: Padding(
+              padding: EdgeInsets.zero,
+              child: Row(children: [
+                Expanded(
+                  child: _WorldUtilityAction(
+                    label: 'world.cardChat'.tr,
+                    primary: true,
+                    icon: Icons.chat_bubble_outline_rounded,
+                    onTap: onChat,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 56,
+                  child: _WorldUtilityAction(
+                    label: 'world.cardGift'.tr,
+                    icon: Icons.card_giftcard_outlined,
+                    onTap: onGift,
+                  ),
+                ),
+                SizedBox(
+                  width: 56,
+                  child: _WorldUtilityAction(
+                    label: 'world.cardJourney'.tr,
+                    icon: Icons.auto_stories_outlined,
+                    onTap: onJourney,
+                  ),
+                ),
+              ]),
             ),
           ),
         ]),
@@ -935,12 +927,10 @@ class _WorldUtilityActionState extends State<_WorldUtilityAction> {
 
   @override
   Widget build(BuildContext context) {
-    final vita = context.vita;
     final primary = widget.primary;
     final label = widget.label;
     final icon = widget.icon;
-    final foreground =
-        primary ? vita.green : vita.text;
+    const foreground = Colors.white;
     final caption = Text(
       label,
       maxLines: 1,
@@ -958,25 +948,22 @@ class _WorldUtilityActionState extends State<_WorldUtilityAction> {
         label: label,
         child: ExcludeSemantics(
           child: Material(
-            color: primary
-                ? vita.green.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? .16 : .08)
-                : Colors.transparent,
+            color: Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: widget.onTap,
-              onHighlightChanged: (pressed) => setState(() => _pressed = pressed),
-              highlightColor: vita.green.withValues(alpha: .10),
+              onHighlightChanged: (pressed) =>
+                  setState(() => _pressed = pressed),
+              highlightColor: Colors.white.withValues(alpha: .10),
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: primary ? 8 : 4),
                 child: primary
                     ? Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.start,
                         children: [
-                          Icon(icon, size: 20, color: foreground),
-                          const SizedBox(width: 7),
-                          Expanded(child: caption),
-                          const SizedBox(width: 4),
+                          Flexible(child: caption),
+                          const SizedBox(width: 8),
                           AnimatedSlide(
                             offset: _pressed
                                 ? const Offset(.15, -.15)
@@ -992,7 +979,7 @@ class _WorldUtilityActionState extends State<_WorldUtilityAction> {
                     : Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(icon, size: 22, color: vita.subText),
+                          Icon(icon, size: 22, color: Colors.white70),
                           const SizedBox(height: 4),
                           Flexible(child: caption),
                         ],
