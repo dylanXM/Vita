@@ -149,12 +149,39 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
   };
   String _gender = 'custom';
   String _relationship = 'stranger';
+  CompanionRelationshipOptions _relations =
+      const CompanionRelationshipOptions([]);
   String? _profileGender;
   String? _imagePath;
   String? _documentPath;
   String? _avatarMediaId;
   bool _busy = false;
   bool _hasDraft = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRelations();
+  }
+
+  Future<void> _loadRelations() async {
+    try {
+      final result = await ApiClient.instance.get('/v1/companion-options');
+      final relations = CompanionRelationshipOptions.from(
+          result is Map ? result['relationships'] : null);
+      if (relations.options.isEmpty)
+        throw ApiException('companion.create.optionsUnavailable'.tr);
+      if (mounted)
+        setState(() {
+          _relations = relations;
+          _relationship = _relations.compatibleStage(_relationship, _gender);
+        });
+    } catch (_) {
+      if (mounted)
+        VitaNotice.error('companion.create.title'.tr,
+            'companion.create.optionsUnavailable'.tr);
+    }
+  }
 
   @override
   void dispose() {
@@ -228,14 +255,14 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
       _profileGender = '${profile['gender'] ?? ''}';
       final knownGender = companionKnownGender(_profileGender);
       final draftedRole = _profileGender!.trim().toLowerCase();
-      _gender = companionRoles.contains(draftedRole)
+      _gender = _relations.roles.contains(draftedRole)
           ? draftedRole
           : knownGender == 'male'
               ? 'boyfriend'
               : knownGender == 'female'
                   ? 'girlfriend'
                   : 'custom';
-      _relationship = compatibleCompanionStage(_relationship, _gender);
+      _relationship = _relations.compatibleStage(_relationship, _gender);
       _avatarMediaId = payload['avatar_media_id'] as String?;
       setState(() => _hasDraft = true);
       AnalyticsService.to.track('companion_draft_generated',
@@ -391,10 +418,10 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
           _selectRow(
             'companion.create.who'.tr,
             _gender,
-            companionRolesForGender(_profileGender),
+            _relations.rolesForGender(_profileGender),
             (value) => setState(() {
               _gender = value;
-              _relationship = compatibleCompanionStage(_relationship, value);
+              _relationship = _relations.compatibleStage(_relationship, value);
             }),
             (value) => 'relation.$value'.tr,
           ),
@@ -406,19 +433,23 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
           _selectRow(
             'companion.create.closeness'.tr,
             _relationship,
-            companionStagesForRole(_gender),
+            _relations.stagesForRole(_gender),
             (value) => setState(() => _relationship = value),
             (value) => 'stage.$value'.tr,
           ),
         ]),
       ),
+      if (_relations.options.isEmpty)
+        TextButton(
+            onPressed: _loadRelations,
+            child: Text('companion.create.retryOptions'.tr)),
       const SizedBox(height: 24),
       OutlinedButton(
           onPressed: _busy ? null : () => setState(() => _hasDraft = false),
           child: Text('companion.create.regenerate'.tr)),
       const SizedBox(height: 8),
       ElevatedButton(
-          onPressed: _busy ? null : _submit,
+          onPressed: _busy || _relations.options.isEmpty ? null : _submit,
           child: Text('companion.create.confirm'.tr)),
     ];
   }

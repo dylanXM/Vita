@@ -20,6 +20,7 @@ import (
 
 	"vita/internal/agent"
 	"vita/internal/auth"
+	"vita/internal/companion"
 	"vita/internal/config"
 	"vita/internal/db"
 	"vita/internal/language"
@@ -1092,7 +1093,7 @@ func CreateCompanion(c *gin.Context) {
 	}
 	if err := alignCompanionRelationship(c.Request.Context(), &req); err != nil {
 		status := http.StatusInternalServerError
-		if errors.Is(err, errCompanionPortraitUnavailable) {
+		if errors.Is(err, errCompanionPortraitUnavailable) || errors.Is(err, companion.ErrInvalidRelationship) {
 			status = http.StatusBadRequest
 		}
 		c.JSON(status, gin.H{"error": err.Error()})
@@ -1236,14 +1237,14 @@ func UpdateCompanion(c *gin.Context) {
 	}
 	if err := alignCompanionRelationship(c.Request.Context(), &req); err != nil {
 		status := http.StatusInternalServerError
-		if errors.Is(err, errCompanionPortraitUnavailable) {
+		if errors.Is(err, errCompanionPortraitUnavailable) || errors.Is(err, companion.ErrInvalidRelationship) {
 			status = http.StatusBadRequest
 		}
 		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 	tags, _ := json.Marshal(req.PersonalityTags)
-	result, err := db.Get().Exec(`UPDATE companions SET name=$3,gender=$4,persona=$5,appearance=$6,city=$7,occupation=$8,interests=$9,personality_tags=$10,speaking_style=$11,likes=$12,dislikes=$13,life_habits=$14,life_goal=$15,backstory=$16,portrait_id=$17,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$2`, id, c.GetString("user_id"), req.Name, req.Gender, req.Persona, req.Appearance, req.City, req.Occupation, req.Interests, tags, req.SpeakingStyle, req.Likes, req.Dislikes, req.LifeHabits, req.LifeGoal, req.Backstory, req.PortraitID)
+	result, err := db.Get().Exec(`UPDATE companions SET name=$3,persona=$4,appearance=$5,city=$6,occupation=$7,interests=$8,personality_tags=$9,speaking_style=$10,likes=$11,dislikes=$12,life_habits=$13,life_goal=$14,backstory=$15,portrait_id=$16,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$2`, id, c.GetString("user_id"), req.Name, req.Persona, req.Appearance, req.City, req.Occupation, req.Interests, tags, req.SpeakingStyle, req.Likes, req.Dislikes, req.LifeHabits, req.LifeGoal, req.Backstory, req.PortraitID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to update companion"})
 		return

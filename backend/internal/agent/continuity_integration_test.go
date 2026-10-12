@@ -32,6 +32,10 @@ func TestCompanionContinuityPostgres(t *testing.T) {
 	}
 	defer database.Close()
 	database.SetMaxOpenConns(5)
+	// Reset only this explicitly named disposable database so reruns are isolated.
+	if _, err := database.Exec(`DROP SCHEMA public CASCADE; CREATE SCHEMA public`); err != nil {
+		t.Fatal(err)
+	}
 	if err := db.Migrate(database, false); err != nil {
 		t.Fatal(err)
 	}
@@ -152,6 +156,15 @@ func TestCompanionContinuityPostgres(t *testing.T) {
 	process()
 	if err := database.QueryRow(`SELECT status FROM companion_memory_jobs WHERE message_id='msg5'`).Scan(&status); err != nil || status != "completed" {
 		t.Fatalf("retry: %s %v", status, err)
+	}
+	// The user may also propose a specific relationship type, which the
+	// companion explicitly confirms. Type and closeness are stored together.
+	addExchange("msg6", "你愿意做我的妻子吗？", "我愿意做你的妻子。", now.Add(-25*time.Minute))
+	output = `{"memories":[],"updates":[],"relationship":{"type":"wife","stage":"partner","user_evidence":"你愿意做我的妻子吗？","assistant_evidence":"我愿意做你的妻子。"}}`
+	process()
+	var role string
+	if err := database.QueryRow(`SELECT gender,relationship_stage FROM companions WHERE id='c'`).Scan(&role, &status); err != nil || role != "wife" || status != "partner" {
+		t.Fatalf("user-led relationship: %s %s %v", role, status, err)
 	}
 	// Familiarity from chat does not create trust/intimacy or change the stage.
 	service.updateRelationshipAndMemory(context.Background(), "c2", "u", "A long enough message to pass the old intimacy rule.")

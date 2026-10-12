@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS companion_memory_jobs (
     last_error TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_companion_memory_jobs_pending
+    ON companion_memory_jobs(retry_at,created_at) WHERE status='pending';
 
 CREATE TABLE IF NOT EXISTS user_contact_preferences (
     user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,

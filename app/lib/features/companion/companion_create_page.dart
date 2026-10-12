@@ -25,6 +25,8 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
   final _interests = TextEditingController();
   String _gender = 'custom';
   String _relationship = 'stranger';
+  CompanionRelationshipOptions _relations =
+      const CompanionRelationshipOptions([]);
   bool _roleEdited = false;
   bool _busy = false;
   bool _loadingOptions = true;
@@ -67,7 +69,13 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
       if (!mounted || data is! Map) return;
       final tags = data['personality_tags'];
       final portraits = data['portraits'];
+      final relations =
+          CompanionRelationshipOptions.from(data['relationships']);
+      if (relations.options.isEmpty)
+        throw ApiException('companion.create.optionsUnavailable'.tr);
       setState(() {
+        _relations = relations;
+        _relationship = _relations.compatibleStage(_relationship, _gender);
         if (tags is List) _availableTags = tags.whereType<String>().toList();
         if (portraits is List) {
           _portraits = portraits
@@ -76,8 +84,10 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
               .toList();
         }
       });
-    } catch (_) {
-      // Creation remains available with built-in tags when options cannot load.
+    } catch (error) {
+      if (mounted)
+        VitaNotice.error('companion.create.title'.tr,
+            'companion.create.optionsUnavailable'.tr);
     } finally {
       if (mounted) setState(() => _loadingOptions = false);
     }
@@ -195,6 +205,7 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
       AnalyticsService.to
           .track('companion_created', category: 'companion', properties: {
         'companion_id': result is Map ? '${result['id'] ?? ''}' : '',
+        'relationship_stage': _relationship,
         'personality_tag_count': _personalityTags.length,
         'has_portrait': _portraitId != null || _avatarMediaId != null,
       });
@@ -266,13 +277,8 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
       children: options.map((o) {
         final isSelected = selected == o;
         return ChoiceChip(
-          label: Text((o.startsWith('girl') ||
-                      o.startsWith('boy') ||
-                      o == 'friend' ||
-                      o == 'custom'
-                  ? 'relation.$o'
-                  : 'stage.$o')
-              .tr),
+          label: Text(
+              (_relations.roles.contains(o) ? 'relation.$o' : 'stage.$o').tr),
           selected: isSelected,
           onSelected: (_) => onSelected(o),
           labelStyle: TextStyle(
@@ -373,10 +379,10 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
                                                 ? knownGender == 'male'
                                                     ? 'boyfriend'
                                                     : 'girlfriend'
-                                                : compatibleCompanionRole(
+                                                : _relations.compatibleRole(
                                                     _gender, portraitGender);
                                         _relationship =
-                                            compatibleCompanionStage(
+                                            _relations.compatibleStage(
                                                 _relationship, _gender);
                                         final suggested =
                                             portrait['personality_tags'];
@@ -444,13 +450,13 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
                             color: context.vita.text)),
                     const SizedBox(height: 10),
                     _chipRow(
-                        companionRolesForGender(_portraitGender),
+                        _relations.rolesForGender(_portraitGender),
                         _gender,
                         (g) => setState(() {
                               _roleEdited = true;
                               _gender = g;
                               _relationship =
-                                  compatibleCompanionStage(_relationship, g);
+                                  _relations.compatibleStage(_relationship, g);
                             })),
                     const SizedBox(height: 18),
                     Text('companion.create.closeness'.tr,
@@ -459,14 +465,21 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
                             fontWeight: FontWeight.w600,
                             color: context.vita.text)),
                     const SizedBox(height: 10),
-                    _chipRow(companionStagesForRole(_gender), _relationship,
+                    _chipRow(_relations.stagesForRole(_gender), _relationship,
                         (s) => setState(() => _relationship = s)),
                   ],
                 ),
               ),
+              if (_relations.options.isEmpty && !_loadingOptions)
+                TextButton(
+                    onPressed: _loadOptions,
+                    child: Text('companion.create.retryOptions'.tr)),
               const SizedBox(height: 28),
               ElevatedButton(
-                onPressed: _busy || _uploadingAvatar ? null : _submit,
+                onPressed:
+                    _busy || _uploadingAvatar || _relations.options.isEmpty
+                        ? null
+                        : _submit,
                 child: _busy
                     ? const SizedBox(
                         width: 20,

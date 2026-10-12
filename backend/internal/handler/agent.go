@@ -17,6 +17,7 @@ import (
 	"github.com/lib/pq"
 
 	"vita/internal/agent"
+	"vita/internal/companion"
 	"vita/internal/db"
 	"vita/internal/language"
 )
@@ -967,6 +968,7 @@ func CompanionOptions(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
+		"relationships":    companion.RelationshipOptions(),
 		"personality_tags": []string{"warm", "independent", "witty", "gentle", "curious", "calm", "outgoing", "thoughtful", "ambitious", "playful"},
 		"portraits":        portraits,
 		"creation_sources": []string{"tags_portrait", "chat_history", "user_images", "admin"},
@@ -1138,6 +1140,14 @@ func saveAdminCompanion(c *gin.Context, id string) {
 	if input.RelationshipStage == "" {
 		input.RelationshipStage = "stranger"
 	}
+	if input.Gender != "pet" {
+		role, stage, err := companion.NormalizeRelationship(input.Gender, input.RelationshipStage, "")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		input.Gender, input.RelationshipStage = role, stage
+	}
 	if input.ModelID != nil {
 		modelID := strings.TrimSpace(*input.ModelID)
 		if modelID == "" {
@@ -1187,8 +1197,8 @@ func saveAdminCompanion(c *gin.Context, id string) {
 		if len(input.VoiceConfig) > 0 {
 			voiceConfig = input.VoiceConfig
 		}
-		result, err := db.Get().Exec(`UPDATE companions SET name=$2,gender=$3,persona=$4,city=$5,occupation=$6,interests=$7,personality_tags=$8,speaking_style=$9,likes=$10,dislikes=$11,life_habits=$12,life_goal=$13,backstory=$14,portrait_id=$15,model_id=$16,proactive_enabled=$17,active=$18,voice_enabled=COALESCE($19,voice_enabled),voice_config=COALESCE($20,voice_config),avatar_url=COALESCE($21,avatar_url),updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
-			id, input.Name, input.Gender, input.Persona, input.City, input.Occupation, input.Interests, tags, input.SpeakingStyle, input.Likes, input.Dislikes, input.LifeHabits, input.LifeGoal, input.Backstory, input.PortraitID, input.ModelID, proactive, active, input.VoiceEnabled, voiceConfig, input.AvatarURL)
+		result, err := db.Get().Exec(`UPDATE companions SET name=$2,persona=$3,city=$4,occupation=$5,interests=$6,personality_tags=$7,speaking_style=$8,likes=$9,dislikes=$10,life_habits=$11,life_goal=$12,backstory=$13,portrait_id=$14,model_id=$15,proactive_enabled=$16,active=$17,voice_enabled=COALESCE($18,voice_enabled),voice_config=COALESCE($19,voice_config),avatar_url=COALESCE($20,avatar_url),updated_at=CURRENT_TIMESTAMP WHERE id=$1`,
+			id, input.Name, input.Persona, input.City, input.Occupation, input.Interests, tags, input.SpeakingStyle, input.Likes, input.Dislikes, input.LifeHabits, input.LifeGoal, input.Backstory, input.PortraitID, input.ModelID, proactive, active, input.VoiceEnabled, voiceConfig, input.AvatarURL)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to update companion"})
 			return

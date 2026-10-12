@@ -13,6 +13,15 @@ class VitaTranslations extends Translations {
 
   static const Map<String, Map<String, String>> _keys = {
     'en': {
+      "relation.wife": "Wife",
+      "relation.husband": "Husband",
+      "relation.crush": "Crush",
+      "relation.confidant": "Confidant",
+      "relation.family": "Family",
+      "relation.mentor": "Mentor",
+      "relation.colleague": "Colleague",
+      "companion.create.optionsUnavailable": "Relationship options could not be loaded. Please retry before creating your companion.",
+      "companion.create.retryOptions": "Reload relationship options",
       // Shell tabs.
       'tab.chat': 'Chat',
       'tab.memories': 'Memories',
@@ -815,6 +824,15 @@ class VitaTranslations extends Translations {
       'stage.partner': 'Partner',
     },
     'zh_CN': {
+      "relation.wife": "妻子",
+      "relation.husband": "丈夫",
+      "relation.crush": "暧昧对象",
+      "relation.confidant": "知己",
+      "relation.family": "家人",
+      "relation.mentor": "导师",
+      "relation.colleague": "同事",
+      "companion.create.optionsUnavailable": "关系选项加载失败，请重试后再创建伴侣。",
+      "companion.create.retryOptions": "重新加载关系选项",
       'tab.chat': '聊天',
       'tab.memories': '回忆',
       'tab.explore': '发现',

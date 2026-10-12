@@ -93,7 +93,7 @@ export function CompanionDetailPage() {
       <Card className="xl:col-span-2"><CardHeader><CardTitle>{t("companions.profile")}</CardTitle><CardDescription>{t("companions.profileDesc")}</CardDescription></CardHeader><CardContent className="space-y-5">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Field label={t("agent.name")}><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-          <Field label={t("agent.gender")}><Input value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} /></Field>
+          <Field label={t("agent.gender")}><Input value={form.gender} readOnly /></Field>
           <Field label={t("agent.city")}><Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></Field>
           <Field label={t("agent.occupation")}><Input value={form.occupation} onChange={(e) => setForm({ ...form, occupation: e.target.value })} /></Field>
           <Field label={t("companions.relationshipStage")}><Input value={form.relationship_stage} readOnly /></Field>

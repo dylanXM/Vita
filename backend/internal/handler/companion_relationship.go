@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 
+	"vita/internal/companion"
 	"vita/internal/db"
 )
 
@@ -15,6 +16,10 @@ var errCompanionPortraitUnavailable = errors.New("companion portrait is unavaila
 // presentation. Older clients may send an incompatible relationship choice;
 // normalize it before persisting instead of creating contradictory profiles.
 func alignCompanionRelationship(ctx context.Context, req *CreateCompanionRequest) error {
+	genderHint := ""
+	if req.Gender == "" {
+		req.Gender = "custom"
+	}
 	if req.PortraitID != nil && strings.TrimSpace(*req.PortraitID) != "" {
 		var portraitGender string
 		err := db.Get().QueryRowContext(ctx,
@@ -27,18 +32,16 @@ func alignCompanionRelationship(ctx context.Context, req *CreateCompanionRequest
 			return err
 		}
 		switch strings.ToLower(strings.TrimSpace(portraitGender)) {
-		case "boyfriend", "male", "man", "boy":
-			if req.Gender == "girlfriend" {
-				req.Gender = "boyfriend"
-			}
-		case "girlfriend", "female", "woman", "girl":
-			if req.Gender == "boyfriend" {
-				req.Gender = "girlfriend"
-			}
+		case "boyfriend", "husband", "male", "man", "boy":
+			genderHint = "male"
+		case "girlfriend", "wife", "female", "woman", "girl":
+			genderHint = "female"
 		}
 	}
-	if req.RelationshipStage == "" {
-		req.RelationshipStage = "stranger"
+	role, stage, err := companion.NormalizeRelationship(req.Gender, req.RelationshipStage, genderHint)
+	if err != nil {
+		return err
 	}
+	req.Gender, req.RelationshipStage = role, stage
 	return nil
 }
