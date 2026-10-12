@@ -990,7 +990,7 @@ class _StoryDetailPageState extends State<StoryDetailPage> {
                                             height: 1.35)),
                                   ),
                                   const SizedBox(width: 8),
-                                  Icon(Icons.arrow_forward_rounded,
+                                  Icon(Icons.arrow_outward_rounded,
                                       size: 18, color: context.vita.green),
                                 ]),
                               ),
