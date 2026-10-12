@@ -412,7 +412,10 @@ class _MemoriesPageState extends State<MemoriesPage> {
         backgroundColor: context.vita.pageBg,
         appBar: widget.companionId == null
             ? null
-            : AppBar(title: Text('tab.journey'.tr)),
+            : AppBar(
+                leading: const VitaBackButton(),
+                title: Text('tab.journey'.tr),
+              ),
         body: SafeArea(
           bottom: false,
           child: Obx(() => _buildBody(context, MemoriesController.to)),
@@ -745,10 +748,7 @@ class _JourneyVisitPageState extends State<_JourneyVisitPage> {
           Padding(
             padding: const EdgeInsets.fromLTRB(10, 2, 14, 4),
             child: Row(children: [
-              IconButton(
-                onPressed: () => Get.back(),
-                icon: const Icon(Icons.arrow_back_ios_new_rounded),
-              ),
+              const VitaBackButton(),
               Expanded(
                 child: Text('journey.thenAndNow'.tr,
                     maxLines: 1,
