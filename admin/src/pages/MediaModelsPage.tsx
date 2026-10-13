@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
-import { compatibleMediaModels, normalizeMediaRoutesForSave, selectedMediaModelIDs } from "./media-model-routes";
+import { compatibleMediaModels, changedMediaRoutesForSave, selectedMediaModelIDs } from "./media-model-routes";
 
 const groups: Array<{ type: MediaModelType; icon: typeof Image }> = [
   { type: "text", icon: MessageCircle },
@@ -29,9 +29,11 @@ export function MediaModelsPage() {
   const [routes, setRoutes] = useState<MediaModelRoute[]>([]);
   const [activeType, setActiveType] = useState<MediaModelType>("text");
   useEffect(() => { if (query.data) setRoutes(query.data.routes); }, [query.data]);
+  const changedRoutes = changedMediaRoutesForSave(routes, query.data?.routes ?? []);
   const save = useMutation({
-    mutationFn: () => agentApi.saveMediaRoutes(normalizeMediaRoutesForSave(routes)),
+    mutationFn: () => agentApi.saveMediaRoutes(changedRoutes),
     onSuccess: (data) => {
+      queryClient.setQueryData(["media-model-routes"], data);
       setRoutes(data.routes);
       toast.success(t("mediaModels.saved"));
       void queryClient.invalidateQueries({ queryKey: ["agent-config"] });
@@ -43,7 +45,7 @@ export function MediaModelsPage() {
   const update = (next: MediaModelRoute) => setRoutes((items) => items.map((item) => item.route_key === next.route_key ? next : item));
   return (
     <div className="space-y-6">
-      <PageHeader title={t("mediaModels.title")} description={t("mediaModels.description")} actions={<Button disabled={save.isPending} onClick={() => save.mutate()}><Save />{t("mediaModels.save")}</Button>} />
+      <PageHeader title={t("mediaModels.title")} description={t("mediaModels.description")} actions={<Button disabled={save.isPending || !changedRoutes.length} onClick={() => save.mutate()}><Save />{t("mediaModels.save")}</Button>} />
       <div className="flex gap-1 overflow-x-auto rounded-lg border bg-muted/40 p-1" role="tablist" aria-label={t("mediaModels.title")}>
         {groups.map(({ type, icon: Icon }) => <button key={type} type="button" role="tab" aria-selected={activeType === type} onClick={() => setActiveType(type)} className={`flex min-w-24 flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${activeType === type ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><Icon className="size-4" />{t(`mediaModels.type.${type}`)}</button>)}
       </div>

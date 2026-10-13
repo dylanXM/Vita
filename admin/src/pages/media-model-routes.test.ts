@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { AIModel, MediaModelRoute } from "@/api/types";
-import { compatibleMediaModels, normalizeMediaRoutesForSave, selectedMediaModelIDs } from "./media-model-routes";
+import { compatibleMediaModels, normalizeMediaRoutesForSave, changedMediaRoutesForSave, selectedMediaModelIDs } from "./media-model-routes";
 
 const route: MediaModelRoute = {
   route_key: "image_life_photo",
@@ -71,5 +71,21 @@ describe("media model route helpers", () => {
     const result = normalizeMediaRoutesForSave(input);
     expect(result[0]).toMatchObject({ primary_model_id: "primary", fallback_model_ids: ["backup-1", "backup-2"] });
     expect(input[0].fallback_model_ids).toEqual([" backup-1 ", "", " backup-2 ", "   "]);
+  });
+});
+
+describe("partial route saves", () => {
+  const textRoute: MediaModelRoute = { route_key: "text_chat", media_type: "text", enabled: true, primary_model_id: "old-chat", fallback_model_ids: [] };
+  it("omits unchanged image routes when saving a text change", () => {
+    const saved = [textRoute, route];
+    expect(changedMediaRoutesForSave([{...textRoute, primary_model_id:"new-chat"},route],saved)).toEqual([{...textRoute,primary_model_id:"new-chat"}]);
+  });
+  it("includes changed fallback order and behavior enablement", () => {
+    expect(changedMediaRoutesForSave([{...route,enabled:false}],[route])).toHaveLength(1);
+    const ordered = {...route,fallback_model_ids:["a","b"]};
+    expect(changedMediaRoutesForSave([{...ordered,fallback_model_ids:["b","a"]}],[ordered])).toHaveLength(1);
+  });
+  it("ignores whitespace and unfinished fallback rows", () => {
+    expect(changedMediaRoutesForSave([{...route,primary_model_id:" primary ",fallback_model_ids:[" backup ",""]}],[route])).toEqual([]);
   });
 });

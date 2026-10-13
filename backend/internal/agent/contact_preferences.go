@@ -41,6 +41,10 @@ func LoadContactPreferences(ctx context.Context, q contactQuerier, userID string
 // All autonomous contact shares one account-wide budget, including follow-ups.
 // The transaction caller locks the user row before this final eligibility check.
 func (s *Service) contactAllowed(ctx context.Context, q contactQuerier, userID, timezone string, settings lifeSettings) (bool, error) {
+	return s.contactAllowedWithChatPresence(ctx, q, userID, timezone, settings, false)
+}
+
+func (s *Service) contactAllowedWithChatPresence(ctx context.Context, q contactQuerier, userID, timezone string, settings lifeSettings, chatPresent bool) (bool, error) {
 	p, err := LoadContactPreferences(ctx, q, userID)
 	if err != nil {
 		return false, err
@@ -59,12 +63,15 @@ func (s *Service) contactAllowed(ctx context.Context, q contactQuerier, userID, 
 	var latest sql.NullTime
 	err = q.QueryRowContext(ctx, `SELECT COUNT(*) FILTER (WHERE m.created_at>=$2 AND m.created_at<$3),MAX(m.created_at)
  FROM messages m JOIN conversations c ON c.id=m.conversation_id
- WHERE c.user_id=$1 AND m.source IN ('proactive','memory_followup')`, userID, start, end).Scan(&count, &latest)
+ WHERE c.user_id=$1 AND m.source IN ('proactive','memory_followup','conversation_followup')`, userID, start, end).Scan(&count, &latest)
 	if err != nil {
 		return false, err
 	}
 	if count >= min(p.DailyLimit, settings.DailyProactiveLimit) || (latest.Valid && time.Since(latest.Time) < time.Duration(p.MinimumGapMinutes)*time.Minute) {
 		return false, nil
+	}
+	if chatPresent {
+		return true, nil
 	}
 	var present bool
 	err = q.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM messages m JOIN conversations c ON c.id=m.conversation_id

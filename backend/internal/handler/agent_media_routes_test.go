@@ -65,7 +65,7 @@ func TestNormalizeMediaModelRoutesCleansOptionalValues(t *testing.T) {
 
 func TestNormalizeMediaModelRoutesRejectsInvalidConfiguration(t *testing.T) {
 	tests := map[string]func([]mediaModelRoute) []mediaModelRoute{
-		"missing route": func(routes []mediaModelRoute) []mediaModelRoute { return routes[:len(routes)-1] },
+		"empty routes": func(routes []mediaModelRoute) []mediaModelRoute { return nil },
 		"wrong media type": func(routes []mediaModelRoute) []mediaModelRoute {
 			routes[0].MediaType = "audio"
 			return routes
@@ -144,5 +144,13 @@ func TestNormalizeModelScenariosAllowsVideoWithoutRequiringATestAdapter(t *testi
 	}
 	if strings.Join(capabilities, ",") != "video" {
 		t.Fatalf("capabilities = %#v", capabilities)
+	}
+}
+
+func TestNormalizeMediaModelRoutesAcceptsPartialUpdate(t *testing.T) {
+	routes := []mediaModelRoute{{RouteKey: "text_chat", MediaType: "text", Enabled: true, PrimaryModelID: stringPointer("chat-model")}}
+	normalized, err := normalizeMediaModelRoutes(routes)
+	if err != nil || len(normalized) != 1 || normalized[0].RouteKey != "text_chat" {
+		t.Fatalf("routes=%v err=%v", normalized, err)
 	}
 }

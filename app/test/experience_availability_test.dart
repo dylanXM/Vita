@@ -86,6 +86,7 @@ void main() {
       for (final key in [
         'credits.purchaseTitle',
         'experience.insufficientCoins',
+        'experience.bookingHours',
         'experience.comingSoon',
         'experience.subscriptionOnly',
         'experience.subscribeToUse'

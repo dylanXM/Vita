@@ -52,7 +52,44 @@ func fitsExperienceSlot(start time.Time, duration time.Duration, blocks []experi
 	return true
 }
 
-func availableExperienceSlots(now time.Time, duration time.Duration, blocks []experienceBlock) []experienceSlot {
+type bookingWindow struct {
+	StartHour, EndHour int
+	Location           *time.Location
+}
+
+func dateBookingWindow(key string, location *time.Location) bookingWindow {
+	start := 6
+	if key == "date_dinner" || key == "date_movie" {
+		start = 18
+	}
+	if location == nil {
+		location = time.UTC
+	}
+	return bookingWindow{start, 22, location}
+}
+
+func (w bookingWindow) allows(start time.Time) bool {
+	hour := start.In(w.Location).Hour()
+	return hour >= w.StartHour && hour < w.EndHour
+}
+
+func loadDateBookingWindow(ctx context.Context, userID, key string) (bookingWindow, error) {
+	var zone string
+	if err := db.Get().QueryRowContext(ctx, `SELECT COALESCE(NULLIF(timezone,''),'UTC') FROM users WHERE id=$1`, userID).Scan(&zone); err != nil {
+		return bookingWindow{}, err
+	}
+	location, err := time.LoadLocation(zone)
+	if err != nil {
+		return bookingWindow{}, err
+	}
+	return dateBookingWindow(key, location), nil
+}
+
+func availableExperienceSlots(now time.Time, duration time.Duration, blocks []experienceBlock, windows ...bookingWindow) []experienceSlot {
+	window := dateBookingWindow("", time.UTC)
+	if len(windows) > 0 {
+		window = windows[0]
+	}
 	slots := make([]experienceSlot, 0, 12)
 	if duration <= 0 || duration > 24*time.Hour {
 		return slots
@@ -64,7 +101,7 @@ func availableExperienceSlots(now time.Time, duration time.Duration, blocks []ex
 	}
 	horizon := now.UTC().Add(7 * 24 * time.Hour)
 	for !candidate.Add(duration).After(horizon) && len(slots) < 12 {
-		if fitsExperienceSlot(candidate, duration, blocks) {
+		if window.allows(candidate) && fitsExperienceSlot(candidate, duration, blocks) {
 			slots = append(slots, experienceSlot{candidate, candidate.Add(duration)})
 			candidate = candidate.Add(30 * time.Minute)
 		} else {
@@ -110,5 +147,10 @@ func ListExperienceSlots(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load available times"})
 		return
 	}
-	c.JSON(200, gin.H{"slots": availableExperienceSlots(now, duration, blocks), "server_time": now})
+	window, err := loadDateBookingWindow(c.Request.Context(), userID, c.Param("product_key"))
+	if err != nil {
+		c.JSON(500, gin.H{"error": "failed to load booking timezone"})
+		return
+	}
+	c.JSON(200, gin.H{"slots": availableExperienceSlots(now, duration, blocks, window), "server_time": now})
 }

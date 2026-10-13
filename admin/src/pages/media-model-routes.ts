@@ -15,3 +15,14 @@ export function normalizeMediaRoutesForSave(routes: MediaModelRoute[]): MediaMod
     fallback_model_ids: route.fallback_model_ids.map((id) => id.trim()).filter(Boolean),
   }));
 }
+
+/** Send only changed settings; unrelated stale routes must not block a save. */
+export function changedMediaRoutesForSave(routes: MediaModelRoute[], saved: MediaModelRoute[]): MediaModelRoute[] {
+  const baseline = new Map(normalizeMediaRoutesForSave(saved).map((route) => [route.route_key, route]));
+  return normalizeMediaRoutesForSave(routes).filter((route) => {
+    const previous = baseline.get(route.route_key);
+    return !previous || route.enabled !== previous.enabled ||
+      route.primary_model_id !== previous.primary_model_id ||
+      JSON.stringify(route.fallback_model_ids) !== JSON.stringify(previous.fallback_model_ids);
+  });
+}

@@ -1170,7 +1170,7 @@ class _SignalFocusDialog extends StatelessWidget {
                   const SizedBox(height: 18),
                 ],
                 if (published != null)
-                  Text(formatDate(published.toLocal()),
+                  Text('${formatDate(published.toLocal())} ${formatClock(published.toLocal())}',
                       style:
                           TextStyle(color: context.vita.subText, fontSize: 12)),
                 if ('${author['id'] ?? ''}'.isNotEmpty) ...[

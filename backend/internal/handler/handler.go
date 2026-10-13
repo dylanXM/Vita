@@ -1573,6 +1573,14 @@ func SendMessage(c *gin.Context) {
 			return
 		}
 	}
+	if _, err = tx.ExecContext(c.Request.Context(), `SELECT id FROM conversations WHERE id=$1 FOR UPDATE`, conversationID); err != nil {
+		c.JSON(500, gin.H{"error": "failed to synchronize conversation"})
+		return
+	}
+	if _, err = tx.ExecContext(c.Request.Context(), `UPDATE companion_conversation_queue SET status='cancelled' WHERE conversation_id=$1 AND status IN ('pending','processing')`, conversationID); err != nil {
+		c.JSON(500, gin.H{"error": "failed to update conversation turn"})
+		return
+	}
 	payloadJSON, _ := json.Marshal(messagePayload)
 	_, err = tx.ExecContext(c.Request.Context(), query, msgID, conversationID, req.MessageType, req.Content, mediaURL, createdAt, activeLifeID.String, string(payloadJSON))
 	if err != nil {
@@ -1688,6 +1696,11 @@ func SendMessage(c *gin.Context) {
 		}
 	} else {
 		response.CompanionMessage = reply
+		if reply != nil {
+			if count, ok := reply.Payload["bubble_count"].(int); ok && count > 1 {
+				response.ReplyStatus = "pending"
+			}
+		}
 		if reply == nil {
 			response.ReplyStatus = "pending"
 		}
@@ -1721,7 +1734,16 @@ func GetReplyStatus(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load reply status"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": status, "age_seconds": ageSeconds, "trigger_message_id": triggerMessageID})
+	burstPending := false
+	if status == "none" && c.Query("channel") != "date" {
+		err := db.Get().QueryRowContext(c.Request.Context(), `SELECT 'pending',GREATEST(0,EXTRACT(EPOCH FROM CURRENT_TIMESTAMP-m.created_at)::int),q.trigger_message_id FROM companion_conversation_queue q JOIN messages m ON m.id=q.trigger_message_id WHERE q.conversation_id=$1 AND q.kind='burst' AND q.status IN ('pending','processing') AND q.expires_at>CURRENT_TIMESTAMP ORDER BY q.due_at LIMIT 1`, conversationID).Scan(&status, &ageSeconds, &triggerMessageID)
+		burstPending = err == nil
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			c.JSON(500, gin.H{"error": "failed to load conversation pacing"})
+			return
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"status": status, "age_seconds": ageSeconds, "trigger_message_id": triggerMessageID, "burst_pending": burstPending})
 }
 
 // Retained for app versions already using this endpoint; the current chat UI
@@ -1759,6 +1781,11 @@ func RetryReply(c *gin.Context) {
 func GetMessages(c *gin.Context) {
 	conversationID := c.Param("id")
 	userID := c.GetString("user_id")
+	if _, err := db.Get().ExecContext(c.Request.Context(), `UPDATE conversations SET last_active_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$2`, conversationID, userID); err != nil {
+		c.JSON(500, gin.H{"error": "failed to update chat presence"})
+		return
+	}
+
 	query := `SELECT m.id,m.conversation_id,m.sender_type,m.message_type,COALESCE(m.content,''),COALESCE(m.media_url,''),m.payload::text,m.source,COALESCE(m.life_event_id,''),m.delivery_status,m.created_at FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE m.conversation_id=$1 AND c.user_id=$2`
 	args := []any{conversationID, userID}
 	dateChannel := c.Query("channel") == "date"

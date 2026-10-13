@@ -396,6 +396,7 @@ class VitaTranslations extends Translations {
       'transfer.confirm': 'Send coins',
       'transfer.coinUnit': 'coins',
       'transfer.sent': 'Delivered',
+      'experience.bookingHours': 'Dates can start from 06:00 to before 22:00. Dinner and movie dates can start from 18:00 to before 22:00.',
       'experience.appointmentInvalid':
           'Choose a time 5 minutes to 30 days from now.',
       'experience.appointmentBusy':
@@ -1303,6 +1304,7 @@ class VitaTranslations extends Translations {
       'transfer.confirm': '转给 TA',
       'transfer.coinUnit': '金币',
       'transfer.sent': '已送达',
+      'experience.bookingHours': '约会开始时间须在 06:00 至 22:00 前；晚餐和电影须在 18:00 至 22:00 前。',
       'experience.appointmentInvalid': '请选择 5 分钟后至 30 天内的时间。',
       'experience.appointmentBusy': '这个时间不可预约，请选择其他时间。',
       'experience.chooseTime': '选择预约时间',

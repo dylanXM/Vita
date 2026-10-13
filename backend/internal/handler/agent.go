@@ -824,8 +824,8 @@ func normalizeMediaModelRoutes(routes []mediaModelRoute) ([]mediaModelRoute, err
 		}
 		normalized = append(normalized, route)
 	}
-	if len(seen) != len(mediaRouteTypes) {
-		return nil, errors.New("all model routes are required")
+	if len(seen) == 0 {
+		return nil, errors.New("at least one model route is required")
 	}
 	return normalized, nil
 }

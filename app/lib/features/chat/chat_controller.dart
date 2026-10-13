@@ -39,6 +39,7 @@ class ChatController extends GetxController {
   final companionStatus = ''.obs;
   final companionBusy = false.obs;
   final replyStatus = 'none'.obs;
+  bool _burstPending = false;
   String? replyPendingMessageId;
   int replyPendingAgeSeconds = 0;
   final trialStatus = 'none'.obs;
@@ -204,8 +205,9 @@ class ChatController extends GetxController {
     if (data is Map && data['status'] is String) {
       replyPendingMessageId = data['trigger_message_id'] as String?;
       replyPendingAgeSeconds = (data['age_seconds'] as num?)?.toInt() ?? 0;
+      _burstPending = data['burst_pending'] == true;
       replyStatus.value = data['status'] as String;
-      if (_latestUserHasReply) replyStatus.value = 'none';
+      if (_latestUserHasReply && !_burstPending) replyStatus.value = 'none';
     }
   }
 
@@ -238,6 +240,7 @@ class ChatController extends GetxController {
   }
 
   void _beginReplyWait() {
+    _burstPending = false;
     _replyStartedAt = DateTime.now();
     replyPendingMessageId = null;
     replyPendingAgeSeconds = 0;
@@ -245,6 +248,10 @@ class ChatController extends GetxController {
   }
 
   void _applyReplyResponse(Map data) {
+    final companionMessage = data['companion_message'];
+    final payload = companionMessage is Map ? companionMessage['payload'] : null;
+    _burstPending = payload is Map && (payload['bubble_count'] as num? ?? 1) > 1;
+
     final userMessage = data['user_message'];
     replyPendingMessageId = userMessage is Map
         ? userMessage['id'] as String?
@@ -252,7 +259,7 @@ class ChatController extends GetxController {
     replyPendingAgeSeconds =
         DateTime.now().difference(_replyStartedAt ?? DateTime.now()).inSeconds;
     if (data['companion_message'] is Map) {
-      replyStatus.value = 'none';
+      replyStatus.value = _burstPending ? 'pending' : 'none';
     } else {
       replyStatus.value = data['reply_status'] == 'pending'
           ? 'pending'
@@ -260,7 +267,7 @@ class ChatController extends GetxController {
               ? 'none'
               : 'failed';
       if (replyStatus.value == 'pending') {
-        if (_latestUserHasReply) replyStatus.value = 'none';
+        if (_latestUserHasReply && !_burstPending) replyStatus.value = 'none';
       }
     }
   }

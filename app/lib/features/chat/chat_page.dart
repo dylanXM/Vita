@@ -440,6 +440,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     });
   }
 
+  void _setInputPanel(String? next) {
+    if (_panel.value == next) return;
+    final wasAtBottom = _scroll.hasClients &&
+        _scroll.position.hasContentDimensions &&
+        _scroll.position.extentAfter <= 24;
+    _panel.value = next;
+    if (!wasAtBottom) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_treeActive || _chatRoute?.isCurrent != true ||
+          _panel.value != next) return;
+      _scrollToBottom();
+    });
+  }
+
   void _scrollToBottom() {
     if (!mounted || !_scroll.hasClients) return;
     final position = _scroll.position;
@@ -636,10 +650,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           child: VitaSkeleton(width: 220, height: 44, radius: 14));
     }
     if (ctrl.messages.isEmpty) {
-      return VitaEmpty(
-        icon: Icons.chat_bubble_outline,
-        title: 'chat.sayHello'.tr,
-        subtitle: 'chat.sayHelloSub'.tr,
+      return Center(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              VitaEmpty(
+                icon: Icons.chat_bubble_outline,
+                title: 'chat.sayHello'.tr,
+                subtitle: 'chat.sayHelloSub'.tr,
+              ),
+              FilledButton.icon(
+                onPressed: _openCompanionDetail,
+                icon: const Icon(Icons.person_outline_rounded),
+                label: Text('explore.openSpace'.tr),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
@@ -847,7 +875,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   controller: _input,
                   enabled: !locked,
                   onTap: () {
-                    if (_panel.value != null) _panel.value = null;
+                    if (_panel.value != null) _setInputPanel(null);
                   },
                   minLines: 1,
                   maxLines: 5,
@@ -881,7 +909,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ? null
                 : () {
                     FocusScope.of(context).unfocus();
-                    _panel.value = panel == 'emoji' ? null : 'emoji';
+                    _setInputPanel(panel == 'emoji' ? null : 'emoji');
                   },
             showBorder: false,
             iconSize: 30,
@@ -893,7 +921,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ? null
                 : () {
                     FocusScope.of(context).unfocus();
-                    _panel.value = panel == 'more' ? null : 'more';
+                    _setInputPanel(panel == 'more' ? null : 'more');
                   },
             showBorder: false,
             iconSize: 30,
@@ -971,18 +999,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         }
                       }));
             },
-          ),
-          _MorePanelButton(
-            icon: Icons.call_outlined,
-            label: 'chat.voiceChat'.tr,
-            onTap: () =>
-                VitaNotice.info('chat.voiceChat'.tr, 'chat.callComingSoon'.tr),
-          ),
-          _MorePanelButton(
-            icon: Icons.videocam_outlined,
-            label: 'chat.videoChat'.tr,
-            onTap: () =>
-                VitaNotice.info('chat.videoChat'.tr, 'chat.callComingSoon'.tr),
           ),
         ],
       ),
@@ -1820,7 +1836,8 @@ class _MorePanelButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
+    return SizedBox(
+        width: 88,
         child: GestureDetector(
       onTap: onTap,
       child: Column(

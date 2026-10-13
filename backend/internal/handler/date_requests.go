@@ -114,6 +114,17 @@ func requestCompanionDate(c *gin.Context, userID, companionID, productKey string
 		c.JSON(422, gin.H{"error": "selected time expired", "code": "invalid_appointment"})
 		return
 	}
+	window, err := loadDateBookingWindow(ctx, userID, productKey)
+	if err != nil {
+		failDateRequest(requestID)
+		c.JSON(500, gin.H{"error": "failed to load booking timezone"})
+		return
+	}
+	if !window.allows(start) {
+		failDateRequest(requestID)
+		c.JSON(422, gin.H{"error": "selected start time is outside booking hours", "code": "date_time_not_allowed"})
+		return
+	}
 	duration := time.Duration(metadataInt(product.Metadata, "duration_minutes", 60)) * time.Minute
 	if duration <= 0 || duration > 24*time.Hour {
 		failDateRequest(requestID)

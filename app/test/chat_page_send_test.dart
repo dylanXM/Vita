@@ -97,7 +97,56 @@ void main() {
 
   tearDown(Get.reset);
 
-  testWidgets('call placeholders show coming soon without leaving chat',
+  testWidgets('emoji and more panels retain bottom or history position', (tester) async {
+    Get.put<AnalyticsService>(_FakeAnalyticsService());
+    ApiClient.instance.dio.httpClientAdapter = _ChatHistoryAdapter();
+    await tester.pumpWidget(GetMaterialApp(
+      theme: VitaTheme.light,
+      translations: VitaTranslations(),
+      locale: const Locale('en'),
+      home: const ChatPage(companionId: 'companion-1', name: 'Ava'),
+    ));
+    await tester.pumpAndSettle();
+    final scroll = tester.widget<SingleChildScrollView>(
+        find.byType(SingleChildScrollView).first).controller!;
+    scroll.jumpTo(scroll.position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.add_circle_outline));
+    await tester.pumpAndSettle();
+    expect(scroll.position.extentAfter, closeTo(0, 1));
+    await tester.tap(find.byIcon(Icons.sentiment_satisfied_alt_outlined));
+    await tester.pumpAndSettle();
+    expect(scroll.position.extentAfter, closeTo(0, 1));
+    await tester.tap(find.byIcon(Icons.keyboard));
+    await tester.pumpAndSettle();
+    expect(scroll.position.extentAfter, closeTo(0, 1));
+    scroll.jumpTo(scroll.position.maxScrollExtent - 300);
+    final historyOffset = scroll.offset;
+    await tester.tap(find.byIcon(Icons.add_circle_outline));
+    await tester.pumpAndSettle();
+    expect(scroll.offset, closeTo(historyOffset, 1));
+  });
+
+  testWidgets('empty chat opens companion detail through its action', (tester) async {
+    Get.put<AnalyticsService>(_FakeAnalyticsService());
+    await tester.pumpWidget(GetMaterialApp(
+      theme: VitaTheme.light,
+      translations: VitaTranslations(),
+      locale: const Locale('en'),
+      home: const ChatPage(companionId: 'companion-1', name: 'Ava',
+        companion: {'city': 'Tokyo'}),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Go to their space'));
+    await tester.pumpAndSettle();
+    final detail = tester.widget<LifeDetailPage>(find.byType(LifeDetailPage));
+    expect(detail.companion, {'id': 'companion-1', 'name': 'Ava', 'city': 'Tokyo'});
+    Get.back();
+    await tester.pumpAndSettle();
+    expect(find.byType(ChatPage), findsOneWidget);
+  });
+
+  testWidgets('call entries are hidden from the chat action panel',
       (tester) async {
     Get.put<AnalyticsService>(_FakeAnalyticsService());
     await tester.pumpWidget(GetMaterialApp(
@@ -109,14 +158,15 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.add_circle_outline));
     await tester.pumpAndSettle();
-    for (final icon in [Icons.call_outlined, Icons.videocam_outlined]) {
-      await tester.tap(find.byIcon(icon));
-      await tester.pump(const Duration(milliseconds: 250));
-      expect(find.text('Coming soon'), findsOneWidget);
-      expect(find.byType(ChatPage), findsOneWidget);
-      await tester.pump(const Duration(seconds: 3));
-      await tester.pumpAndSettle();
-    }
+    final transfer = tester.getCenter(find.byIcon(Icons.swap_horiz_rounded));
+    final experience = tester.getCenter(find.byIcon(Icons.card_giftcard_rounded));
+    expect(transfer.dx, lessThan(100));
+    expect(experience.dx - transfer.dx, 88);
+    expect(find.byIcon(Icons.call_outlined), findsNothing);
+    expect(find.byIcon(Icons.videocam_outlined), findsNothing);
+    expect(find.text('Voice chat'), findsNothing);
+    expect(find.text('Video chat'), findsNothing);
+    expect(find.byType(ChatPage), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

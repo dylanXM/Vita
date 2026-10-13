@@ -181,6 +181,27 @@ func (s *Service) Run(ctx context.Context, interval time.Duration) {
 			}
 		}
 	}()
+	// Message pacing and initiative must not wait behind media generation.
+	for _, kind := range []string{"burst", "followup"} {
+		go func(kind string) {
+			interval := time.Second
+			if kind == "followup" {
+				interval = 15 * time.Second
+			}
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					if err := s.DispatchConversationQueue(ctx, kind); err != nil {
+						log.Printf("conversation %s queue: %v", kind, err)
+					}
+				}
+			}
+		}(kind)
+	}
 	s.runTick(ctx)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -326,9 +347,9 @@ func (s *Service) CheckChatRoute(ctx context.Context, companionID, userID string
 }
 
 func (s *Service) replyNow(ctx context.Context, conversationID, userID string, profile companionContext) (*SavedMessage, error) {
-	lifeEventID, spendID := "", ""
+	lifeEventID, spendID, triggerMessageID := "", "", ""
 	var dateChannel bool
-	if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(m.life_event_id,''),COALESCE(m.payload->>'shared_experience_spend_id',''),`+companion.DateMessageSQL("m")+` FROM messages m WHERE m.conversation_id=$1 AND m.sender_type='user' ORDER BY m.created_at DESC,m.id DESC LIMIT 1`, conversationID).Scan(&lifeEventID, &spendID, &dateChannel); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT m.id,COALESCE(m.life_event_id,''),COALESCE(m.payload->>'shared_experience_spend_id',''),`+companion.DateMessageSQL("m")+` FROM messages m WHERE m.conversation_id=$1 AND m.sender_type='user' ORDER BY m.created_at DESC,m.id DESC LIMIT 1`, conversationID).Scan(&triggerMessageID, &lifeEventID, &spendID, &dateChannel); err != nil {
 		return nil, err
 	}
 	recent, err := s.loadRecentReplyMessages(ctx, conversationID, 24, dateChannel, lifeEventID)
@@ -476,6 +497,10 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 	if surpriseNow {
 		system += "\n\nThis is the second exchange during your shared moment. Offer one small, spontaneous surprise or thoughtful personal detail rooted in your profile or their previous words. Keep it natural and avoid invented major memories, purchases, or physical claims."
 	}
+	var turn conversationalTurn
+	if !immersive && !dateChannel {
+		system += "\n\n" + conversationTurnPolicy
+	}
 	var text string
 	if requestsPaidMedia(latestQuestion) {
 		text = paidMediaChatRefusal(detectSupportedLocale(latestQuestion, preferredLocale))
@@ -495,11 +520,21 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 				if immersive {
 					return 1200
 				}
-				return 320
+				if dateChannel {
+					return 320
+				}
+				return 2048
 			}(),
 		})
 		if err != nil {
 			return nil, err
+		}
+		if !immersive && !dateChannel {
+			turn, err = decodeConversationalTurn(text)
+			if err != nil {
+				return nil, err
+			}
+			text = strings.Join(turn.Messages, "\n\n")
 		}
 		if immersive {
 			experienceScene, err = decodeMomentSceneState(text)
@@ -520,6 +555,7 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 		}
 		sceneActions = validActions
 		if !responseUsesRequiredScript(text, replyLocale) {
+			turn = conversationalTurn{}
 			sceneActions = nil
 			text, err = s.repairMessageLanguage(ctx, profile.ID, "reply_language", models, text, replyLocale)
 			if err != nil {
@@ -575,7 +611,15 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 			payload["shared_experience_spend_id"] = spendID
 		}
 	}
-	reply, err := s.insertMessage(ctx, conversationID, "assistant", "text", text, "reply", lifeEventID, payload)
+	var reply *SavedMessage
+	if !immersive && !dateChannel {
+		if len(turn.Messages) == 0 {
+			turn.Messages = []string{text}
+		}
+		reply, err = s.saveConversationalTurn(ctx, conversationID, userID, profile.ID, triggerMessageID, lifeEventID, turn, payload)
+	} else {
+		reply, err = s.insertMessage(ctx, conversationID, "assistant", "text", text, "reply", lifeEventID, payload)
+	}
 	if err != nil {
 		return nil, err
 	}

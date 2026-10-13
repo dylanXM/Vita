@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import 'package:vita/core/api_client.dart';
 import 'package:vita/core/i18n/translations.dart';
 import 'package:vita/core/theme.dart';
+import 'package:vita/shared/widgets.dart';
 import 'package:vita/features/explore/explore_page.dart';
 import 'package:vita/features/life/life_detail_page.dart';
 
@@ -59,6 +60,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Mimi'));
     await tester.pumpAndSettle();
+    final published = DateTime.parse('2026-09-30T08:00:00Z').toLocal();
+    expect(find.text('${formatDate(published)} ${formatClock(published)}'), findsOneWidget);
     expect(find.text('Go to their space'), findsOneWidget);
     expect(find.text('Talk together'), findsOneWidget);
     await tester.tap(find.text('Go to their space'));

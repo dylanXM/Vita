@@ -74,6 +74,26 @@ void main() {
         ChatController(companionId: 'companion-1', companionName: 'Ava');
     await controller.load();
   });
+  test('first bubble keeps reply pending until the remaining bubbles arrive', () async {
+    final send = controller.send('Hello');
+    await adapter.postStarted.future;
+    adapter.postResponse.complete({
+      'user_message': adapter.message,
+      'reply_status': 'pending',
+      'companion_message': {
+        'id': 'reply-1', 'sender_type': 'assistant', 'source': 'reply',
+        'message_type': 'text', 'content': 'I hear you.',
+        'created_at': '2026-01-01T00:00:01Z',
+        'payload': {'bubble_index': 0, 'bubble_count': 3},
+      },
+    });
+    await send;
+    expect(controller.replyStatus.value, 'pending');
+    await controller.refreshReplyStatus();
+    expect(controller.replyStatus.value, 'none');
+    expect(controller.messages.where((m) => m['sender_type'] == 'assistant'), hasLength(1));
+  });
+
   test('paid speech updates an existing reply instead of discarding it', () async {
     controller.messages.assignAll([{
       'id': 'reply', 'sender_type': 'assistant', 'message_type': 'text',
