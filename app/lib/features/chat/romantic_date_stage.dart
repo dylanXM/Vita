@@ -34,10 +34,10 @@ class RomanticDateStage extends StatefulWidget {
   final VoidCallback? onKeepsake;
   final Widget? journey;
   @override
-  State<RomanticDateStage> createState() => _RomanticDateStageState();
+  State<RomanticDateStage> createState() => RomanticDateStageState();
 }
 
-class _RomanticDateStageState extends State<RomanticDateStage>
+class RomanticDateStageState extends State<RomanticDateStage>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _motion =
       AnimationController(vsync: this, duration: const Duration(seconds: 8));
@@ -199,6 +199,8 @@ class _RomanticDateStageState extends State<RomanticDateStage>
       }
     }
   }
+
+  void openHistory() => _openHistory();
 
   void _openHistory() => showModalBottomSheet<void>(
       context: context,
@@ -406,10 +408,6 @@ class _RomanticDateStageState extends State<RomanticDateStage>
                                 ? Icons.volume_up_outlined
                                 : Icons.volume_off_outlined,
                             color: Colors.white)),
-                  TextButton(
-                      onPressed: _openHistory,
-                      child: Text('moment.scene.history'.tr,
-                          style: const TextStyle(color: Colors.white))),
                 ])),
             const Spacer(),
             if (reply.isNotEmpty && !keyboard)
@@ -420,26 +418,47 @@ class _RomanticDateStageState extends State<RomanticDateStage>
                       child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(children: [
-                              if (widget.portraitUrl?.isNotEmpty == true) ...[
-                                ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: SizedBox.square(
-                                        dimension: 44,
-                                        child: VitaMediaImage(
+                            ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: SizedBox.square(
+                                    dimension: 96,
+                                    child:
+                                        Stack(fit: StackFit.expand, children: [
+                                      if (widget.portraitUrl?.isNotEmpty ==
+                                          true)
+                                        VitaMediaImage(
                                             url: widget.portraitUrl!,
-                                            fit: BoxFit.cover))),
-                                const SizedBox(width: 8),
-                              ],
-                              Expanded(
-                                  child: Text(widget.companionName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                          color: Color(0xFFF1DCC0),
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w600))),
-                            ]),
+                                            fit: BoxFit.cover)
+                                      else
+                                        const ColoredBox(
+                                            color: Color(0xFF46382D)),
+                                      const Positioned.fill(
+                                          child: IgnorePointer(
+                                              child: DecoratedBox(
+                                                  decoration: BoxDecoration(
+                                                      gradient: LinearGradient(
+                                                          begin:
+                                                              Alignment.center,
+                                                          end: Alignment
+                                                              .bottomCenter,
+                                                          colors: [
+                                            Colors.transparent,
+                                            Colors.black54
+                                          ]))))),
+                                      PositionedDirectional(
+                                          end: 7,
+                                          start: 7,
+                                          bottom: 6,
+                                          child: Text(widget.companionName,
+                                              textAlign: TextAlign.end,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 13,
+                                                  fontWeight:
+                                                      FontWeight.w600))),
+                                    ]))),
                             const SizedBox(height: 8),
                             Text(reply,
                                 maxLines: 4,

@@ -41,6 +41,7 @@ class CompanionMomentPage extends StatefulWidget {
 
 class _CompanionMomentPageState extends State<CompanionMomentPage>
     with WidgetsBindingObserver {
+  final _romanticStageKey = GlobalKey<RomanticDateStageState>();
   final _message = TextEditingController();
   final _artifact = TextEditingController();
   Map<String, dynamic>? _moment;
@@ -533,6 +534,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
                 .contains(_chat.replyStatus.value);
         if (['cafe', 'restaurant', 'ballroom', 'cinema'].contains(location)) {
           return RomanticDateStage(
+            key: _romanticStageKey,
             title: title,
             location: location,
             backgroundUrl: '${_moment?["scene_background_url"] ?? ""}',
@@ -678,7 +680,20 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
               )
             : const VitaBackButton(),
         title: Text(immersive ? title : widget.name,
-            style: immersive ? const TextStyle(color: Colors.white) : null),
+            style: immersive
+                ? const TextStyle(color: Colors.white, fontSize: 18)
+                : null),
+        actions: immersive &&
+                ['cafe', 'restaurant', 'ballroom', 'cinema'].contains(location)
+            ? [
+                IconButton(
+                    tooltip: 'moment.scene.history'.tr,
+                    onPressed: () =>
+                        _romanticStageKey.currentState?.openHistory(),
+                    icon: const Icon(Icons.history_outlined,
+                        size: 18, color: Colors.white)),
+              ]
+            : null,
       ),
       body: _phase == _MomentPhase.together && !_loading
           ? _immersive(title, location)
