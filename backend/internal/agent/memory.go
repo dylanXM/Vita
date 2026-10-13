@@ -124,7 +124,7 @@ func (s *Service) ProcessMemoryJobs(ctx context.Context) error {
  WHERE status='pending' AND ((attempts>=3 AND (claimed_at IS NULL OR claimed_at<CURRENT_TIMESTAMP-INTERVAL '3 minutes'))
  OR (created_at<CURRENT_TIMESTAMP-INTERVAL '15 minutes' AND NOT EXISTS(SELECT 1 FROM messages reply
  JOIN messages original ON original.id=companion_memory_jobs.message_id
- WHERE reply.conversation_id=original.conversation_id AND reply.sender_type='assistant' AND reply.source='reply' AND reply.created_at>=original.created_at))) )`)
+ WHERE reply.conversation_id=original.conversation_id AND reply.sender_type='assistant' AND reply.source='reply' AND reply.created_at>=original.created_at)))`)
 	if err != nil {
 		return err
 	}
