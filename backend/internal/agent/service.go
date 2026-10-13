@@ -601,7 +601,14 @@ Be present and invite conversation; do not list options, claim a physical encoun
 		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy,
 		Messages: recent, Temperature: 0.85, MaxTokens: 140,
 	})
-	return strings.TrimSpace(text), err
+	if err != nil {
+		return "", err
+	}
+	text = strings.TrimSpace(text)
+	if !responseUsesRequiredScript(text, locale) {
+		text, err = s.repairMessageLanguage(ctx, profile.ID, "moment_opening_language", models, text, locale)
+	}
+	return text, err
 }
 
 // ComposeMomentInvitation gives the user a character-led acceptance after the
@@ -642,7 +649,14 @@ Reply now in one or two natural sentences from your own perspective. Accept this
 		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy,
 		Messages: []ChatMessage{{Role: "user", Content: instruction}}, Temperature: 0.85, MaxTokens: 140,
 	})
-	return strings.TrimSpace(text), err
+	if err != nil {
+		return "", err
+	}
+	text = strings.TrimSpace(text)
+	if !responseUsesRequiredScript(text, locale) {
+		text, err = s.repairMessageLanguage(ctx, profile.ID, "moment_invitation_language", models, text, locale)
+	}
+	return text, err
 }
 
 // ComposeTransferReply runs before any credits are deducted so failed model

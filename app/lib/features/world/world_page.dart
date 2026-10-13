@@ -141,9 +141,9 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _openGift(Map<String, dynamic> companion) async {
+  Future<void> _openDate(Map<String, dynamic> companion) async {
     final id = '${companion['id'] ?? ''}';
-    AnalyticsService.to.track('world_gift_opened', category: 'life');
+    AnalyticsService.to.track('world_date_opened', category: 'life');
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -151,6 +151,7 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
       backgroundColor: context.vita.surface,
       builder: (_) => ExperienceSheet(
         companionId: id,
+        categoryFilter: 'date',
         onCompleted: () async {
           await ChatListController.to.load();
           if (mounted && _sceneCompanionId == id) await _loadScene(id);
@@ -181,6 +182,7 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
                 portrait: companion['portrait_url'] as String?,
                 response: response));
           }
+          if (mounted && _sceneCompanionId == id) await _loadScene(id);
         },
       ),
     );
@@ -292,6 +294,25 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
     await Get.to(() => const CompanionCreateMethodPage(),
         transition: Transition.cupertino);
     await ChatListController.to.load();
+  }
+
+  Future<void> _openCard(Map<String, dynamic> companion) async {
+    final id = '${companion['id'] ?? ''}';
+    final raw = id == _sceneCompanionId ? (_scene?['appointment']) : null;
+    if (raw is! Map || raw['id'] is! String) {
+      await _openChat(companion);
+      return;
+    }
+    await Get.to(
+        () => CompanionMomentPage(
+            companionId: id,
+            eventId: raw['id'] as String,
+            name: '${companion['name'] ?? ''}',
+            avatarUrl: companion['portrait_url'] as String?),
+        transition: Transition.cupertino);
+    if (!mounted) return;
+    await ChatListController.to.load();
+    if (mounted && _sceneCompanionId == id) await _loadScene(id);
   }
 
   Future<void> _openChat(Map<String, dynamic> companion) async {
@@ -465,15 +486,8 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
                                         scene: id == currentId
                                             ? activeScene
                                             : null,
-                                        onChat: () => _openChat(item),
-                                        onJourney: () {
-                                          AnalyticsService.to.track(
-                                              'world_journey_opened',
-                                              category: 'life');
-                                          ShellController.to
-                                              .showJourneyForCompanion(id);
-                                        },
-                                        onGift: () => _openGift(item),
+                                        onChat: () => _openCard(item),
+                                        onDate: () => _openDate(item),
                                         onNote: () => _leaveNote(item),
                                         visitBusy: _visitBusy,
                                         visitResult: _visitResults[id],
@@ -632,8 +646,7 @@ class _RelationshipCard extends StatelessWidget {
     required this.companion,
     required this.scene,
     required this.onChat,
-    required this.onJourney,
-    required this.onGift,
+    required this.onDate,
     required this.onNote,
     required this.visitBusy,
     required this.visitResult,
@@ -643,8 +656,7 @@ class _RelationshipCard extends StatelessWidget {
   final Map<String, dynamic> companion;
   final Map<String, dynamic>? scene;
   final VoidCallback onChat;
-  final VoidCallback onJourney;
-  final VoidCallback onGift;
+  final VoidCallback onDate;
   final VoidCallback onNote;
   final bool visitBusy;
   final Map<String, dynamic>? visitResult;
@@ -658,6 +670,15 @@ class _RelationshipCard extends StatelessWidget {
     final place = scene?['place'] is Map ? scene!['place'] as Map : null;
     final event = scene?['event'] is Map ? scene!['event'] as Map : null;
     final eventTitle = '${event?['title'] ?? ''}'.trim();
+    final appointment =
+        scene?['appointment'] is Map ? scene!['appointment'] as Map : null;
+    final appointmentTime =
+        DateTime.tryParse('${appointment?['starts_at'] ?? ''}')?.toLocal();
+    final appointmentReady = appointment?['can_enter'] == true;
+    final appointmentLine = appointment == null
+        ? ''
+        : '${'${appointment['title_key'] ?? ''}'.tr} · ${appointmentTime == null ? '' : '${MaterialLocalizations.of(context).formatMediumDate(appointmentTime)} ${TimeOfDay.fromDateTime(appointmentTime).format(context)}'}';
+
     final placeTitle = '${place?['title'] ?? ''}'.trim();
     final hour = scene?['local_hour'] is num
         ? (scene!['local_hour'] as num).toInt()
@@ -824,27 +845,41 @@ class _RelationshipCard extends StatelessWidget {
               children: [
                 SizedBox(
                   height: 23,
-                  child: visited
-                      ? Row(children: [
-                          Icon(
-                              asking
-                                  ? Icons.record_voice_over_rounded
-                                  : Icons.favorite_rounded,
-                              size: 15,
-                              color: Colors.white),
-                          const SizedBox(width: 6),
-                          Expanded(
-                              child: Text(
-                            asking ? 'world.sceneAsk'.tr : 'world.sceneStay'.tr,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600),
-                          )),
-                        ])
-                      : const SizedBox.shrink(),
+                  child: appointment != null
+                      ? Text(
+                          (appointmentReady
+                                  ? 'world.appointment.ready'
+                                  : 'world.appointment.booked')
+                              .tr,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600))
+                      : visited
+                          ? Row(children: [
+                              Icon(
+                                  asking
+                                      ? Icons.record_voice_over_rounded
+                                      : Icons.favorite_rounded,
+                                  size: 15,
+                                  color: Colors.white),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                  child: Text(
+                                asking
+                                    ? 'world.sceneAsk'.tr
+                                    : 'world.sceneStay'.tr,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600),
+                              )),
+                            ])
+                          : const SizedBox.shrink(),
                 ),
                 Text(name,
                     maxLines: 1,
@@ -858,8 +893,11 @@ class _RelationshipCard extends StatelessWidget {
                   height: 36,
                   child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 350),
-                      child: Text(momentLine,
-                          key: ValueKey(momentLine),
+                      child: Text(
+                          appointment == null ? momentLine : appointmentLine,
+                          key: ValueKey(appointment == null
+                              ? momentLine
+                              : appointmentLine),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -881,7 +919,10 @@ class _RelationshipCard extends StatelessWidget {
               child: Row(children: [
                 Expanded(
                   child: _WorldUtilityAction(
-                    label: 'world.cardChat'.tr,
+                    label: (appointment == null
+                            ? 'world.cardChat'
+                            : 'world.appointment.enter')
+                        .tr,
                     primary: true,
                     icon: Icons.chat_bubble_outline_rounded,
                     onTap: onChat,
@@ -891,17 +932,9 @@ class _RelationshipCard extends StatelessWidget {
                 SizedBox(
                   width: 56,
                   child: _WorldUtilityAction(
-                    label: 'world.cardGift'.tr,
-                    icon: Icons.card_giftcard_outlined,
-                    onTap: onGift,
-                  ),
-                ),
-                SizedBox(
-                  width: 56,
-                  child: _WorldUtilityAction(
-                    label: 'world.cardJourney'.tr,
-                    icon: Icons.auto_stories_outlined,
-                    onTap: onJourney,
+                    label: 'world.cardDate'.tr,
+                    icon: Icons.calendar_month_outlined,
+                    onTap: onDate,
                   ),
                 ),
               ]),

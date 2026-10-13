@@ -16,6 +16,7 @@ import (
 
 	"vita/internal/credits"
 	"vita/internal/db"
+	"vita/internal/language"
 )
 
 type experienceRequest struct {
@@ -75,6 +76,9 @@ func PurchaseCompanionExperience(c *gin.Context) {
 	companionID := c.Param("id")
 	productKey := strings.TrimSpace(c.Param("product_key"))
 	if !requireExperienceCompanion(c, userID, companionID) {
+		return
+	}
+	if !syncExperienceLocale(c) {
 		return
 	}
 	var input experienceRequest
@@ -550,4 +554,17 @@ func AdminUpdateCreditProduct(c *gin.Context) {
 		return
 	}
 	AdminListCreditProducts(c)
+}
+
+// Shared experiences follow the current App language, just like normal chat.
+func syncExperienceLocale(c *gin.Context) bool {
+	raw := strings.TrimSpace(c.GetHeader("Accept-Language"))
+	if raw == "" {
+		return true
+	}
+	if _, err := db.Get().ExecContext(c.Request.Context(), `UPDATE users SET preferred_locale=$1,updated_at=CURRENT_TIMESTAMP WHERE id=$2 AND preferred_locale IS DISTINCT FROM $1`, language.Normalize(raw), c.GetString("user_id")); err != nil {
+		c.JSON(500, gin.H{"error": "failed to save experience language"})
+		return false
+	}
+	return true
 }

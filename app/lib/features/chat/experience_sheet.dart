@@ -22,9 +22,11 @@ class ExperienceSheet extends StatefulWidget {
       required this.companionId,
       required this.onCompleted,
       this.recommendedProductKey,
+      this.categoryFilter,
       this.onResult});
   final String companionId;
   final String? recommendedProductKey;
+  final String? categoryFilter;
   final Future<void> Function() onCompleted;
   final Future<void> Function(Map<String, dynamic>)? onResult;
   @override
@@ -102,7 +104,9 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     _needsReload = false;
     try {
       final raw = await ApiClient.instance
-          .get('/v1/companions/${widget.companionId}/experiences');
+          .get('/v1/companions/${widget.companionId}/experiences', query: {
+        if (widget.categoryFilter != null) 'category': widget.categoryFilter
+      });
       if (!mounted) return;
       if (raw is! Map) throw ApiException('experience.flow.failed'.tr);
       final products = (raw['products'] as List? ?? [])
@@ -467,7 +471,9 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
       const SizedBox(height: 20),
       Wrap(
           spacing: 8,
-          children: ['gift', 'date', 'other']
+          children: (widget.categoryFilter == null
+                  ? ['gift', 'date', 'other']
+                  : [widget.categoryFilter!])
               .map((group) => ChoiceChip(
                   label: Text(_groupLabel(group)),
                   selected: _category == group,

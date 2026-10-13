@@ -179,6 +179,25 @@ func GetWorldScene(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load next world event"})
 		return
 	}
+	// A booked shared experience must remain visible independently of routine
+	// life events and the last chat preview.
+	var appointmentID, appointmentTitle string
+	var appointmentStart, appointmentEnd time.Time
+	var appointmentReady bool
+	appointmentErr := db.Get().QueryRowContext(c.Request.Context(), `SELECT e.id,COALESCE(e.title,''),e.start_time,e.end_time,e.start_time<=CURRENT_TIMESTAMP
+ FROM life_events e LEFT JOIN companion_moment_sessions ms ON ms.event_id=e.id AND ms.user_id=$2
+ WHERE e.companion_id=$1 AND e.event_type='shared_activity' AND e.generation_source='user_purchase' AND e.status IN ('active','scheduled')
+ AND (e.end_time>CURRENT_TIMESTAMP OR ms.opening_message_id IS NULL)
+ AND EXISTS(SELECT 1 FROM credit_spends paid WHERE paid.user_id=$2 AND paid.companion_id=$1 AND paid.reference_id=e.id AND paid.status='completed' AND paid.reference_type='companion_experience')
+ ORDER BY CASE WHEN e.start_time<=CURRENT_TIMESTAMP AND e.end_time>CURRENT_TIMESTAMP THEN 0 WHEN e.start_time>CURRENT_TIMESTAMP THEN 1 ELSE 2 END,e.start_time ASC,e.id ASC LIMIT 1`, companionID, userID).Scan(&appointmentID, &appointmentTitle, &appointmentStart, &appointmentEnd, &appointmentReady)
+	if appointmentErr != nil && !errors.Is(appointmentErr, sql.ErrNoRows) {
+		c.JSON(500, gin.H{"error": "failed to load booked appointment"})
+		return
+	}
+	var appointment any
+	if appointmentErr == nil {
+		appointment = gin.H{"id": appointmentID, "title_key": appointmentTitle, "starts_at": appointmentStart, "ends_at": appointmentEnd, "can_enter": appointmentReady}
+	}
 	var nextEvent any
 	if nextErr == nil {
 		nextEvent = gin.H{"id": nextID, "event_type": nextType, "title": nextTitle,
@@ -284,7 +303,7 @@ func GetWorldScene(c *gin.Context) {
 		"companion_id": companionID, "local_date": localNow.Format("2006-01-02"), "region_code": region,
 		"local_hour": localNow.Hour(),
 		"phase":      phase, "place": gin.H{"kind": kind, "title": placeTitle, "description": placeDescription},
-		"event": event, "next_event": nextEvent, "campaign": campaign, "mood": mood, "visited_today": visitsToday > 0, "today_visit": todayVisit,
+		"event": event, "next_event": nextEvent, "appointment": appointment, "campaign": campaign, "mood": mood, "visited_today": visitsToday > 0, "today_visit": todayVisit,
 		"memories": memories, "connections": connections, "last_action": lastAction, "recent_gift": recentGift,
 	})
 }

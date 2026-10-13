@@ -296,6 +296,9 @@ func StartCompanionMoment(c *gin.Context) {
 	if !requireExperienceAccess(c, userID, companionID, moment.ProductKey) {
 		return
 	}
+	if !syncExperienceLocale(c) {
+		return
+	}
 	if moment.Opening != "" {
 		c.JSON(http.StatusOK, moment)
 		return
