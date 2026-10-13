@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../../core/constants.dart';
 import '../../core/theme.dart';
 import '../../shared/media_image.dart';
+import 'shared_experience_stage.dart';
 
 /// Environment first: no portrait, no mandatory chat transcript, no extra charge.
 class RomanticDateStage extends StatefulWidget {
@@ -14,6 +15,7 @@ class RomanticDateStage extends StatefulWidget {
       required this.location,
       required this.backgroundUrl,
       required this.audioUrl,
+      this.portraitUrl,
       required this.messages,
       required this.input,
       required this.busy,
@@ -22,6 +24,7 @@ class RomanticDateStage extends StatefulWidget {
       this.onKeepsake,
       this.journey});
   final String title, location, backgroundUrl, audioUrl;
+  final String? portraitUrl;
   final List<Map<String, dynamic>> messages;
   final TextEditingController input;
   final bool busy;
@@ -239,6 +242,13 @@ class _RomanticDateStageState extends State<RomanticDateStage>
         .lastOrNull;
     final reply = '${latest?['content'] ?? ''}';
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final latestIsAssistant = widget.messages.isNotEmpty &&
+        widget.messages.last['sender_type'] == 'assistant';
+    final suggestions = latestIsAssistant
+        ? sharedSceneActions(latest)
+        : <Map<String, String>>[];
+    final availableActions =
+        actions.where((action) => action != _action).toList();
     return Stack(children: [
       Positioned.fill(
           child: ExcludeSemantics(
@@ -307,6 +317,25 @@ class _RomanticDateStageState extends State<RomanticDateStage>
                             offset: Offset(0,
                                 _action == 'toast' ? -12 * _motion.value : 0),
                             child: child))))),
+      if (!keyboard && widget.portraitUrl?.isNotEmpty == true)
+        PositionedDirectional(
+            end: 20,
+            top: 65,
+            child: IgnorePointer(
+                child: Container(
+                    width: MediaQuery.sizeOf(context).width * .36,
+                    height: 220,
+                    decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        color: const Color(0x66271C17),
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black.withValues(alpha: .16),
+                              blurRadius: 20)
+                        ]),
+                    clipBehavior: Clip.antiAlias,
+                    child: VitaMediaImage(
+                        url: widget.portraitUrl!, fit: BoxFit.contain)))),
       SafeArea(
           top: false,
           child: Column(children: [
@@ -335,36 +364,62 @@ class _RomanticDateStageState extends State<RomanticDateStage>
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: GestureDetector(
                       onTap: _openHistory,
-                      child: Text(reply,
-                          maxLines: 4,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                              color: Color(0xFFFFF5E5),
-                              fontSize: 17,
-                              height: 1.5,
-                              shadows: [
-                                Shadow(color: Colors.black54, blurRadius: 8)
-                              ])))),
-            if (!keyboard)
+                      child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
+                          decoration: BoxDecoration(
+                              color: const Color(0xED241B17),
+                              borderRadius: BorderRadius.circular(18),
+                              border:
+                                  Border.all(color: const Color(0x33E8C99C))),
+                          child: Text(reply,
+                              maxLines: 4,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.start,
+                              style: const TextStyle(
+                                  color: Color(0xFFFFF8EF),
+                                  fontSize: 17,
+                                  height: 1.55))))),
+            if (!keyboard && suggestions.isEmpty)
               Padding(
                   padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
                   child: Wrap(
                       alignment: WrapAlignment.center,
                       spacing: 8,
                       runSpacing: 8,
-                      children: actions
+                      children: availableActions
                           .map((action) => OutlinedButton(
                               onPressed: widget.busy || _sending
                                   ? null
                                   : () => _perform(action),
                               style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFFFFE9CB),
-                                  backgroundColor: const Color(0x663A2A20),
+                                  foregroundColor: const Color(0xFFFFF8EF),
+                                  backgroundColor: const Color(0xED34251D),
                                   side: const BorderSide(
                                       color: Color(0x66E8C99C)),
                                   minimumSize: const Size(64, 44)),
                               child: Text('date.scene.$action'.tr)))
+                          .toList())),
+            if (!keyboard && suggestions.isNotEmpty)
+              Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: suggestions
+                          .map((choice) => OutlinedButton(
+                              onPressed: widget.busy || _sending
+                                  ? null
+                                  : () =>
+                                      widget.onSend(choice['message'] ?? ''),
+                              style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  backgroundColor: const Color(0xED241B17),
+                                  side: const BorderSide(color: Colors.white38),
+                                  minimumSize: const Size(44, 44)),
+                              child: Text(choice['label'] ?? '',
+                                  style: const TextStyle(fontSize: 14))))
                           .toList())),
             if (widget.busy || _sending)
               Padding(

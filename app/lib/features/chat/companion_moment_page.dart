@@ -537,6 +537,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
             location: location,
             backgroundUrl: '${_moment?["scene_background_url"] ?? ""}',
             audioUrl: '${_moment?["scene_audio_url"] ?? ""}',
+            portraitUrl: widget.avatarUrl,
             messages: messages,
             input: _message,
             busy: busy,
