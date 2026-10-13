@@ -43,8 +43,10 @@ class SharedExperienceStage extends StatefulWidget {
       this.attachment,
       this.journey,
       this.onHistory,
-      this.onKeepsake});
+      this.onKeepsake,
+      this.compactDate = false});
   final String name, title, reply, lastAction, location, situation, focus;
+  final bool compactDate;
   final String? portrait;
   final TextEditingController input;
   final Future<void> Function(String) onSend;
@@ -126,36 +128,39 @@ class _SharedExperienceStageState extends State<SharedExperienceStage> {
             child: SafeArea(
                 top: false,
                 child: Column(children: [
-                  Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 8, 0),
-                      child: Row(children: [
-                        Expanded(
-                            child: Text(widget.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600))),
-                        if (widget.onHistory != null)
-                          IconButton(
-                              tooltip: 'moment.scene.history'.tr,
-                              onPressed: widget.onHistory,
-                              icon: const Icon(Icons.history_outlined,
-                                  color: Colors.white)),
-                        if (widget.onKeepsake != null)
-                          IconButton(
-                              tooltip: 'moment.create'.tr,
-                              onPressed: widget.onKeepsake,
-                              icon: const Icon(Icons.bookmark_border,
-                                  color: Colors.white))
-                      ])),
+                  if (!widget.compactDate)
+                    Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 8, 0),
+                        child: Row(children: [
+                          Expanded(
+                              child: Text(widget.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600))),
+                          if (widget.onHistory != null)
+                            IconButton(
+                                tooltip: 'moment.scene.history'.tr,
+                                onPressed: widget.onHistory,
+                                icon: const Icon(Icons.history_outlined,
+                                    color: Colors.white)),
+                          if (widget.onKeepsake != null)
+                            IconButton(
+                                tooltip: 'moment.create'.tr,
+                                onPressed: widget.onKeepsake,
+                                icon: const Icon(Icons.bookmark_border,
+                                    color: Colors.white))
+                        ])),
                   if (constraints.maxHeight >= 240)
                     Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: ExperienceEnvironment(
-                            height: (constraints.maxHeight * .27)
-                                .clamp(48.0, 200.0),
+                            height: (constraints.maxHeight *
+                                    (widget.compactDate ? .20 : .27))
+                                .clamp(
+                                    48.0, widget.compactDate ? 140.0 : 200.0),
                             location: widget.location,
                             name: widget.name,
                             portrait: widget.portrait,
@@ -164,13 +169,13 @@ class _SharedExperienceStageState extends State<SharedExperienceStage> {
                       !keyboard &&
                       constraints.maxHeight >= 400)
                     Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
                         child: Text(widget.situation,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                color: Colors.white60,
-                                fontSize: 12,
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: .85),
+                                fontSize: 14,
                                 height: 1.4))),
                   Expanded(
                       child: ListView(
@@ -183,6 +188,30 @@ class _SharedExperienceStageState extends State<SharedExperienceStage> {
                               padding: const EdgeInsets.only(bottom: 12),
                               child: widget.attachment!),
                         ...messages.map(_line),
+                        if (widget.compactDate &&
+                            !keyboard &&
+                            (widget.onHistory != null ||
+                                widget.onKeepsake != null))
+                          Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                if (widget.onHistory != null)
+                                  IconButton(
+                                      tooltip: 'moment.scene.history'.tr,
+                                      onPressed: widget.onHistory,
+                                      icon: const Icon(Icons.history_outlined,
+                                          color: Colors.white70)),
+                                if (widget.onKeepsake != null)
+                                  IconButton(
+                                      tooltip: 'moment.create'.tr,
+                                      onPressed: widget.onKeepsake,
+                                      icon: const Icon(Icons.bookmark_border,
+                                          color: Colors.white70)),
+                              ]),
+                        if (widget.compactDate &&
+                            !keyboard &&
+                            widget.journey != null)
+                          widget.journey!,
                         if (widget.busy)
                           Padding(
                               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -190,7 +219,8 @@ class _SharedExperienceStageState extends State<SharedExperienceStage> {
                                   style: const TextStyle(
                                       color: Colors.white60, fontSize: 13)))
                       ])),
-                  if (!keyboard &&
+                  if (!widget.compactDate &&
+                      !keyboard &&
                       constraints.maxHeight >= 400 &&
                       widget.journey != null)
                     Padding(
@@ -220,7 +250,7 @@ class _SharedExperienceStageState extends State<SharedExperienceStage> {
                                         const BoxConstraints(maxWidth: 180),
                                     child: Text(widget.actions[index]['label'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis))))),
                   Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                       child: Row(children: [
                         Expanded(
                             child: TextField(

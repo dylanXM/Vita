@@ -274,6 +274,7 @@ class ChatController extends GetxController {
       {String? momentEventId,
       String? journeyVisitId,
       String? lifeEventContextId,
+      String? lifeEventContextTitle,
       String? experienceSpendId}) async {
     final content = text.trim();
     if (content.isEmpty) return false;
@@ -305,6 +306,7 @@ class ChatController extends GetxController {
         if (journeyVisitId != null) 'journey_visit_id': journeyVisitId,
         if (lifeEventContextId != null)
           'life_event_context_id': lifeEventContextId,
+        if (lifeEventContextTitle != null) 'event_title': lifeEventContextTitle,
         if (experienceSpendId != null)
           'shared_experience_spend_id': experienceSpendId,
       },
@@ -346,6 +348,8 @@ class ChatController extends GetxController {
               if (journeyVisitId != null) 'journey_visit_id': journeyVisitId,
               if (lifeEventContextId != null)
                 'life_event_context_id': lifeEventContextId,
+              if (lifeEventContextTitle != null)
+                'event_title': lifeEventContextTitle,
             },
             'delivery_status': 'delivered',
             'created_at': data['created_at'],

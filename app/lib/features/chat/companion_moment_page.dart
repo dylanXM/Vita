@@ -12,6 +12,7 @@ import '../auth/auth_controller.dart';
 import 'chat_controller.dart';
 import 'chat_page.dart';
 import 'shared_experience_stage.dart';
+import 'experience_environment.dart';
 import 'experience_decision_panel.dart';
 
 enum _MomentPhase { booked, ready, together, keepsake }
@@ -509,6 +510,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
             ['pending', 'processing', 'scheduled']
                 .contains(_chat.replyStatus.value);
         return SharedExperienceStage(
+          compactDate: true,
           name: widget.name,
           portrait: widget.avatarUrl,
           title: title,
@@ -606,9 +608,26 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
     final vita = context.vita;
     final title = '${_moment?['title_key'] ?? ''}'.tr;
     final location = '${_moment?['location'] ?? ''}';
+    final immersive = _phase == _MomentPhase.together && !_loading;
     return Scaffold(
-      backgroundColor: vita.pageBg,
-      appBar: AppBar(leading: const VitaBackButton(), title: Text(widget.name)),
+      backgroundColor:
+          immersive ? ExperienceEnvironment.background(location) : vita.pageBg,
+      appBar: AppBar(
+        backgroundColor: immersive ? Colors.transparent : null,
+        surfaceTintColor: immersive ? Colors.transparent : null,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: immersive
+            ? IconButton(
+                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                onPressed: () => Get.back(),
+                icon: const Icon(Icons.arrow_back_ios_new,
+                    size: 20, color: Colors.white),
+              )
+            : const VitaBackButton(),
+        title: Text(immersive ? title : widget.name,
+            style: immersive ? const TextStyle(color: Colors.white) : null),
+      ),
       body: _phase == _MomentPhase.together && !_loading
           ? _immersive(title, location)
           : _loading

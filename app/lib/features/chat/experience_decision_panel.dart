@@ -189,7 +189,12 @@ class _ExperienceDecisionPanelState extends State<ExperienceDecisionPanel> {
                             child: SingleChildScrollView(
                                 child: _card(sheetContext, content, goal,
                                     challenge, saved))))),
-            style: TextButton.styleFrom(foregroundColor: Colors.white70),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white,
+              backgroundColor: Colors.white.withValues(alpha: .10),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
             icon: Icon(
                 saved
                     ? Icons.bookmark_border

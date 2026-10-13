@@ -223,7 +223,8 @@ class _ChatPageState extends State<ChatPage> {
     _autoLifeEventPrompt = null;
     final send = ctrl.send(text,
         journeyVisitId: _journeyContextSent ? null : widget.journeyVisitId,
-        lifeEventContextId: _lifeEventContextId);
+        lifeEventContextId: _lifeEventContextId,
+        lifeEventContextTitle: _lifeEventContextTitle);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
     final queued = await send;
     if (!mounted) return;
@@ -254,7 +255,10 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _openLifeEvent(Map<String, dynamic> message) async {
-    final eventId = '${message['life_event_id'] ?? ''}';
+    final rawPayload = message['payload'];
+    final referenceId =
+        rawPayload is Map ? rawPayload['life_event_context_id'] : null;
+    final eventId = '${referenceId ?? message['life_event_id'] ?? ''}';
     final payload = message['payload'] is Map
         ? Map<String, dynamic>.from(message['payload'] as Map)
         : const <String, dynamic>{};
@@ -506,7 +510,7 @@ class _ChatPageState extends State<ChatPage> {
                   children: [
                     if (_lifeEventContextId != null)
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+                        padding: const EdgeInsets.fromLTRB(14, 0, 8, 0),
                         child: Row(children: [
                           Icon(Icons.auto_stories_outlined,
                               size: 16, color: context.vita.green),
@@ -729,7 +733,8 @@ class _ChatPageState extends State<ChatPage> {
         color: context.vita.pageBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+      padding:
+          EdgeInsets.fromLTRB(8, _lifeEventContextId == null ? 8 : 0, 8, 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -1089,14 +1094,19 @@ class _ChatMessageBody extends StatelessWidget {
               color: type == 'voice' ? context.vita.subText : context.vita.text,
               height: 1.4)));
     }
-    if (type == 'life_card' ||
+    final referencedEvent =
+        '${payload['life_event_context_id'] ?? ''}'.isNotEmpty;
+    if (referencedEvent ||
+        type == 'life_card' ||
         (type == 'image_text' &&
             (payload['event_location'] as String? ?? '').isNotEmpty)) {
-      if (children.isNotEmpty) children.add(const SizedBox(height: 8));
-      children.add(InkWell(
+      if (!referencedEvent && children.isNotEmpty)
+        children.add(const SizedBox(height: 8));
+      final referenceCard = InkWell(
         onTap: () => onOpenLifeEvent(message),
         borderRadius: BorderRadius.circular(6),
         child: Container(
+          constraints: const BoxConstraints(minHeight: 44),
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
               color: context.vita.pageBg,
@@ -1109,12 +1119,16 @@ class _ChatMessageBody extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(payload['event_title'] as String? ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: context.vita.text)),
                 if ((payload['event_location'] as String? ?? '').isNotEmpty)
                   Text(payload['event_location'] as String,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style:
                           TextStyle(fontSize: 11, color: context.vita.subText)),
               ],
@@ -1122,7 +1136,13 @@ class _ChatMessageBody extends StatelessWidget {
             Icon(Icons.chevron_right, size: 18, color: context.vita.hint),
           ]),
         ),
-      ));
+      );
+      if (referencedEvent) {
+        children.insert(0, referenceCard);
+        children.insert(1, const SizedBox(height: 8));
+      } else {
+        children.add(referenceCard);
+      }
     }
     return Column(
         crossAxisAlignment: CrossAxisAlignment.start, children: children);

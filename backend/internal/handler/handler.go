@@ -1512,13 +1512,16 @@ func SendMessage(c *gin.Context) {
 		messagePayload["conversation_channel"] = "date"
 	}
 	if req.LifeEventContextID != "" {
-		var contextEventID string
-		if err := tx.QueryRowContext(c.Request.Context(), `SELECT e.id FROM life_events e
-			WHERE e.id=$1 AND e.companion_id=$2`, req.LifeEventContextID, companionID).Scan(&contextEventID); err != nil {
+		var contextEventID, contextTitle, contextDescription, contextLocation string
+		if err := tx.QueryRowContext(c.Request.Context(), `SELECT e.id,COALESCE(e.title,''),COALESCE(e.description,''),COALESCE(e.location,'') FROM life_events e
+			WHERE e.id=$1 AND e.companion_id=$2`, req.LifeEventContextID, companionID).Scan(&contextEventID, &contextTitle, &contextDescription, &contextLocation); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "event not found", "code": "event_not_found"})
 			return
 		}
 		messagePayload["life_event_context_id"] = contextEventID
+		messagePayload["event_title"] = contextTitle
+		messagePayload["event_description"] = contextDescription
+		messagePayload["event_location"] = contextLocation
 	}
 	if req.JourneyVisitID != "" {
 		var visitID string
