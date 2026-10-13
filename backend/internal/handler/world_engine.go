@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"vita/internal/agent"
 	"vita/internal/db"
 )
 
@@ -367,9 +368,27 @@ func VisitWorld(c *gin.Context) {
 		if input.Choice == "ask" {
 			memoryContent = "The user asked about my day during a visit."
 		}
-		followUpLocal := time.Date(localNow.Year(), localNow.Month(), localNow.Day()+1, 18, 0, 0, 0, localNow.Location())
+		var trialDeadline sql.NullTime
+		if err := tx.QueryRowContext(c.Request.Context(), `SELECT CASE WHEN EXISTS(SELECT 1 FROM subscriptions WHERE user_id=$1 AND status='active' AND (current_period_end IS NULL OR current_period_end>CURRENT_TIMESTAMP)) THEN NULL ELSE created_at + INTERVAL '12 hours' END FROM users WHERE id=$1`, userID).Scan(&trialDeadline); err != nil {
+			c.JSON(500, gin.H{"error": "failed to load trial deadline"})
+			return
+		}
+		var trialExpiry *time.Time
+		if trialDeadline.Valid {
+			trialExpiry = &trialDeadline.Time
+		}
+		preferences, preferenceErr := agent.LoadContactPreferences(c.Request.Context(), tx, userID)
+		if preferenceErr != nil {
+			c.JSON(500, gin.H{"error": "failed to load contact preferences"})
+			return
+		}
+		followUpLocal := worldVisitFollowupAt(localNow, trialExpiry, preferences)
+		var followUpAt any
+		if followUpLocal != nil {
+			followUpAt = followUpLocal.UTC()
+		}
 		if _, err := tx.ExecContext(c.Request.Context(), `INSERT INTO memories(id,companion_id,type,content,importance,event_time,metadata,follow_up_at)
-			VALUES($1,$2,'world_visit',$3,40,CURRENT_TIMESTAMP,$4,$5)`, memoryID, companionID, memoryContent, string(payload), followUpLocal.UTC()); err != nil {
+			VALUES($1,$2,'world_visit',$3,40,CURRENT_TIMESTAMP,$4,$5)`, memoryID, companionID, memoryContent, string(payload), followUpAt); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record visit memory"})
 			return
 		}

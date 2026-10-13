@@ -130,6 +130,19 @@ const zhHans = {
   },
 
   users: {
+    refundInfo: "退款信息",
+    unknownStore: "付款来源未知",
+    refund_apple_review: "由 Apple 审核",
+    refund_google_within_48h: "付款 48 小时内，以商店审核为准",
+    refund_google_after_48h: "已超过 48 小时，以商店审核为准",
+    refund_unknown: "无法判定",
+    paidAt: "付款时间",
+
+    allSubscriptions: "全部订阅状态",
+    subscription: "订阅状态",
+    subscribed: "订阅用户",
+    unsubscribed: "非订阅用户",
+
     title: "用户管理",
     desc: "管理普通用户账号。",
     searchPlaceholder: "按邮箱搜索…",

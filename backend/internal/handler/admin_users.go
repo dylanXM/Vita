@@ -2,6 +2,7 @@ package handler
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -27,14 +28,33 @@ import (
 
 // AdminUser is the admin-facing view of a user account.
 type AdminUser struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	Role      string    `json:"role"`
-	Timezone  string    `json:"timezone"`
-	Banned    bool      `json:"banned"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID                  string                    `json:"id"`
+	Email               string                    `json:"email"`
+	Role                string                    `json:"role"`
+	Timezone            string                    `json:"timezone"`
+	Banned              bool                      `json:"banned"`
+	CreatedAt           time.Time                 `json:"created_at"`
+	UpdatedAt           time.Time                 `json:"updated_at"`
+	IsSubscribed        bool                      `json:"is_subscribed"`
+	SubscriptionRefunds []AdminSubscriptionRefund `json:"subscription_refunds,omitempty"`
 }
+
+type AdminSubscriptionRefund struct {
+	Store        string     `json:"store"`
+	PurchasedAt  *time.Time `json:"purchased_at"`
+	RefundStatus string     `json:"refund_status"`
+}
+
+const adminSubscriptionRefundColumns = `COALESCE((SELECT jsonb_agg(jsonb_build_object(
+ 'store',sub.store,
+ 'purchased_at',CASE WHEN sub.period_type='TRIAL' THEN NULL ELSE to_char(sub.current_period_start,'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') END,
+ 'refund_status',CASE
+ WHEN sub.current_period_start IS NULL OR sub.current_period_start>CURRENT_TIMESTAMP OR sub.period_type='TRIAL' THEN 'unknown'
+ WHEN sub.store IN ('APP_STORE','MAC_APP_STORE') THEN 'apple_review'
+ WHEN sub.store='PLAY_STORE' AND sub.period_type IN ('NORMAL','INTRO') AND sub.current_period_start IS NOT NULL AND sub.current_period_start<=CURRENT_TIMESTAMP THEN
+ CASE WHEN sub.current_period_start+INTERVAL '48 hours'>CURRENT_TIMESTAMP THEN 'google_within_48h' ELSE 'google_after_48h' END
+ ELSE 'unknown' END) ORDER BY sub.current_period_start DESC NULLS LAST,sub.id)
+ FROM subscriptions sub WHERE sub.user_id=users.id AND sub.status='active' AND (sub.current_period_end IS NULL OR sub.current_period_end>CURRENT_TIMESTAMP)), '[]'::jsonb)::text`
 
 // AdminUserDetail adds per-account usage counts to the base fields.
 type AdminUserDetail struct {
@@ -54,7 +74,9 @@ type AdminUserListResponse struct {
 	TotalPages int         `json:"total_pages"`
 }
 
-const adminUserColumns = `id, email, COALESCE(role_id, 'user'), COALESCE(timezone, 'UTC'), COALESCE(banned, false), created_at, updated_at`
+const adminUserSubscriptionExists = `EXISTS(SELECT 1 FROM subscriptions sub WHERE sub.user_id=users.id AND sub.status='active' AND (sub.current_period_end IS NULL OR sub.current_period_end>CURRENT_TIMESTAMP))`
+
+const adminUserColumns = `id, email, COALESCE(role_id, 'user'), COALESCE(timezone, 'UTC'), COALESCE(banned, false), created_at, updated_at, ` + adminUserSubscriptionExists
 
 // rowScanner is satisfied by both *sql.Row and *sql.Rows.
 type rowScanner interface {
@@ -63,7 +85,7 @@ type rowScanner interface {
 
 func scanAdminUser(sc rowScanner) (AdminUser, error) {
 	var u AdminUser
-	err := sc.Scan(&u.ID, &u.Email, &u.Role, &u.Timezone, &u.Banned, &u.CreatedAt, &u.UpdatedAt)
+	err := sc.Scan(&u.ID, &u.Email, &u.Role, &u.Timezone, &u.Banned, &u.CreatedAt, &u.UpdatedAt, &u.IsSubscribed)
 	return u, err
 }
 
@@ -87,6 +109,7 @@ var errUserNotFound = errors.New("user not found")
 //	q            string (case-insensitive email substring)
 //	role         string ("user" | "admin")
 //	status       string ("active" | "banned")
+//	subscription string ("subscribed" | "unsubscribed")
 func AdminListUsers(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	if page < 1 {
@@ -115,6 +138,17 @@ func AdminListUsers(c *gin.Context) {
 		args = append(args, status == "banned")
 		conds = append(conds, fmt.Sprintf("banned = $%d", len(args)))
 	}
+	if subscription := strings.TrimSpace(c.Query("subscription")); subscription != "" {
+		if subscription != "subscribed" && subscription != "unsubscribed" {
+			c.JSON(400, gin.H{"error": "invalid subscription filter"})
+			return
+		}
+		condition := adminUserSubscriptionExists
+		if subscription == "unsubscribed" {
+			condition = "NOT " + condition
+		}
+		conds = append(conds, condition)
+	}
 	args = append(args, currentEnvironment())
 	conds = append(conds, fmt.Sprintf("environment = $%d", len(args)))
 
@@ -131,7 +165,7 @@ func AdminListUsers(c *gin.Context) {
 
 	args = append(args, pageSize, (page-1)*pageSize)
 	rows, err := db.Get().Query(
-		`SELECT `+adminUserColumns+` FROM users`+where+` ORDER BY created_at DESC, email ASC
+		`SELECT `+adminUserColumns+`, `+adminSubscriptionRefundColumns+` FROM users`+where+` ORDER BY created_at DESC, email ASC
 		 LIMIT $`+strconv.Itoa(len(args)-1)+` OFFSET $`+strconv.Itoa(len(args)),
 		args...)
 	if err != nil {
@@ -142,7 +176,12 @@ func AdminListUsers(c *gin.Context) {
 
 	items := make([]AdminUser, 0, pageSize)
 	for rows.Next() {
-		u, err := scanAdminUser(rows)
+		var u AdminUser
+		var rawRefunds string
+		err := rows.Scan(&u.ID, &u.Email, &u.Role, &u.Timezone, &u.Banned, &u.CreatedAt, &u.UpdatedAt, &u.IsSubscribed, &rawRefunds)
+		if err == nil {
+			err = json.Unmarshal([]byte(rawRefunds), &u.SubscriptionRefunds)
+		}
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read users"})
 			return
@@ -150,6 +189,10 @@ func AdminListUsers(c *gin.Context) {
 		items = append(items, u)
 	}
 
+	if err := rows.Err(); err != nil {
+		c.JSON(500, gin.H{"error": "failed to read users"})
+		return
+	}
 	totalPages := (total + pageSize - 1) / pageSize
 	c.JSON(http.StatusOK, AdminUserListResponse{
 		Items:      items,
@@ -280,7 +323,7 @@ func AdminUpdateUser(c *gin.Context) {
 	var curHash string
 	err := db.Get().QueryRow(
 		`SELECT `+adminUserColumns+`, COALESCE(password_hash, '') FROM users WHERE id = $1`, id).
-		Scan(&cur.ID, &cur.Email, &cur.Role, &cur.Timezone, &cur.Banned, &cur.CreatedAt, &cur.UpdatedAt, &curHash)
+		Scan(&cur.ID, &cur.Email, &cur.Role, &cur.Timezone, &cur.Banned, &cur.CreatedAt, &cur.UpdatedAt, &cur.IsSubscribed, &curHash)
 	if errors.Is(err, sql.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 		return

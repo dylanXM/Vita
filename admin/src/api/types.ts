@@ -125,6 +125,12 @@ export interface AdminUser {
   banned: boolean;
   created_at: string;
   updated_at: string;
+  is_subscribed?: boolean;
+  subscription_refunds?: Array<{
+    store: string;
+    purchased_at: string | null;
+    refund_status: "apple_review" | "google_within_48h" | "google_after_48h" | "unknown";
+  }>;
 }
 
 /** `GET /v1/admin/users/:id` — detail adds per-account usage counts. */
@@ -172,6 +178,7 @@ export interface AdminUserListParams {
   q?: string;
   role?: string;
   status?: "active" | "banned";
+  subscription?: "subscribed" | "unsubscribed";
 }
 
 /** Create/update payload for a user. */

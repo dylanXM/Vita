@@ -251,6 +251,7 @@ export function UsersPage() {
   const [searchInput, setSearchInput] = useState("");
   const [role, setRole] = useState("");
   const [status, setStatus] = useState<Filters["status"]>("");
+  const [subscription, setSubscription] = useState<"" | "subscribed" | "unsubscribed">("");
 
   // Debounce the search box so typing doesn't fire a request per keystroke.
   const [q, setQ] = useState("");
@@ -262,10 +263,10 @@ export function UsersPage() {
   // Any filter change restarts from page 1.
   useEffect(() => {
     setPage(1);
-  }, [q, role, status]);
+  }, [q, role, status, subscription]);
 
   const list = useQuery({
-    queryKey: ["admin-users", { page, q, role, status }],
+    queryKey: ["admin-users", { page, q, role, status, subscription }],
     queryFn: ({ signal }) =>
       usersApi.list(
         {
@@ -273,6 +274,7 @@ export function UsersPage() {
           q: q || undefined,
           role: role || undefined,
           status: status || undefined,
+          subscription: subscription || undefined,
         },
         signal,
       ),
@@ -369,7 +371,7 @@ export function UsersPage() {
                 className="ps-9"
               />
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               <Select
                 value={role === "" ? "all" : role}
                 onValueChange={(v) => setRole(v === "all" ? "" : v)}
@@ -396,6 +398,17 @@ export function UsersPage() {
                   <SelectItem value="banned">{t("users.statusBanned")}</SelectItem>
                 </SelectContent>
               </Select>
+              <Select
+                value={subscription || "all"}
+                onValueChange={(value) => setSubscription(value === "all" ? "" : value as "subscribed" | "unsubscribed")}
+              >
+                <SelectTrigger className="sm:w-36"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("users.allSubscriptions")}</SelectItem>
+                  <SelectItem value="subscribed">{t("users.subscribed")}</SelectItem>
+                  <SelectItem value="unsubscribed">{t("users.unsubscribed")}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -410,7 +423,7 @@ export function UsersPage() {
             </div>
           ) : !data || data.items.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              {q || role || status ? t("users.noResults") : t("users.empty")}
+              {q || role || status || subscription ? t("users.noResults") : t("users.empty")}
             </p>
           ) : (
             <Table>
@@ -419,6 +432,8 @@ export function UsersPage() {
                   <TableHead>{t("users.email")}</TableHead>
                   <TableHead>{t("users.role")}</TableHead>
                   <TableHead>{t("users.status")}</TableHead>
+                  <TableHead>{t("users.subscription")}</TableHead>
+                  <TableHead>{t("users.refundInfo")}</TableHead>
                   <TableHead className="hidden lg:table-cell">{t("users.createdAt")}</TableHead>
                   <TableHead className="text-end">{t("users.actions")}</TableHead>
                 </TableRow>
@@ -441,6 +456,18 @@ export function UsersPage() {
                     </TableCell>
                     <TableCell><RoleBadge role={u.role} /></TableCell>
                     <TableCell><StatusBadge banned={u.banned} /></TableCell>
+                    <TableCell>{u.is_subscribed === undefined ? "—" : <Badge variant={u.is_subscribed ? "default" : "secondary"}>{t(u.is_subscribed ? "users.subscribed" : "users.unsubscribed")}</Badge>}</TableCell>
+                    <TableCell className="text-xs">
+                      {u.is_subscribed ? <div className="space-y-2">
+                        {(u.subscription_refunds?.length ? u.subscription_refunds : [{ store: "", purchased_at: null, refund_status: "unknown" as const }]).map((refund, index) => (
+                          <div key={`${refund.store}-${index}`}>
+                            <div className="font-medium">{refund.store === "APP_STORE" || refund.store === "MAC_APP_STORE" ? "App Store" : refund.store === "PLAY_STORE" ? "Google Play" : refund.store || t("users.unknownStore")}</div>
+                            <div className="text-muted-foreground">{t(`users.refund_${refund.refund_status}`)}</div>
+                            {refund.purchased_at && <div className="text-muted-foreground">{t("users.paidAt")}: {formatDate(refund.purchased_at)}</div>}
+                          </div>
+                        ))}
+                      </div> : "—"}
+                    </TableCell>
                     <TableCell className="hidden text-muted-foreground lg:table-cell">{formatDate(u.created_at)}</TableCell>
                     <TableCell className="text-end">
                       <DropdownMenu>

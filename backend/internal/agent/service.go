@@ -332,7 +332,7 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 
 	preferredLocale := s.preferredLocale(ctx, userID)
 	latestQuestion := latestUserMessage(recent)
-	system := s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy(latestQuestion, preferredLocale) + "\n\n" + emojiMessagePolicy
+	system := s.companionPrompt(ctx, profile, latestQuestion) + "\n\n" + responseLanguagePolicy(latestQuestion, preferredLocale) + "\n\n" + emojiMessagePolicy
 	system += "\n\nFor a direct reply, answer the user's actual question, but do not merely mirror their last message. Let your own current activity, mood, personality, and world context shape your perspective. Mention those details only when they naturally belong in the reply; never invent a current event. When the user shares an unresolved personal matter, acknowledge how it feels and ask one specific question grounded in their words. Leave room for the user to shape what happens next instead of closing every topic with a complete speech."
 	system += "\n\nMedia policy: Ordinary chat is text-only. If the user requests that you create or send a photo, picture, generated image, voice recording, speech audio, or video, explicitly decline generation in this chat and direct them to the app's Shared Experiences (共同体验) to choose a paid coin experience. Say this naturally in the required response language. Never claim that media was generated, sent, queued, or will be sent later. Their consent in chat does not authorize a purchase. You may discuss an existing image or incoming audio normally."
 	var journeyVisitID string
@@ -413,7 +413,10 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 		}
 		replyLocale := detectSupportedLocale(latestQuestion, preferredLocale)
 		if !responseUsesRequiredScript(text, replyLocale) {
-			text = mockReply(profile, recent, replyLocale)
+			text, err = s.repairMessageLanguage(ctx, profile.ID, "reply_language", models, text, replyLocale)
+			if err != nil {
+				text = unavailableReply(replyLocale)
+			}
 		}
 	}
 	gesture := "smile"
@@ -1045,6 +1048,20 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// Repair visits scheduled under the former next-day policy, while there
+	// is still a usable trial window. Delivery still obeys contact preferences.
+	_, err = s.db.ExecContext(ctx, `WITH candidates AS (
+ SELECT m.id,GREATEST(COALESCE(m.event_time,m.created_at)+GREATEST(COALESCE(p.minimum_gap_minutes,120),30)*INTERVAL '1 minute',CURRENT_TIMESTAMP+INTERVAL '30 minutes') AS due,u.created_at+INTERVAL '12 hours' AS deadline
+ FROM memories m JOIN companions c ON c.id=m.companion_id JOIN users u ON u.id=c.user_id
+ LEFT JOIN user_contact_preferences p ON p.user_id=u.id
+ WHERE m.type='world_visit' AND m.status='active' AND m.followed_up_at IS NULL
+ AND m.follow_up_at>=u.created_at+INTERVAL '12 hours' AND c.active=true
+ AND vita_companion_access(c.user_id,c.id)
+ AND NOT EXISTS(SELECT 1 FROM subscriptions sub WHERE sub.user_id=u.id AND sub.status='active' AND (sub.current_period_end IS NULL OR sub.current_period_end>CURRENT_TIMESTAMP))
+ ) UPDATE memories m SET follow_up_at=c.due FROM candidates c WHERE m.id=c.id AND c.due+INTERVAL '15 minutes'<c.deadline`)
+	if err != nil {
+		return err
+	}
 	rows, err := s.db.QueryContext(ctx, `SELECT m.id,m.companion_id,c.user_id,cv.id,COALESCE(m.content,''),c.name,COALESCE(u.timezone,'UTC'),COALESCE(m.type,''),COALESCE(m.metadata,'')
 		FROM memories m JOIN companions c ON c.id=m.companion_id JOIN users u ON u.id=c.user_id
 		JOIN conversations cv ON cv.companion_id=c.id AND cv.user_id=c.user_id
@@ -1080,7 +1097,7 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 		// Wait until the latest conversation has been analysed, so a newly
 		// reported result or boundary can cancel this follow-up first.
 		var pendingMemory bool
-		if err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM companion_memory_jobs j JOIN messages m ON m.id=j.message_id WHERE m.conversation_id=$1 AND j.status='pending')`, item.conversationID).Scan(&pendingMemory); err != nil {
+		if err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM companion_memory_jobs j JOIN messages m ON m.id=j.message_id WHERE m.conversation_id=$1 AND (j.status='pending' OR (j.status='failed' AND m.created_at>=(SELECT created_at FROM memories WHERE id=$2) AND NOT EXISTS(SELECT 1 FROM companion_memory_jobs later JOIN messages lm ON lm.id=later.message_id WHERE lm.conversation_id=m.conversation_id AND later.status='completed' AND (lm.created_at,lm.id)>(m.created_at,m.id)))))`, item.conversationID, item.id).Scan(&pendingMemory); err != nil {
 			return err
 		}
 		if pendingMemory {
@@ -1170,15 +1187,11 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 				continue
 			}
 			if !responseUsesRequiredScript(text, preferredLocale) {
-				text = localizedMock(map[string]string{
-					"zh-Hans": "想起你之前说的那件事，后来怎么样了？",
-					"zh-Hant": "想起你之前說的那件事，後來怎麼樣了？",
-					"ja":      "前に話してくれたこと、その後どうなった？",
-					"ko":      "전에 말해 준 일, 그 후 어떻게 됐어?",
-					"ar":      "تذكرت ما أخبرتني به سابقًا. كيف سارت الأمور؟",
-					"es":      "Me acordé de lo que me contaste. ¿Cómo fue después?",
-					"pt":      "Lembrei-me do que me contaste. Como correu depois?",
-				}, preferredLocale, "I remembered what you told me. How did it go?")
+				text, modelErr = s.repairMessageLanguage(ctx, item.companionID, "followup_language", proactiveModels, text, preferredLocale)
+				if modelErr != nil {
+					_, _ = s.db.ExecContext(ctx, `UPDATE memories SET follow_up_claimed_at=NULL WHERE id=$1`, item.id)
+					continue
+				}
 			}
 		}
 		tx, err := s.db.BeginTx(ctx, nil)
@@ -1196,7 +1209,8 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 		}
 		var stillActive bool
 		err = tx.QueryRowContext(ctx, `SELECT status='active' AND followed_up_at IS NULL
- AND NOT EXISTS(SELECT 1 FROM companion_memory_jobs j JOIN messages m ON m.id=j.message_id WHERE m.conversation_id=$2 AND j.status='pending')
+ AND EXISTS(SELECT 1 FROM companions c WHERE c.id=memories.companion_id AND c.active=true AND c.proactive_enabled=true AND c.friendship_active=true AND vita_companion_access(c.user_id,c.id))
+ AND NOT EXISTS(SELECT 1 FROM companion_memory_jobs j JOIN messages m ON m.id=j.message_id WHERE m.conversation_id=$2 AND (j.status='pending' OR (j.status='failed' AND m.created_at>=memories.created_at AND NOT EXISTS(SELECT 1 FROM companion_memory_jobs later JOIN messages lm ON lm.id=later.message_id WHERE lm.conversation_id=m.conversation_id AND later.status='completed' AND (lm.created_at,lm.id)>(m.created_at,m.id)))))
  FROM memories WHERE id=$1 FOR UPDATE`, item.id, item.conversationID).Scan(&stillActive)
 		if err != nil || !stillActive {
 			tx.Rollback()
@@ -2011,7 +2025,10 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 			return err
 		}
 		if !responseUsesRequiredScript(text, preferredLocale) {
-			text = mockProactiveMessage(targetLocale)
+			text, err = s.repairMessageLanguage(ctx, event.companionID, "proactive_language", models, text, targetLocale)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	if !s.mock {
@@ -2240,8 +2257,12 @@ func (s *Service) loadCompanionForConversation(ctx context.Context, conversation
 	return profile, err
 }
 
-func (s *Service) companionPrompt(ctx context.Context, profile companionContext) string {
+func (s *Service) companionPrompt(ctx context.Context, profile companionContext, questions ...string) string {
 	var life, memories []string
+	if len(questions) > 0 {
+		memories = append(memories, s.relevantMemoryContext(ctx, profile.ID, questions[0]))
+	}
+	memories = append(memories, s.unprocessedConversationContext(ctx, profile.ID))
 	petStatusLine := ""
 	worldNow := s.currentCompanionWorldContext(ctx, profile)
 	// One factual memory joins lived events to their published moments. Keep
@@ -3110,30 +3131,7 @@ func containsLanguageMarker(value string, markers []string) bool {
 const emojiMessagePolicy = `Emoji are supported in chat messages. You may use 0 to 2 emoji when they naturally fit the character's emotion and speaking style. Do not add emoji mechanically, repeat them excessively, or use them in every reply.`
 
 func mockReply(profile companionContext, messages []ChatMessage, locale string) string {
-	last := ""
-	if len(messages) > 0 {
-		last = messages[len(messages)-1].Content
-	}
-	if strings.Contains(last, "今天") || strings.Contains(strings.ToLower(last), "today") {
-		return localizedMock(map[string]string{
-			"ar":      "كان يومي مزدحمًا قليلًا، لكن حدث شيء لطيف في الطريق. سأخبرك عنه لاحقًا.",
-			"es":      "Hoy estuve un poco ocupada, pero me pasó algo interesante por el camino. Luego te lo cuento con calma.",
-			"ja":      "今日は少し忙しかったけど、途中でちょっと面白いことがあったの。あとでゆっくり話すね。",
-			"ko":      "오늘은 조금 바빴는데, 오는 길에 재미있는 일이 있었어. 이따 천천히 얘기해 줄게.",
-			"pt":      "Hoje estive um pouco ocupada, mas aconteceu algo interessante no caminho. Depois conto com calma.",
-			"zh-Hans": "今天有点忙，不过路上遇到了一件挺有意思的小事，晚点慢慢跟你说。",
-			"zh-Hant": "今天有點忙，不過路上遇到了一件挺有意思的小事，晚點慢慢跟你說。",
-		}, locale, "I was a little busy today, but something interesting happened on the way. I'll tell you about it later.")
-	}
-	return localizedMock(map[string]string{
-		"ar":      "رأيت رسالتك. كنت مشغولة قليلًا، والآن يمكنني أن أستمع إليك باهتمام.",
-		"es":      "Ya vi tu mensaje. Estaba ocupada con mis cosas, pero ahora puedo escucharte con atención.",
-		"ja":      "メッセージ見たよ。さっきまで自分のことをしてたけど、今はゆっくり話を聞けるよ。",
-		"ko":      "메시지 봤어. 아까는 내 일을 하고 있었는데, 이제 네 얘기를 제대로 들을 수 있어.",
-		"pt":      "Vi a sua mensagem. Estava ocupada com as minhas coisas, mas agora posso ouvir você com atenção.",
-		"zh-Hans": "看到啦。刚刚还在忙自己的事，现在可以认真听你说。",
-		"zh-Hant": "看到啦。剛剛還在忙自己的事，現在可以認真聽你說。",
-	}, locale, "I saw your message. I was busy with my own things, but now I can really listen.")
+	return unavailableReply(locale)
 }
 
 func mockProactiveMessage(locale string) string {

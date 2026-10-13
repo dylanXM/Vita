@@ -328,11 +328,11 @@ func applyRevenueCatPurchase(tx *sql.Tx, ev *revenueCatEvent) error {
 		if eventAt == 0 {
 			eventAt = ev.PurchasedAtMS
 		}
-		_, err := tx.Exec(`INSERT INTO subscriptions(id,user_id,provider,provider_ref,product_id,entitlement,entitlement_ids,status,platform,environment,current_period_start,current_period_end,will_renew,revenuecat_event_at_ms)
-  VALUES($1,$2,'revenuecat',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+		_, err := tx.Exec(`INSERT INTO subscriptions(id,user_id,provider,provider_ref,product_id,entitlement,entitlement_ids,status,platform,environment,current_period_start,current_period_end,will_renew,revenuecat_event_at_ms,store,period_type)
+  VALUES($1,$2,'revenuecat',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
   ON CONFLICT(provider,provider_ref) DO UPDATE SET user_id=$2,product_id=$4,entitlement=$5,entitlement_ids=$6,status=$7,platform=$8,
-  current_period_start=COALESCE($10,subscriptions.current_period_start),current_period_end=COALESCE($11,subscriptions.current_period_end),will_renew=$12,revenuecat_event_at_ms=$13,updated_at=CURRENT_TIMESTAMP
-  WHERE subscriptions.revenuecat_event_at_ms<=$13`, uuid.New().String(), userID, ev.OriginalTransactionID, ev.ProductID, firstString(ids), string(encoded), status, platform, currentEnvironment(), start, end, willRenew, eventAt)
+  current_period_start=COALESCE($10,subscriptions.current_period_start),current_period_end=COALESCE($11,subscriptions.current_period_end),will_renew=$12,revenuecat_event_at_ms=$13,store=COALESCE(NULLIF($14,''),subscriptions.store),period_type=COALESCE(NULLIF($15,''),subscriptions.period_type),updated_at=CURRENT_TIMESTAMP
+  WHERE subscriptions.revenuecat_event_at_ms<=$13`, uuid.New().String(), userID, ev.OriginalTransactionID, ev.ProductID, firstString(ids), string(encoded), status, platform, currentEnvironment(), start, end, willRenew, eventAt, strings.ToUpper(strings.TrimSpace(ev.Store)), strings.ToUpper(strings.TrimSpace(ev.PeriodType)))
 		if err != nil {
 			return err
 		}

@@ -130,6 +130,19 @@ const en = {
   },
 
   users: {
+    refundInfo: "Refund information",
+    unknownStore: "Unknown payment source",
+    refund_apple_review: "Subject to Apple review",
+    refund_google_within_48h: "Within 48 hours of purchase; subject to store review",
+    refund_google_after_48h: "Over 48 hours since purchase; subject to store review",
+    refund_unknown: "Cannot determine",
+    paidAt: "Purchase time",
+
+    allSubscriptions: "All subscription statuses",
+    subscription: "Subscription",
+    subscribed: "Subscribed",
+    unsubscribed: "Not subscribed",
+
     title: "Users",
     desc: "Manage regular user accounts.",
     searchPlaceholder: "Search by email…",
