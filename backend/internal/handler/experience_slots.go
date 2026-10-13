@@ -2,7 +2,9 @@ package handler
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -74,8 +76,12 @@ func ListExperienceSlots(c *gin.Context) {
 	var raw string
 	var launched bool
 	err := db.Get().QueryRowContext(c.Request.Context(), `SELECT metadata::text,is_launched FROM credit_products WHERE environment=$1 AND product_key=$2 AND category='date' AND enabled=true`, currentEnvironment(), c.Param("product_key")).Scan(&raw, &launched)
-	if err != nil {
+	if errors.Is(err, sql.ErrNoRows) {
 		c.JSON(404, gin.H{"error": "date experience unavailable"})
+		return
+	}
+	if err != nil {
+		c.JSON(500, gin.H{"error": "failed to load date experience"})
 		return
 	}
 	if !launched {

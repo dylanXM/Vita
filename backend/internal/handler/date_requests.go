@@ -107,7 +107,19 @@ func requestCompanionDate(c *gin.Context, userID, companionID, productKey string
 		return
 	}
 
+	// Recover an existing request before applying the clock cutoff. A completed
+	// booking remains retrievable even after its originally selected time passes.
+	if start.Before(time.Now().Add(5*time.Minute)) || start.After(time.Now().Add(30*24*time.Hour)) {
+		failDateRequest(requestID)
+		c.JSON(422, gin.H{"error": "selected time expired", "code": "invalid_appointment"})
+		return
+	}
 	duration := time.Duration(metadataInt(product.Metadata, "duration_minutes", 60)) * time.Minute
+	if duration <= 0 || duration > 24*time.Hour {
+		failDateRequest(requestID)
+		c.JSON(500, gin.H{"error": "invalid date duration"})
+		return
+	}
 	if companionAgent == nil {
 		failDateRequest(requestID)
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "companion service unavailable", "code": "date_decision_failed"})
@@ -226,7 +238,7 @@ func requestedDateTime(input map[string]any) (time.Time, error) {
 		return time.Time{}, errInvalidAppointment
 	}
 	start, err := time.Parse(time.RFC3339, value)
-	if err != nil || start.Before(time.Now().Add(5*time.Minute)) || start.After(time.Now().Add(30*24*time.Hour)) {
+	if err != nil {
 		return time.Time{}, errInvalidAppointment
 	}
 	return start.UTC(), nil

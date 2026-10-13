@@ -14,11 +14,15 @@ class VitaTranslations extends Translations {
   static const Map<String, Map<String, String>> _keys = {
     'en': {
       "experience.slots.title": "Choose an available time",
-      "experience.slots.hint": "These times come from your companion’s schedule and use your device’s local time. Tap one to continue.",
-      "experience.slots.failed": "Available times could not load. Refresh to retry.",
-      "experience.slots.empty": "No available times in the next seven days. Refresh later.",
+      "experience.slots.hint":
+          "These times come from your companion’s schedule and use your device’s local time. Tap one to continue.",
+      "experience.slots.failed":
+          "Available times could not load. Refresh to retry.",
+      "experience.slots.empty":
+          "No available times in the next seven days. Refresh later.",
       "experience.slots.refresh": "Refresh available times",
-      "experience.slots.changed": "Availability changed or another booking is processing. No coins were charged. Choose a fresh time.",
+      "experience.slots.changed":
+          "Availability changed or another booking is processing. No coins were charged. Choose a fresh time.",
       "experience.journey.nameInvalid": "Enter a name with 1 to 80 characters.",
       "experience.journey.preview.cafe":
           "The drink is unavailable. Discuss an alternative with your companion, name the moment and confirm a personal keepsake.",
