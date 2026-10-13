@@ -34,7 +34,7 @@ export function CreditProductsPage() {
         <Table>
           <TableHeader><TableRow>
             <TableHead>{t("creditProducts.product")}</TableHead>
-            <TableHead>{t("creditProducts.category")}</TableHead>
+            <TableHead>{t("creditProducts.category")}</TableHead><TableHead>{t("creditProducts.sceneBackground")}</TableHead>
             <TableHead className="w-32">{t("creditProducts.coins")}</TableHead>
             <TableHead className="w-28">{t("creditProducts.enabled")}</TableHead>
             <TableHead>{t("creditProducts.subscriptionOnly")}</TableHead>
@@ -54,22 +54,25 @@ export function CreditProductsPage() {
 
 function CreditProductRow({ product, saving, onSave }: { product: CreditProduct; saving: boolean; onSave: (product: CreditProduct) => void }) {
   const { t } = useTranslation();
+  const [sceneBackground, setSceneBackground] = useState(String(product.metadata?.scene_background_url ?? ""));
+  useEffect(() => setSceneBackground(String(product.metadata?.scene_background_url ?? "")), [product.metadata]);
   const [coins, setCoins] = useState(product.coins);
   const [enabled, setEnabled] = useState(product.enabled);
   const [subscriptionOnly, setSubscriptionOnly] = useState(product.subscription_only);
   const [isLaunched, setIsLaunched] = useState(product.is_launched);
   useEffect(() => { setCoins(product.coins); setEnabled(product.enabled); setSubscriptionOnly(product.subscription_only); setIsLaunched(product.is_launched); }, [product.coins, product.enabled, product.subscription_only, product.is_launched]);
-  const modified = coins !== product.coins || enabled !== product.enabled ||
+  const modified = sceneBackground !== String(product.metadata?.scene_background_url ?? "") || coins !== product.coins || enabled !== product.enabled ||
     subscriptionOnly !== product.subscription_only || isLaunched !== product.is_launched;
   return (
     <TableRow className={modified ? "bg-amber-500/10 hover:bg-amber-500/15" : undefined}>
       <TableCell><div className="font-medium">{product.emoji} {product.key}</div><div className="text-xs text-muted-foreground">{t(product.name_key, { defaultValue: product.key })}</div></TableCell>
       <TableCell>{t(`creditProducts.categories.${product.category}`, { defaultValue: product.category })}</TableCell>
+      <TableCell>{product.category === "date" ? <div className="min-w-56 space-y-2"><Input aria-label={t("creditProducts.sceneBackground")} value={sceneBackground} placeholder={t("creditProducts.sceneBackgroundHint")} onChange={(event) => setSceneBackground(event.target.value)} />{sceneBackground && <img src={sceneBackground} alt={t("creditProducts.sceneBackground")} className="h-24 w-48 rounded-lg object-cover" loading="lazy" />}</div> : "—"}</TableCell>
       <TableCell><Input type="number" min={1} value={coins} onChange={(event) => setCoins(Number(event.target.value))} /></TableCell>
       <TableCell><input aria-label={t("creditProducts.enabled")} type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /></TableCell>
       <TableCell><input aria-label={t("creditProducts.subscriptionOnly")} type="checkbox" checked={subscriptionOnly} onChange={(event) => setSubscriptionOnly(event.target.checked)} /></TableCell>
       <TableCell><input aria-label={t("creditProducts.isLaunched")} type="checkbox" checked={isLaunched} onChange={(event) => setIsLaunched(event.target.checked)} /></TableCell>
-      <TableCell><div className="flex items-center justify-between gap-3"><span role="status" className={modified ? "text-xs font-medium text-amber-700 dark:text-amber-400" : "text-xs text-muted-foreground"}>{t(modified ? "creditProducts.pendingSave" : "creditProducts.unchanged")}</span><Button size="sm" disabled={saving || !modified || !Number.isFinite(coins) || coins < 1} onClick={() => onSave({ ...product, coins, enabled, subscription_only: subscriptionOnly, is_launched: isLaunched })}>{t("common.save")}</Button></div></TableCell>
+      <TableCell><div className="flex items-center justify-between gap-3"><span role="status" className={modified ? "text-xs font-medium text-amber-700 dark:text-amber-400" : "text-xs text-muted-foreground"}>{t(modified ? "creditProducts.pendingSave" : "creditProducts.unchanged")}</span><Button size="sm" disabled={saving || !modified || !Number.isFinite(coins) || coins < 1} onClick={() => onSave({ ...product, coins, enabled, subscription_only: subscriptionOnly, is_launched: isLaunched, ...(product.category === "date" ? { scene_background_url: sceneBackground } : {}) })}>{t("common.save")}</Button></div></TableCell>
     </TableRow>
   );
 }

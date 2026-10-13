@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -524,11 +525,12 @@ func AdminListCreditProducts(c *gin.Context) {
 func AdminUpdateCreditProduct(c *gin.Context) {
 	environment := currentEnvironment()
 	var input struct {
-		SubscriptionOnly *bool `json:"subscription_only"`
-		IsLaunched       *bool `json:"is_launched"`
-		Coins            int   `json:"coins" binding:"required,min=1,max=100000"`
-		Enabled          bool  `json:"enabled"`
-		SortOrder        int   `json:"sort_order"`
+		SceneBackgroundURL *string `json:"scene_background_url"`
+		SubscriptionOnly   *bool   `json:"subscription_only"`
+		IsLaunched         *bool   `json:"is_launched"`
+		Coins              int     `json:"coins" binding:"required,min=1,max=100000"`
+		Enabled            bool    `json:"enabled"`
+		SortOrder          int     `json:"sort_order"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid credit product"})
@@ -543,8 +545,19 @@ func AdminUpdateCreditProduct(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "configure a real-time calling provider before enabling call products"})
 		return
 	}
-	result, err := db.Get().Exec(`UPDATE credit_products SET coins=$3,enabled=$4,sort_order=$5,subscription_only=COALESCE($6,subscription_only),is_launched=COALESCE($7,is_launched),updated_at=CURRENT_TIMESTAMP
-		WHERE environment=$1 AND product_key=$2`, environment, c.Param("product_key"), input.Coins, input.Enabled, input.SortOrder, input.SubscriptionOnly, input.IsLaunched)
+	var scenePatch any
+	if input.SceneBackgroundURL != nil {
+		image := strings.TrimSpace(*input.SceneBackgroundURL)
+		parsed, parseErr := url.Parse(image)
+		if category != "date" || len(image) > 2048 || (image != "" && (parseErr != nil || !((parsed.Scheme == "https" && parsed.Host != "" && parsed.User == nil) || (strings.HasPrefix(image, "/v1/media/") && parsed.Host == "" && parsed.Scheme == "")))) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid scene background URL"})
+			return
+		}
+		patch, _ := json.Marshal(map[string]string{"scene_background_url": image})
+		scenePatch = string(patch)
+	}
+	result, err := db.Get().Exec(`UPDATE credit_products SET coins=$3,enabled=$4,sort_order=$5,subscription_only=COALESCE($6,subscription_only),is_launched=COALESCE($7,is_launched),metadata=COALESCE(metadata,'{}'::jsonb)||COALESCE($8::jsonb,'{}'::jsonb),updated_at=CURRENT_TIMESTAMP
+		WHERE environment=$1 AND product_key=$2`, environment, c.Param("product_key"), input.Coins, input.Enabled, input.SortOrder, input.SubscriptionOnly, input.IsLaunched, scenePatch)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update credit product"})
 		return

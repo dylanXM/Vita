@@ -511,6 +511,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
                 .contains(_chat.replyStatus.value);
         return SharedExperienceStage(
           compactDate: true,
+          backgroundUrl: '${_moment?["scene_background_url"] ?? ""}',
           name: widget.name,
           portrait: widget.avatarUrl,
           title: title,

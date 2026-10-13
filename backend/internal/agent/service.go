@@ -605,7 +605,7 @@ func (s *Service) ComposeMomentOpening(ctx context.Context, conversationID, user
 Their preparation choice was %s. Honor it naturally in your opening.
 Open the moment naturally in one or two sentences, in the user's language. Refer to your personality and recent conversation.
 Be present and invite conversation; do not list options, claim a physical encounter, or ask for payment.`, experienceName, location, preparation)
-	openingInstruction += "\n" + momentExperienceBrief(location) + " Introduce this minor situation naturally and invite the user to take the first step. Do not resolve it or choose for them."
+	openingInstruction += "\n" + momentExperienceBrief(location) + " Introduce one concrete minor situation through a small observable action and a simple question. Avoid abstract instructions such as taking the first step, finding what we know about each other, or naming a task. Keep the opening short; do not resolve the situation or choose for the user."
 	recent = append(recent, ChatMessage{Role: "user", Content: openingInstruction})
 	text, _, err := s.generateTextWithFallback(ctx, profile.ID, "moment_opening", models, GenerateRequest{
 		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy,

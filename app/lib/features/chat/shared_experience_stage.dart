@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../core/theme.dart';
 import 'experience_environment.dart';
+import '../../shared/media_image.dart';
 
 List<Map<String, dynamic>> chronologicalSceneMessages(
     Iterable<Map<String, dynamic>> messages) {
@@ -44,10 +45,11 @@ class SharedExperienceStage extends StatefulWidget {
       this.journey,
       this.onHistory,
       this.onKeepsake,
+      this.backgroundUrl,
       this.compactDate = false});
   final String name, title, reply, lastAction, location, situation, focus;
   final bool compactDate;
-  final String? portrait;
+  final String? portrait, backgroundUrl;
   final TextEditingController input;
   final Future<void> Function(String) onSend;
   final bool busy;
@@ -123,8 +125,16 @@ class _SharedExperienceStageState extends State<SharedExperienceStage> {
             'content': widget.reply
           });
         _followLatest(messages);
-        return ColoredBox(
-            color: ExperienceEnvironment.background(widget.location),
+        return DecoratedBox(
+            decoration: BoxDecoration(
+                gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                  ExperienceEnvironment.background(widget.location),
+                  Color.lerp(ExperienceEnvironment.background(widget.location),
+                      Colors.black, .30)!
+                ])),
             child: SafeArea(
                 top: false,
                 child: Column(children: [
@@ -158,12 +168,13 @@ class _SharedExperienceStageState extends State<SharedExperienceStage> {
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: ExperienceEnvironment(
                             height: (constraints.maxHeight *
-                                    (widget.compactDate ? .20 : .27))
-                                .clamp(
-                                    48.0, widget.compactDate ? 140.0 : 200.0),
+                                    (widget.compactDate ? .28 : .27))
+                                .clamp(48.0, 200.0),
                             location: widget.location,
                             name: widget.name,
                             portrait: widget.portrait,
+                            backgroundUrl: widget.backgroundUrl,
+                            sceneFirst: widget.compactDate,
                             focus: widget.focus)),
                   if (widget.situation.isNotEmpty &&
                       !keyboard &&
@@ -187,6 +198,26 @@ class _SharedExperienceStageState extends State<SharedExperienceStage> {
                           Padding(
                               padding: const EdgeInsets.only(bottom: 12),
                               child: widget.attachment!),
+                        if (widget.compactDate)
+                          Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Row(children: [
+                                SizedBox(
+                                    width: 28,
+                                    height: 28,
+                                    child: ClipOval(
+                                        child: widget.portrait?.isNotEmpty ==
+                                                true
+                                            ? VitaMediaImage(
+                                                url: widget.portrait!,
+                                                fit: BoxFit.cover)
+                                            : const Icon(Icons.person_outline,
+                                                color: Colors.white70))),
+                                const SizedBox(width: 8),
+                                Text(widget.name,
+                                    style: const TextStyle(
+                                        color: Colors.white70, fontSize: 13)),
+                              ])),
                         ...messages.map(_line),
                         if (widget.compactDate &&
                             !keyboard &&
@@ -196,17 +227,26 @@ class _SharedExperienceStageState extends State<SharedExperienceStage> {
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
                                 if (widget.onHistory != null)
-                                  IconButton(
-                                      tooltip: 'moment.scene.history'.tr,
+                                  TextButton.icon(
                                       onPressed: widget.onHistory,
                                       icon: const Icon(Icons.history_outlined,
-                                          color: Colors.white70)),
+                                          size: 16),
+                                      label: Text('moment.scene.history'.tr),
+                                      style: TextButton.styleFrom(
+                                          foregroundColor: Colors.white70)),
                                 if (widget.onKeepsake != null)
-                                  IconButton(
-                                      tooltip: 'moment.create'.tr,
-                                      onPressed: widget.onKeepsake,
-                                      icon: const Icon(Icons.bookmark_border,
-                                          color: Colors.white70)),
+                                  Flexible(
+                                      child: TextButton.icon(
+                                          onPressed: widget.onKeepsake,
+                                          icon: const Icon(
+                                              Icons.bookmark_border,
+                                              size: 16),
+                                          label: Text('moment.create'.tr,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis),
+                                          style: TextButton.styleFrom(
+                                              foregroundColor:
+                                                  Colors.white70))),
                               ]),
                         if (widget.compactDate &&
                             !keyboard &&
@@ -261,6 +301,10 @@ class _SharedExperienceStageState extends State<SharedExperienceStage> {
                                 maxLines: constraints.maxHeight < 400 ? 1 : 3,
                                 style: const TextStyle(color: Colors.white),
                                 decoration: InputDecoration(
+                                    focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(18),
+                                        borderSide: const BorderSide(
+                                            color: Colors.white38)),
                                     counterText: '',
                                     hintText: 'moment.messageHint'.tr,
                                     hintStyle:

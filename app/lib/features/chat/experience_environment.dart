@@ -11,11 +11,14 @@ class ExperienceEnvironment extends StatelessWidget {
       required this.location,
       required this.name,
       this.portrait,
+      this.backgroundUrl,
+      this.sceneFirst = false,
       this.focus = 'ambient',
       this.narration = '',
       this.height = 300});
   final String location, name, focus, narration;
-  final String? portrait;
+  final String? portrait, backgroundUrl;
+  final bool sceneFirst;
   final double height;
 
   static String kind(String location) => switch (location) {
@@ -32,115 +35,145 @@ class ExperienceEnvironment extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox(
       height: height,
-      child: Stack(children: [
-        Positioned.fill(
-            child: RepaintBoundary(
-                child: CustomPaint(
-                    painter: _EnvironmentPainter(kind(location), focus,
-                        Directionality.of(context) == TextDirection.rtl)))),
-        PositionedDirectional(
-            end: 24,
-            top: height < 250 ? 8 : 20,
-            bottom: height < 250 ? 18 : 74,
-            child: SizedBox(
-                width: height < 250 ? (height * .5).clamp(44.0, 110.0) : 126,
-                child: Column(children: [
-                  Expanded(
-                      child: Container(
+      child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Stack(children: [
+            Positioned.fill(
+                child: RepaintBoundary(
+                    child: CustomPaint(
+                        painter: _EnvironmentPainter(kind(location), focus,
+                            Directionality.of(context) == TextDirection.rtl)))),
+            if (backgroundUrl?.isNotEmpty == true)
+              Positioned.fill(
+                  child: ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: VitaMediaImage(
+                          url: backgroundUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => CustomPaint(
+                              painter: _EnvironmentPainter(
+                                  kind(location),
+                                  focus,
+                                  Directionality.of(context) ==
+                                      TextDirection.rtl))))),
+            Positioned.fill(
+                child: IgnorePointer(
+                    child: DecoratedBox(
+                        decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                  Colors.transparent,
+                  background(location).withValues(alpha: .65)
+                ]))))),
+            if (!sceneFirst)
+              PositionedDirectional(
+                  end: 24,
+                  top: height < 250 ? 8 : 20,
+                  bottom: height < 250 ? 18 : 74,
+                  child: SizedBox(
+                      width:
+                          height < 250 ? (height * .5).clamp(44.0, 110.0) : 126,
+                      child: Column(children: [
+                        Expanded(
+                            child: Container(
+                                decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(64),
+                                    boxShadow: [
+                                      BoxShadow(
+                                          color: Colors.black
+                                              .withValues(alpha: .3),
+                                          blurRadius: 26,
+                                          offset: const Offset(0, 12))
+                                    ],
+                                    border: Border.all(
+                                        color: Colors.white.withValues(
+                                            alpha: focus == 'ta' ? .5 : .15),
+                                        width: 2)),
+                                child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(64),
+                                    child: portrait?.isNotEmpty == true
+                                        ? VitaMediaImage(
+                                            url: portrait!,
+                                            errorBuilder: (_, __, ___) =>
+                                                _missingPerson())
+                                        : _missingPerson()))),
+                        if (height >= 120) const SizedBox(height: 8),
+                        if (height >= 120)
+                          Text(name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600)),
+                      ]))),
+            if (height >= 120)
+              PositionedDirectional(
+                  start: 16,
+                  bottom: height < 250 ? 12 : 58,
+                  child: Text('moment.environment.${kind(location)}'.tr,
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: .7),
+                          fontSize: 12))),
+            if (narration.trim().isNotEmpty)
+              Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: 96,
+                  child: IgnorePointer(
+                      child: DecoratedBox(
                           decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(64),
-                              boxShadow: [
-                                BoxShadow(
-                                    color: Colors.black.withValues(alpha: .3),
-                                    blurRadius: 26,
-                                    offset: const Offset(0, 12))
-                              ],
-                              border: Border.all(
-                                  color: Colors.white.withValues(
-                                      alpha: focus == 'ta' ? .5 : .15),
-                                  width: 2)),
-                          child: ClipRRect(
-                              borderRadius: BorderRadius.circular(64),
-                              child: portrait?.isNotEmpty == true
-                                  ? VitaMediaImage(
-                                      url: portrait!,
-                                      errorBuilder: (_, __, ___) =>
-                                          _missingPerson())
-                                  : _missingPerson()))),
-                  if (height >= 120) const SizedBox(height: 8),
-                  if (height >= 120)
-                    Text(name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600)),
-                ]))),
-        if (height >= 120)
-          PositionedDirectional(
-              start: 16,
-              bottom: height < 250 ? 12 : 58,
-              child: Text('moment.environment.${kind(location)}'.tr,
-                  style: TextStyle(
-                      color: Colors.white.withValues(alpha: .7),
-                      fontSize: 12))),
-        if (narration.trim().isNotEmpty)
-          Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: 96,
-              child: IgnorePointer(
-                  child: DecoratedBox(
-                      decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                    Colors.transparent,
-                    background(location).withValues(alpha: .88)
-                  ]))))),
-        if (narration.trim().isNotEmpty)
-          PositionedDirectional(
-              start: 16,
-              end: 16,
-              bottom: 14,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => showModalBottomSheet<void>(
-                    context: context,
-                    showDragHandle: true,
-                    isScrollControlled: true,
-                    builder: (sheetContext) => SafeArea(
-                        top: false,
-                        child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                                maxHeight:
-                                    MediaQuery.sizeOf(sheetContext).height *
-                                        .6),
-                            child: SingleChildScrollView(
-                                padding:
-                                    const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                                child: SelectableText(narration,
-                                    style: const TextStyle(
-                                        fontSize: 16, height: 1.6)))))),
-                child: SizedBox(
-                    height: 44,
-                    child: Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: Text(narration,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                color: Colors.white.withValues(alpha: .76),
-                                fontSize: 13,
-                                height: 1.55,
-                                shadows: const [
-                                  Shadow(color: Colors.black38, blurRadius: 6)
-                                ])))),
-              )),
-      ]));
+                              gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                        Colors.transparent,
+                        background(location).withValues(alpha: .88)
+                      ]))))),
+            if (narration.trim().isNotEmpty)
+              PositionedDirectional(
+                  start: 16,
+                  end: 16,
+                  bottom: 14,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => showModalBottomSheet<void>(
+                        context: context,
+                        showDragHandle: true,
+                        isScrollControlled: true,
+                        builder: (sheetContext) => SafeArea(
+                            top: false,
+                            child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                    maxHeight:
+                                        MediaQuery.sizeOf(sheetContext).height *
+                                            .6),
+                                child: SingleChildScrollView(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        20, 0, 20, 24),
+                                    child: SelectableText(narration,
+                                        style: const TextStyle(
+                                            fontSize: 16, height: 1.6)))))),
+                    child: SizedBox(
+                        height: 44,
+                        child: Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: Text(narration,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: Colors.white.withValues(alpha: .76),
+                                    fontSize: 13,
+                                    height: 1.55,
+                                    shadows: const [
+                                      Shadow(
+                                          color: Colors.black38, blurRadius: 6)
+                                    ])))),
+                  )),
+          ])));
 
   Widget _missingPerson() => ColoredBox(
       color: background(location),
@@ -220,6 +253,25 @@ class _EnvironmentPainter extends CustomPainter {
     } else if (location == 'cafe' || location == 'restaurant') {
       rect(22, 22, 152, 122, const Color(0xFF98ADAC), 10);
       rect(30, 30, 136, 106, const Color(0xFF829697), 6);
+      // Rainy blue-hour glass and distant warm street lights.
+      rect(30, 30, 136, 106, const Color(0xFF384956), 6);
+      for (var i = 0; i < 7; i++) {
+        canvas.drawCircle(
+            Offset(42 + i * 17.0, 65 + (i % 3) * 18.0),
+            7,
+            Paint()
+              ..color = warm.withValues(alpha: .22)
+              ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
+        line(38 + i * 19.0, 35 + (i % 3) * 8.0, 34 + i * 19.0,
+            73 + (i % 3) * 8.0, Colors.white.withValues(alpha: .12), 1);
+      }
+      canvas.drawCircle(
+          const Offset(230, 85),
+          75,
+          Paint()
+            ..shader = RadialGradient(
+                    colors: [warm.withValues(alpha: .16), Colors.transparent])
+                .createShader(const Rect.fromLTWH(155, 10, 150, 150)));
       line(97, 25, 97, 140, const Color(0xFF423E3A), 5);
       line(25, 84, 170, 84, const Color(0xFF423E3A), 5);
       rect(10, 153, 184, 14, const Color(0xFF453D35), 5);
@@ -236,6 +288,23 @@ class _EnvironmentPainter extends CustomPainter {
       canvas.drawOval(const Rect.fromLTWH(7, 193, 320, 78),
           Paint()..color = const Color(0xFF9A795F));
       if (location == 'cafe') {
+        canvas.drawOval(const Rect.fromLTWH(210, 220, 55, 14),
+            Paint()..color = const Color(0xFFD2BBA0));
+        rect(217, 201, 34, 25, const Color(0xFFE2D4C1), 8);
+        canvas.drawOval(const Rect.fromLTWH(219, 200, 30, 8),
+            Paint()..color = const Color(0xFF493126));
+        for (var i = 0; i < 2; i++) {
+          final steam = Path()
+            ..moveTo(228 + i * 10.0, 195)
+            ..quadraticBezierTo(218 + i * 10.0, 185, 231 + i * 10.0, 174);
+          canvas.drawPath(
+              steam,
+              Paint()
+                ..color = Colors.white.withValues(alpha: .20)
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 2);
+        }
+
         canvas.drawOval(const Rect.fromLTWH(38, 213, 62, 16),
             Paint()..color = const Color(0xFFC6B7A2));
         rect(50, 194, 38, 27, const Color(0xFFE6D9C5), 7);
