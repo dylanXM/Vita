@@ -177,11 +177,15 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
           return;
         }
       }
-      await BillingController.to.refreshCredits();
       if (data is Map && widget.onResult != null) {
         await widget.onResult!(Map<String, dynamic>.from(data));
       } else {
         await widget.onCompleted();
+      }
+      try {
+        await BillingController.to.refreshCredits();
+      } catch (_) {
+        // The delivered media must stay visible even if balance refresh fails.
       }
       AnalyticsService.to
           .track('experience_purchased', category: 'billing', properties: {
@@ -203,6 +207,11 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
           owned ? 'experience.equipped'.tr : 'experience.doneMessage'.tr);
       await _load();
     } on ApiException catch (error) {
+      try {
+        await BillingController.to.refreshCredits();
+      } catch (_) {
+        // Keep the original purchase error visible if balance refresh fails.
+      }
       if (!mounted) return;
       if (error.action == 'open_credits' ||
           error.code == 'insufficient_credits') {

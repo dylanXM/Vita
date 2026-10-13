@@ -378,7 +378,13 @@ class ChatController extends GetxController {
       if (message['source'] == 'paid_gift') {
         message['_animate_gift'] = true;
       }
-      _addIfNew(message);
+      final index = messages.indexWhere((item) => item['id'] == message['id']);
+      if (index >= 0) {
+        messages[index] = message;
+        _markDisplayedMessagesRead([message]);
+      } else {
+        _addIfNew(message);
+      }
       final rawReaction = result['reaction_message'];
       if (rawReaction is Map) {
         _addIfNew(Map<String, dynamic>.from(rawReaction));

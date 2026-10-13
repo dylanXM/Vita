@@ -565,16 +565,16 @@ class _ChatPageState extends State<ChatPage> {
     for (var i = 0; i < ctrl.messages.length; i++) {
       final m = ctrl.messages[i];
       final dt =
-          DateTime.tryParse(m['created_at'] as String? ?? '') ?? DateTime.now();
+          (DateTime.tryParse(m['created_at'] as String? ?? '') ?? DateTime.now())
+              .toLocal();
       if (prevDate == null || !isSameDay(dt, prevDate)) {
         items.add(VitaDateChip(label: formatDateSeparator(dt)));
       } else {
         final prev = ctrl.messages[i - 1];
         final prevDt =
-            DateTime.tryParse(prev['created_at'] as String? ?? '') ?? dt;
-        final sameSender = _isUserMessage(prev) == _isUserMessage(m);
-        final closeInTime = dt.difference(prevDt) < const Duration(minutes: 10);
-        if (!sameSender || !closeInTime) {
+            (DateTime.tryParse(prev['created_at'] as String? ?? '') ?? dt)
+                .toLocal();
+        if (dt.hour != prevDt.hour || dt.minute != prevDt.minute) {
           items.add(Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),

@@ -102,13 +102,7 @@ func PurchaseCompanionExperience(c *gin.Context) {
 		var owned bool
 		_ = db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM companion_outfits WHERE user_id=$1 AND companion_id=$2 AND product_key=$3)`, userID, companionID, productKey).Scan(&owned)
 		if owned {
-			if _, err := db.Get().Exec(`UPDATE companions SET equipped_outfit_key=$3,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$2`, companionID, userID, productKey); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to equip outfit"})
-				return
-			}
-			var balance int
-			_ = db.Get().QueryRow(`SELECT credits_balance FROM users WHERE id=$1`, userID).Scan(&balance)
-			c.JSON(http.StatusOK, gin.H{"balance": balance, "product_key": productKey, "equipped": true, "already_owned": true})
+			equipOwnedMediaOutfit(c, userID, companionID, productKey)
 			return
 		}
 	}
@@ -124,6 +118,11 @@ func PurchaseCompanionExperience(c *gin.Context) {
 	}
 	if productCategory == "date" {
 		requestCompanionDate(c, userID, companionID, productKey, input)
+		return
+	}
+
+	if productCategory == "photo" || productCategory == "voice" || productCategory == "outfit" {
+		purchaseMediaExperience(c, userID, companionID, productKey, input)
 		return
 	}
 
@@ -171,28 +170,10 @@ func fulfillExperience(ctx context.Context, userID, companionID string, product 
 	switch product.Category {
 	case "gift":
 		return fulfillCatalogGift(ctx, userID, companionID, product)
-	case "photo":
-		if companionAgent == nil {
-			return nil, "", fmt.Errorf("agent service is unavailable")
-		}
-		message, err := companionAgent.GenerateRequestedLifePhoto(ctx, userID, companionID)
-		if err != nil {
-			return nil, "", err
-		}
-		return map[string]any{"message": message}, message.ID, nil
-	case "voice":
-		if companionAgent == nil {
-			return nil, "", fmt.Errorf("agent service is unavailable")
-		}
-		message, err := companionAgent.SpeakLatestReply(ctx, userID, companionID)
-		if err != nil {
-			return nil, "", err
-		}
-		return map[string]any{"message": message}, message.ID, nil
+	case "photo", "voice", "outfit":
+		return nil, "", fmt.Errorf("media experiences require transactional delivery")
 	case "keepsake":
 		return fulfillKeepsake(ctx, userID, companionID, product)
-	case "outfit":
-		return fulfillOutfit(ctx, userID, companionID, product)
 	case "call":
 		return nil, "", fmt.Errorf("real-time calling is not configured")
 	default:
@@ -366,24 +347,6 @@ func fulfillKeepsake(ctx context.Context, userID, companionID string, product cr
 		return nil, "", err
 	}
 	return map[string]any{"keepsake_id": id, "title_key": product.NameKey, "content": content}, id, nil
-}
-
-func fulfillOutfit(ctx context.Context, userID, companionID string, product credits.Product) (map[string]any, string, error) {
-	tx, err := db.Get().BeginTx(ctx, nil)
-	if err != nil {
-		return nil, "", err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `INSERT INTO companion_outfits(user_id,companion_id,product_key) VALUES($1,$2,$3)`, userID, companionID, product.Key); err != nil {
-		return nil, "", err
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE companions SET equipped_outfit_key=$3,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$2`, companionID, userID, product.Key); err != nil {
-		return nil, "", err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, "", err
-	}
-	return map[string]any{"equipped": true}, product.Key, nil
 }
 
 func experienceConversation(ctx context.Context, userID, companionID string) (string, error) {

@@ -137,6 +137,9 @@ func (c *Client) generateSpeech(ctx context.Context, model Model, text, voice st
 	if err != nil || len(audio) == 0 {
 		return nil, "", fmt.Errorf("provider returned empty speech audio")
 	}
+	if detected := http.DetectContentType(audio); strings.HasPrefix(detected, "text/") || detected == "application/json" {
+		return nil, "", fmt.Errorf("provider returned non-audio content")
+	}
 	mimeType := resp.Header.Get("Content-Type")
 	if mimeType == "" {
 		mimeType = "audio/mpeg"
@@ -651,9 +654,15 @@ func (c *Client) kieGenerateSpeech(ctx context.Context, model Model, text, voice
 		return nil, "", fmt.Errorf("kie audio download: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, "", fmt.Errorf("kie audio download failed: %s", resp.Status)
+	}
 	audio, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil || len(audio) == 0 {
 		return nil, "", fmt.Errorf("kie audio download returned empty content")
+	}
+	if detected := http.DetectContentType(audio); strings.HasPrefix(detected, "text/") || detected == "application/json" {
+		return nil, "", fmt.Errorf("provider returned non-audio content")
 	}
 	mimeType := resp.Header.Get("Content-Type")
 	if mimeType == "" {

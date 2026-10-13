@@ -104,9 +104,33 @@ func Reserve(ctx context.Context, database *sql.DB, params ReserveParams) (*Rese
 	}
 	defer tx.Rollback()
 
+	reservation, err := reserveInTx(ctx, tx, params)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return reservation, nil
+}
+
+// reserveInTx serializes reservations for a user before checking idempotency.
+func reserveInTx(ctx context.Context, tx *sql.Tx, params ReserveParams) (*Reservation, error) {
+
+	var lockedBalance int
+	if err := tx.QueryRowContext(ctx, `SELECT credits_balance FROM users WHERE id=$1 FOR UPDATE`, params.UserID).Scan(&lockedBalance); err != nil {
+		return nil, err
+	}
 	if existing, found, err := loadReservation(ctx, tx, params.UserID, params.IdempotencyKey); err != nil {
 		return nil, err
 	} else if found {
+		var companion string
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(companion_id,'') FROM credit_spends WHERE id=$1`, existing.ID).Scan(&companion); err != nil {
+			return nil, err
+		}
+		if existing.Product.Key != params.ProductKey || companion != params.CompanionID {
+			return nil, fmt.Errorf("idempotency key belongs to another experience")
+		}
 		existing.Idempotent = true
 		switch existing.Status {
 		case "completed":
@@ -120,7 +144,7 @@ func Reserve(ctx context.Context, database *sql.DB, params ReserveParams) (*Rese
 
 	var product Product
 	var metadataRaw string
-	err = tx.QueryRowContext(ctx, `SELECT product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata::text,subscription_only,is_launched
+	err := tx.QueryRowContext(ctx, `SELECT product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata::text,subscription_only,is_launched
 		FROM credit_products WHERE environment=$1 AND product_key=$2 AND enabled=true FOR SHARE`, params.Environment, params.ProductKey).Scan(
 		&product.Key, &product.Category, &product.NameKey, &product.DescriptionKey, &product.Emoji,
 		&product.Coins, &product.Enabled, &product.SortOrder, &metadataRaw, &product.SubscriptionOnly, &product.IsLaunched)
@@ -167,9 +191,6 @@ func Reserve(ctx context.Context, database *sql.DB, params ReserveParams) (*Rese
 		id,user_id,amount,balance_after,kind,description,platform,environment,spend_id)
 		VALUES($1,$2,$3,$4,'consume',$5,$6,$7,$8)`, uuid.New().String(), params.UserID,
 		-product.Coins, newBalance, "product:"+product.Key, params.Platform, params.Environment, spendID); err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return &Reservation{ID: spendID, Product: product, Balance: newBalance, Status: "reserved", Result: map[string]any{}}, nil

@@ -88,7 +88,7 @@ func TestOpenAICompatibleAudioClient(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{"text": "voice transcript"})
 		case "/v1/audio/speech":
 			w.Header().Set("Content-Type", "audio/mpeg")
-			_, _ = w.Write([]byte("mp3-data"))
+			_, _ = w.Write([]byte("ID3\x03\x00\x00\x00\x00\x00\x00mp3-data"))
 		default:
 			t.Fatalf("path = %s", r.URL.Path)
 		}
@@ -101,7 +101,7 @@ func TestOpenAICompatibleAudioClient(t *testing.T) {
 		t.Fatalf("transcript = %q, err = %v", transcript, err)
 	}
 	audio, mimeType, err := client.GenerateSpeech(context.Background(), model, "hello", "alloy")
-	if err != nil || string(audio) != "mp3-data" || mimeType != "audio/mpeg" {
+	if err != nil || string(audio) != "ID3\x03\x00\x00\x00\x00\x00\x00mp3-data" || mimeType != "audio/mpeg" {
 		t.Fatalf("audio = %q, mime = %q, err = %v", audio, mimeType, err)
 	}
 }
@@ -165,7 +165,7 @@ func TestKieSpeechClient(t *testing.T) {
 			})
 		case "/kie-voice.mp3":
 			w.Header().Set("Content-Type", "audio/mpeg")
-			_, _ = w.Write([]byte("kie-mp3"))
+			_, _ = w.Write([]byte("ID3\x03\x00\x00\x00\x00\x00\x00kie-mp3"))
 		default:
 			t.Fatalf("path = %s", r.URL.Path)
 		}
@@ -179,7 +179,7 @@ func TestKieSpeechClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(audio) != "kie-mp3" || mimeType != "audio/mpeg" {
+	if string(audio) != "ID3\x03\x00\x00\x00\x00\x00\x00kie-mp3" || mimeType != "audio/mpeg" {
 		t.Fatalf("audio = %q, mime = %q", string(audio), mimeType)
 	}
 }

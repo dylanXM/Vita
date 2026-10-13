@@ -74,6 +74,20 @@ void main() {
         ChatController(companionId: 'companion-1', companionName: 'Ava');
     await controller.load();
   });
+  test('paid speech updates an existing reply instead of discarding it', () async {
+    controller.messages.assignAll([{
+      'id': 'reply', 'sender_type': 'assistant', 'message_type': 'text',
+      'content': 'Hello',
+    }]);
+    await controller.experienceCompleted({'result': {'message': {
+      'id': 'reply', 'sender_type': 'assistant', 'message_type': 'voice',
+      'content': 'Hello', 'media_url': '/v1/media/audio',
+    }}});
+    expect(controller.messages, hasLength(1));
+    expect(controller.messages.single['message_type'], 'voice');
+    expect(controller.messages.single['media_url'], '/v1/media/audio');
+  });
+
   test('covered chat does not fetch or mark new messages read', () async {
     controller.isVisible = () => false;
     await controller.poll();

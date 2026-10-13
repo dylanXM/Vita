@@ -814,10 +814,10 @@ func (s *Service) TranscribeMedia(ctx context.Context, mediaID, userID, companio
 	return s.transcribeWithFallback(ctx, companionID, models, filename, mimeType, data)
 }
 
-// GenerateRequestedLifePhoto creates a paid, user-requested photo anchored to
+// PrepareRequestedLifePhoto generates a photo without publishing it, anchored to
 // the companion's most recent real life event. It never invents a location or
 // activity outside the Life timeline.
-func (s *Service) GenerateRequestedLifePhoto(ctx context.Context, userID, companionID string) (*SavedMessage, error) {
+func (s *Service) PrepareRequestedLifePhoto(ctx context.Context, userID, companionID string) (*SavedMessage, error) {
 	var eventID, eventType, name, appearance, outfit, title, description, location, emotion, payloadRaw string
 	err := s.db.QueryRowContext(ctx, `SELECT e.id,COALESCE(e.event_type,''),c.name,COALESCE(c.appearance,''),COALESCE((SELECT p.metadata->>'style' FROM credit_products p WHERE p.environment=u.environment AND p.product_key=c.equipped_outfit_key),''),
 		COALESCE(e.title,''),COALESCE(e.description,''),COALESCE(e.location,''),COALESCE(e.emotion,''),e.payload::text
@@ -845,35 +845,21 @@ func (s *Service) GenerateRequestedLifePhoto(ctx context.Context, userID, compan
 	if err != nil {
 		return nil, err
 	}
-	s.recordRun(ctx, companionID, "requested_life_photo", model.ID, "succeeded", "")
-	payload := map[string]any{}
-	_ = json.Unmarshal([]byte(payloadRaw), &payload)
-	media := stringSlice(payload["media_urls"])
-	media = append(media, imageURL)
-	payload["media_urls"] = media
-	payload["photo_source"] = "user_request"
-	encoded, _ := json.Marshal(payload)
-	if _, err := s.db.ExecContext(ctx, `UPDATE life_events SET payload=$2 WHERE id=$1`, eventID, encoded); err != nil {
+	imageURL, err = s.storePaidImage(ctx, userID, imageURL)
+	if err != nil {
 		return nil, err
 	}
+	s.recordRun(ctx, companionID, "requested_life_photo", model.ID, "succeeded", "")
 	conversationID, err := s.getOrCreateConversation(ctx, userID, companionID)
 	if err != nil {
 		return nil, err
 	}
-	message, err := s.insertMessage(ctx, conversationID, "assistant", "image_text", description, "paid_photo", eventID,
-		map[string]any{"media_urls": []string{imageURL}, "requested": true})
-	if err != nil {
-		return nil, err
-	}
-	message.MediaURL = imageURL
-	_, err = s.db.ExecContext(ctx, `UPDATE messages SET media_url=$2 WHERE id=$1`, message.ID, imageURL)
-	return message, err
+	return &SavedMessage{ID: uuid.New().String(), ConversationID: conversationID, SenderType: "assistant", MessageType: "image_text", Content: description, MediaURL: imageURL, Payload: map[string]any{"media_urls": []string{imageURL}, "requested": true}, Source: "paid_photo", LifeEventID: eventID, DeliveryStatus: "delivered", CreatedAt: time.Now().UTC()}, nil
 }
 
-// SpeakLatestReply converts the latest text response into audio. Charging is
-// handled by the caller and can therefore be refunded if speech generation
-// fails before this method updates the message.
-func (s *Service) SpeakLatestReply(ctx context.Context, userID, companionID string) (*SavedMessage, error) {
+// PrepareLatestReplySpeech stores generated audio but leaves the chat message
+// unchanged until the caller commits delivery and completes the reservation.
+func (s *Service) PrepareLatestReplySpeech(ctx context.Context, userID, companionID string) (*SavedMessage, error) {
 	conversationID, err := s.getOrCreateConversation(ctx, userID, companionID)
 	if err != nil {
 		return nil, err
@@ -920,11 +906,10 @@ func (s *Service) SpeakLatestReply(ctx context.Context, userID, companionID stri
 	}
 	message.MessageType = "voice"
 	message.MediaURL = "/v1/media/" + mediaID
-	message.Payload["paid_voice"] = true
-	encoded, _ := json.Marshal(message.Payload)
-	if _, err := s.db.ExecContext(ctx, `UPDATE messages SET message_type='voice',media_url=$2,payload=$3 WHERE id=$1`, message.ID, message.MediaURL, encoded); err != nil {
-		return nil, err
+	if message.Payload == nil {
+		message.Payload = map[string]any{}
 	}
+	message.Payload["paid_voice"] = true
 	s.recordRun(ctx, companionID, "paid_speech", model.ID, "succeeded", "")
 	return &message, nil
 }
