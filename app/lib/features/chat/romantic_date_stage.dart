@@ -16,6 +16,7 @@ class RomanticDateStage extends StatefulWidget {
       required this.backgroundUrl,
       required this.audioUrl,
       this.portraitUrl,
+      required this.companionName,
       required this.messages,
       required this.input,
       required this.busy,
@@ -23,7 +24,7 @@ class RomanticDateStage extends StatefulWidget {
       required this.onAction,
       this.onKeepsake,
       this.journey});
-  final String title, location, backgroundUrl, audioUrl;
+  final String title, location, backgroundUrl, audioUrl, companionName;
   final String? portraitUrl;
   final List<Map<String, dynamic>> messages;
   final TextEditingController input;
@@ -41,6 +42,7 @@ class _RomanticDateStageState extends State<RomanticDateStage>
   late final AnimationController _motion =
       AnimationController(vsync: this, duration: const Duration(seconds: 8));
   final AudioPlayer _audio = AudioPlayer();
+  final FocusNode _inputFocus = FocusNode();
   final ValueNotifier<List<Map<String, dynamic>>> _history = ValueNotifier([]);
   bool _sending = false, _sound = false, _chat = false, _active = true;
   ModalRoute<dynamic>? _route;
@@ -114,6 +116,7 @@ class _RomanticDateStageState extends State<RomanticDateStage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _motion.dispose();
+    _inputFocus.dispose();
     _audio.dispose();
     _history.dispose();
     super.dispose();
@@ -223,6 +226,62 @@ class _RomanticDateStageState extends State<RomanticDateStage>
                                         fontSize: 16,
                                         height: 1.4))));
                       })))));
+  void _hideComposer() {
+    _inputFocus.unfocus();
+    setState(() => _chat = false);
+  }
+
+  void _toggleComposer() {
+    if (_chat) {
+      _hideComposer();
+    } else {
+      setState(() => _chat = true);
+    }
+  }
+
+  Widget _choice(String label, VoidCallback onTap) => Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: TextButton(
+              onPressed: widget.busy || _sending ? null : onTap,
+              style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFFFFAF0),
+                  backgroundColor: const Color(0xB3322923),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: const BorderSide(color: Color(0x66D9C9B1)))),
+              child: Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 15)))));
+
+  void _openKeepsakePanel() {
+    if (widget.journey == null) {
+      widget.onKeepsake?.call();
+      return;
+    }
+    showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        backgroundColor: const Color(0xFF29221D),
+        builder: (ctx) => SafeArea(
+            top: false,
+            child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  widget.journey!,
+                  TextButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        widget.onKeepsake?.call();
+                      },
+                      child: Text('moment.create'.tr,
+                          style: const TextStyle(color: Colors.white)))
+                ]))));
+  }
+
   @override
   Widget build(BuildContext context) {
     final asset = switch (widget.location) {
@@ -318,30 +377,50 @@ class _RomanticDateStageState extends State<RomanticDateStage>
                                 _action == 'toast' ? -12 * _motion.value : 0),
                             child: child))))),
       if (!keyboard && widget.portraitUrl?.isNotEmpty == true)
-        PositionedDirectional(
-            end: 20,
-            top: 65,
+        Positioned(
+            left: 16,
+            right: 16,
+            top: MediaQuery.paddingOf(context).top + kToolbarHeight + 18,
             child: IgnorePointer(
-                child: Container(
-                    width: MediaQuery.sizeOf(context).width * .36,
-                    height: 220,
-                    decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        color: const Color(0x66271C17),
-                        boxShadow: [
-                          BoxShadow(
-                              color: Colors.black.withValues(alpha: .16),
-                              blurRadius: 20)
-                        ]),
-                    clipBehavior: Clip.antiAlias,
-                    child: VitaMediaImage(
-                        url: widget.portraitUrl!, fit: BoxFit.contain)))),
+                child: SizedBox(
+                    height: MediaQuery.sizeOf(context).height * .46,
+                    child: ShaderMask(
+                        blendMode: BlendMode.dstIn,
+                        shaderCallback: (bounds) => const LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black,
+                                  Colors.black,
+                                  Colors.transparent
+                                ],
+                                stops: [
+                                  0,
+                                  .12,
+                                  .76,
+                                  1
+                                ]).createShader(bounds),
+                        child: ShaderMask(
+                            blendMode: BlendMode.dstIn,
+                            shaderCallback: (bounds) => const LinearGradient(colors: [
+                                  Colors.transparent,
+                                  Colors.black,
+                                  Colors.black,
+                                  Colors.transparent
+                                ], stops: [
+                                  0,
+                                  .18,
+                                  .82,
+                                  1
+                                ]).createShader(bounds),
+                            child: VitaMediaImage(url: widget.portraitUrl!, fit: BoxFit.contain)))))),
       SafeArea(
-          top: false,
+          top: true,
           child: Column(children: [
             Padding(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    const EdgeInsets.fromLTRB(16, kToolbarHeight + 8, 16, 8),
                 child: Row(children: [
                   const Spacer(),
                   if (widget.audioUrl.isNotEmpty)
@@ -361,77 +440,59 @@ class _RomanticDateStageState extends State<RomanticDateStage>
             const Spacer(),
             if (reply.isNotEmpty && !keyboard)
               Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
                   child: GestureDetector(
                       onTap: _openHistory,
-                      child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 14),
-                          decoration: BoxDecoration(
-                              color: const Color(0xED241B17),
-                              borderRadius: BorderRadius.circular(18),
-                              border:
-                                  Border.all(color: const Color(0x33E8C99C))),
-                          child: Text(reply,
-                              maxLines: 4,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.start,
-                              style: const TextStyle(
-                                  color: Color(0xFFFFF8EF),
-                                  fontSize: 17,
-                                  height: 1.55))))),
-            if (!keyboard && suggestions.isEmpty)
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(widget.companionName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: Color(0xFFF1DCC0),
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: .5)),
+                            const SizedBox(height: 8),
+                            Text(reply,
+                                maxLines: 4,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.start,
+                                style: const TextStyle(
+                                    color: Color(0xFFFFFBF5),
+                                    fontSize: 17,
+                                    height: 1.55,
+                                    shadows: [
+                                      Shadow(
+                                          color: Colors.black87, blurRadius: 8)
+                                    ])),
+                          ]))),
+            if (!keyboard)
               Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
-                  child: Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: availableActions
-                          .map((action) => OutlinedButton(
-                              onPressed: widget.busy || _sending
-                                  ? null
-                                  : () => _perform(action),
-                              style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFFFFF8EF),
-                                  backgroundColor: const Color(0xED34251D),
-                                  side: const BorderSide(
-                                      color: Color(0x66E8C99C)),
-                                  minimumSize: const Size(64, 44)),
-                              child: Text('date.scene.$action'.tr)))
-                          .toList())),
-            if (!keyboard && suggestions.isNotEmpty)
-              Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: suggestions
-                          .map((choice) => OutlinedButton(
-                              onPressed: widget.busy || _sending
-                                  ? null
-                                  : () =>
-                                      widget.onSend(choice['message'] ?? ''),
-                              style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.white,
-                                  backgroundColor: const Color(0xED241B17),
-                                  side: const BorderSide(color: Colors.white38),
-                                  minimumSize: const Size(44, 44)),
-                              child: Text(choice['label'] ?? '',
-                                  style: const TextStyle(fontSize: 14))))
-                          .toList())),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                      children: suggestions.isNotEmpty
+                          ? suggestions
+                              .take(2)
+                              .map((choice) => _choice(choice['label'] ?? '',
+                                  () => widget.onSend(choice['message'] ?? '')))
+                              .toList()
+                          : availableActions
+                              .take(2)
+                              .map((action) => _choice('date.scene.$action'.tr,
+                                  () => _perform(action)))
+                              .toList())),
             if (widget.busy || _sending)
               Padding(
                   padding: const EdgeInsets.all(8),
                   child: Text('moment.scene.responding'.tr,
                       style: const TextStyle(color: Colors.white70))),
-            if (widget.journey != null && !keyboard) widget.journey!,
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(children: [
                   TextButton.icon(
-                      onPressed: () => setState(() => _chat = !_chat),
+                      onPressed: _toggleComposer,
                       icon: const Icon(Icons.chat_bubble_outline, size: 16),
                       label: Text('date.scene.respond'.tr),
                       style:
@@ -439,20 +500,21 @@ class _RomanticDateStageState extends State<RomanticDateStage>
                   if (widget.onKeepsake != null)
                     Expanded(
                         child: TextButton(
-                            onPressed: widget.onKeepsake,
+                            onPressed: _openKeepsakePanel,
                             child: Text('moment.create'.tr,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style:
                                     const TextStyle(color: Colors.white70)))),
                 ])),
-            if (_chat || keyboard)
+            if (_chat)
               Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                   child: Row(children: [
                     Expanded(
                         child: TextField(
                             controller: widget.input,
+                            focusNode: _inputFocus,
                             enabled: !widget.busy,
                             maxLength: 2000,
                             maxLines: 3,
@@ -460,6 +522,11 @@ class _RomanticDateStageState extends State<RomanticDateStage>
                             textInputAction: TextInputAction.send,
                             style: TextStyle(color: context.vita.text),
                             decoration: InputDecoration(
+                                suffixIcon: IconButton(
+                                    tooltip: 'common.cancel'.tr,
+                                    onPressed: _hideComposer,
+                                    icon: const Icon(Icons.close_rounded,
+                                        size: 18)),
                                 counterText: '',
                                 hintText: 'chat.message'.tr,
                                 filled: true,

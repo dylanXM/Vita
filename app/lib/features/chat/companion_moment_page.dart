@@ -538,6 +538,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
             backgroundUrl: '${_moment?["scene_background_url"] ?? ""}',
             audioUrl: '${_moment?["scene_audio_url"] ?? ""}',
             portraitUrl: widget.avatarUrl,
+            companionName: widget.name,
             messages: messages,
             input: _message,
             busy: busy,
@@ -660,6 +661,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
     final location = '${_moment?['location'] ?? ''}';
     final immersive = _phase == _MomentPhase.together && !_loading;
     return Scaffold(
+      extendBodyBehindAppBar: immersive,
       backgroundColor:
           immersive ? ExperienceEnvironment.background(location) : vita.pageBg,
       appBar: AppBar(
