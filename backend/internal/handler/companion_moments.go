@@ -303,6 +303,14 @@ func StartCompanionMoment(c *gin.Context) {
 		c.JSON(http.StatusOK, moment)
 		return
 	}
+	if companionAgent == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "agent service is unavailable"})
+		return
+	}
+	if err := companionAgent.ProcessDateAttendance(ctx, eventID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record appointment attendance"})
+		return
+	}
 	_, _ = db.Get().ExecContext(ctx, `DELETE FROM companion_moment_sessions
 		WHERE event_id=$1 AND opening_message_id IS NULL AND created_at<CURRENT_TIMESTAMP-INTERVAL '2 minutes'`, eventID)
 	claim, err := db.Get().ExecContext(ctx, `INSERT INTO companion_moment_sessions(event_id,user_id,companion_id)
@@ -321,11 +329,17 @@ func StartCompanionMoment(c *gin.Context) {
 		}
 		return
 	}
+	if _, err = db.Get().ExecContext(ctx, `UPDATE life_events SET payload=jsonb_set(COALESCE(payload,'{}'::jsonb),'{attendance_entering_at}',to_jsonb(CURRENT_TIMESTAMP)) WHERE id=$1`, eventID); err != nil {
+		_, _ = db.Get().ExecContext(ctx, `DELETE FROM companion_moment_sessions WHERE event_id=$1 AND opening_message_id IS NULL`, eventID)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record scene entry"})
+		return
+	}
 	completed := false
 	defer func() {
 		if !completed {
 			cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
+			_, _ = db.Get().ExecContext(cleanupCtx, `UPDATE life_events SET payload=COALESCE(payload,'{}'::jsonb)-'attendance_entering_at' WHERE id=$1`, eventID)
 			_, _ = db.Get().ExecContext(cleanupCtx, `DELETE FROM companion_moment_sessions
 				WHERE event_id=$1 AND opening_message_id IS NULL`, eventID)
 		}
@@ -365,6 +379,12 @@ func StartCompanionMoment(c *gin.Context) {
 		return
 	}
 	defer tx.Rollback()
+	var lockedEventID string
+	if err = tx.QueryRowContext(ctx, `SELECT id FROM life_events WHERE id=$1 FOR UPDATE`, eventID).Scan(&lockedEventID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to lock appointment"})
+		return
+	}
+
 	if _, err = tx.ExecContext(ctx, `INSERT INTO messages(id,conversation_id,sender_type,message_type,content,payload,source,life_event_id,delivery_status)
 		VALUES($1,$2,'assistant','text',$3,$4,'moment_opening',$5,'delivered')`, messageID, conversationID, text, messagePayload, eventID); err == nil {
 		_, err = tx.ExecContext(ctx, `UPDATE companion_moment_sessions SET opening_message_id=$2 WHERE event_id=$1 AND user_id=$3`, eventID, messageID, userID)

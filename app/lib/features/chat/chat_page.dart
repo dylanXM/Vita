@@ -93,12 +93,26 @@ class _ChatPageState extends State<ChatPage> {
     '🌸',
   ];
 
-  late final ChatController ctrl = Get.put(
-    ChatController(companionId: widget.companionId, companionName: widget.name)
-      ..isVisible =
-          () => mounted && (ModalRoute.of(context)?.isCurrent ?? false),
-    tag: widget.companionId,
-  );
+  late final ChatController ctrl = _createChatController();
+
+  ChatController _createChatController() {
+    final controller = ChatController(
+        companionId: widget.companionId, companionName: widget.name);
+    controller.isVisible =
+        () => mounted && (ModalRoute.of(context)?.isCurrent ?? false);
+    controller.revealChat = () {
+      if (!mounted) return;
+      final route = ModalRoute.of(context);
+      if (route == null) return;
+      Navigator.of(context)
+          .popUntil((candidate) => identical(candidate, route));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _scrollToBottom();
+      });
+    };
+    return Get.put(controller, tag: widget.companionId);
+  }
+
   final _input = TextEditingController();
   final _scroll = ScrollController();
   final _recorder = AudioRecorder();
@@ -271,6 +285,9 @@ class _ChatPageState extends State<ChatPage> {
         companionId: widget.companionId,
         eventId: eventId,
         fallback: payload,
+        name: widget.name,
+        avatarUrl: widget.companion?['portrait_url'] as String?,
+        allowDiscuss: message['sender_type'] != 'user',
       ),
     );
     if (!mounted || selected == null) return;
@@ -951,6 +968,24 @@ class _CompanionGestureAvatar extends StatelessWidget {
   }
 }
 
+// Persisted event snapshots can contain catalog keys or literal generated text.
+String _eventText(String value) => value.trim().tr;
+
+String _eventLocation(String value) {
+  final raw = value.trim();
+  final key = switch (raw.toLowerCase()) {
+    'home' => 'world.place.home',
+    'work' => 'world.place.work',
+    'cafe' || 'coffee' => 'world.place.cafe',
+    'outdoors' => 'world.place.outdoors',
+    'story' => 'world.place.story',
+    'cinema' => 'experience.date.movie',
+    'restaurant' => 'experience.date.dinner',
+    _ => raw,
+  };
+  return key.tr;
+}
+
 class _ChatMessageBody extends StatelessWidget {
   const _ChatMessageBody({
     required this.message,
@@ -1106,8 +1141,9 @@ class _ChatMessageBody extends StatelessWidget {
         onTap: () => onOpenLifeEvent(message),
         borderRadius: BorderRadius.circular(6),
         child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.all(10),
+          width: MediaQuery.sizeOf(context).width * .66 - 28,
+          height: 54,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
               color: context.vita.pageBg,
               borderRadius: BorderRadius.circular(6)),
@@ -1118,7 +1154,7 @@ class _ChatMessageBody extends StatelessWidget {
                 child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(payload['event_title'] as String? ?? '',
+                Text(_eventText(payload['event_title'] as String? ?? ''),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -1126,7 +1162,7 @@ class _ChatMessageBody extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                         color: context.vita.text)),
                 if ((payload['event_location'] as String? ?? '').isNotEmpty)
-                  Text(payload['event_location'] as String,
+                  Text(_eventLocation(payload['event_location'] as String),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style:
@@ -1154,11 +1190,17 @@ class _LifeEventSheet extends StatefulWidget {
     required this.companionId,
     required this.eventId,
     required this.fallback,
+    required this.name,
+    this.avatarUrl,
+    this.allowDiscuss = true,
   });
 
   final String companionId;
   final String eventId;
   final Map<String, dynamic> fallback;
+  final String name;
+  final String? avatarUrl;
+  final bool allowDiscuss;
 
   @override
   State<_LifeEventSheet> createState() => _LifeEventSheetState();
@@ -1183,15 +1225,12 @@ class _LifeEventSheetState extends State<_LifeEventSheet> {
         future: _event,
         builder: (context, snapshot) {
           final event = snapshot.data;
-          final title =
-              '${event?['title'] ?? widget.fallback['event_title'] ?? ''}'
-                  .trim();
-          final description =
-              '${event?['description'] ?? widget.fallback['event_description'] ?? ''}'
-                  .trim();
-          final location =
-              '${event?['location'] ?? widget.fallback['event_location'] ?? ''}'
-                  .trim();
+          final title = _eventText(
+              '${event?['title'] ?? widget.fallback['event_title'] ?? ''}');
+          final description = _eventText(
+              '${event?['description'] ?? widget.fallback['event_description'] ?? ''}');
+          final location = _eventLocation(
+              '${event?['location'] ?? widget.fallback['event_location'] ?? ''}');
           final start =
               DateTime.tryParse('${event?['start_time'] ?? ''}')?.toLocal();
           final end =
@@ -1225,6 +1264,23 @@ class _LifeEventSheetState extends State<_LifeEventSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(children: [
+                      VitaAvatar(
+                          name: widget.name,
+                          radius: 20,
+                          imageUrl: widget.avatarUrl,
+                          borderRadius: BorderRadius.circular(10)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: Text(widget.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: context.vita.text,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600))),
+                    ]),
+                    const SizedBox(height: 18),
                     if (imageUrl.isNotEmpty) ...[
                       ClipRRect(
                         borderRadius: BorderRadius.circular(18),
@@ -1273,23 +1329,25 @@ class _LifeEventSheetState extends State<_LifeEventSheet> {
                       const SizedBox(height: 18),
                       const LinearProgressIndicator(minHeight: 2),
                     ],
-                    const SizedBox(height: 26),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: title.isEmpty
-                            ? null
-                            : () => Navigator.of(context).pop({
-                                  'title': title,
-                                  'event_id': widget.eventId,
-                                }),
-                        icon: const Icon(Icons.chat_bubble_outline_rounded,
-                            size: 17),
-                        label: Text(isActive
-                            ? 'chat.event.discussNow'.tr
-                            : 'chat.event.discuss'.tr),
+                    if (widget.allowDiscuss) ...[
+                      const SizedBox(height: 26),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: title.isEmpty
+                              ? null
+                              : () => Navigator.of(context).pop({
+                                    'title': title,
+                                    'event_id': widget.eventId,
+                                  }),
+                          icon: const Icon(Icons.chat_bubble_outline_rounded,
+                              size: 17),
+                          label: Text(isActive
+                              ? 'chat.event.discussNow'.tr
+                              : 'chat.event.discuss'.tr),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),

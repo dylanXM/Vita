@@ -41,17 +41,15 @@ class _MessageNotificationOverlayState
                 if (AuthController.to.profile.value == null) {
                   return const SizedBox.shrink();
                 }
-                final unread = ChatListController.to.companions
-                    .where((item) {
-                      if (ChatListPresentation.from(item).unreadCount <= 0) {
-                        return false;
-                      }
-                      final id = '${item['id'] ?? ''}';
-                      return !Get.isRegistered<ChatController>(tag: id) ||
-                          Get.find<ChatController>(tag: id).isVisible?.call() !=
-                              true;
-                    })
-                    .toList();
+                final unread = ChatListController.to.companions.where((item) {
+                  if (ChatListPresentation.from(item).unreadCount <= 0) {
+                    return false;
+                  }
+                  final id = '${item['id'] ?? ''}';
+                  return !Get.isRegistered<ChatController>(tag: id) ||
+                      Get.find<ChatController>(tag: id).isVisible?.call() !=
+                          true;
+                }).toList();
                 if (unread.isEmpty) {
                   return const AnimatedSwitcher(
                     duration: Duration(milliseconds: 240),
@@ -95,12 +93,24 @@ class _MessageNotificationOverlayState
                       onTap: () async {
                         final id = '${companion['id'] ?? ''}';
                         if (id.isEmpty) return;
-                        await Get.to(() => ChatPage(
-                              companionId: id,
-                              name:
-                                  '${companion['name'] ?? 'chat.companion'.tr}',
-                              companion: companion,
-                            ));
+                        if (Get.isRegistered<ChatController>(tag: id)) {
+                          final existing = Get.find<ChatController>(tag: id);
+                          if (existing.revealChat != null) {
+                            existing.revealChat!();
+                            setState(() =>
+                                _hiddenNotifications.add(notificationKey));
+                            await ChatListController.to.load(silent: true);
+                            return;
+                          }
+                        }
+                        await Get.to(
+                            () => ChatPage(
+                                  companionId: id,
+                                  name:
+                                      '${companion['name'] ?? 'chat.companion'.tr}',
+                                  companion: companion,
+                                ),
+                            preventDuplicates: false);
                         await ChatListController.to.load(silent: true);
                       },
                     ),

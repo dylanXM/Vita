@@ -680,7 +680,7 @@ class _RelationshipCard extends StatelessWidget {
     final appointmentReady = appointment?['can_enter'] == true;
     final appointmentLine = appointment == null
         ? ''
-        : '${appointmentTime == null ? '' : '${MaterialLocalizations.of(context).formatMediumDate(appointmentTime)} ${TimeOfDay.fromDateTime(appointmentTime).format(context)}'}';
+        : '${'${appointment['title_key'] ?? ''}'.tr} · ${appointmentTime == null ? '' : '${MaterialLocalizations.of(context).formatMediumDate(appointmentTime)} ${TimeOfDay.fromDateTime(appointmentTime).format(context)}'}';
 
     final placeTitle = '${place?['title'] ?? ''}'.trim();
     final hour = scene?['local_hour'] is num
@@ -1177,14 +1177,14 @@ class _AppointmentEntranceState extends State<_AppointmentEntrance>
         onTap: widget.onTap,
         label: '${widget.title}, ${widget.label}',
         child: Material(
-            color: const Color(0xDD302823),
+            color: Colors.transparent,
             borderRadius: BorderRadius.circular(14),
             child: InkWell(
                 onTap: widget.onTap,
                 borderRadius: BorderRadius.circular(14),
                 child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Row(children: [
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
                       // Decorative motion must not dirty the button semantics.
                       ExcludeSemantics(
                           child: AnimatedBuilder(
@@ -1198,30 +1198,20 @@ class _AppointmentEntranceState extends State<_AppointmentEntrance>
                                   child: Transform.scale(
                                       scale: 1 + .06 * _motion.value,
                                       child: child)),
-                              child: Icon(icon,
-                                  size: 24, color: const Color(0xFFFFDFB5)))),
+                              child:
+                                  Icon(icon, size: 20, color: Colors.white))),
                       const SizedBox(width: 9),
-                      Expanded(
-                          child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                            Text(widget.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600)),
-                            Text(widget.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    color: Color(0xFFFFDFB5), fontSize: 11)),
-                          ])),
+                      Flexible(
+                          child: Text(widget.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600))),
                       const SizedBox(width: 6),
                       const Icon(Icons.north_east,
-                          size: 15, color: Color(0xFFFFDFB5)),
+                          size: 14, color: Colors.white),
                     ])))));
   }
 }

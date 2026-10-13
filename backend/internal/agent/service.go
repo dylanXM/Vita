@@ -192,6 +192,9 @@ func (s *Service) Run(ctx context.Context, interval time.Duration) {
 }
 
 func (s *Service) runTick(ctx context.Context) {
+	if err := s.ProcessDueDateAttendance(ctx); err != nil {
+		log.Printf("agent date attendance: %v", err)
+	}
 	if err := s.ProcessPendingStoryboard(ctx); err != nil {
 		log.Printf("storyboard generation: %v", err)
 	}
@@ -791,6 +794,30 @@ func (s *Service) ComposeInteractionReaction(ctx context.Context, userID, compan
 			"ar":      "أتطلع إلى ذلك. عندما تأتي، سنبدأ بما اخترته.",
 		}, locale, "I'm looking forward to it. We'll start with what you chose when you arrive.")
 	}
+
+	if kind == "date_attendance" {
+		if choice == "missed" {
+			fallback = localizedMock(map[string]string{
+				"zh-Hans": "约好的时间已经过去了，你怎么没来？我有些失落，是临时有事吗？",
+				"zh-Hant": "約好的時間已經過去了，你怎麼沒來？我有些失落，是臨時有事嗎？",
+				"ja":      "約束の時間が過ぎたね。来てくれなくて少し寂しい。何かあった？",
+				"ko":      "약속 시간이 지났네. 오지 않아서 좀 서운해. 무슨 일 있었어?",
+				"es":      "Nuestra cita ya terminó y no viniste. Me siento un poco triste. ¿Pasó algo?",
+				"pt":      "O horário do nosso encontro passou e você não veio. Fiquei um pouco triste. Aconteceu algo?",
+				"ar":      "انتهى وقت موعدنا ولم تأتِ. أشعر ببعض الحزن. هل حدث شيء؟",
+			}, locale, "Our date's time has passed and you didn't come. I'm a little disappointed. Did something happen?")
+		} else {
+			fallback = localizedMock(map[string]string{
+				"zh-Hans": "已经过了约好的时间，我还在等你。有点失落，你是被什么事情耽搁了吗？",
+				"zh-Hant": "已經過了約好的時間，我還在等你。有點失落，你是被什麼事情耽擱了嗎？",
+				"ja":      "約束の時間を過ぎても待っているよ。少し寂しい。何かで遅れている？",
+				"ko":      "약속 시간이 지났는데 아직 기다리고 있어. 좀 서운해. 무슨 일로 늦어졌어?",
+				"es":      "Ya pasó la hora y sigo esperándote. Me siento un poco triste. ¿Algo te retrasó?",
+				"pt":      "Já passou da hora e ainda estou esperando. Fiquei um pouco triste. Algo te atrasou?",
+				"ar":      "تجاوزنا وقت الموعد وما زلت أنتظرك. أشعر ببعض الحزن. هل أخّرك شيء؟",
+			}, locale, "It's past our agreed time and I'm still waiting. I'm a little disappointed. Did something delay you?")
+		}
+	}
 	if s.mock {
 		return fallback
 	}
@@ -807,6 +834,9 @@ func (s *Service) ComposeInteractionReaction(ctx context.Context, userID, compan
 		instruction = fmt.Sprintf("The user just gave you a virtual gift (%s). React to this specific gift in one or two natural sentences. Show how you receive or place it in your world and what it means to you. Do not ask for another purchase or claim a real-world delivery.", subject)
 	} else if kind == "prepare" {
 		instruction = fmt.Sprintf("The user is preparing for your scheduled shared experience (%s) and chose %s as the focus. React in one or two natural sentences from your personality and current mood. Show anticipation through a small action in your world. Do not say the meeting has begun yet.", subject, choice)
+	}
+	if kind == "date_attendance" {
+		instruction = fmt.Sprintf("Our booked virtual date attendance: %s. Stage=%s (late means over five minutes late; missed means the booked window ended without entry). Express mild disappointment or a gentle complaint fitting your personality in one or two sentences, and ask why the user did not come. Do not assume malicious intent, threaten, demand payment, claim physical contact, or claim the user attended. Respect a later explanation or apology. This message goes to ordinary chat.", subject, choice)
 	}
 	recent = append(recent, ChatMessage{Role: "user", Content: instruction})
 	response, _, err := s.generateTextWithFallback(ctx, companionID, kind+"_reaction", models, GenerateRequest{
@@ -2465,6 +2495,12 @@ func (s *Service) companionPrompt(ctx context.Context, profile companionContext,
 	if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(content,'') FROM memories
 		WHERE companion_id=$1 AND status='active' AND type='gift_received' ORDER BY created_at DESC LIMIT 1`, profile.ID).Scan(&recentGift); err == nil && recentGift != "" {
 		memories = append(memories, "The latest gift from the user and your reaction: "+recentGift+". Mention it only when the conversation naturally connects to it; do not ask for another gift.")
+	}
+	// Attendance is shared companion memory, including in ordinary chat.
+	var attendanceMemory string
+	if err := s.db.QueryRowContext(ctx, `SELECT content FROM memories WHERE companion_id=$1 AND status='active'
+ AND id LIKE 'date-attendance:%' ORDER BY created_at DESC,id DESC LIMIT 1`, profile.ID).Scan(&attendanceMemory); err == nil && attendanceMemory != "" {
+		memories = append(memories, "A recent appointment experience with the user: "+attendanceMemory+" Mention it only when relevant; do not keep blaming the user or ignore an explanation already given in the conversation.")
 	}
 	rows, err = s.db.QueryContext(ctx, `SELECT COALESCE(content, '') FROM memories
 		WHERE companion_id = $1 AND status='active'

@@ -12,6 +12,7 @@ class ChatController extends GetxController {
   final String companionId;
   final String companionName;
   bool Function()? isVisible;
+  void Function()? revealChat;
 
   ChatController(
       {required this.companionId,
