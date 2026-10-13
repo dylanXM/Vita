@@ -424,7 +424,7 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 		}
 		system += `
 Extend the JSON with "goal" (a short objective in the user's language), "challenge" (the original minor situation; do not introduce a new dilemma every turn), and "proposal" (null while discussing, otherwise {"title":"a proposed name","challenge":"the actual situation","decision":"the concrete solution discussed by BOTH participants","note":"your short personal keepsake note grounded in this exchange"}).
-A proposal is only a draft. Do not claim it was accepted, completed, saved, or remembered until the user's explicit in-app confirmation. Do not infer permanent preferences from one choice. Continue discussing if the user changes direction.`
+Keep goal and challenge concise, the decision specific, and the note to one short sentence. The note must not quote the proposed title (the user may rename it), claim the user already named the card, or claim confirmation has happened. Avoid repeating the whole conversation. A proposal is only a draft. Do not claim it was accepted, completed, saved, or remembered until the user's explicit in-app confirmation. Do not infer permanent preferences from one choice. Continue discussing if the user changes direction.`
 		system += fmt.Sprintf(`
 The user is participating in an in-app imagined shared experience: %q, setting %q. Continue this specific scene from the user's latest words and your recorded conversation, rather than replying as an unrelated daily chat.
 Use one small sensory detail and one natural action or personal response. These are events inside this imagined scene, never a claim of meeting physically in the real world. Respect the user's boundaries and let them change direction. Do not narrate a choice they have not made, invent purchased media, or skip ahead to an ending.
@@ -474,7 +474,7 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 		text, _, err = s.generateTextWithFallback(ctx, profile.ID, "reply", models, GenerateRequest{
 			System: system, Messages: recent, Temperature: 0.9, MaxTokens: func() int {
 				if immersive {
-					return 600
+					return 1200
 				}
 				return 320
 			}(),

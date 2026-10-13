@@ -13,6 +13,7 @@ class VitaTranslations extends Translations {
 
   static const Map<String, Map<String, String>> _keys = {
     'en': {
+      "experience.journey.nameInvalid": "Enter a name with 1 to 80 characters.",
       "experience.journey.preview.cafe":
           "The drink is unavailable. Discuss an alternative with your companion, name the moment and confirm a personal keepsake.",
       "experience.journey.preview.cinema":
@@ -922,6 +923,7 @@ class VitaTranslations extends Translations {
       'stage.partner': 'Partner',
     },
     'zh_CN': {
+      "experience.journey.nameInvalid": "请输入 1 到 80 字的名称。",
       "experience.journey.preview.cafe":
           "想喝的饮品售罄了。和 TA 商量替代口味，为这一刻取名，确认后留下专属纪念卡。",
       "experience.journey.preview.cinema":

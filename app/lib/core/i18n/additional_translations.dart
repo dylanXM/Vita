@@ -1,5 +1,7 @@
 const Map<String, Map<String, String>> additionalVitaTranslations = {
   'es': {
+    "experience.journey.nameInvalid":
+        "Introduce un nombre de 1 a 80 caracteres.",
     "experience.journey.preview.cafe":
         "La bebida no está disponible. Elijan una alternativa, nombren el momento y confirmen un recuerdo personal.",
     "experience.journey.preview.cinema":
@@ -880,6 +882,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'Sin configurar',
   },
   'pt': {
+    "experience.journey.nameInvalid": "Digite um nome com 1 a 80 caracteres.",
     "experience.journey.preview.cafe":
         "A bebida não está disponível. Escolham uma alternativa, deem nome ao momento e confirmem uma lembrança pessoal.",
     "experience.journey.preview.cinema":
@@ -1764,6 +1767,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'Não definido',
   },
   'ja': {
+    "experience.journey.nameInvalid": "名前は1〜80文字で入力してください。",
     "experience.journey.preview.cafe":
         "飲みたいものが売り切れ。代わりの味を相談して、この瞬間に名前をつけ、記念カードを確認して残しましょう。",
     "experience.journey.preview.cinema":
@@ -2576,6 +2580,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': '未設定',
   },
   'ko': {
+    "experience.journey.nameInvalid": "이름은 1~80자로 입력해 주세요.",
     "experience.journey.preview.cafe":
         "원하는 음료가 품절됐어요. 대안을 함께 이야기하고 순간에 이름을 붙여 기념 카드를 확인해 보세요.",
     "experience.journey.preview.cinema":
@@ -3391,6 +3396,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': '미설정',
   },
   'ar': {
+    "experience.journey.nameInvalid": "أدخل اسمًا من حرف واحد إلى 80 حرفًا.",
     "experience.journey.preview.cafe":
         "المشروب غير متاح. اتفقا على بديل واسم للحظة ثم أكدا بطاقة ذكرى خاصة.",
     "experience.journey.preview.cinema":
@@ -4233,6 +4239,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'غير محدد',
   },
   'zh_TW': {
+    "experience.journey.nameInvalid": "請輸入 1 到 80 字的名稱。",
     "experience.journey.preview.cafe":
         "想喝的飲品售罄了。和 TA 商量替代口味，為這一刻取名，確認後留下專屬紀念卡。",
     "experience.journey.preview.cinema": "你們喜歡的電影類型不同。一起商量今晚的選擇，留下屬於這場約定的紀念卡。",

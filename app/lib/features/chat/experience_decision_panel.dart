@@ -48,7 +48,8 @@ class _ExperienceDecisionPanelState extends State<ExperienceDecisionPanel> {
     try {
       final raw = await ApiClient.instance.get(
           '/v1/companions/${widget.companionId}/experience-outcome',
-          query: _reference);
+          query: _reference,
+          receiveTimeout: const Duration(seconds: 5));
       if (!mounted) return;
       if (raw is! Map) throw StateError('invalid response');
       setState(() {
@@ -104,7 +105,15 @@ class _ExperienceDecisionPanelState extends State<ExperienceDecisionPanel> {
                               color: sheetContext.vita.subText, height: 1.5)),
                       const SizedBox(height: 16),
                       FilledButton(
-                          onPressed: () => Navigator.pop(sheetContext, true),
+                          onPressed: () {
+                            final value = title.trim();
+                            if (value.isEmpty || value.runes.length > 80) {
+                              VitaNotice.error('experience.failed'.tr,
+                                  'experience.journey.nameInvalid'.tr);
+                              return;
+                            }
+                            Navigator.pop(sheetContext, true);
+                          },
                           child: Text('experience.journey.confirm'.tr)),
                     ]))));
     if (accepted != true || !mounted || widget.busy) return;
