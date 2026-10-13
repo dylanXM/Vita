@@ -422,9 +422,10 @@ class _RomanticDateStageState extends State<RomanticDateStage>
                           children: [
                             Row(children: [
                               if (widget.portraitUrl?.isNotEmpty == true) ...[
-                                ClipOval(
+                                ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
                                     child: SizedBox.square(
-                                        dimension: 28,
+                                        dimension: 44,
                                         child: VitaMediaImage(
                                             url: widget.portraitUrl!,
                                             fit: BoxFit.cover))),
