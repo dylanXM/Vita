@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +14,7 @@ import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
 import '../billing/billing_controller.dart';
 import 'experience_flow.dart';
+import 'experience_slot_picker.dart';
 
 class ExperienceSheet extends StatefulWidget {
   const ExperienceSheet(
@@ -204,8 +204,9 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     final request =
         owned || product['category'] == 'date' ? '' : _request.text.trim();
     if (request.runes.length > 500) return;
-    final appointment =
-        product['category'] == 'date' ? await _chooseAppointment() : null;
+    final appointment = product['category'] == 'date'
+        ? await _chooseAppointment(product)
+        : null;
     if (!mounted || product['category'] == 'date' && appointment == null)
       return;
     final confirmed = await showModalBottomSheet<bool>(
@@ -347,7 +348,11 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
               ? 'experience.flow.failed'
               : 'experience.flow.refunded',
           'spend_refunded' => 'experience.flow.refunded',
-          'date_declined' => 'experience.date.declinedSchedule',
+          'date_declined' ||
+          'date_slots_changed' ||
+          'date_schedule_busy' ||
+          'invalid_appointment' =>
+            'experience.slots.changed',
           _ => 'experience.flow.failed'
         };
       });
@@ -385,48 +390,15 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
     super.dispose();
   }
 
-  Future<DateTime?> _chooseAppointment() async {
-    final now = DateTime.now();
-    final earliest = now.add(const Duration(minutes: 5));
-    final latest = now.add(const Duration(days: 30));
-    var selected = now.add(const Duration(hours: 1));
-    return showModalBottomSheet<DateTime>(
-      context: context,
-      backgroundColor: context.vita.surface,
-      builder: (sheetContext) => SafeArea(
-        child: SizedBox(
-          height: 330,
-          child: Column(children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 12, 4),
-              child: Row(children: [
-                Expanded(
-                  child: Text('experience.chooseTime'.tr,
-                      style: TextStyle(
-                          color: sheetContext.vita.text,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700)),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(sheetContext, selected),
-                  child: Text('common.save'.tr),
-                ),
-              ]),
-            ),
-            Expanded(
-              child: CupertinoDatePicker(
-                mode: CupertinoDatePickerMode.dateAndTime,
-                initialDateTime: selected,
-                minimumDate: earliest,
-                maximumDate: latest,
-                onDateTimeChanged: (value) => selected = value,
-              ),
-            ),
-          ]),
-        ),
-      ),
-    );
-  }
+  Future<DateTime?> _chooseAppointment(Map<String, dynamic> product) =>
+      showModalBottomSheet<DateTime>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        backgroundColor: context.vita.surface,
+        builder: (_) => ExperienceSlotPicker(
+            companionId: widget.companionId, productKey: '${product['key']}'),
+      );
 
   Widget _action(String label, VoidCallback? action) => SizedBox(
         width: double.infinity,

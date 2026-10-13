@@ -391,23 +391,16 @@ func experienceConversation(ctx context.Context, userID, companionID string) (st
 }
 
 func nextAvailableExperienceTime(ctx context.Context, companionID string, candidate time.Time, duration time.Duration) (time.Time, error) {
-	rows, err := db.Get().QueryContext(ctx, `SELECT start_time,end_time FROM life_events
-		WHERE companion_id=$1 AND status IN ('active','scheduled') AND end_time>$2 AND start_time<$3
-		ORDER BY start_time`, companionID, candidate, candidate.Add(36*time.Hour))
+	blocks, err := loadExperienceBlocks(ctx, companionID, candidate, candidate.Add(31*24*time.Hour))
 	if err != nil {
 		return time.Time{}, err
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var start, end time.Time
-		if err := rows.Scan(&start, &end); err != nil {
-			return time.Time{}, err
-		}
-		if candidate.Add(duration).After(start) && candidate.Before(end) {
-			candidate = end.Add(15 * time.Minute)
+	for _, block := range blocks {
+		if candidate.Add(duration).After(block.Start) && candidate.Before(block.End) {
+			candidate = block.End.Add(15 * time.Minute)
 		}
 	}
-	return candidate, rows.Err()
+	return candidate, nil
 }
 
 func requireExperienceCompanion(c *gin.Context, userID, companionID string) bool {

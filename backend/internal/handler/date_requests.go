@@ -113,10 +113,24 @@ func requestCompanionDate(c *gin.Context, userID, companionID, productKey string
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "companion service unavailable", "code": "date_decision_failed"})
 		return
 	}
-	status, err := companionAgent.CurrentStatus(ctx, companionID, userID)
+	// One date request per companion may negotiate at a time. Other requests
+	// fail without charging instead of racing past the same availability check.
+	guard, err := db.Get().BeginTx(ctx, nil)
 	if err != nil {
 		failDateRequest(requestID)
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "companion could not consider the invitation", "code": "date_decision_failed"})
+		c.JSON(500, gin.H{"error": "failed to check reservation lock"})
+		return
+	}
+	defer guard.Rollback()
+	var locked bool
+	if err = guard.QueryRowContext(ctx, `SELECT pg_try_advisory_xact_lock(hashtextextended($1,0))`, "experience-booking:"+companionID).Scan(&locked); err != nil {
+		failDateRequest(requestID)
+		c.JSON(500, gin.H{"error": "failed to check reservation lock"})
+		return
+	}
+	if !locked {
+		failDateRequest(requestID)
+		c.JSON(409, gin.H{"error": "another reservation is being processed", "code": "date_schedule_busy"})
 		return
 	}
 	available, err := nextAvailableExperienceTime(ctx, companionID, start, duration)
@@ -125,7 +139,7 @@ func requestCompanionDate(c *gin.Context, userID, companionID, productKey string
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check companion schedule"})
 		return
 	}
-	if (status.Busy && status.AvailableAt != nil && status.AvailableAt.After(start)) || !available.Equal(start) {
+	if !available.Equal(start) {
 		result := map[string]any{"status": "declined", "reason": "schedule_conflict", "scheduled_at": start}
 		_, err = db.Get().ExecContext(ctx, `UPDATE companion_date_requests SET status='declined',reason='schedule_conflict',
 			result=$2,updated_at=CURRENT_TIMESTAMP WHERE id=$1`, requestID, jsonValue(result))
@@ -147,6 +161,17 @@ func requestCompanionDate(c *gin.Context, userID, companionID, productKey string
 	if err != nil || strings.TrimSpace(reaction) == "" {
 		failDateRequest(requestID)
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "companion could not respond to the invitation", "code": "date_decision_failed"})
+		return
+	}
+	available, err = nextAvailableExperienceTime(ctx, companionID, start, duration)
+	if err != nil {
+		failDateRequest(requestID)
+		c.JSON(500, gin.H{"error": "failed to recheck companion schedule"})
+		return
+	}
+	if !available.Equal(start) || start.Before(time.Now().Add(5*time.Minute)) {
+		failDateRequest(requestID)
+		c.JSON(409, gin.H{"error": "available times changed", "code": "date_slots_changed"})
 		return
 	}
 	reservation, err := credits.Reserve(ctx, db.Get(), credits.ReserveParams{
