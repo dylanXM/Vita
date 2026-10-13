@@ -22,6 +22,7 @@ class SharedExperienceStage extends StatelessWidget {
       this.situation = '',
       this.focus = 'ambient',
       this.attachment,
+      this.journey,
       this.onHistory,
       this.onKeepsake});
   final String name, title, reply, lastAction, location, situation, focus;
@@ -31,7 +32,7 @@ class SharedExperienceStage extends StatelessWidget {
   final bool busy;
   final List<Map<String, String>> actions;
   final VoidCallback? onHistory, onKeepsake;
-  final Widget? attachment;
+  final Widget? attachment, journey;
 
   @override
   Widget build(BuildContext context) => Stack(children: [
@@ -135,6 +136,7 @@ class SharedExperienceStage extends StatelessWidget {
                                       style: TextStyle(
                                           color: Colors.white
                                               .withValues(alpha: .7)))),
+                            if (journey != null) journey!,
                             const SizedBox(height: 22),
                             for (final action in actions.take(2))
                               Padding(

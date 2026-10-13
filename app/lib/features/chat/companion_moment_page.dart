@@ -12,6 +12,7 @@ import '../auth/auth_controller.dart';
 import 'chat_controller.dart';
 import 'chat_page.dart';
 import 'shared_experience_stage.dart';
+import 'experience_decision_panel.dart';
 
 enum _MomentPhase { booked, ready, together, keepsake }
 
@@ -53,6 +54,8 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
   bool _finishFailed = false;
   late final ChatController _chat;
   late final String _chatTag;
+
+  bool _confirmingDecision = false;
 
   @override
   void initState() {
@@ -494,7 +497,8 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
             : 'general';
         final choices = sharedSceneActions(reply);
         final initial = user == null;
-        final busy = _sending ||
+        final busy = _confirmingDecision ||
+            _sending ||
             _chat.sending.value ||
             ['pending', 'processing', 'scheduled']
                 .contains(_chat.replyStatus.value);
@@ -513,6 +517,17 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
           lastAction: '${user?['content'] ?? ''}',
           input: _message,
           busy: busy,
+          journey: ExperienceDecisionPanel(
+              companionId: widget.companionId,
+              eventId: widget.eventId,
+              proposalMessage: reply,
+              busy: _sending ||
+                  _chat.sending.value ||
+                  ['pending', 'processing', 'scheduled']
+                      .contains(_chat.replyStatus.value),
+              onConfirmingChanged: (value) {
+                if (mounted) setState(() => _confirmingDecision = value);
+              }),
           actions: choices.isNotEmpty
               ? choices
               : initial
@@ -602,6 +617,11 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
                           _scene(context, title, location),
                           const SizedBox(height: 12),
                           _journey(context),
+                          if (_phase == _MomentPhase.keepsake)
+                            ExperienceDecisionPanel(
+                                companionId: widget.companionId,
+                                eventId: widget.eventId,
+                                busy: true),
                           const SizedBox(height: 12),
                           if (_phase == _MomentPhase.booked) ...[
                             Text('moment.prepareTitle'.tr,

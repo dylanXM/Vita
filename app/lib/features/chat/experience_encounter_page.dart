@@ -16,6 +16,7 @@ import '../../shared/widgets.dart';
 import '../auth/auth_controller.dart';
 import 'chat_controller.dart';
 import 'shared_experience_stage.dart';
+import 'experience_decision_panel.dart';
 
 class ExperienceEncounterPage extends StatefulWidget {
   const ExperienceEncounterPage(
@@ -48,6 +49,8 @@ class _ExperienceEncounterPageState extends State<ExperienceEncounterPage>
   String get _media => '${_message['media_url'] ?? ''}';
   bool get _foreground =>
       WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+
+  bool _confirmingDecision = false;
 
   @override
   void initState() {
@@ -185,7 +188,18 @@ class _ExperienceEncounterPageState extends State<ExperienceEncounterPage>
             reply: '${reply?['content'] ?? initial}',
             lastAction: '${user?['content'] ?? ''}',
             input: _input,
-            busy: _chat.sending.value ||
+            journey: ExperienceDecisionPanel(
+                companionId: widget.companionId,
+                spendId: _spend,
+                proposalMessage: reply,
+                busy: _chat.sending.value ||
+                    ['pending', 'processing', 'scheduled']
+                        .contains(_chat.replyStatus.value),
+                onConfirmingChanged: (value) {
+                  if (mounted) setState(() => _confirmingDecision = value);
+                }),
+            busy: _confirmingDecision ||
+                _chat.sending.value ||
                 ['pending', 'processing', 'scheduled']
                     .contains(_chat.replyStatus.value),
             onSend: _send,

@@ -182,6 +182,8 @@ func main() {
 			companions.GET("/:id/experiences", handler.ListCompanionExperiences)
 			companions.GET("/:id/story", handler.GetCompanionStory)
 			companions.POST("/:id/experiences/:product_key", handler.PurchaseCompanionExperience)
+			companions.GET("/:id/experience-outcome", handler.GetExperienceOutcome)
+			companions.POST("/:id/experience-outcome", handler.ConfirmExperienceOutcome)
 			companions.GET("/:id/moments/:event_id", handler.GetCompanionMoment)
 			companions.POST("/:id/moments/:event_id/prepare", handler.PrepareCompanionMoment)
 			companions.POST("/:id/moments/:event_id/start", handler.StartCompanionMoment)

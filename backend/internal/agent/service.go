@@ -405,11 +405,11 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 			}
 		}
 	}
-	var previousSituation, previousFocus string
+	var previousSituation, previousFocus, previousGoal, previousChallenge string
 	if immersive {
-		situationErr := s.db.QueryRowContext(ctx, `SELECT COALESCE(payload->>'scene_situation',''),COALESCE(payload->>'scene_focus','ambient') FROM messages
+		situationErr := s.db.QueryRowContext(ctx, `SELECT COALESCE(payload->>'scene_situation',''),COALESCE(payload->>'scene_focus','ambient'),COALESCE(payload->>'scene_goal',''),COALESCE(payload->>'scene_challenge','') FROM messages
  WHERE conversation_id=$1 AND sender_type='assistant' AND COALESCE(payload->>'scene_situation','')<>''
- AND CASE WHEN $3<>'' THEN payload->>'shared_experience_spend_id'=$3 ELSE life_event_id=$2 END ORDER BY created_at DESC,id DESC LIMIT 1`, conversationID, lifeEventID, spendID).Scan(&previousSituation, &previousFocus)
+ AND CASE WHEN $3<>'' THEN payload->>'shared_experience_spend_id'=$3 ELSE life_event_id=$2 END ORDER BY created_at DESC,id DESC LIMIT 1`, conversationID, lifeEventID, spendID).Scan(&previousSituation, &previousFocus, &previousGoal, &previousChallenge)
 		if situationErr != nil && !errors.Is(situationErr, sql.ErrNoRows) {
 			return nil, situationErr
 		}
@@ -418,6 +418,13 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 		}
 	}
 	if immersive {
+		system += "\n" + momentExperienceBrief(sceneLocation)
+		if previousGoal != "" || previousChallenge != "" {
+			system += fmt.Sprintf("\nThe established objective is %q and original situation is %q. Continue these, do not replace them with a fresh problem.", previousGoal, previousChallenge)
+		}
+		system += `
+Extend the JSON with "goal" (a short objective in the user's language), "challenge" (the original minor situation; do not introduce a new dilemma every turn), and "proposal" (null while discussing, otherwise {"title":"a proposed name","challenge":"the actual situation","decision":"the concrete solution discussed by BOTH participants","note":"your short personal keepsake note grounded in this exchange"}).
+A proposal is only a draft. Do not claim it was accepted, completed, saved, or remembered until the user's explicit in-app confirmation. Do not infer permanent preferences from one choice. Continue discussing if the user changes direction.`
 		system += fmt.Sprintf(`
 The user is participating in an in-app imagined shared experience: %q, setting %q. Continue this specific scene from the user's latest words and your recorded conversation, rather than replying as an unrelated daily chat.
 Use one small sensory detail and one natural action or personal response. These are events inside this imagined scene, never a claim of meeting physically in the real world. Respect the user's boundaries and let them change direction. Do not narrate a choice they have not made, invent purchased media, or skip ahead to an ending.
@@ -425,6 +432,7 @@ Return ONLY JSON {"reply":"your natural response, 1-3 sentences","situation":"on
 Both suggestions must follow this exact exchange and offer meaningful different directions. Use the user's required language for reply, labels and messages. Suggestions cannot purchase anything or request generated media. Free text remains available.`, sceneTitle, sceneLocation)
 	}
 
+	var experienceScene momentScene
 	var sceneActions []momentSceneAction
 	var situation, focus string
 	surpriseNow := false
@@ -465,9 +473,8 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 			return nil, err
 		}
 		if immersive {
-			var scene momentScene
-			scene, err = decodeMomentSceneState(text)
-			text, sceneActions, situation, focus = scene.Reply, scene.Actions, scene.Situation, scene.Focus
+			experienceScene, err = decodeMomentSceneState(text)
+			text, sceneActions, situation, focus = experienceScene.Reply, experienceScene.Actions, experienceScene.Situation, experienceScene.Focus
 			if err != nil {
 				return nil, err
 			}
@@ -500,12 +507,33 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 	} else if len([]rune(latestQuestion)) > 60 {
 		gesture = "thoughtful"
 	}
+	if immersive && experienceScene.Proposal != nil {
+		var turns int
+		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM (SELECT id FROM messages WHERE conversation_id=$1 AND sender_type='user' AND CASE WHEN $3<>'' THEN payload->>'shared_experience_spend_id'=$3 ELSE life_event_id=$2 END LIMIT 2) choices`, conversationID, lifeEventID, spendID).Scan(&turns); err != nil {
+			return nil, err
+		}
+		if turns < 2 {
+			experienceScene.Proposal = nil
+		}
+		if p := experienceScene.Proposal; p != nil && (!responseUsesRequiredScript(p.Title, preferredLocale) || !responseUsesRequiredScript(p.Challenge, preferredLocale) || !responseUsesRequiredScript(p.Decision, preferredLocale) || !responseUsesRequiredScript(p.Note, preferredLocale)) {
+			experienceScene.Proposal = nil
+		}
+	}
 	payload := map[string]any{"gesture": gesture, "interaction_stage": "chat"}
 	if immersive {
 		payload["interaction_stage"] = "shared_scene"
 		payload["scene_actions"] = sceneActions
 		payload["scene_situation"] = situation
 		payload["scene_focus"] = focus
+		if responseUsesRequiredScript(experienceScene.Goal, preferredLocale) {
+			payload["scene_goal"] = experienceScene.Goal
+		}
+		if responseUsesRequiredScript(experienceScene.Challenge, preferredLocale) {
+			payload["scene_challenge"] = experienceScene.Challenge
+		}
+		if experienceScene.Proposal != nil {
+			payload["experience_proposal"] = experienceScene.Proposal
+		}
 		if spendID != "" {
 			payload["shared_experience_spend_id"] = spendID
 		}
@@ -554,6 +582,7 @@ func (s *Service) ComposeMomentOpening(ctx context.Context, conversationID, user
 Their preparation choice was %s. Honor it naturally in your opening.
 Open the moment naturally in one or two sentences, in the user's language. Refer to your personality and recent conversation.
 Be present and invite conversation; do not list options, claim a physical encounter, or ask for payment.`, experienceName, location, preparation)
+	openingInstruction += "\n" + momentExperienceBrief(location) + " Introduce this minor situation naturally and invite the user to take the first step. Do not resolve it or choose for them."
 	recent = append(recent, ChatMessage{Role: "user", Content: openingInstruction})
 	text, _, err := s.generateTextWithFallback(ctx, profile.ID, "moment_opening", models, GenerateRequest{
 		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy,

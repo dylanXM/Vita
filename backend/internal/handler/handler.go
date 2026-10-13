@@ -1531,6 +1531,21 @@ func SendMessage(c *gin.Context) {
 		}
 		messagePayload["shared_experience_spend_id"] = spendID
 	}
+	if req.LifeEventID != "" || req.ExperienceSpendID != "" {
+		eventID := req.LifeEventID
+		if req.ExperienceSpendID != "" {
+			eventID = ""
+		}
+		lockID, lockErr := outcomeIdentity(eventID, req.ExperienceSpendID)
+		if lockErr != nil {
+			c.JSON(400, gin.H{"error": "invalid experience reference"})
+			return
+		}
+		if _, err = tx.ExecContext(c.Request.Context(), `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, lockID); err != nil {
+			c.JSON(500, gin.H{"error": "failed to synchronize shared experience"})
+			return
+		}
+	}
 	payloadJSON, _ := json.Marshal(messagePayload)
 	_, err = tx.ExecContext(c.Request.Context(), query, msgID, conversationID, req.MessageType, req.Content, mediaURL, createdAt, activeLifeID.String, string(payloadJSON))
 	if err != nil {
