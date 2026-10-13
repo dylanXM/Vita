@@ -1,5 +1,18 @@
 const Map<String, Map<String, String>> additionalVitaTranslations = {
   'es': {
+    "experience.journey.confirmTitle": "Nuestra decisión conjunta",
+    "experience.journey.name": "Ponle nombre al momento",
+    "experience.journey.confirmHint":
+        "La confirmación guarda la decisión y el recuerdo en la memoria de tu compañero. No se cobran más monedas.",
+    "experience.journey.confirm": "Confirmar nuestra decisión",
+    "experience.journey.confirmFailed":
+        "No se pudo verificar el guardado. Consulta el recuerdo o reintenta.",
+    "experience.journey.retryLoad": "Recargar nuestro recuerdo",
+    "experience.journey.keepsake": "Nuestro recuerdo",
+    "experience.journey.goal": "Algo para hacer juntos",
+    "experience.journey.saved":
+        "La decisión confirmada y el recuerdo están guardados en la memoria de tu compañero.",
+    "experience.journey.review": "Revisar nuestra decisión",
     "moment.environment.begin": "Esta escena empieza con tu próxima elección.",
     "moment.environment.cafe": "Junto a la ventana del café",
     "moment.environment.cinema": "Una noche de cine",
@@ -859,6 +872,19 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'Sin configurar',
   },
   'pt': {
+    "experience.journey.confirmTitle": "Nossa decisão conjunta",
+    "experience.journey.name": "Dê um nome ao momento",
+    "experience.journey.confirmHint":
+        "A confirmação salva a decisão e a lembrança na memória do seu companheiro. Não são cobradas mais moedas.",
+    "experience.journey.confirm": "Confirmar nossa decisão",
+    "experience.journey.confirmFailed":
+        "Não foi possível verificar o salvamento. Confira a lembrança ou tente novamente.",
+    "experience.journey.retryLoad": "Recarregar nossa lembrança",
+    "experience.journey.keepsake": "Nossa lembrança",
+    "experience.journey.goal": "Algo para fazer juntos",
+    "experience.journey.saved":
+        "A decisão confirmada e a lembrança estão salvas na memória do seu companheiro.",
+    "experience.journey.review": "Rever nossa decisão",
     "moment.environment.begin": "Esta cena começa com a sua próxima escolha.",
     "moment.environment.cafe": "À janela do café",
     "moment.environment.cinema": "Uma noite no cinema",
@@ -1722,6 +1748,17 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'Não definido',
   },
   'ja': {
+    "experience.journey.confirmTitle": "二人で決めたこと",
+    "experience.journey.name": "この瞬間に名前をつける",
+    "experience.journey.confirmHint":
+        "確認すると決定と記念カードがパートナーの記憶に保存されます。追加のコインは不要です。",
+    "experience.journey.confirm": "二人の決定を確認",
+    "experience.journey.confirmFailed": "保存を確認できませんでした。記念カードを確認するか再試行してください。",
+    "experience.journey.retryLoad": "記念カードを再読み込み",
+    "experience.journey.keepsake": "二人の記念カード",
+    "experience.journey.goal": "一緒に取り組むこと",
+    "experience.journey.saved": "確認した決定と記念カードをパートナーの記憶に保存しました。",
+    "experience.journey.review": "二人の決定を見る",
     "moment.environment.begin": "あなたの選択から、この場面が始まります。",
     "moment.environment.cafe": "カフェの窓辺",
     "moment.environment.cinema": "映画館で同じ映画を",
@@ -2515,6 +2552,18 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': '未設定',
   },
   'ko': {
+    "experience.journey.confirmTitle": "함께 내린 결정",
+    "experience.journey.name": "이 순간에 이름 붙이기",
+    "experience.journey.confirmHint":
+        "확인하면 결정과 기념 카드가 파트너의 기억에 저장돼요. 코인이 추가로 차감되지 않아요.",
+    "experience.journey.confirm": "우리의 결정 확인",
+    "experience.journey.confirmFailed":
+        "저장을 확인할 수 없어요. 기념 카드를 확인하거나 다시 시도해 주세요.",
+    "experience.journey.retryLoad": "기념 카드 다시 불러오기",
+    "experience.journey.keepsake": "우리의 기념 카드",
+    "experience.journey.goal": "함께할 작은 목표",
+    "experience.journey.saved": "확인한 결정과 기념 카드가 파트너의 기억에 저장되었어요.",
+    "experience.journey.review": "우리의 결정 살펴보기",
     "moment.environment.begin": "이 장면은 당신의 선택으로 시작돼요.",
     "moment.environment.cafe": "카페 창가에서",
     "moment.environment.cinema": "함께 보는 영화",
@@ -3310,6 +3359,19 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': '미설정',
   },
   'ar': {
+    "experience.journey.confirmTitle": "قرارنا المشترك",
+    "experience.journey.name": "امنح هذه اللحظة اسمًا",
+    "experience.journey.confirmHint":
+        "يحفظ التأكيد القرار وبطاقة الذكرى في ذاكرة رفيقك دون خصم عملات إضافية.",
+    "experience.journey.confirm": "تأكيد قرارنا",
+    "experience.journey.confirmFailed":
+        "تعذر التحقق من الحفظ. راجع بطاقة الذكرى أو حاول مجددًا.",
+    "experience.journey.retryLoad": "إعادة تحميل الذكرى",
+    "experience.journey.keepsake": "بطاقة ذكرياتنا",
+    "experience.journey.goal": "هدف ننجزه معًا",
+    "experience.journey.saved":
+        "حُفظ القرار المؤكد وبطاقة الذكرى في ذاكرة رفيقك.",
+    "experience.journey.review": "مراجعة قرارنا",
     "moment.environment.begin": "يبدأ هذا المشهد باختيارك التالي.",
     "moment.environment.cafe": "بجانب نافذة المقهى",
     "moment.environment.cinema": "ليلة في السينما",
@@ -4131,6 +4193,16 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'غير محدد',
   },
   'zh_TW': {
+    "experience.journey.confirmTitle": "我們的共同決定",
+    "experience.journey.name": "為這一刻取個名字",
+    "experience.journey.confirmHint": "確認後儲存這次決定與紀念卡，並加入 TA 的記憶，不額外扣除金幣。",
+    "experience.journey.confirm": "確認我們的決定",
+    "experience.journey.confirmFailed": "暫時無法確認儲存結果，請查看紀念卡或重試。",
+    "experience.journey.retryLoad": "重新讀取紀念卡",
+    "experience.journey.keepsake": "屬於我們的紀念卡",
+    "experience.journey.goal": "這次一起完成的事",
+    "experience.journey.saved": "這次確認的決定與紀念卡已加入 TA 的記憶。",
+    "experience.journey.review": "看看我們的決定",
     "moment.environment.begin": "這一幕，從你的選擇開始。",
     "moment.environment.cafe": "咖啡館 · 窗邊",
     "moment.environment.cinema": "影院 · 同一場電影",

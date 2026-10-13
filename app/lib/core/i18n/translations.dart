@@ -13,6 +13,19 @@ class VitaTranslations extends Translations {
 
   static const Map<String, Map<String, String>> _keys = {
     'en': {
+      "experience.journey.confirmTitle": "Our joint decision",
+      "experience.journey.name": "Name this moment",
+      "experience.journey.confirmHint":
+          "Confirming saves this decision and a keepsake to your companion’s memory. No extra coins are charged.",
+      "experience.journey.confirm": "Confirm our decision",
+      "experience.journey.confirmFailed":
+          "Confirmation could not be verified. Check the saved keepsake or try again.",
+      "experience.journey.retryLoad": "Reload our keepsake",
+      "experience.journey.keepsake": "Our keepsake",
+      "experience.journey.goal": "Something to do together",
+      "experience.journey.saved":
+          "Your confirmed decision and keepsake are saved in your companion’s memory.",
+      "experience.journey.review": "Review our decision",
       "moment.environment.begin": "This scene begins with your next choice.",
       "moment.environment.cafe": "By the café window",
       "moment.environment.cinema": "A night at the cinema",
@@ -901,6 +914,16 @@ class VitaTranslations extends Translations {
       'stage.partner': 'Partner',
     },
     'zh_CN': {
+      "experience.journey.confirmTitle": "我们的共同决定",
+      "experience.journey.name": "为这一刻取个名字",
+      "experience.journey.confirmHint": "确认后保存这次决定与纪念卡，并加入 TA 的记忆，不额外扣除金币。",
+      "experience.journey.confirm": "确认我们的决定",
+      "experience.journey.confirmFailed": "暂时无法确认保存结果，请查看纪念卡或重试。",
+      "experience.journey.retryLoad": "重新读取纪念卡",
+      "experience.journey.keepsake": "属于我们的纪念卡",
+      "experience.journey.goal": "这次一起完成的事",
+      "experience.journey.saved": "这次确认的决定与纪念卡已加入 TA 的记忆。",
+      "experience.journey.review": "看看我们的决定",
       "moment.environment.begin": "这一幕，从你的选择开始。",
       "moment.environment.cafe": "咖啡馆 · 窗边",
       "moment.environment.cinema": "影院 · 同一场电影",

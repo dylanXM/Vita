@@ -161,7 +161,8 @@ class _ExperienceEncounterPageState extends State<ExperienceEncounterPage>
         body: Obx(() {
           final messages = _chat.messages.where((m) {
             final payload = m['payload'];
-            return _spend.isNotEmpty &&
+            return m['sender_type'] == 'user' &&
+                _spend.isNotEmpty &&
                 payload is Map &&
                 payload['shared_experience_spend_id'] == _spend;
           }).toList();
