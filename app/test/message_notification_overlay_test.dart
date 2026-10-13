@@ -76,6 +76,35 @@ void main() {
     expect(find.text('New message'), findsNothing);
   });
 
+  testWidgets('read messages stay hidden after leaving chat, newer messages alert', (tester) async {
+    Get.testMode = true;
+    Get.put(AuthController()).profile.value = {'id': 'user'};
+    final list = Get.put<ChatListController>(_ChatList());
+    list.companions.assignAll([{
+      'id': 'companion', 'name': 'Mimi', 'last_message': 'Already read',
+      'last_message_at': '2026-10-13T01:00:00Z', 'unread_count': 1,
+    }]);
+    await tester.pumpWidget(GetMaterialApp(
+      theme: VitaTheme.light,
+      builder: (context, child) => MessageNotificationOverlay(child: child!),
+      home: const Scaffold(body: Text('Home')),
+    ));
+    expect(find.text('Already read'), findsOneWidget);
+    list.markMessagesRead('companion', [{
+      'sender_type': 'assistant', 'created_at': '2026-10-13T01:00:00Z',
+    }]);
+    list.currentRoute.value = '/home';
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Already read'), findsNothing);
+    list.companions.assignAll([{
+      'id': 'companion', 'name': 'Mimi', 'last_message': 'New unread message',
+      'last_message_at': '2026-10-13T01:01:00Z', 'unread_count': 1,
+    }]);
+    await tester.pump();
+    expect(find.text('New unread message'), findsOneWidget);
+  });
+
   testWidgets(
       'opening world below an existing banner does not mutate during build',
       (tester) async {

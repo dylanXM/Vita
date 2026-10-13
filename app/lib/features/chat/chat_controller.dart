@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../core/api_client.dart';
 import '../../core/analytics_service.dart';
+import 'chat_list_controller.dart';
 
 /// State for a single chat session: get-or-create the conversation, load the
 /// messages and send new ones.
@@ -128,6 +129,7 @@ class ChatController extends GetxController {
             .whereType<Map<String, dynamic>>()
             .map((e) => Map<String, dynamic>.from(e)),
       );
+      _markDisplayedMessagesRead(messages);
     }
   }
 
@@ -460,6 +462,12 @@ class ChatController extends GetxController {
     final id = message['id'];
     if (id != null && messages.any((item) => item['id'] == id)) return;
     messages.add(message);
+    _markDisplayedMessagesRead([message]);
+  }
+
+  void _markDisplayedMessagesRead(Iterable<Map<String, dynamic>> displayed) {
+    if (isVisible?.call() != true || !Get.isRegistered<ChatListController>()) return;
+    ChatListController.to.markMessagesRead(companionId, displayed);
   }
 
   void _flushDeferredPollMessages() {

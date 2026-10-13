@@ -22,6 +22,29 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
   final searchQuery = ''.obs;
   final currentRoute = ''.obs;
 
+  final _readThrough = <String, DateTime>{};
+
+  /// Keep stale list responses from resurrecting messages already displayed.
+  Map<String, dynamic> _withReadState(Map<String, dynamic> item) {
+    final read = _readThrough['${item['id']}'];
+    final latest = DateTime.tryParse('${item['last_message_at'] ?? ''}');
+    return read != null && latest != null && !latest.isAfter(read)
+        ? {...item, 'unread_count': 0}
+        : item;
+  }
+
+  void markMessagesRead(String companionId, Iterable<Map<String, dynamic>> messages) {
+    var latest = _readThrough[companionId];
+    for (final message in messages) {
+      if (message['sender_type'] != 'assistant') continue;
+      final at = DateTime.tryParse('${message['created_at'] ?? ''}');
+      if (at != null && (latest == null || at.isAfter(latest))) latest = at;
+    }
+    if (latest == null) return;
+    _readThrough[companionId] = latest;
+    companions.assignAll(companions.map(_withReadState).toList());
+  }
+
   Timer? _poll;
   bool _silent = false;
   bool _foreground = true;
@@ -62,7 +85,7 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
             .map((item) => <String, dynamic>{
                   ...item,
                   ...?changed[item['id']],
-                }).toList());
+                }).map(_withReadState).toList());
       }
       _cursor = data['cursor'] as String?;
     } on ApiException catch (error) {
@@ -86,6 +109,7 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
         ++_requestId;
         _cursor = null;
         companions.clear();
+        _readThrough.clear();
         loading.value = false;
         _silent = false;
       } else {
@@ -143,7 +167,7 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
         data
             .whereType<Map<String, dynamic>>()
             .where((e) => e['creation_source'] != 'ai_pet')
-            .map((e) => Map<String, dynamic>.from(e)),
+            .map((e) => _withReadState(Map<String, dynamic>.from(e))),
       );
     } catch (_) {
       if (requestId == _requestId && !silent && companions.isEmpty) {
