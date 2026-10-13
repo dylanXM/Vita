@@ -125,7 +125,7 @@ func requestCompanionDate(c *gin.Context, userID, companionID, productKey string
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "companion service unavailable", "code": "date_decision_failed"})
 		return
 	}
-	// One date request per companion may negotiate at a time. Other requests
+	// One date request per user may negotiate at a time, across companions. Other requests
 	// fail without charging instead of racing past the same availability check.
 	guard, err := db.Get().BeginTx(ctx, nil)
 	if err != nil {
@@ -135,7 +135,7 @@ func requestCompanionDate(c *gin.Context, userID, companionID, productKey string
 	}
 	defer guard.Rollback()
 	var locked bool
-	if err = guard.QueryRowContext(ctx, `SELECT pg_try_advisory_xact_lock(hashtextextended($1,0))`, "experience-booking:"+companionID).Scan(&locked); err != nil {
+	if err = guard.QueryRowContext(ctx, `SELECT pg_try_advisory_xact_lock(hashtextextended($1,0))`, "experience-booking-user:"+userID).Scan(&locked); err != nil {
 		failDateRequest(requestID)
 		c.JSON(500, gin.H{"error": "failed to check reservation lock"})
 		return

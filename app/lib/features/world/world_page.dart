@@ -895,20 +895,17 @@ class _RelationshipCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 SizedBox(
                   height: 36,
-                  child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 350),
-                      child: Text(
-                          appointment == null ? momentLine : appointmentLine,
-                          key: ValueKey(appointment == null
-                              ? momentLine
-                              : appointmentLine),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              height: 1.3,
-                              fontWeight: FontWeight.w500))),
+                  // Routine refreshes can return to the same text while a
+                  // previous transition is still mounted. Keep a single node.
+                  child: Text(
+                      appointment == null ? momentLine : appointmentLine,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          height: 1.3,
+                          fontWeight: FontWeight.w500)),
                 ),
               ],
             ),

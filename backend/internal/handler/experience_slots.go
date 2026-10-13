@@ -18,10 +18,16 @@ type experienceSlot struct {
 	EndsAt   time.Time `json:"ends_at"`
 }
 
-// Routine leisure can be rearranged. Work, study, commuting and existing paid
-// shared activities remain hard commitments for both listing and submission.
+// Check this companion's hard routine commitments and the user's booked dates
+// across all companions. Listing and submission share the same overlap rules.
 func loadExperienceBlocks(ctx context.Context, companionID string, from, to time.Time) ([]experienceBlock, error) {
-	rows, err := db.Get().QueryContext(ctx, `SELECT start_time,end_time FROM life_events WHERE companion_id=$1 AND status IN ('active','scheduled') AND end_time>$2 AND start_time<$3 AND (event_type IN ('work','study','commute') OR (event_type='shared_activity' AND generation_source='user_purchase')) ORDER BY start_time,end_time`, companionID, from, to)
+	rows, err := db.Get().QueryContext(ctx, `SELECT e.start_time,e.end_time FROM life_events e
+ JOIN companions booked ON booked.id=e.companion_id
+ WHERE e.status IN ('active','scheduled') AND e.end_time>$2 AND e.start_time<$3
+ AND ((e.companion_id=$1 AND e.event_type IN ('work','study','commute'))
+ OR (e.event_type='shared_activity' AND e.generation_source='user_purchase'
+ AND booked.user_id=(SELECT user_id FROM companions WHERE id=$1)))
+ ORDER BY e.start_time,e.end_time`, companionID, from, to)
 	if err != nil {
 		return nil, err
 	}

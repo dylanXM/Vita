@@ -735,8 +735,8 @@ class _ChatPageState extends State<ChatPage> {
                     ),
                     if (isUser && deliveryStatus != 'delivered')
                       Positioned(
-                        right:
-                            -(8 + (deliveryStatus == 'sending' ? 14.0 : 17.0)),
+                        left: deliveryStatus == 'sending' ? -22 : null,
+                        right: deliveryStatus == 'sending' ? null : -25,
                         bottom: 0,
                         child: deliveryStatus == 'sending'
                             ? SizedBox.square(

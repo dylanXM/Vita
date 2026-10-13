@@ -377,13 +377,14 @@ class _RomanticDateStageState extends State<RomanticDateStage>
                                 _action == 'toast' ? -12 * _motion.value : 0),
                             child: child))))),
       if (!keyboard && widget.portraitUrl?.isNotEmpty == true)
-        Positioned(
-            left: 16,
-            right: 16,
-            top: MediaQuery.paddingOf(context).top + kToolbarHeight + 18,
+        PositionedDirectional(
+            end: 16,
+            top: MediaQuery.paddingOf(context).top + kToolbarHeight + 64,
             child: IgnorePointer(
                 child: SizedBox(
-                    height: MediaQuery.sizeOf(context).height * .46,
+                    width: MediaQuery.sizeOf(context).width * .38,
+                    height: (MediaQuery.sizeOf(context).height * .28)
+                        .clamp(120.0, 210.0),
                     child: ShaderMask(
                         blendMode: BlendMode.dstIn,
                         shaderCallback: (bounds) => const LinearGradient(
@@ -403,17 +404,9 @@ class _RomanticDateStageState extends State<RomanticDateStage>
                                 ]).createShader(bounds),
                         child: ShaderMask(
                             blendMode: BlendMode.dstIn,
-                            shaderCallback: (bounds) => const LinearGradient(colors: [
-                                  Colors.transparent,
-                                  Colors.black,
-                                  Colors.black,
-                                  Colors.transparent
-                                ], stops: [
-                                  0,
-                                  .18,
-                                  .82,
-                                  1
-                                ]).createShader(bounds),
+                            shaderCallback: (bounds) =>
+                                const LinearGradient(colors: [Colors.transparent, Colors.black, Colors.black, Colors.transparent], stops: [0, .18, .82, 1])
+                                    .createShader(bounds),
                             child: VitaMediaImage(url: widget.portraitUrl!, fit: BoxFit.contain)))))),
       SafeArea(
           top: true,
