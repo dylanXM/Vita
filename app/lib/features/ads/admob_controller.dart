@@ -41,17 +41,34 @@ class AdmobController extends GetxController {
           !BillingController.to.isSubscribed) &&
       '${config.value?['interstitial_unit_id'] ?? ''}'.isNotEmpty;
 
+  Future<bool>? _configFlight;
   Future<void> refreshConfig() async {
-    if (!supported) return;
+    await synchronizeConfiguration();
+  }
+
+  Future<bool> synchronizeConfiguration() {
+    if (_configFlight != null) return _configFlight!;
+    final next = _refreshConfig();
+    _configFlight = next;
+    return next.whenComplete(() => _configFlight = null);
+  }
+
+  Future<bool> _refreshConfig() async {
+    if (!supported) return true;
+    final user = AuthController.to.profile.value?['user_id'];
     try {
-      final data = await ApiClient.instance.get('/v1/ads/config');
-      if (data is! Map) return;
+      final data = await ApiClient.instance
+          .get('/v1/ads/config', receiveTimeout: const Duration(seconds: 5));
+      if (data is! Map || AuthController.to.profile.value?['user_id'] != user)
+        return false;
       config.value = Map<String, dynamic>.from(data);
       if (canShowRewarded || canShowBanner || canShowInterstitial) {
         await _ensureSdk();
       }
+      return true;
     } catch (_) {
-      config.value = null;
+      // A transient failure must not erase the last valid configuration.
+      return false;
     }
   }
 

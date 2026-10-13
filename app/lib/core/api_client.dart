@@ -124,9 +124,14 @@ class ApiClient {
     }
   }
 
-  Future<dynamic> get(String path, {Map<String, dynamic>? query}) async {
+  Future<dynamic> get(String path,
+      {Map<String, dynamic>? query, Duration? receiveTimeout}) async {
     try {
-      final r = await dio.get(path, queryParameters: query);
+      final r = await dio.get(path,
+          queryParameters: query,
+          options: receiveTimeout == null
+              ? null
+              : Options(receiveTimeout: receiveTimeout));
       return r.data;
     } on DioException catch (e) {
       throw _exception(e);

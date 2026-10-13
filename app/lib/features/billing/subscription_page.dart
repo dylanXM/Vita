@@ -6,6 +6,7 @@ import 'package:purchases_flutter/purchases_flutter.dart';
 
 import '../../core/constants.dart';
 import '../../core/theme.dart';
+import '../../core/config_sync_controller.dart';
 import 'billing_controller.dart';
 import 'billing_products.dart';
 import 'billing_sync_banner.dart';
@@ -46,7 +47,10 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
   @override
   void initState() {
     super.initState();
-    BillingController.to.refreshPlanBenefits();
+    if (Get.isRegistered<ConfigSyncController>())
+      ConfigSyncController.to.refresh();
+    else
+      BillingController.to.refreshPlanBenefits();
   }
 
   @override
@@ -62,7 +66,7 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
 
   Widget _body(BuildContext context, BillingController ctrl) {
     final plans = ctrl.offerings.value?.current?.availablePackages
-            .where((item) => isSubscriptionProduct(
+            .where((item) => ctrl.includesSubscription(
                 item.identifier, item.storeProduct.identifier))
             .toList() ??
         const <Package>[];

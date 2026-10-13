@@ -17,6 +17,7 @@ class OnboardingPage extends StatefulWidget {
 class _OnboardingPageState extends State<OnboardingPage> {
   final _controller = PageController();
   int _index = 0;
+  Worker? _contentWorker;
 
   List<OnboardingContentPage> get _pages =>
       AppContentController.to.onboarding?.pages ?? const [];
@@ -24,6 +25,18 @@ class _OnboardingPageState extends State<OnboardingPage> {
   @override
   void initState() {
     super.initState();
+    _contentWorker = ever(AppContentController.to.revision, (_) {
+      if (!mounted) return;
+      if (AppContentController.to.onboarding?.enabled != true ||
+          _pages.isEmpty) {
+        _finish('configuration_disabled');
+        return;
+      }
+      setState(() => _index = _index.clamp(0, _pages.length - 1).toInt());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _controller.hasClients) _controller.jumpToPage(_index);
+      });
+    });
     AnalyticsService.to.track('onboarding_viewed',
         category: 'onboarding', properties: {'page_index': 0});
   }
@@ -52,6 +65,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   @override
   void dispose() {
+    _contentWorker?.dispose();
     _controller.dispose();
     super.dispose();
   }

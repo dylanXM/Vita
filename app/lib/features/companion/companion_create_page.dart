@@ -6,6 +6,7 @@ import '../../core/notice.dart';
 import '../../core/api_client.dart';
 import '../../core/analytics_service.dart';
 import '../../core/theme.dart';
+import '../../core/config_sync_controller.dart';
 import '../../shared/widgets.dart';
 import '../chat/chat_list_controller.dart';
 import 'companion_relation_rules.dart';
@@ -60,10 +61,43 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
   void initState() {
     super.initState();
     AnalyticsService.to.track('companion_create_viewed', category: 'companion');
+    if (Get.isRegistered<ConfigSyncController>()) {
+      final sync = ConfigSyncController.to;
+      _seenConfigVersion = sync.revisions['companion'];
+      _configWorker = ever(sync.revisions, (_) {
+        final version = sync.revisions['companion'];
+        if (version == _seenConfigVersion) return;
+        _seenConfigVersion = version;
+        if (!mounted) return;
+        if (_busy || _uploadingAvatar || _configLoadFlight != null) {
+          _needsConfigReload = true;
+        } else {
+          _loadOptions();
+        }
+      });
+      sync.refresh();
+    }
     _loadOptions();
   }
 
-  Future<void> _loadOptions() async {
+  bool _needsConfigReload = false;
+  Worker? _configWorker;
+  String? _seenConfigVersion;
+  Future<void>? _configLoadFlight;
+
+  Future<void> _loadOptions() {
+    if (_configLoadFlight != null) return _configLoadFlight!;
+    final next = _loadOptionsNow();
+    _configLoadFlight = next;
+    return next.whenComplete(() {
+      _configLoadFlight = null;
+      if (mounted && _needsConfigReload && !(_busy || _uploadingAvatar))
+        _loadOptions();
+    });
+  }
+
+  Future<void> _loadOptionsNow() async {
+    _needsConfigReload = false;
     try {
       final data = await ApiClient.instance.get('/v1/companion-options');
       if (!mounted || data is! Map) return;
@@ -85,6 +119,8 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
         }
       });
     } catch (error) {
+      if (mounted && Get.isRegistered<ConfigSyncController>())
+        ConfigSyncController.to.invalidate('companion');
       if (mounted)
         VitaNotice.error('companion.create.title'.tr,
             'companion.create.optionsUnavailable'.tr);
@@ -95,6 +131,7 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
 
   @override
   void dispose() {
+    _configWorker?.dispose();
     _name.dispose();
     _city.dispose();
     _occupation.dispose();
@@ -133,7 +170,10 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
                       : e.message)
               : 'profile.uploadFailed'.tr);
     } finally {
-      if (mounted) setState(() => _uploadingAvatar = false);
+      if (mounted) {
+        setState(() => _uploadingAvatar = false);
+        if (_needsConfigReload) _loadOptions();
+      }
     }
   }
 
@@ -240,7 +280,10 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
           category: 'companion', properties: {'reason': 'unexpected'});
       VitaNotice.error('companion.create.failed'.tr, '$e');
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+        if (_needsConfigReload) _loadOptions();
+      }
     }
   }
 

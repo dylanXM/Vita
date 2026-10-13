@@ -6,6 +6,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../../core/push_notification_service.dart';
 import '../../core/app_content_controller.dart';
+import '../../core/config_sync_controller.dart';
 import '../../core/analytics_service.dart';
 import '../../core/theme.dart';
 import '../world/world_page.dart';
@@ -54,19 +55,52 @@ class ShellPage extends StatefulWidget {
 }
 
 class _ShellPageState extends State<ShellPage> {
+  Worker? _contentWorker;
+  Worker? _routeWorker;
+  bool _showingUpdates = false;
   @override
   void initState() {
     super.initState();
     ShellController.to.index.value = 0;
     ShellController.to.journeyFocusCompanionId.value = null;
     MemoriesController.to.prepareForShell();
-    AdmobController.to.refreshConfig();
+    if (Get.isRegistered<ConfigSyncController>())
+      ConfigSyncController.to.refresh();
+    else
+      AdmobController.to.refreshConfig();
+    _contentWorker =
+        ever(AppContentController.to.revision, (_) => _showUpdates());
+    if (Get.isRegistered<ChatListController>()) {
+      _routeWorker = ever(ChatListController.to.currentRoute, (route) {
+        if (route == '/shell')
+          WidgetsBinding.instance.addPostFrameCallback((_) => _showUpdates());
+      });
+    }
     PushNotificationService.instance.activateForSignedInUser();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showUpdates());
+  }
+
+  Future<void> _showUpdates() async {
+    if (!mounted ||
+        _showingUpdates ||
+        ModalRoute.of(context)?.isCurrent != true) return;
+    _showingUpdates = true;
+    try {
       final campaign = await AppContentController.to.campaignToShow();
-      if (!mounted || campaign == null) return;
+      if (!mounted ||
+          campaign == null ||
+          ModalRoute.of(context)?.isCurrent != true) return;
       await WhatsNewSheet.show(context, campaign);
-    });
+    } finally {
+      _showingUpdates = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _contentWorker?.dispose();
+    _routeWorker?.dispose();
+    super.dispose();
   }
 
   @override

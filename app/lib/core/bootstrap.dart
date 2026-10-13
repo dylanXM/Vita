@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import 'settings_controller.dart';
+import 'config_sync_controller.dart';
 import 'app_content_controller.dart';
 import 'analytics_service.dart';
 import '../features/auth/auth_controller.dart';
@@ -26,4 +27,5 @@ void initControllers() {
   Get.put(ShellController(), permanent: true);
   Get.put(BillingController(), permanent: true);
   Get.put(AdmobController(), permanent: true);
+  Get.put(ConfigSyncController(), permanent: true);
 }

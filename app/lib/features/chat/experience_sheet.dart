@@ -6,6 +6,7 @@ import '../../core/notice.dart';
 import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../../core/config_sync_controller.dart';
 import '../../shared/widgets.dart';
 import '../billing/billing_controller.dart';
 import 'gift_visual.dart';
@@ -41,10 +42,42 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
   @override
   void initState() {
     super.initState();
+    if (Get.isRegistered<ConfigSyncController>()) {
+      final sync = ConfigSyncController.to;
+      _seenConfigVersion = sync.revisions['experiences'];
+      _configWorker = ever(sync.revisions, (_) {
+        final version = sync.revisions['experiences'];
+        if (version == _seenConfigVersion) return;
+        _seenConfigVersion = version;
+        if (!mounted) return;
+        if (_buying != null || _configLoadFlight != null) {
+          _needsConfigReload = true;
+        } else {
+          _load();
+        }
+      });
+      sync.refresh();
+    }
     _load();
   }
 
-  Future<void> _load() async {
+  bool _needsConfigReload = false;
+  Worker? _configWorker;
+  String? _seenConfigVersion;
+  Future<void>? _configLoadFlight;
+
+  Future<void> _load() {
+    if (_configLoadFlight != null) return _configLoadFlight!;
+    final next = _loadNow();
+    _configLoadFlight = next;
+    return next.whenComplete(() {
+      _configLoadFlight = null;
+      if (mounted && _needsConfigReload && !(_buying != null)) _load();
+    });
+  }
+
+  Future<void> _loadNow() async {
+    _needsConfigReload = false;
     try {
       final data = await ApiClient.instance
           .get('/v1/companions/${widget.companionId}/experiences');
@@ -88,9 +121,17 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
         Navigator.of(context).pop();
         Get.toNamed('/subscription');
       } else {
+        if (Get.isRegistered<ConfigSyncController>())
+          ConfigSyncController.to.invalidate('experiences');
         VitaNotice.error('experience.failed'.tr, error.message);
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _configWorker?.dispose();
+    super.dispose();
   }
 
   Future<void> _purchase(Map<String, dynamic> product) async {
@@ -251,7 +292,10 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
         VitaNotice.error('experience.failed'.tr, error.message);
       }
     } finally {
-      if (mounted) setState(() => _buying = null);
+      if (mounted) {
+        setState(() => _buying = null);
+        if (_needsConfigReload) _load();
+      }
     }
   }
 

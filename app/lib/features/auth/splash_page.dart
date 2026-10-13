@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../core/theme.dart';
 import '../../core/token_storage.dart';
 import '../../core/app_content_controller.dart';
+import '../../core/config_sync_controller.dart';
 import 'auth_controller.dart';
 
 /// Startup gate: restores the stored session and routes to the shell or login.
@@ -29,7 +30,15 @@ class _SplashPageState extends State<SplashPage> {
       // Secure storage unavailable (e.g. fresh install) — treat as signed out.
     }
     if (!mounted) return;
-    await AppContentController.to.load();
+    await ConfigSyncController.to
+        .refresh()
+        .timeout(const Duration(seconds: 3), onTimeout: () {});
+    // Compatible with a backend rollout that has not exposed versions yet.
+    if (ConfigSyncController.to.versionsUnavailable &&
+        !ConfigSyncController.to.revisions.containsKey('content'))
+      await AppContentController.to
+          .load()
+          .timeout(const Duration(seconds: 3), onTimeout: () {});
     if (!mounted) return;
     // Existing signed-in installs must not be pushed through a newly added
     // first-run flow after an app upgrade.

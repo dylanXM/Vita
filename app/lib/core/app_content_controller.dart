@@ -155,6 +155,12 @@ class SocialMediaLinks {
 }
 
 class AppContentController extends GetxController {
+  AppContentController({Future<dynamic> Function()? fetchContent})
+      : _fetchContent = fetchContent ??
+            (() => ApiClient.instance.get('/v1/app-content',
+                receiveTimeout: const Duration(seconds: 5)));
+  final Future<dynamic> Function() _fetchContent;
+
   static AppContentController get to => Get.find();
   static const _onboardingDoneKey = 'vita.onboarding.completed';
   static const _whatsNewPrefix = 'vita.whats_new.shown.';
@@ -244,6 +250,9 @@ class AppContentController extends GetxController {
     ],
   );
   WhatsNewCampaignContent? whatsNew;
+  String _campaignRevision = '';
+  final revision = 0.obs;
+  Future<bool>? _flight;
   final socialLinks = const SocialMediaLinks().obs;
   final legalDocuments = <LegalDocumentType, LegalDocument>{}.obs;
 
@@ -254,9 +263,21 @@ class AppContentController extends GetxController {
       legalDocument(LegalDocumentType.terms)?.isUsable == true;
 
   Future<void> load() async {
+    await synchronize();
+  }
+
+  Future<bool> synchronize() {
+    final running = _flight;
+    if (running != null) return running;
+    final next = _load();
+    _flight = next;
+    return next.whenComplete(() => _flight = null);
+  }
+
+  Future<bool> _load() async {
     try {
-      final raw = await ApiClient.instance.get('/v1/app-content');
-      if (raw is! Map) return;
+      final raw = await _fetchContent();
+      if (raw is! Map) return false;
       final onboardingRaw = raw['onboarding'];
       final whatsNewRaw = raw['whats_new'];
       final socialLinksRaw = raw['social_links'];
@@ -265,10 +286,12 @@ class AppContentController extends GetxController {
         onboarding =
             OnboardingContent.from(Map<String, dynamic>.from(onboardingRaw));
       }
-      if (whatsNewRaw is Map) {
-        whatsNew = WhatsNewCampaignContent.from(
-            Map<String, dynamic>.from(whatsNewRaw));
-      }
+      whatsNew = whatsNewRaw is Map
+          ? WhatsNewCampaignContent.from(Map<String, dynamic>.from(whatsNewRaw))
+          : null;
+      _campaignRevision =
+          whatsNewRaw is Map ? '${whatsNewRaw['updated_at'] ?? ''}' : '';
+
       if (socialLinksRaw is Map) {
         socialLinks.value =
             SocialMediaLinks.from(Map<String, dynamic>.from(socialLinksRaw));
@@ -282,8 +305,11 @@ class AppContentController extends GetxController {
         }
         legalDocuments.assignAll(parsed);
       }
+      revision.value++;
+      return true;
     } catch (_) {
-      // Content is remotely managed but must never block app startup.
+      // Retain the last valid content; the sync coordinator retries.
+      return false;
     }
   }
 
@@ -305,8 +331,9 @@ class AppContentController extends GetxController {
       return null;
     }
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool('$_whatsNewPrefix${campaign.id}') ?? false) return null;
-    await prefs.setBool('$_whatsNewPrefix${campaign.id}', true);
+    final key = '$_whatsNewPrefix${campaign.id}.$_campaignRevision';
+    if (prefs.getBool(key) ?? false) return null;
+    await prefs.setBool(key, true);
     return campaign;
   }
 }

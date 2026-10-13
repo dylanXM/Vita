@@ -36,17 +36,44 @@ class WhatsNewSheet extends StatefulWidget {
 class _WhatsNewSheetState extends State<WhatsNewSheet> {
   final _controller = PageController();
   int _index = 0;
+  Worker? _contentWorker;
+  WhatsNewCampaignContent get _campaign =>
+      AppContentController.to.whatsNew?.id == widget.campaign.id
+          ? AppContentController.to.whatsNew!
+          : widget.campaign;
+
+  @override
+  void initState() {
+    super.initState();
+    _contentWorker = ever(AppContentController.to.revision, (_) {
+      if (!mounted) return;
+      final latest = AppContentController.to.whatsNew;
+      if (latest == null ||
+          latest.id != widget.campaign.id ||
+          latest.pages.isEmpty) {
+        final route = ModalRoute.of(context);
+        if (route?.isCurrent == true)
+          Navigator.of(context).pop();
+        else if (route != null) Navigator.of(context).removeRoute(route);
+        return;
+      }
+      setState(() => _index = _index.clamp(0, latest.pages.length - 1).toInt());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _controller.hasClients) _controller.jumpToPage(_index);
+      });
+    });
+  }
 
   Future<void> _action(WhatsNewContentPage page) async {
     AnalyticsService.to
         .track('whats_new_cta_clicked', category: 'updates', properties: {
-      'campaign_id': widget.campaign.id,
+      'campaign_id': _campaign.id,
       'page_id': page.id,
       'action': page.ctaAction,
     });
     switch (page.ctaAction) {
       case 'next':
-        if (_index < widget.campaign.pages.length - 1) {
+        if (_index < _campaign.pages.length - 1) {
           await _controller.nextPage(
               duration: const Duration(milliseconds: 280),
               curve: Curves.easeOutCubic);
@@ -69,14 +96,16 @@ class _WhatsNewSheetState extends State<WhatsNewSheet> {
 
   @override
   void dispose() {
+    _contentWorker?.dispose();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final pages = widget.campaign.pages;
-    final current = pages[_index];
+    final pages = _campaign.pages;
+    if (pages.isEmpty) return const SizedBox.shrink();
+    final current = pages[_index.clamp(0, pages.length - 1).toInt()];
     final cta = current.ctaLabel.resolve();
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
@@ -113,7 +142,7 @@ class _WhatsNewSheetState extends State<WhatsNewSheet> {
                       AnalyticsService.to.track('whats_new_page_viewed',
                           category: 'updates',
                           properties: {
-                            'campaign_id': widget.campaign.id,
+                            'campaign_id': _campaign.id,
                             'page_index': value,
                             'page_id': pages[value].id,
                           });

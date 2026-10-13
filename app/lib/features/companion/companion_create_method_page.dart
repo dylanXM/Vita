@@ -9,6 +9,7 @@ import '../../core/notice.dart';
 import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../../core/config_sync_controller.dart';
 import '../../shared/widgets.dart';
 import '../chat/chat_list_controller.dart';
 import 'companion_create_page.dart';
@@ -161,10 +162,42 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
   @override
   void initState() {
     super.initState();
+    if (Get.isRegistered<ConfigSyncController>()) {
+      final sync = ConfigSyncController.to;
+      _seenConfigVersion = sync.revisions['companion'];
+      _configWorker = ever(sync.revisions, (_) {
+        final version = sync.revisions['companion'];
+        if (version == _seenConfigVersion) return;
+        _seenConfigVersion = version;
+        if (!mounted) return;
+        if (_busy || _configLoadFlight != null) {
+          _needsConfigReload = true;
+        } else {
+          _loadRelations();
+        }
+      });
+      sync.refresh();
+    }
     _loadRelations();
   }
 
-  Future<void> _loadRelations() async {
+  bool _needsConfigReload = false;
+  Worker? _configWorker;
+  String? _seenConfigVersion;
+  Future<void>? _configLoadFlight;
+
+  Future<void> _loadRelations() {
+    if (_configLoadFlight != null) return _configLoadFlight!;
+    final next = _loadRelationsNow();
+    _configLoadFlight = next;
+    return next.whenComplete(() {
+      _configLoadFlight = null;
+      if (mounted && _needsConfigReload && !(_busy)) _loadRelations();
+    });
+  }
+
+  Future<void> _loadRelationsNow() async {
+    _needsConfigReload = false;
     try {
       final result = await ApiClient.instance.get('/v1/companion-options');
       final relations = CompanionRelationshipOptions.from(
@@ -177,6 +210,8 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
           _relationship = _relations.compatibleStage(_relationship, _gender);
         });
     } catch (_) {
+      if (mounted && Get.isRegistered<ConfigSyncController>())
+        ConfigSyncController.to.invalidate('companion');
       if (mounted)
         VitaNotice.error('companion.create.title'.tr,
             'companion.create.optionsUnavailable'.tr);
@@ -185,6 +220,7 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
 
   @override
   void dispose() {
+    _configWorker?.dispose();
     _description.dispose();
     _characterName.dispose();
     for (final controller in _fields.values) {
@@ -276,7 +312,10 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
                   ? 'companion.create.imageValidationUnavailable'.tr
                   : error.message));
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+        if (_needsConfigReload) _loadRelations();
+      }
     }
   }
 
@@ -321,7 +360,10 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
                   ? 'companion.create.imageValidationUnavailable'.tr
                   : error.message));
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+        if (_needsConfigReload) _loadRelations();
+      }
     }
   }
 

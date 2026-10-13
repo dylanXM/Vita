@@ -214,6 +214,7 @@ func main() {
 		api.GET("/me/subscription", middleware.RequireAuth(), handler.GetMySubscription)
 		api.POST("/me/billing/confirm", middleware.RequireAuth(), handler.ConfirmBillingPurchase)
 		api.GET("/subscription-plans/benefits", middleware.RequireAuth(), handler.ListSubscriptionPlanBenefits)
+		api.GET("/billing/catalog", middleware.RequireAuth(), handler.AppBillingCatalog)
 		api.POST("/stripe/checkout", middleware.RequireAuth(), handler.CreateStripeCheckout)
 		api.POST("/webhooks/revenuecat", handler.RevenueCatWebhook)
 		api.POST("/webhooks/stripe", handler.StripeWebhook)
@@ -273,6 +274,7 @@ func main() {
 		api.GET("/health", handler.Health)
 		api.POST("/providers/kie/callback", middleware.RateLimit(120, time.Minute), handler.KieCallback)
 		api.GET("/app-content", handler.AppContent)
+		api.GET("/app-config/versions", handler.AppConfigVersions)
 		api.POST("/events", middleware.RateLimit(120, time.Minute), handler.IngestAnalyticsEvents)
 
 		// Current account — used by the admin dashboard to rehydrate a stored

@@ -10,6 +10,7 @@ import '../../core/notice.dart';
 import '../../core/api_client.dart';
 import '../../core/analytics_service.dart';
 import '../../core/constants.dart';
+import 'billing_products.dart';
 import '../chat/chat_list_controller.dart';
 import '../ads/admob_controller.dart';
 import '../auth/auth_controller.dart';
@@ -102,9 +103,11 @@ class BillingController extends GetxController {
         rcReady.value = false;
       }
     }
-    await refreshSubscription();
-    await refreshCredits();
-    await refreshPlanBenefits();
+    if (currentUserID.isNotEmpty) {
+      await refreshSubscription();
+      await refreshCredits();
+      await refreshPlanBenefits();
+    }
   }
 
   Future<void> _loadOfferings(String source) async {
@@ -131,12 +134,100 @@ class BillingController extends GetxController {
     }
   }
 
+  final coinProductCoins = <String, int>{}.obs;
+  final subscriptionProductIDs = <String, bool>{}.obs;
+  final catalogLoaded = false.obs;
+
+  int coinsForProduct(String id) => catalogLoaded.value
+      ? coinProductCoins[id.toLowerCase()] ?? 0
+      : vitaCoinProductIds[id.toLowerCase()] ?? 0;
+  bool includesCoin(String id) => catalogLoaded.value
+      ? coinProductCoins.containsKey(id.toLowerCase())
+      : vitaCoinProductIds.containsKey(id.toLowerCase());
+  bool includesSubscription(String packageID, String productID) =>
+      catalogLoaded.value
+          ? subscriptionProductIDs.containsKey(productID.toLowerCase())
+          : isSubscriptionProduct(packageID, productID);
+
+  Future<bool>? _benefitsFlight;
+  Future<bool>? _configurationFlight;
+  String? _configurationUserID;
+
   Future<void> refreshPlanBenefits() async {
+    await synchronizeBenefits();
+  }
+
+  Future<bool> synchronizeBenefits() {
+    if (_benefitsFlight != null) return _benefitsFlight!;
+    final next = _refreshPlanBenefits();
+    _benefitsFlight = next;
+    return next.whenComplete(() => _benefitsFlight = null);
+  }
+
+  Future<bool> synchronizeConfiguration({bool refreshCatalog = true}) {
+    if (_configurationFlight != null) return _configurationFlight!;
+    final next = _synchronizeConfiguration(refreshCatalog);
+    _configurationFlight = next;
+    return next.whenComplete(() => _configurationFlight = null);
+  }
+
+  Future<bool> _synchronizeConfiguration(bool refreshCatalog) async {
+    await _initializing;
+    final user = currentUserID;
+    if (user.isEmpty) return false;
+    if (_configurationUserID != user) {
+      await refreshSubscription();
+      await refreshCredits();
+      if (currentUserID != user) return false;
+      _configurationUserID = user;
+    }
+    final benefitsOK = await synchronizeBenefits();
+    if (!refreshCatalog) return benefitsOK;
+    bool catalogOK = false;
     try {
-      final data =
-          await ApiClient.instance.get('/v1/subscription-plans/benefits');
+      final raw = await ApiClient.instance.get('/v1/billing/catalog',
+          receiveTimeout: const Duration(seconds: 5));
+      final items = raw is Map ? raw['items'] : null;
+      if (items is List && currentUserID == user) {
+        final coins = <String, int>{};
+        final plans = <String, bool>{};
+        for (final item in items.whereType<Map>()) {
+          final id = '${item['product_id'] ?? ''}'.toLowerCase();
+          if (id.isEmpty) continue;
+          if (item['kind'] == 'coin')
+            coins[id] = (item['coins'] as num?)?.toInt() ?? 0;
+          if (item['kind'] == 'subscription') plans[id] = true;
+        }
+        coinProductCoins.assignAll(coins);
+        subscriptionProductIDs.assignAll(plans);
+        catalogLoaded.value = true;
+        catalogOK = true;
+      }
+    } catch (_) {}
+    if (currentUserID != user) return false;
+    if (!rcReady.value) return benefitsOK && catalogOK;
+    try {
+      if (_identifiedUserID != user) {
+        await syncUser(user);
+        if (_identifiedUserID != user) return false;
+      } else {
+        await _loadOfferings('config_sync');
+      }
+      return benefitsOK && catalogOK;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _refreshPlanBenefits() async {
+    final user = currentUserID;
+    final locale = Get.locale;
+    try {
+      final data = await ApiClient.instance.get(
+          '/v1/subscription-plans/benefits',
+          receiveTimeout: const Duration(seconds: 5));
       final items = data is Map ? data['items'] : null;
-      if (items is! List) return;
+      if (items is! List) return false;
       final benefits = <String, List<String>>{};
       for (final item in items.whereType<Map>()) {
         final productID = '${item['product_id'] ?? ''}';
@@ -146,9 +237,13 @@ class BillingController extends GetxController {
             .where((value) => value.trim().isNotEmpty)
             .toList();
       }
+      if (_closed || user != currentUserID || locale != Get.locale)
+        return false;
       planBenefits.assignAll(benefits);
+      return true;
     } catch (_) {
-      // Store packages remain purchasable when benefit copy is unavailable.
+      // Preserve the last valid benefits and allow a later retry.
+      return false;
     }
   }
 
@@ -203,6 +298,11 @@ class BillingController extends GetxController {
     entitlements.clear();
     balance.value = 0;
     transactions.clear();
+    coinProductCoins.clear();
+    subscriptionProductIDs.clear();
+    catalogLoaded.value = false;
+    planBenefits.clear();
+    _configurationUserID = null;
     if (Get.isRegistered<AdmobController>()) {
       AdmobController.to.config.value = null;
     }

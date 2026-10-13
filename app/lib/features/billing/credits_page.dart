@@ -3,9 +3,9 @@ import 'package:get/get.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 
 import '../../core/theme.dart';
+import '../../core/config_sync_controller.dart';
 import '../../shared/widgets.dart';
 import 'billing_controller.dart';
-import 'billing_products.dart';
 import 'billing_sync_banner.dart';
 import '../ads/admob_controller.dart';
 
@@ -23,6 +23,8 @@ class _CreditsPageState extends State<CreditsPage> {
   @override
   void initState() {
     super.initState();
+    if (Get.isRegistered<ConfigSyncController>())
+      ConfigSyncController.to.refresh();
     if (widget.purchaseOnly) {
       BillingController.to.refreshCredits();
     } else {
@@ -42,6 +44,7 @@ class _CreditsPageState extends State<CreditsPage> {
                   .tr)),
       body: Obx(() => RefreshIndicator(
             onRefresh: () async {
+              if (Get.isRegistered<ConfigSyncController>()) await ConfigSyncController.to.refresh(force: true);
               await ctrl.refreshCredits();
               if (!widget.purchaseOnly)
                 await AdmobController.to.refreshConfig();
@@ -182,7 +185,7 @@ class _CreditsPageState extends State<CreditsPage> {
       if (offering == null) return;
       for (final package in offering.availablePackages) {
         final id = package.storeProduct.identifier;
-        if (isCoinProduct(package.identifier, id) && seen.add(id)) {
+        if (ctrl.includesCoin(id) && seen.add(id)) {
           packs.add(package);
         }
       }
@@ -191,8 +194,8 @@ class _CreditsPageState extends State<CreditsPage> {
     collect(offerings.current);
     offerings.all.forEach((_, offering) => collect(offering));
     packs.sort((a, b) {
-      final aCoins = vitaCoinProductIds[a.storeProduct.identifier.toLowerCase()]!;
-      final bCoins = vitaCoinProductIds[b.storeProduct.identifier.toLowerCase()]!;
+      final aCoins = ctrl.coinsForProduct(a.storeProduct.identifier);
+      final bCoins = ctrl.coinsForProduct(b.storeProduct.identifier);
       return aCoins.compareTo(bCoins);
     });
     return packs;
@@ -248,7 +251,7 @@ class _PackRow extends StatelessWidget {
     final store = package.storeProduct;
     final price =
         store.priceString.isEmpty ? 'credits.buy'.tr : store.priceString;
-    final coins = vitaCoinProductIds[store.identifier.toLowerCase()]!;
+    final coins = BillingController.to.coinsForProduct(store.identifier);
     final quantity = MaterialLocalizations.of(context).formatDecimal(coins);
     return Container(
       height: 88,
@@ -274,19 +277,22 @@ class _PackRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Flexible(child: Text(quantity,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: 25,
-                      height: 1.1,
-                      fontWeight: FontWeight.w700,
-                      color: context.vita.text))),
+              Flexible(
+                  child: Text(quantity,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 25,
+                          height: 1.1,
+                          fontWeight: FontWeight.w700,
+                          color: context.vita.text))),
               const SizedBox(height: 4),
-              Flexible(child: Text('credits.unit'.tr,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: context.vita.subText))),
+              Flexible(
+                  child: Text('credits.unit'.tr,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 12, color: context.vita.subText))),
             ],
           ),
         ),
