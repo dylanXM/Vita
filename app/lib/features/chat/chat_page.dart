@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:dio/dio.dart';
@@ -57,7 +58,7 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
-class _ChatPageState extends State<ChatPage> {
+class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   static const _messageEmojis = <String>[
     '😊',
     '😂',
@@ -134,10 +135,15 @@ class _ChatPageState extends State<ChatPage> {
   ModalRoute<dynamic>? _chatRoute;
   NavigatorState? _chatNavigator;
   bool _treeActive = true;
+  ui.FlutterView? _chatView;
+  double _keyboardInset = 0;
+  bool _followKeyboard = false;
+  bool _keyboardUpdateScheduled = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _chatView = View.of(context);
     _chatRoute = ModalRoute.of(context);
     _chatNavigator = Navigator.of(context);
   }
@@ -157,6 +163,7 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _lifeEventContextId = widget.lifeEventContextId;
     _lifeEventContextTitle = widget.lifeEventContextTitle;
     if (widget.journeyDraft case final draft?) {
@@ -188,6 +195,7 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _recorder.dispose();
     _player.dispose();
     _messageWorker.dispose();
@@ -407,6 +415,28 @@ class _ChatPageState extends State<ChatPage> {
         return;
       }
       VitaNotice.info('chat.message'.tr, 'chat.replyPending'.tr);
+    });
+  }
+
+  @override
+  void didChangeMetrics() {
+    if (!mounted || !_treeActive || _chatRoute?.isCurrent != true) return;
+    final nextInset = _chatView?.viewInsets.bottom ?? 0;
+    if (nextInset == _keyboardInset) return;
+    if (_keyboardInset == 0 && nextInset > 0) {
+      // Capture before the keyboard reduces the list viewport.
+      _followKeyboard = _scroll.hasClients &&
+          _scroll.position.hasContentDimensions &&
+          _scroll.position.extentAfter <= 24;
+    }
+    _keyboardInset = nextInset;
+    if (!_followKeyboard || _keyboardUpdateScheduled) return;
+    _keyboardUpdateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _keyboardUpdateScheduled = false;
+      if (!mounted || !_treeActive || _chatRoute?.isCurrent != true) return;
+      if (_followKeyboard) _scrollToBottom();
+      if (_keyboardInset == 0) _followKeyboard = false;
     });
   }
 

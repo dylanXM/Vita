@@ -418,47 +418,39 @@ class RomanticDateStageState extends State<RomanticDateStage>
                       child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: SizedBox.square(
-                                    dimension: 96,
-                                    child:
-                                        Stack(fit: StackFit.expand, children: [
-                                      if (widget.portraitUrl?.isNotEmpty ==
-                                          true)
-                                        VitaMediaImage(
-                                            url: widget.portraitUrl!,
-                                            fit: BoxFit.cover)
-                                      else
-                                        const ColoredBox(
-                                            color: Color(0xFF46382D)),
-                                      const Positioned.fill(
-                                          child: IgnorePointer(
-                                              child: DecoratedBox(
-                                                  decoration: BoxDecoration(
-                                                      gradient: LinearGradient(
-                                                          begin:
-                                                              Alignment.center,
-                                                          end: Alignment
-                                                              .bottomCenter,
-                                                          colors: [
-                                            Colors.transparent,
-                                            Colors.black54
-                                          ]))))),
-                                      PositionedDirectional(
-                                          end: 7,
-                                          start: 7,
-                                          bottom: 6,
+                            Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: SizedBox.square(
+                                          dimension: 96,
+                                          child: widget.portraitUrl
+                                                      ?.isNotEmpty ==
+                                                  true
+                                              ? VitaMediaImage(
+                                                  url: widget.portraitUrl!,
+                                                  fit: BoxFit.cover)
+                                              : const ColoredBox(
+                                                  color: Color(0xFF46382D)))),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                      child: Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 4),
                                           child: Text(widget.companionName,
-                                              textAlign: TextAlign.end,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: const TextStyle(
                                                   color: Colors.white,
-                                                  fontSize: 13,
-                                                  fontWeight:
-                                                      FontWeight.w600))),
-                                    ]))),
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w600,
+                                                  shadows: [
+                                                    Shadow(
+                                                        color: Colors.black54,
+                                                        blurRadius: 6)
+                                                  ])))),
+                                ]),
                             const SizedBox(height: 8),
                             Text(reply,
                                 maxLines: 4,
