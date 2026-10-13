@@ -976,6 +976,8 @@ class _CompanionGestureAvatar extends StatelessWidget {
       _ => Icons.favorite_rounded,
     };
     return Semantics(
+      container: true,
+      excludeSemantics: true,
       label: 'chat.gesture.$gesture'.tr,
       child: SizedBox.square(
         dimension: 44,

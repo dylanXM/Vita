@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
 
 import 'core/bootstrap.dart';
+import 'core/semantics_diagnostics.dart';
 import 'features/chat/chat_list_controller.dart';
 import 'features/chat/message_notification_overlay.dart';
 import 'core/analytics_service.dart';
@@ -24,6 +25,7 @@ import 'features/shell/shell_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  installSemanticsDiagnostics();
   await PushNotificationService.instance.initialize();
   initControllers();
   // Wait for persisted language/theme preferences before the first frame
