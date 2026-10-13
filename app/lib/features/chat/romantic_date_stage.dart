@@ -46,6 +46,7 @@ class _RomanticDateStageState extends State<RomanticDateStage>
   final ValueNotifier<List<Map<String, dynamic>>> _history = ValueNotifier([]);
   bool _sending = false, _sound = false, _chat = false, _active = true;
   ModalRoute<dynamic>? _route;
+  bool _historyUpdateScheduled = false;
   @override
   void initState() {
     super.initState();
@@ -63,12 +64,24 @@ class _RomanticDateStageState extends State<RomanticDateStage>
   @override
   void didUpdateWidget(covariant RomanticDateStage old) {
     super.didUpdateWidget(old);
-    _history.value = widget.messages;
+    _scheduleHistoryUpdate();
     if (old.audioUrl != widget.audioUrl) {
       _audio.stop();
       _sound = false;
     }
     _sync();
+  }
+
+  // The history sheet is a separate route; notifying during the parent
+  // route's build would mark that sheet dirty outside the building subtree.
+  void _scheduleHistoryUpdate() {
+    if (_historyUpdateScheduled) return;
+    _historyUpdateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _historyUpdateScheduled = false;
+      if (!mounted) return;
+      _history.value = List<Map<String, dynamic>>.of(widget.messages);
+    });
   }
 
   void _sync() {
@@ -376,38 +389,6 @@ class _RomanticDateStageState extends State<RomanticDateStage>
                             offset: Offset(0,
                                 _action == 'toast' ? -12 * _motion.value : 0),
                             child: child))))),
-      if (!keyboard && widget.portraitUrl?.isNotEmpty == true)
-        PositionedDirectional(
-            end: 16,
-            top: MediaQuery.paddingOf(context).top + kToolbarHeight + 64,
-            child: IgnorePointer(
-                child: SizedBox(
-                    width: MediaQuery.sizeOf(context).width * .38,
-                    height: (MediaQuery.sizeOf(context).height * .28)
-                        .clamp(120.0, 210.0),
-                    child: ShaderMask(
-                        blendMode: BlendMode.dstIn,
-                        shaderCallback: (bounds) => const LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black,
-                                  Colors.black,
-                                  Colors.transparent
-                                ],
-                                stops: [
-                                  0,
-                                  .12,
-                                  .76,
-                                  1
-                                ]).createShader(bounds),
-                        child: ShaderMask(
-                            blendMode: BlendMode.dstIn,
-                            shaderCallback: (bounds) =>
-                                const LinearGradient(colors: [Colors.transparent, Colors.black, Colors.black, Colors.transparent], stops: [0, .18, .82, 1])
-                                    .createShader(bounds),
-                            child: VitaMediaImage(url: widget.portraitUrl!, fit: BoxFit.contain)))))),
       SafeArea(
           top: true,
           child: Column(children: [
@@ -439,14 +420,25 @@ class _RomanticDateStageState extends State<RomanticDateStage>
                       child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(widget.companionName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    color: Color(0xFFF1DCC0),
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: .5)),
+                            Row(children: [
+                              if (widget.portraitUrl?.isNotEmpty == true) ...[
+                                ClipOval(
+                                    child: SizedBox.square(
+                                        dimension: 28,
+                                        child: VitaMediaImage(
+                                            url: widget.portraitUrl!,
+                                            fit: BoxFit.cover))),
+                                const SizedBox(width: 8),
+                              ],
+                              Expanded(
+                                  child: Text(widget.companionName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          color: Color(0xFFF1DCC0),
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600))),
+                            ]),
                             const SizedBox(height: 8),
                             Text(reply,
                                 maxLines: 4,
