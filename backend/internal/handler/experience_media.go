@@ -126,7 +126,7 @@ func refundMediaFailure(c *gin.Context, spendID string, failure error) {
 func equipOwnedMediaOutfit(c *gin.Context, userID, companionID, key string) {
 	ctx := c.Request.Context()
 	var raw string
-	err := db.Get().QueryRowContext(ctx, `SELECT to_jsonb(m)::text FROM messages m JOIN conversations cv ON cv.id=m.conversation_id WHERE cv.user_id=$1 AND cv.companion_id=$2 AND m.source='paid_outfit' AND m.payload->>'product_key'=$3 AND COALESCE(m.media_url,'')<>'' ORDER BY m.created_at DESC LIMIT 1`, userID, companionID, key).Scan(&raw)
+	err := db.Get().QueryRowContext(ctx, `SELECT to_jsonb(m)::text FROM messages m JOIN conversations cv ON cv.id=m.conversation_id WHERE cv.user_id=$1 AND cv.companion_id=$2 AND m.source='paid_outfit' AND m.payload->>'product_key'=$3 AND m.payload->>'portrait_reference'=(SELECT COALESCE(NULLIF(c.avatar_url,''),p.image_url,'') FROM companions c LEFT JOIN companion_portraits p ON p.id=c.portrait_id WHERE c.id=$2 AND c.user_id=$1) AND COALESCE(m.media_url,'')<>'' ORDER BY m.created_at DESC LIMIT 1`, userID, companionID, key).Scan(&raw)
 	var message *agent.SavedMessage
 	if err == nil {
 		message = &agent.SavedMessage{}

@@ -276,7 +276,11 @@ func (s *Service) GenerateDueLifePhotos(ctx context.Context) error {
 			continue
 		}
 		prompt := fmt.Sprintf("A candid, realistic everyday photo from %s's life in %s. Event: %s — %s. Location: %s. Mood: %s. Appearance continuity: %s. Natural phone-camera composition, ordinary lived-in details, no text, no watermark, no collage.", item.name, item.city, item.title, item.description, item.location, item.emotion, item.appearance)
-		imageURL, model, imageErr := s.generateImageWithFallback(ctx, item.companionID, "life_photo", models, GenerateImageRequest{Prompt: prompt, Size: "1024x1024"})
+		reference, referenceErr := s.companionImageReference(ctx, item.userID, item.companionID)
+		if referenceErr != nil {
+			continue
+		}
+		imageURL, model, imageErr := s.generateImageWithFallback(ctx, item.companionID, "life_photo", models, GenerateImageRequest{Prompt: prompt + portraitIdentityPrompt, Size: "1024x1024", Reference: reference})
 		if imageErr != nil {
 			continue
 		}
@@ -841,7 +845,11 @@ func (s *Service) PrepareRequestedLifePhoto(ctx context.Context, userID, compani
 	}
 	prompt := fmt.Sprintf("A candid phone photo from %s's current day. Current event: %s — %s. Current location: %s. Mood: %s. Appearance continuity: %s. Outfit selection: %s. Natural light, believable everyday details, one coherent scene, no text, no watermark, no collage.",
 		name, title, description, location, emotion, appearance, outfit)
-	imageURL, model, err := s.generateImageWithFallback(ctx, companionID, "requested_life_photo", models, GenerateImageRequest{Prompt: prompt, Size: "1024x1024"})
+	reference, err := s.companionImageReference(ctx, userID, companionID)
+	if err != nil {
+		return nil, err
+	}
+	imageURL, model, err := s.generateImageWithFallback(ctx, companionID, "requested_life_photo", models, GenerateImageRequest{Prompt: prompt + portraitIdentityPrompt, Size: "1024x1024", Reference: reference})
 	if err != nil {
 		return nil, err
 	}
@@ -854,7 +862,7 @@ func (s *Service) PrepareRequestedLifePhoto(ctx context.Context, userID, compani
 	if err != nil {
 		return nil, err
 	}
-	return &SavedMessage{ID: uuid.New().String(), ConversationID: conversationID, SenderType: "assistant", MessageType: "image_text", Content: description, MediaURL: imageURL, Payload: map[string]any{"media_urls": []string{imageURL}, "requested": true}, Source: "paid_photo", LifeEventID: eventID, DeliveryStatus: "delivered", CreatedAt: time.Now().UTC()}, nil
+	return &SavedMessage{ID: uuid.New().String(), ConversationID: conversationID, SenderType: "assistant", MessageType: "image_text", Content: description, MediaURL: imageURL, Payload: map[string]any{"media_urls": []string{imageURL}, "requested": true, "portrait_reference": reference.Source}, Source: "paid_photo", LifeEventID: eventID, DeliveryStatus: "delivered", CreatedAt: time.Now().UTC()}, nil
 }
 
 // PrepareLatestReplySpeech stores generated audio but leaves the chat message

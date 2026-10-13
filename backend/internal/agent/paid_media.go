@@ -27,7 +27,11 @@ func (s *Service) GenerateOutfitPhoto(ctx context.Context, userID, companionID, 
 	if strings.TrimSpace(style) == "" {
 		return nil, fmt.Errorf("outfit style is not configured")
 	}
-	imageURL, model, err := s.generateImageWithFallback(ctx, companionID, "paid_outfit", models, GenerateImageRequest{Prompt: fmt.Sprintf("A natural full-body outfit photo of %s. Appearance continuity: %s. Wearing this outfit: %s. One coherent everyday scene, realistic clothing, no text, no watermark, no collage.", name, appearance, style), Size: "1024x1024"})
+	reference, err := s.companionImageReference(ctx, userID, companionID)
+	if err != nil {
+		return nil, err
+	}
+	imageURL, model, err := s.generateImageWithFallback(ctx, companionID, "paid_outfit", models, GenerateImageRequest{Prompt: fmt.Sprintf("A natural full-body outfit photo of %s. Appearance continuity: %s. Wearing this outfit: %s. One coherent everyday scene, realistic clothing, no text, no watermark, no collage.", name, appearance, style) + portraitIdentityPrompt, Size: "1024x1024", Reference: reference})
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +47,7 @@ func (s *Service) GenerateOutfitPhoto(ctx context.Context, userID, companionID, 
 		return nil, err
 	}
 	s.recordRun(ctx, companionID, "paid_outfit", model.ID, "succeeded", "")
-	return &SavedMessage{ID: uuid.New().String(), ConversationID: conversation, SenderType: "assistant", MessageType: "image_text", MediaURL: imageURL, Payload: map[string]any{"media_urls": []string{imageURL}, "product_key": productKey, "requested": true}, Source: "paid_outfit", DeliveryStatus: "delivered", CreatedAt: time.Now().UTC()}, nil
+	return &SavedMessage{ID: uuid.New().String(), ConversationID: conversation, SenderType: "assistant", MessageType: "image_text", MediaURL: imageURL, Payload: map[string]any{"media_urls": []string{imageURL}, "product_key": productKey, "requested": true, "portrait_reference": reference.Source}, Source: "paid_outfit", DeliveryStatus: "delivered", CreatedAt: time.Now().UTC()}, nil
 }
 
 // DeliverPreparedMedia commits media and ownership with reservation completion.

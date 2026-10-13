@@ -48,8 +48,15 @@ type GenerateRequest struct {
 }
 
 type GenerateImageRequest struct {
-	Prompt string
-	Size   string
+	Prompt    string
+	Size      string
+	Reference *ImageReference `json:",omitempty"`
+}
+
+type ImageReference struct {
+	Source string
+	MIME   string
+	Data   []byte `json:"-"`
 }
 
 func (c *Client) transcribeAudio(ctx context.Context, model Model, filename, mimeType string, audio []byte) (string, error) {
@@ -148,8 +155,9 @@ func (c *Client) generateSpeech(ctx context.Context, model Model, text, voice st
 }
 
 type Client struct {
-	httpClient *http.Client
-	recorder   *sql.DB
+	httpClient   *http.Client
+	kieUploadURL string
+	recorder     *sql.DB
 }
 
 func NewClient() *Client {
@@ -175,6 +183,12 @@ func (c *Client) generateText(ctx context.Context, model Model, input GenerateRe
 }
 
 func (c *Client) generateImage(ctx context.Context, model Model, input GenerateImageRequest) (string, error) {
+	if input.Reference != nil && (len(input.Reference.Data) == 0 || !strings.HasPrefix(input.Reference.MIME, "image/")) {
+		return "", fmt.Errorf("portrait reference is unavailable")
+	}
+	if input.Reference != nil && model.Kind == "openai" {
+		return c.editImage(ctx, model, input)
+	}
 	if model.Kind == "kie" {
 		return c.kieGenerateImage(ctx, model, input)
 	}
@@ -612,9 +626,33 @@ func kieResultURL(resultJSON string) (string, error) {
 
 // kieGenerateImage runs the async KIE flow for text-to-image and returns the image URL.
 func (c *Client) kieGenerateImage(ctx context.Context, model Model, input GenerateImageRequest) (string, error) {
+	var referenceURL string
+	if input.Reference != nil {
+		switch model.ModelName {
+		case "gpt-image-2-5-sunburst-text-to-image":
+			model.ModelName = "gpt-image-2-5-sunburst-image-to-image"
+		case "gpt-image-2-5-sunburst-image-to-image", "google/nano-banana-edit":
+		default:
+			return "", fmt.Errorf("KIE model %q does not have a supported portrait-reference adapter", model.ModelName)
+		}
+		var err error
+		referenceURL, err = c.uploadKieReference(ctx, model, input.Reference)
+		if err != nil {
+			return "", err
+		}
+	}
 	params, err := kieImageInput(model, input)
 	if err != nil {
 		return "", err
+	}
+	if referenceURL != "" {
+		if model.ModelName == "google/nano-banana-edit" {
+			params["image_urls"] = []string{referenceURL}
+			params["output_format"] = "png"
+			params["aspect_ratio"] = "1:1"
+		} else {
+			params["input_urls"] = []string{referenceURL}
+		}
 	}
 	taskID, err := c.kieCreateTask(ctx, model, params)
 	if err != nil {
@@ -714,7 +752,7 @@ func (c *Client) kieTestConnection(ctx context.Context, model Model) ([]string, 
 // kieImageInput keeps model-specific parameters out of other providers' requests.
 func kieImageInput(model Model, input GenerateImageRequest) (map[string]any, error) {
 	params := map[string]any{"prompt": input.Prompt}
-	if model.ModelName != "gpt-image-2-5-sunburst-text-to-image" {
+	if model.ModelName != "gpt-image-2-5-sunburst-text-to-image" && model.ModelName != "gpt-image-2-5-sunburst-image-to-image" {
 		return params, nil
 	}
 	ratio, resolution := "1:1", "1K"

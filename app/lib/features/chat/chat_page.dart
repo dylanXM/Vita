@@ -22,6 +22,7 @@ import 'chat_controller.dart';
 import '../auth/auth_controller.dart';
 import '../life/life_detail_page.dart';
 import 'chat_message_content.dart';
+import 'chat_photo.dart';
 import 'companion_moment_page.dart';
 import 'companion_transfer_sheet.dart';
 import 'experience_sheet.dart';
@@ -1091,13 +1092,7 @@ class _ChatMessageBody extends StatelessWidget {
         ),
       ));
     } else if (parsed.mediaKind == ChatMediaKind.image) {
-      children.add(ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: AspectRatio(
-          aspectRatio: 4 / 3,
-          child: VitaMediaImage(url: mediaURL),
-        ),
-      ));
+      children.add(ChatPhoto(url: mediaURL));
     }
     if (displayContent.isNotEmpty) {
       if (children.isNotEmpty) children.add(const SizedBox(height: 7));
