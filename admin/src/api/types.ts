@@ -255,6 +255,7 @@ export interface CreditProduct {
   sort_order: number;
   metadata: Record<string, unknown>;
   scene_background_url?: string;
+  scene_audio_url?: string;
 }
 
 export interface AIPetBreed {

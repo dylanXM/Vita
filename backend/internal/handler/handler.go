@@ -1375,6 +1375,7 @@ func DeleteCompanion(c *gin.Context) {
 }
 
 type SendMessageRequest struct {
+	SceneAction        string `json:"scene_action"`
 	Content            string `json:"content"`
 	MessageType        string `json:"message_type"`
 	MediaID            string `json:"media_id"`
@@ -1510,6 +1511,22 @@ func SendMessage(c *gin.Context) {
 	messagePayload := map[string]any{"conversation_channel": "chat"}
 	if req.LifeEventID != "" {
 		messagePayload["conversation_channel"] = "date"
+	}
+	if req.SceneAction != "" {
+		var sceneLocation string
+		if req.LifeEventID == "" {
+			c.JSON(400, gin.H{"error": "scene action requires a date"})
+			return
+		}
+		if err := tx.QueryRowContext(c.Request.Context(), `SELECT location FROM life_events WHERE id=$1 AND companion_id=$2`, req.LifeEventID, companionID).Scan(&sceneLocation); err != nil {
+			c.JSON(400, gin.H{"error": "scene not found"})
+			return
+		}
+		if !validDateSceneAction(sceneLocation, req.SceneAction) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid scene action"})
+			return
+		}
+		messagePayload["scene_action"] = req.SceneAction
 	}
 	if req.LifeEventContextID != "" {
 		var contextEventID, contextTitle, contextDescription, contextLocation string

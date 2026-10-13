@@ -13,6 +13,7 @@ import 'chat_controller.dart';
 import 'chat_page.dart';
 import 'shared_experience_stage.dart';
 import 'experience_environment.dart';
+import 'romantic_date_stage.dart';
 import 'experience_decision_panel.dart';
 
 enum _MomentPhase { booked, ready, together, keepsake }
@@ -530,6 +531,29 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
             _chat.sending.value ||
             ['pending', 'processing', 'scheduled']
                 .contains(_chat.replyStatus.value);
+        if (['cafe', 'restaurant', 'ballroom', 'cinema'].contains(location)) {
+          return RomanticDateStage(
+            title: title,
+            location: location,
+            backgroundUrl: '${_moment?["scene_background_url"] ?? ""}',
+            audioUrl: '${_moment?["scene_audio_url"] ?? ""}',
+            messages: messages,
+            input: _message,
+            busy: busy,
+            onSend: _sendChoice,
+            onAction: (action, text) async {
+              final queued = await _chat.send(text,
+                  momentEventId: widget.eventId, sceneAction: action);
+              return queued && _chat.sendError.value == null;
+            },
+            onKeepsake: _openKeepsake,
+            journey: ExperienceDecisionPanel(
+                companionId: widget.companionId,
+                eventId: widget.eventId,
+                proposalMessage: reply,
+                busy: busy),
+          );
+        }
         return SharedExperienceStage(
           compactDate: true,
           backgroundUrl: '${_moment?["scene_background_url"] ?? ""}',
@@ -590,40 +614,43 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
                                   ? 'moment.scene.you'.tr
                                   : widget.name)))
                           .toList()))),
-          onKeepsake: () => showModalBottomSheet<void>(
-              context: context,
-              isScrollControlled: true,
-              showDragHandle: true,
-              backgroundColor: context.vita.surface,
-              builder: (sheetContext) => Padding(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20,
-                      MediaQuery.viewInsetsOf(sheetContext).bottom + 20),
-                  child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text('moment.create'.tr,
-                            style: const TextStyle(
-                                fontSize: 20, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 16),
-                        TextField(
-                            controller: _artifact,
-                            maxLength: 500,
-                            maxLines: 3,
-                            onChanged: (_) => _artifactDirty = true,
-                            decoration: InputDecoration(
-                                hintText: 'moment.createHint'.tr)),
-                        const SizedBox(height: 12),
-                        FilledButton(
-                            onPressed: () async {
-                              await _saveArtifact();
-                              if (sheetContext.mounted)
-                                Navigator.pop(sheetContext);
-                            },
-                            child: Text('moment.save'.tr))
-                      ]))),
+          onKeepsake: _openKeepsake,
         );
       });
+
+  void _openKeepsake() {
+    showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        backgroundColor: context.vita.surface,
+        builder: (sheetContext) => Padding(
+            padding: EdgeInsets.fromLTRB(
+                20, 0, 20, MediaQuery.viewInsetsOf(sheetContext).bottom + 20),
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('moment.create'.tr,
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 16),
+                  TextField(
+                      controller: _artifact,
+                      maxLength: 500,
+                      maxLines: 3,
+                      onChanged: (_) => _artifactDirty = true,
+                      decoration:
+                          InputDecoration(hintText: 'moment.createHint'.tr)),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                      onPressed: () async {
+                        await _saveArtifact();
+                        if (sheetContext.mounted) Navigator.pop(sheetContext);
+                      },
+                      child: Text('moment.save'.tr))
+                ])));
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -91,12 +91,14 @@ func decodeMomentSceneState(raw string) (momentScene, error) {
 // A stable brief keeps this paid experience from becoming an unrelated chat.
 func momentExperienceBrief(location string) string {
 	switch location {
+	case "ballroom":
+		return "A warm romantic virtual ballroom date. Invite the user to choose a dance, slow the rhythm, or rest on the terrace. These are first-person scene actions without visible human bodies. React to their actual saved action, do not invent physical touch or a completed dance that did not occur. No mandatory challenge or task."
 	case "cafe":
-		return "Minor situation: the drink you wanted is unavailable. Goal: discuss your different tastes, jointly choose an alternative drink and give this moment a name. Respect changing venue or another user-proposed solution."
+		return "A cozy romantic first-person cafe date. The user can select coffee or tea and raise a cup; those saved actions visibly change the table. React naturally to actual actions, remember their preferences, and invite relaxed conversation. Do not repeat a fixed sold-out-drink problem or force a task or naming exercise."
 	case "cinema":
-		return "Minor situation: you prefer different kinds of films. Goal: discuss both preferences, jointly choose what kind of fictional movie night to have and a detail to remember. Do not invent having watched a film or its ending."
+		return "A cozy virtual cinema date. The user can choose a romantic or mystery atmosphere, or pause to talk. The screen light changes, but this app does not stream a real film. React to their saved action and discuss preferences naturally. Never invent having watched a specific film, its scenes or its ending, and do not force a disagreement."
 	case "restaurant":
-		return "Minor situation: you want different dishes and must choose something to share. Goal: discuss both preferences, jointly agree on the imagined meal and a name for this evening. No real order or reservation is made."
+		return "A romantic candlelit dinner. The user can share a meal, choose dessert or raise a glass. React naturally to the actual saved action and their preferences. Do not force a disagreement, naming task or real-world order."
 	default:
 		return "Goal: together decide how to commemorate the already delivered gift or media. Let the user and companion contribute a meaning and a name; preserve their differences. Never invent another purchase or media delivery."
 	}

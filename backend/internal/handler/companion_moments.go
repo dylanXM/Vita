@@ -16,6 +16,7 @@ import (
 )
 
 type companionMoment struct {
+	SceneAudioURL      string    `json:"scene_audio_url"`
 	SceneBackgroundURL string    `json:"scene_background_url"`
 	ID                 string    `json:"id"`
 	ProductKey         string    `json:"product_key"`
@@ -52,7 +53,7 @@ func loadCompanionMoment(ctx context.Context, userID, companionID, eventID strin
 		COALESCE(e.payload->>'memory_id',(SELECT cs.result->>'memory_id' FROM credit_spends cs
 			WHERE cs.user_id=$1 AND cs.reference_id=e.id AND cs.reference_type='companion_experience'
 			AND cs.status='completed' ORDER BY cs.completed_at DESC LIMIT 1),''),
-		COALESCE((SELECT cp.metadata->>'scene_background_url' FROM credit_products cp WHERE cp.environment=$4 AND cp.product_key=e.payload->>'product_key'),''),COALESCE(e.title,''),COALESCE(e.description,''),COALESCE(e.location,''),e.start_time,e.end_time,
+		COALESCE((SELECT cp.metadata->>'scene_audio_url' FROM credit_products cp WHERE cp.environment=$4 AND cp.product_key=e.payload->>'product_key'),''),COALESCE((SELECT cp.metadata->>'scene_background_url' FROM credit_products cp WHERE cp.environment=$4 AND cp.product_key=e.payload->>'product_key'),''),COALESCE(e.title,''),COALESCE(e.description,''),COALESCE(e.location,''),e.start_time,e.end_time,
 		COALESCE(s.artifact_text,''),COALESCE(s.artifact_user_text,''),COALESCE(s.artifact_companion_text,''),
 		COALESCE((SELECT invitation.content FROM messages invitation WHERE invitation.life_event_id=e.id AND invitation.source='moment_invitation' ORDER BY invitation.created_at DESC LIMIT 1),''),
 		COALESCE(m.content,''),COALESCE(s.closing_text,''),COALESCE(s.next_topic,''),
@@ -64,7 +65,7 @@ func loadCompanionMoment(ctx context.Context, userID, companionID, eventID strin
 		LEFT JOIN LATERAL(SELECT sm.payload FROM messages sm WHERE EXISTS(SELECT 1 FROM conversations cv WHERE cv.id=sm.conversation_id AND cv.user_id=$1 AND cv.companion_id=e.companion_id) AND sm.life_event_id=e.id AND sm.sender_type='assistant' AND COALESCE(sm.payload->>'scene_situation','')<>'' ORDER BY sm.created_at DESC,sm.id DESC LIMIT 1) scene ON true
 		WHERE e.id=$3 AND e.companion_id=$2 AND c.user_id=$1 AND c.active=true
 		AND e.event_type='shared_activity' AND e.generation_source='user_purchase'`,
-		userID, companionID, eventID, currentEnvironment()).Scan(&moment.ID, &moment.ProductKey, &moment.MemoryID, &moment.SceneBackgroundURL, &moment.TitleKey,
+		userID, companionID, eventID, currentEnvironment()).Scan(&moment.ID, &moment.ProductKey, &moment.MemoryID, &moment.SceneAudioURL, &moment.SceneBackgroundURL, &moment.TitleKey,
 		&moment.Description, &moment.Location, &moment.StartsAt, &moment.EndsAt,
 		&moment.Artifact, &moment.UserText, &moment.CompanionText, &moment.Invitation, &moment.Opening,
 		&moment.Closing, &moment.NextTopic, &moment.Preparation, &moment.PrepReaction, &moment.SceneSituation, &moment.SceneFocus)

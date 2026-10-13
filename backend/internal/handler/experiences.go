@@ -525,6 +525,7 @@ func AdminListCreditProducts(c *gin.Context) {
 func AdminUpdateCreditProduct(c *gin.Context) {
 	environment := currentEnvironment()
 	var input struct {
+		SceneAudioURL      *string `json:"scene_audio_url"`
 		SceneBackgroundURL *string `json:"scene_background_url"`
 		SubscriptionOnly   *bool   `json:"subscription_only"`
 		IsLaunched         *bool   `json:"is_launched"`
@@ -546,15 +547,22 @@ func AdminUpdateCreditProduct(c *gin.Context) {
 		return
 	}
 	var scenePatch any
-	if input.SceneBackgroundURL != nil {
-		image := strings.TrimSpace(*input.SceneBackgroundURL)
-		parsed, parseErr := url.Parse(image)
-		if category != "date" || len(image) > 2048 || (image != "" && (parseErr != nil || !((parsed.Scheme == "https" && parsed.Host != "" && parsed.User == nil) || (strings.HasPrefix(image, "/v1/media/") && parsed.Host == "" && parsed.Scheme == "")))) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid scene background URL"})
+	patch := map[string]string{}
+	for key, value := range map[string]*string{"scene_background_url": input.SceneBackgroundURL, "scene_audio_url": input.SceneAudioURL} {
+		if value == nil {
+			continue
+		}
+		asset := strings.TrimSpace(*value)
+		parsed, parseErr := url.Parse(asset)
+		if category != "date" || len(asset) > 2048 || (asset != "" && (parseErr != nil || !((parsed.Scheme == "https" && parsed.Host != "" && parsed.User == nil) || (key == "scene_background_url" && strings.HasPrefix(asset, "/v1/media/") && parsed.Host == "" && parsed.Scheme == "")))) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid scene asset URL"})
 			return
 		}
-		patch, _ := json.Marshal(map[string]string{"scene_background_url": image})
-		scenePatch = string(patch)
+		patch[key] = asset
+	}
+	if len(patch) > 0 {
+		encoded, _ := json.Marshal(patch)
+		scenePatch = string(encoded)
 	}
 	result, err := db.Get().Exec(`UPDATE credit_products SET coins=$3,enabled=$4,sort_order=$5,subscription_only=COALESCE($6,subscription_only),is_launched=COALESCE($7,is_launched),metadata=COALESCE(metadata,'{}'::jsonb)||COALESCE($8::jsonb,'{}'::jsonb),updated_at=CURRENT_TIMESTAMP
 		WHERE environment=$1 AND product_key=$2`, environment, c.Param("product_key"), input.Coins, input.Enabled, input.SortOrder, input.SubscriptionOnly, input.IsLaunched, scenePatch)

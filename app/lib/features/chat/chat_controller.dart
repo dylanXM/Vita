@@ -273,6 +273,7 @@ class ChatController extends GetxController {
   /// reason in [sendError].
   Future<bool> send(String text,
       {String? momentEventId,
+      String? sceneAction,
       String? journeyVisitId,
       String? lifeEventContextId,
       String? lifeEventContextTitle,
@@ -304,6 +305,7 @@ class ChatController extends GetxController {
       'source': 'user',
       'life_event_id': momentEventId ?? '',
       'payload': <String, dynamic>{
+        if (sceneAction != null) 'scene_action': sceneAction,
         if (journeyVisitId != null) 'journey_visit_id': journeyVisitId,
         if (lifeEventContextId != null)
           'life_event_context_id': lifeEventContextId,
@@ -322,6 +324,7 @@ class ChatController extends GetxController {
           'content': content,
           'message_type': 'text',
           if (momentEventId != null) 'life_event_id': momentEventId,
+          if (sceneAction != null) 'scene_action': sceneAction,
           if (journeyVisitId != null) 'journey_visit_id': journeyVisitId,
           if (lifeEventContextId != null)
             'life_event_context_id': lifeEventContextId,
@@ -346,6 +349,7 @@ class ChatController extends GetxController {
             'source': 'user',
             'life_event_id': momentEventId ?? '',
             'payload': <String, dynamic>{
+              if (sceneAction != null) 'scene_action': sceneAction,
               if (journeyVisitId != null) 'journey_visit_id': journeyVisitId,
               if (lifeEventContextId != null)
                 'life_event_context_id': lifeEventContextId,

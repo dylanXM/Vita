@@ -424,6 +424,17 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 	}
 	if immersive {
 		system += "\n" + momentExperienceBrief(sceneLocation)
+		var executedAction string
+		actionErr := s.db.QueryRowContext(ctx, `SELECT COALESCE(payload->>'scene_action','') FROM messages
+          WHERE conversation_id=$1 AND life_event_id=$2 AND sender_type='user'
+          ORDER BY created_at DESC,id DESC LIMIT 1`, conversationID, lifeEventID).Scan(&executedAction)
+		if actionErr != nil && !errors.Is(actionErr, sql.ErrNoRows) {
+			return nil, actionErr
+		}
+		if executedAction != "" {
+			system += fmt.Sprintf("\nThe user just performed the validated scene action %q. This action is already saved and shown in the environment. Respond to it; do not contradict it or propose an unsupported scene mechanic.", executedAction)
+		}
+
 		if previousGoal != "" || previousChallenge != "" {
 			system += fmt.Sprintf("\nThe established objective is %q and original situation is %q. Continue these, do not replace them with a fresh problem.", previousGoal, previousChallenge)
 		}
@@ -597,6 +608,7 @@ func (s *Service) ComposeMomentOpening(ctx context.Context, conversationID, user
 		"experience.date.coffee": "a quiet coffee date",
 		"experience.date.movie":  "a movie night",
 		"experience.date.dinner": "dinner together",
+		"experience.date.dance":  "an intimate ballroom date",
 	}[titleKey]
 	if experienceName == "" {
 		experienceName = "a shared moment"
