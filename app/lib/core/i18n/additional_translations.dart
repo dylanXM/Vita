@@ -1,5 +1,11 @@
 const Map<String, Map<String, String>> additionalVitaTranslations = {
   'es': {
+      "experience.slots.title": "Elige un horario disponible",
+      "experience.slots.hint": "Los horarios vienen de la agenda de tu compañero y usan la hora local de tu dispositivo. Toca uno para continuar.",
+      "experience.slots.failed": "No se pudieron cargar los horarios. Actualiza para reintentar.",
+      "experience.slots.empty": "No hay horarios disponibles en los próximos siete días. Actualiza más tarde.",
+      "experience.slots.refresh": "Actualizar horarios",
+      "experience.slots.changed": "La disponibilidad cambió o hay otra reserva en proceso. No se cobraron monedas. Elige un horario actualizado.",
     "experience.journey.nameInvalid":
         "Introduce un nombre de 1 a 80 caracteres.",
     "experience.journey.preview.cafe":
@@ -882,6 +888,12 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'Sin configurar',
   },
   'pt': {
+      "experience.slots.title": "Escolha um horário disponível",
+      "experience.slots.hint": "Os horários vêm da agenda do seu companheiro e usam a hora local do dispositivo. Toque em um para continuar.",
+      "experience.slots.failed": "Não foi possível carregar os horários. Atualize para tentar novamente.",
+      "experience.slots.empty": "Não há horários disponíveis nos próximos sete dias. Atualize mais tarde.",
+      "experience.slots.refresh": "Atualizar horários",
+      "experience.slots.changed": "A disponibilidade mudou ou outra reserva está em andamento. Nenhuma moeda foi cobrada. Escolha um horário atualizado.",
     "experience.journey.nameInvalid": "Digite um nome com 1 a 80 caracteres.",
     "experience.journey.preview.cafe":
         "A bebida não está disponível. Escolham uma alternativa, deem nome ao momento e confirmem uma lembrança pessoal.",
@@ -1767,6 +1779,12 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'Não definido',
   },
   'ja': {
+      "experience.slots.title": "予約できる時間を選ぶ",
+      "experience.slots.hint": "パートナーの予定に基づく空き時間を端末の現地時間で表示します。タップして確認へ進みます。",
+      "experience.slots.failed": "空き時間を読み込めませんでした。再読み込みしてください。",
+      "experience.slots.empty": "今後7日間に空き時間がありません。後で再読み込みしてください。",
+      "experience.slots.refresh": "空き時間を再読み込み",
+      "experience.slots.changed": "空き時間が変わったか、別の予約を処理中です。コインは消費していません。最新の時間を選び直してください。",
     "experience.journey.nameInvalid": "名前は1〜80文字で入力してください。",
     "experience.journey.preview.cafe":
         "飲みたいものが売り切れ。代わりの味を相談して、この瞬間に名前をつけ、記念カードを確認して残しましょう。",
@@ -2580,6 +2598,12 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': '未設定',
   },
   'ko': {
+      "experience.slots.title": "예약 가능한 시간 선택",
+      "experience.slots.hint": "파트너의 일정에 따른 시간을 기기의 현지 시간으로 표시해요. 시간을 눌러 확인해 주세요.",
+      "experience.slots.failed": "시간을 불러올 수 없어요. 새로고침해 주세요.",
+      "experience.slots.empty": "앞으로 7일간 예약 가능한 시간이 없어요. 나중에 새로고침해 주세요.",
+      "experience.slots.refresh": "예약 시간 새로고침",
+      "experience.slots.changed": "시간이 변경되었거나 다른 예약이 처리 중이에요. 코인은 차감되지 않았어요. 최신 시간을 다시 선택해 주세요.",
     "experience.journey.nameInvalid": "이름은 1~80자로 입력해 주세요.",
     "experience.journey.preview.cafe":
         "원하는 음료가 품절됐어요. 대안을 함께 이야기하고 순간에 이름을 붙여 기념 카드를 확인해 보세요.",
@@ -3396,6 +3420,12 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': '미설정',
   },
   'ar': {
+      "experience.slots.title": "اختر موعدًا متاحًا",
+      "experience.slots.hint": "هذه المواعيد من جدول رفيقك وتُعرض بالتوقيت المحلي لجهازك. اضغط موعدًا للمتابعة.",
+      "experience.slots.failed": "تعذر تحميل المواعيد. حدّث للمحاولة مجددًا.",
+      "experience.slots.empty": "لا توجد مواعيد متاحة خلال الأيام السبعة القادمة. حدّث لاحقًا.",
+      "experience.slots.refresh": "تحديث المواعيد",
+      "experience.slots.changed": "تغيرت المواعيد أو يجري حجز آخر. لم تُخصم عملات. اختر موعدًا محدثًا.",
     "experience.journey.nameInvalid": "أدخل اسمًا من حرف واحد إلى 80 حرفًا.",
     "experience.journey.preview.cafe":
         "المشروب غير متاح. اتفقا على بديل واسم للحظة ثم أكدا بطاقة ذكرى خاصة.",
@@ -4239,6 +4269,12 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'غير محدد',
   },
   'zh_TW': {
+      "experience.slots.title": "選擇可預約時段",
+      "experience.slots.hint": "以下時段來自 TA 的日程，以裝置本地時間顯示。點選一個時段繼續確認。",
+      "experience.slots.failed": "暫時無法讀取可預約時段，請重新整理。",
+      "experience.slots.empty": "未來七天暫無可預約時段，請稍後重新整理。",
+      "experience.slots.refresh": "重新整理可預約時段",
+      "experience.slots.changed": "可預約時段已變更或正在處理另一份預約。本次未扣金幣，請重新選擇最新時段。",
     "experience.journey.nameInvalid": "請輸入 1 到 80 字的名稱。",
     "experience.journey.preview.cafe":
         "想喝的飲品售罄了。和 TA 商量替代口味，為這一刻取名，確認後留下專屬紀念卡。",

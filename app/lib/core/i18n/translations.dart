@@ -13,6 +13,12 @@ class VitaTranslations extends Translations {
 
   static const Map<String, Map<String, String>> _keys = {
     'en': {
+      "experience.slots.title": "Choose an available time",
+      "experience.slots.hint": "These times come from your companion’s schedule and use your device’s local time. Tap one to continue.",
+      "experience.slots.failed": "Available times could not load. Refresh to retry.",
+      "experience.slots.empty": "No available times in the next seven days. Refresh later.",
+      "experience.slots.refresh": "Refresh available times",
+      "experience.slots.changed": "Availability changed or another booking is processing. No coins were charged. Choose a fresh time.",
       "experience.journey.nameInvalid": "Enter a name with 1 to 80 characters.",
       "experience.journey.preview.cafe":
           "The drink is unavailable. Discuss an alternative with your companion, name the moment and confirm a personal keepsake.",
@@ -923,6 +929,12 @@ class VitaTranslations extends Translations {
       'stage.partner': 'Partner',
     },
     'zh_CN': {
+      "experience.slots.title": "选择可预约时段",
+      "experience.slots.hint": "以下时段来自 TA 的日程，按你的设备本地时间显示。点击一个时段继续确认。",
+      "experience.slots.failed": "暂时无法读取可预约时段，请刷新重试。",
+      "experience.slots.empty": "未来七天暂无可预约时段，请稍后刷新。",
+      "experience.slots.refresh": "刷新可预约时段",
+      "experience.slots.changed": "可预约时段已变化或正在处理另一份预约。本次未扣金币，请重新选择最新时段。",
       "experience.journey.nameInvalid": "请输入 1 到 80 字的名称。",
       "experience.journey.preview.cafe":
           "想喝的饮品售罄了。和 TA 商量替代口味，为这一刻取名，确认后留下专属纪念卡。",
