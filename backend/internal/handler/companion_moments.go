@@ -16,23 +16,25 @@ import (
 )
 
 type companionMoment struct {
-	ID            string    `json:"id"`
-	ProductKey    string    `json:"product_key"`
-	TitleKey      string    `json:"title_key"`
-	Description   string    `json:"description_key"`
-	Location      string    `json:"location"`
-	StartsAt      time.Time `json:"starts_at"`
-	EndsAt        time.Time `json:"ends_at"`
-	Artifact      string    `json:"artifact"`
-	UserText      string    `json:"user_text"`
-	CompanionText string    `json:"companion_text"`
-	Invitation    string    `json:"invitation"`
-	Preparation   string    `json:"preparation"`
-	PrepReaction  string    `json:"preparation_reaction"`
-	Opening       string    `json:"opening"`
-	Closing       string    `json:"closing"`
-	NextTopic     string    `json:"next_topic"`
-	MemoryID      string    `json:"-"`
+	ID             string    `json:"id"`
+	ProductKey     string    `json:"product_key"`
+	TitleKey       string    `json:"title_key"`
+	Description    string    `json:"description_key"`
+	Location       string    `json:"location"`
+	StartsAt       time.Time `json:"starts_at"`
+	EndsAt         time.Time `json:"ends_at"`
+	Artifact       string    `json:"artifact"`
+	UserText       string    `json:"user_text"`
+	CompanionText  string    `json:"companion_text"`
+	Invitation     string    `json:"invitation"`
+	Preparation    string    `json:"preparation"`
+	PrepReaction   string    `json:"preparation_reaction"`
+	Opening        string    `json:"opening"`
+	Closing        string    `json:"closing"`
+	NextTopic      string    `json:"next_topic"`
+	MemoryID       string    `json:"-"`
+	SceneSituation string    `json:"scene_situation"`
+	SceneFocus     string    `json:"scene_focus"`
 }
 
 func (moment companionMoment) duration() time.Duration {
@@ -54,16 +56,17 @@ func loadCompanionMoment(ctx context.Context, userID, companionID, eventID strin
 		COALESCE((SELECT invitation.content FROM messages invitation WHERE invitation.life_event_id=e.id AND invitation.source='moment_invitation' ORDER BY invitation.created_at DESC LIMIT 1),''),
 		COALESCE(m.content,''),COALESCE(s.closing_text,''),COALESCE(s.next_topic,''),
 		COALESCE(e.payload->>'preparation_choice',''),
-		COALESCE((SELECT preparation.content FROM messages preparation WHERE preparation.life_event_id=e.id AND preparation.source='moment_preparation' ORDER BY preparation.created_at DESC LIMIT 1),'')
+		COALESCE((SELECT preparation.content FROM messages preparation WHERE preparation.life_event_id=e.id AND preparation.source='moment_preparation' ORDER BY preparation.created_at DESC LIMIT 1),''),COALESCE(scene.payload->>'scene_situation',''),COALESCE(scene.payload->>'scene_focus','ambient')
 		FROM life_events e JOIN companions c ON c.id=e.companion_id
 		LEFT JOIN companion_moment_sessions s ON s.event_id=e.id AND s.user_id=$1
 		LEFT JOIN messages m ON m.id=s.opening_message_id
+		LEFT JOIN LATERAL(SELECT sm.payload FROM messages sm WHERE sm.conversation_id=(SELECT cv.id FROM conversations cv WHERE cv.user_id=$1 AND cv.companion_id=e.companion_id ORDER BY cv.created_at LIMIT 1) AND sm.life_event_id=e.id AND sm.sender_type='assistant' AND COALESCE(sm.payload->>'scene_situation','')<>'' ORDER BY sm.created_at DESC,sm.id DESC LIMIT 1) scene ON true
 		WHERE e.id=$3 AND e.companion_id=$2 AND c.user_id=$1 AND c.active=true
 		AND e.event_type='shared_activity' AND e.generation_source='user_purchase'`,
 		userID, companionID, eventID).Scan(&moment.ID, &moment.ProductKey, &moment.MemoryID, &moment.TitleKey,
 		&moment.Description, &moment.Location, &moment.StartsAt, &moment.EndsAt,
 		&moment.Artifact, &moment.UserText, &moment.CompanionText, &moment.Invitation, &moment.Opening,
-		&moment.Closing, &moment.NextTopic, &moment.Preparation, &moment.PrepReaction)
+		&moment.Closing, &moment.NextTopic, &moment.Preparation, &moment.PrepReaction, &moment.SceneSituation, &moment.SceneFocus)
 	return moment, err
 }
 
@@ -184,20 +187,21 @@ func FinishCompanionMoment(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load conversation"})
 		return
 	}
-	rows, err := db.Get().QueryContext(ctx, `SELECT sender_type,COALESCE(content,'') FROM messages
-		WHERE conversation_id=$1 AND life_event_id=$2 AND message_type IN ('text','voice')
-		ORDER BY created_at,id LIMIT 40`, conversationID, eventID)
+	rows, err := db.Get().QueryContext(ctx, `SELECT sender_type,COALESCE(content,''),COALESCE(payload->>'scene_situation','') FROM (SELECT sender_type,content,payload,created_at,id FROM messages WHERE conversation_id=$1 AND life_event_id=$2 AND message_type IN ('text','voice') ORDER BY created_at DESC,id DESC LIMIT 40) recent ORDER BY created_at,id`, conversationID, eventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load moment conversation"})
 		return
 	}
 	var transcript strings.Builder
 	for rows.Next() {
-		var sender, content string
-		if err := rows.Scan(&sender, &content); err != nil {
+		var sender, content, situation string
+		if err := rows.Scan(&sender, &content, &situation); err != nil {
 			rows.Close()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read moment conversation"})
 			return
+		}
+		if sender == "assistant" && strings.TrimSpace(situation) != "" {
+			transcript.WriteString("imagined scene: " + strings.TrimSpace(situation) + "\n")
 		}
 		if strings.TrimSpace(content) != "" {
 			transcript.WriteString(sender + ": " + strings.TrimSpace(content) + "\n")

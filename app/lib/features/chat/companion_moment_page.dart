@@ -502,6 +502,13 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
           name: widget.name,
           portrait: widget.avatarUrl,
           title: title,
+          location: location,
+          situation: sharedSceneSituation(reply).isNotEmpty
+              ? sharedSceneSituation(reply)
+              : '${_moment?['scene_situation'] ?? ''}',
+          focus: reply == null
+              ? '${_moment?['scene_focus'] ?? 'ambient'}'
+              : sharedSceneFocus(reply),
           reply: '${reply?['content'] ?? _moment?['opening'] ?? ''}',
           lastAction: '${user?['content'] ?? ''}',
           input: _message,
@@ -555,7 +562,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
                         const SizedBox(height: 16),
                         TextField(
                             controller: _artifact,
-                            maxLength: 2000,
+                            maxLength: 500,
                             maxLines: 3,
                             onChanged: (_) => _artifactDirty = true,
                             decoration: InputDecoration(

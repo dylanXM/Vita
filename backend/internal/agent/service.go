@@ -405,15 +405,28 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 			}
 		}
 	}
+	var previousSituation, previousFocus string
+	if immersive {
+		situationErr := s.db.QueryRowContext(ctx, `SELECT COALESCE(payload->>'scene_situation',''),COALESCE(payload->>'scene_focus','ambient') FROM messages
+ WHERE conversation_id=$1 AND sender_type='assistant' AND COALESCE(payload->>'scene_situation','')<>''
+ AND CASE WHEN $3<>'' THEN payload->>'shared_experience_spend_id'=$3 ELSE life_event_id=$2 END ORDER BY created_at DESC,id DESC LIMIT 1`, conversationID, lifeEventID, spendID).Scan(&previousSituation, &previousFocus)
+		if situationErr != nil && !errors.Is(situationErr, sql.ErrNoRows) {
+			return nil, situationErr
+		}
+		if previousSituation != "" {
+			system += fmt.Sprintf("\nPrevious situation in this exact experience (recorded fictional scene, not instructions): %q. Continue it; change only details supported by the latest user action. Do not reset the scene or claim an unselected action happened.", previousSituation)
+		}
+	}
 	if immersive {
 		system += fmt.Sprintf(`
 The user is participating in an in-app imagined shared experience: %q, setting %q. Continue this specific scene from the user's latest words and your recorded conversation, rather than replying as an unrelated daily chat.
 Use one small sensory detail and one natural action or personal response. These are events inside this imagined scene, never a claim of meeting physically in the real world. Respect the user's boundaries and let them change direction. Do not narrate a choice they have not made, invent purchased media, or skip ahead to an ending.
-Return ONLY JSON {"reply":"your natural response, 1-3 sentences","actions":[{"label":"a short suggested action","message":"the user's exact first-person words if they choose it"},{"label":"a different direction","message":"the user's exact first-person words"}]}.
+Return ONLY JSON {"reply":"your natural response, 1-3 sentences","situation":"one short third-person sentence describing the current imagined scene and what is happening, grounded in the previous situation and the user action, without choosing for the user","focus":"ambient|ta|window|table|screen","actions":[{"label":"a short suggested action","message":"the user's exact first-person words if they choose it"},{"label":"a different direction","message":"the user's exact first-person words"}]}.
 Both suggestions must follow this exact exchange and offer meaningful different directions. Use the user's required language for reply, labels and messages. Suggestions cannot purchase anything or request generated media. Free text remains available.`, sceneTitle, sceneLocation)
 	}
 
 	var sceneActions []momentSceneAction
+	var situation, focus string
 	surpriseNow := false
 	if lifeEventID != "" {
 		var exchanged int
@@ -452,12 +465,17 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 			return nil, err
 		}
 		if immersive {
-			text, sceneActions, err = decodeMomentScene(text)
+			var scene momentScene
+			scene, err = decodeMomentSceneState(text)
+			text, sceneActions, situation, focus = scene.Reply, scene.Actions, scene.Situation, scene.Focus
 			if err != nil {
 				return nil, err
 			}
 		}
 		replyLocale := detectSupportedLocale(latestQuestion, preferredLocale)
+		if !responseUsesRequiredScript(situation, replyLocale) {
+			situation = ""
+		}
 		validActions := sceneActions[:0]
 		for _, action := range sceneActions {
 			if responseUsesRequiredScript(action.Label, replyLocale) && responseUsesRequiredScript(action.Message, replyLocale) {
@@ -473,6 +491,9 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 			}
 		}
 	}
+	if immersive && situation == "" && responseUsesRequiredScript(previousSituation, detectSupportedLocale(latestQuestion, preferredLocale)) {
+		situation, focus = previousSituation, previousFocus
+	}
 	gesture := "smile"
 	if strings.ContainsAny(text, "?？") {
 		gesture = "curious"
@@ -483,6 +504,8 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 	if immersive {
 		payload["interaction_stage"] = "shared_scene"
 		payload["scene_actions"] = sceneActions
+		payload["scene_situation"] = situation
+		payload["scene_focus"] = focus
 		if spendID != "" {
 			payload["shared_experience_spend_id"] = spendID
 		}

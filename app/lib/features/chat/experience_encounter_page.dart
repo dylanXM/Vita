@@ -178,6 +178,10 @@ class _ExperienceEncounterPageState extends State<ExperienceEncounterPage>
             name: widget.name,
             portrait: widget.portrait,
             title: '${product['name_key'] ?? 'experience.title'}'.tr,
+            location:
+                '${(widget.response['scene'] as Map?)?['location'] ?? 'general'}',
+            situation: sharedSceneSituation(reply),
+            focus: sharedSceneFocus(reply),
             reply: '${reply?['content'] ?? initial}',
             lastAction: '${user?['content'] ?? ''}',
             input: _input,

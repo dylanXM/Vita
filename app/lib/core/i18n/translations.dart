@@ -13,6 +13,12 @@ class VitaTranslations extends Translations {
 
   static const Map<String, Map<String, String>> _keys = {
     'en': {
+      "moment.environment.begin": "This scene begins with your next choice.",
+      "moment.environment.cafe": "By the café window",
+      "moment.environment.cinema": "A night at the cinema",
+      "moment.environment.restaurant": "Across the dinner table",
+      "moment.environment.general": "A space to share",
+      "moment.environment.situation": "In this scene",
       "moment.scene.history": "Our conversation",
       "moment.scene.you": "You",
       "moment.scene.responding": "Waiting for a response…",
@@ -895,6 +901,12 @@ class VitaTranslations extends Translations {
       'stage.partner': 'Partner',
     },
     'zh_CN': {
+      "moment.environment.begin": "这一幕，从你的选择开始。",
+      "moment.environment.cafe": "咖啡馆 · 窗边",
+      "moment.environment.cinema": "影院 · 同一场电影",
+      "moment.environment.restaurant": "餐厅 · 相对而坐",
+      "moment.environment.general": "属于你们的空间",
+      "moment.environment.situation": "此刻的情况",
       "moment.scene.history": "这段对话",
       "moment.scene.you": "你",
       "moment.scene.responding": "正在等待 TA 的回应…",

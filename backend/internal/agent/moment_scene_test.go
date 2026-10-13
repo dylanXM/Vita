@@ -23,3 +23,14 @@ func TestDecodeMomentSceneSupportsPlainReply(t *testing.T) {
 		t.Fatalf("plain reply changed: %q %v %v", text, actions, err)
 	}
 }
+
+func TestDecodeMomentSceneKeepsSituationAndValidatesFocus(t *testing.T) {
+	scene, err := decodeMomentSceneState(`{"reply":"听你说完，我把杯子放回桌上。","situation":"两人仍在窗边聊天，TA 把杯子放下。","focus":"table","actions":[]}`)
+	if err != nil || scene.Focus != "table" || scene.Situation != "两人仍在窗边聊天，TA 把杯子放下。" {
+		t.Fatalf("lost scene: %+v %v", scene, err)
+	}
+	scene, err = decodeMomentSceneState(`{"reply":"继续聊聊吧。","focus":"invalid"}`)
+	if err != nil || scene.Focus != "ambient" {
+		t.Fatalf("invalid focus accepted: %+v %v", scene, err)
+	}
+}

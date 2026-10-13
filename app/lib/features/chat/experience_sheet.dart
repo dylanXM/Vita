@@ -318,6 +318,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
             code: 'settlement_pending');
       final response = Map<String, dynamic>.from(raw);
       response.putIfAbsent('product', () => product);
+      response['scene'] = Map<String, dynamic>.from(_scene);
       await _clearPending();
       if (!mounted) return;
       setState(() {

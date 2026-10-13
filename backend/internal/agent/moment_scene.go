@@ -14,7 +14,19 @@ type momentSceneAction struct {
 
 // Scene choices are suggestions only. Nothing is sent or purchased until the
 // user selects one, and the normal message endpoint validates the resulting text.
+type momentScene struct {
+	Reply     string              `json:"reply"`
+	Actions   []momentSceneAction `json:"actions"`
+	Situation string              `json:"situation"`
+	Focus     string              `json:"focus"`
+}
+
 func decodeMomentScene(raw string) (string, []momentSceneAction, error) {
+	scene, err := decodeMomentSceneState(raw)
+	return scene.Reply, scene.Actions, err
+}
+
+func decodeMomentSceneState(raw string) (momentScene, error) {
 	text := strings.TrimSpace(raw)
 	if strings.HasPrefix(text, "```") {
 		if newline := strings.IndexByte(text, '\n'); newline >= 0 {
@@ -22,14 +34,11 @@ func decodeMomentScene(raw string) (string, []momentSceneAction, error) {
 		}
 	}
 	if !strings.HasPrefix(text, "{") {
-		return text, nil, nil
+		return momentScene{Reply: text}, nil
 	}
-	var scene struct {
-		Reply   string              `json:"reply"`
-		Actions []momentSceneAction `json:"actions"`
-	}
+	var scene momentScene
 	if err := json.Unmarshal([]byte(text), &scene); err != nil || strings.TrimSpace(scene.Reply) == "" {
-		return "", nil, fmt.Errorf("shared scene returned an invalid reply")
+		return momentScene{}, fmt.Errorf("shared scene returned an invalid reply")
 	}
 	actions := make([]momentSceneAction, 0, 2)
 	for _, action := range scene.Actions {
@@ -43,5 +52,16 @@ func decodeMomentScene(raw string) (string, []momentSceneAction, error) {
 			break
 		}
 	}
-	return strings.TrimSpace(scene.Reply), actions, nil
+	scene.Reply = strings.TrimSpace(scene.Reply)
+	scene.Actions = actions
+	scene.Situation = strings.TrimSpace(scene.Situation)
+	if utf8.RuneCountInString(scene.Situation) > 320 {
+		scene.Situation = string([]rune(scene.Situation)[:320])
+	}
+	switch scene.Focus {
+	case "ta", "window", "table", "screen", "ambient":
+	default:
+		scene.Focus = "ambient"
+	}
+	return scene, nil
 }

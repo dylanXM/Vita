@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../core/theme.dart';
-import '../../shared/media_image.dart';
+import 'experience_environment.dart';
 
 /// One continuous scene: the person, the latest response and the user's next
 /// action share a surface. Choices send real messages; they never auto-purchase.
@@ -18,10 +18,13 @@ class SharedExperienceStage extends StatelessWidget {
       required this.busy,
       this.actions = const [],
       this.lastAction = '',
+      this.location = 'general',
+      this.situation = '',
+      this.focus = 'ambient',
       this.attachment,
       this.onHistory,
       this.onKeepsake});
-  final String name, title, reply, lastAction;
+  final String name, title, reply, lastAction, location, situation, focus;
   final String? portrait;
   final TextEditingController input;
   final Future<void> Function(String) onSend;
@@ -33,23 +36,8 @@ class SharedExperienceStage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Stack(children: [
         Positioned.fill(
-            child: portrait?.isNotEmpty == true
-                ? VitaMediaImage(
-                    url: portrait!,
-                    errorBuilder: (_, __, ___) =>
-                        ColoredBox(color: context.vita.greenTint))
-                : ColoredBox(color: context.vita.greenTint)),
-        Positioned.fill(
-            child: DecoratedBox(
-                decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-              Colors.black.withValues(alpha: .18),
-              Colors.black.withValues(alpha: .45),
-              Colors.black.withValues(alpha: .84)
-            ])))),
+            child:
+                ColoredBox(color: ExperienceEnvironment.background(location))),
         SafeArea(
             top: false,
             child: Column(children: [
@@ -80,10 +68,43 @@ class SharedExperienceStage extends StatelessWidget {
               Expanded(
                   child: SingleChildScrollView(
                       reverse: false,
-                      padding: const EdgeInsets.fromLTRB(20, 80, 20, 16),
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                       child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            ExperienceEnvironment(
+                                location: location,
+                                name: name,
+                                portrait: portrait,
+                                focus: focus),
+                            ...[
+                              Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                      color:
+                                          Colors.white.withValues(alpha: .08),
+                                      borderRadius: BorderRadius.circular(16)),
+                                  child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text('moment.environment.situation'.tr,
+                                            style: TextStyle(
+                                                color: Colors.white
+                                                    .withValues(alpha: .6),
+                                                fontSize: 11)),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                            situation.isEmpty
+                                                ? 'moment.environment.begin'.tr
+                                                : situation,
+                                            style: const TextStyle(
+                                                color: Colors.white,
+                                                height: 1.6,
+                                                fontSize: 14))
+                                      ])),
+                              const SizedBox(height: 16),
+                            ],
                             if (lastAction.isNotEmpty)
                               Text(lastAction,
                                   maxLines: 3,
@@ -185,4 +206,19 @@ List<Map<String, String>> sharedSceneActions(Map<String, dynamic>? message) {
             'message': a['message'] as String
           })
       .toList();
+}
+
+String sharedSceneSituation(Map<String, dynamic>? message) {
+  final payload = message?['payload'];
+  final situation = payload is Map ? payload['scene_situation'] : null;
+  return situation is String ? situation : '';
+}
+
+String sharedSceneFocus(Map<String, dynamic>? message) {
+  final payload = message?['payload'];
+  final focus = payload is Map ? payload['scene_focus'] : null;
+  return focus is String &&
+          ['ambient', 'ta', 'window', 'table', 'screen'].contains(focus)
+      ? focus
+      : 'ambient';
 }
