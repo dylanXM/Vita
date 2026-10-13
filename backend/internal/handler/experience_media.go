@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"vita/internal/agent"
 	"vita/internal/credits"
 	"vita/internal/db"
@@ -96,7 +97,12 @@ func settleMediaExperience(ctx context.Context, database *sql.DB, params credits
 	if err = agent.DeliverPreparedMedia(ctx, tx, params.UserID, params.CompanionID, outfitKey, message); err != nil {
 		return reservation, err
 	}
-	result := map[string]any{"message": message, "spend_id": reservation.ID, "product_key": reservation.Product.Key, "coins": reservation.Product.Coins}
+	memoryID := uuid.New().String()
+	memoryMetadata, _ := json.Marshal(map[string]any{"source": "paid_media_delivery", "spend_id": reservation.ID, "product_key": reservation.Product.Key, "custom_request": params.Metadata["custom_request"], "message_id": message.ID, "media_url": message.MediaURL, "phase": "delivered"})
+	if _, err = tx.ExecContext(ctx, `INSERT INTO memories(id,companion_id,type,content,importance,event_time,metadata,source_message_id) VALUES($1,$2,'shared_experience',$3,65,CURRENT_TIMESTAMP,$4,$5)`, memoryID, params.CompanionID, message.Content, string(memoryMetadata), message.ID); err != nil {
+		return reservation, err
+	}
+	result := map[string]any{"message": message, "spend_id": reservation.ID, "product_key": reservation.Product.Key, "coins": reservation.Product.Coins, "memory_id": memoryID}
 	if outfitKey != "" {
 		result["equipped"] = true
 	}

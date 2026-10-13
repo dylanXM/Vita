@@ -13,6 +13,43 @@ class VitaTranslations extends Translations {
 
   static const Map<String, Map<String, String>> _keys = {
     'en': {
+      "experience.flow.group.gift": "A little care",
+      "experience.flow.group.date": "Time together",
+      "experience.flow.group.other": "Capture this moment",
+      "experience.flow.sceneFallback": "Choose an experience to share",
+      "experience.flow.coins": "@coins coins",
+      "experience.flow.choose": "Choose this experience",
+      "experience.flow.confirmTitle": "Confirm your experience",
+      "experience.flow.cost": "@coins coins · Balance @balance",
+      "experience.flow.charge":
+          "Coins are charged after confirmation and refunded if generation fails.",
+      "experience.flow.dateCharge":
+          "Coins are charged only after your companion accepts.",
+      "experience.flow.confirm": "Confirm and begin",
+      "experience.flow.preparing": "Preparing this moment",
+      "experience.flow.preparingHint":
+          "Waiting for your companion’s response or content. Please hold on.",
+      "experience.flow.ready": "A moment to share",
+      "experience.flow.dateReady": "Your invitation was accepted",
+      "experience.flow.openGift": "Tap to unwrap",
+      "experience.flow.voiceReady": "Your audio is ready. Listen in chat.",
+      "experience.flow.remembered":
+          "This delivery is now part of your companion’s memory",
+      "experience.flow.continue": "Continue together in chat",
+      "experience.flow.openDate": "View your plans",
+      "experience.flow.uncertain":
+          "The result is unconfirmed. Your request is saved; checking it will not charge you again.",
+      "experience.flow.recover": "Check the result",
+      "experience.flow.chooseAgain": "Choose again",
+      "experience.flow.failed":
+          "This experience was not completed. Please choose again.",
+      "experience.flow.refunded":
+          "This experience was not completed. Your coins were refunded.",
+      "experience.flow.priceChanged":
+          "The price changed. Please confirm again.",
+      "experience.flow.followupFailed":
+          "Your result was delivered, but chat could not open. Please retry later.",
+      "experience.flow.mediaInChat": "Your image is available in chat",
       "experience.mediaRequest.title": "Your preferences (optional)",
       "experience.mediaRequest.hint":
           "Tell us what you would like. Generation stays grounded in your companion’s current surroundings and appearance.",
@@ -852,6 +889,34 @@ class VitaTranslations extends Translations {
       'stage.partner': 'Partner',
     },
     'zh_CN': {
+      "experience.flow.group.gift": "心意",
+      "experience.flow.group.date": "一起度过",
+      "experience.flow.group.other": "留下此刻",
+      "experience.flow.sceneFallback": "选择一份属于你们的共同体验",
+      "experience.flow.coins": "@coins 金币",
+      "experience.flow.choose": "选择这份体验",
+      "experience.flow.confirmTitle": "确认共同体验",
+      "experience.flow.cost": "花费 @coins 金币 · 当前余额 @balance",
+      "experience.flow.charge": "确认后扣除金币；生成失败会退还。",
+      "experience.flow.dateCharge": "TA 接受邀请后才扣除金币。",
+      "experience.flow.confirm": "确认并开始",
+      "experience.flow.preparing": "正在为这一刻准备",
+      "experience.flow.preparingHint": "正在等待 TA 的回应或生成内容，请稍候。",
+      "experience.flow.ready": "这一刻，属于你们",
+      "experience.flow.dateReady": "TA 已接受邀请",
+      "experience.flow.openGift": "轻触，打开这份心意",
+      "experience.flow.voiceReady": "语音已准备好，回到聊天即可聆听",
+      "experience.flow.remembered": "这次交付已加入 TA 的记忆",
+      "experience.flow.continue": "和 TA 继续聊聊",
+      "experience.flow.openDate": "查看共同安排",
+      "experience.flow.uncertain": "结果尚未确认。已保留原请求，查看结果不会重复扣费。",
+      "experience.flow.recover": "查看结果",
+      "experience.flow.chooseAgain": "重新选择",
+      "experience.flow.failed": "这次体验未完成，请重新选择。",
+      "experience.flow.refunded": "这次体验未完成，金币已退还。",
+      "experience.flow.priceChanged": "价格已更新，请重新确认。",
+      "experience.flow.followupFailed": "结果已交付，暂时无法打开聊天，请稍后重试。",
+      "experience.flow.mediaInChat": "图片已送达聊天，可在那里查看",
       "experience.mediaRequest.title": "自定义需求（可选）",
       "experience.mediaRequest.hint": "描述你想要的内容，生成将结合TA当前环境与形象。",
       "experience.mediaRequest.continue": "继续确认金币花费",

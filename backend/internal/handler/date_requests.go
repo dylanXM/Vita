@@ -152,7 +152,7 @@ func requestCompanionDate(c *gin.Context, userID, companionID, productKey string
 	reservation, err := credits.Reserve(ctx, db.Get(), credits.ReserveParams{
 		UserID: userID, CompanionID: companionID, Environment: currentEnvironment(), Platform: requestPlatform(c),
 		ProductKey: productKey, IdempotencyKey: "date-" + requestID, ReferenceType: "companion_experience",
-		Metadata: map[string]any{"scheduled_at": start, "date_request_id": requestID},
+		Metadata: map[string]any{"scheduled_at": start, "date_request_id": requestID, "quoted_coins": input.Input["quoted_coins"]},
 	})
 	if err != nil {
 		if errors.Is(err, credits.ErrInsufficientCredit) {

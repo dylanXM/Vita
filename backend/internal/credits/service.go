@@ -18,6 +18,7 @@ var (
 	ErrProductNotFound      = errors.New("credit product not found")
 	ErrInsufficientCredit   = errors.New("insufficient credits")
 	ErrSpendInProgress      = errors.New("credit spend is still processing")
+	ErrPriceChanged         = errors.New("experience price changed")
 	ErrSpendRefunded        = errors.New("credit spend was refunded")
 )
 
@@ -153,6 +154,21 @@ func reserveInTx(ctx context.Context, tx *sql.Tx, params ReserveParams) (*Reserv
 	}
 	if err != nil {
 		return nil, err
+	}
+	if quote, exists := params.Metadata["quoted_coins"]; exists && quote != nil {
+		valid := false
+		switch value := quote.(type) {
+		case float64:
+			valid = value == float64(product.Coins)
+		case int:
+			valid = value == product.Coins
+		case json.Number:
+			amount, parseErr := value.Int64()
+			valid = parseErr == nil && amount == int64(product.Coins)
+		}
+		if !valid {
+			return nil, ErrPriceChanged
+		}
 	}
 	_ = json.Unmarshal([]byte(metadataRaw), &product.Metadata)
 	if !product.IsLaunched {

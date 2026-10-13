@@ -26,7 +26,6 @@ import 'chat_photo.dart';
 import 'companion_moment_page.dart';
 import 'companion_transfer_sheet.dart';
 import 'experience_sheet.dart';
-import 'gift_reveal_page.dart';
 import 'gift_visual.dart';
 
 /// Conversation within a companion's world.
@@ -565,9 +564,9 @@ class _ChatPageState extends State<ChatPage> {
     DateTime? prevDate;
     for (var i = 0; i < ctrl.messages.length; i++) {
       final m = ctrl.messages[i];
-      final dt =
-          (DateTime.tryParse(m['created_at'] as String? ?? '') ?? DateTime.now())
-              .toLocal();
+      final dt = (DateTime.tryParse(m['created_at'] as String? ?? '') ??
+              DateTime.now())
+          .toLocal();
       if (prevDate == null || !isSameDay(dt, prevDate)) {
         items.add(VitaDateChip(label: formatDateSeparator(dt)));
       } else {
@@ -839,7 +838,7 @@ class _ChatPageState extends State<ChatPage> {
           ),
           _MorePanelButton(
             icon: Icons.card_giftcard_rounded,
-            label: 'experience.collection.gifts'.tr,
+            label: 'experience.title'.tr,
             onTap: () {
               _panel.value = null;
               showModalBottomSheet<void>(
@@ -856,26 +855,6 @@ class _ChatPageState extends State<ChatPage> {
                         final product = response['product'];
                         final eventId =
                             result is Map ? result['event_id'] : null;
-                        if (mounted &&
-                            product is Map &&
-                            product['category'] == 'gift') {
-                          Navigator.of(context).pop();
-                          final action = await Get.to<String>(
-                              () => GiftRevealPage(
-                                    name: widget.name,
-                                    portraitUrl: widget
-                                        .companion?['portrait_url'] as String?,
-                                    response: response,
-                                  ),
-                              transition: Transition.cupertino);
-                          if (mounted && action == 'world') {
-                            ShellController.to.selectedCompanionId.value =
-                                widget.companionId;
-                            ShellController.to.switchTo(0);
-                            Get.back();
-                          }
-                          return;
-                        }
                         if (mounted &&
                             product is Map &&
                             product['category'] == 'date' &&

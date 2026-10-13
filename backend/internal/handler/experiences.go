@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -57,7 +58,15 @@ func ListCompanionExperiences(c *gin.Context) {
 	}
 	var equipped string
 	_ = db.Get().QueryRow(`SELECT equipped_outfit_key FROM companions WHERE id=$1 AND user_id=$2`, companionID, userID).Scan(&equipped)
-	c.JSON(http.StatusOK, gin.H{"balance": balance, "is_subscribed": subscribed, "products": products, "owned_outfits": owned, "equipped_outfit": equipped})
+	var name, portrait, title, location string
+	if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT c.name,COALESCE(NULLIF(c.avatar_url,''),p.image_url,''),COALESCE(e.title,''),COALESCE(e.location,'')
+ FROM companions c LEFT JOIN companion_portraits p ON p.id=c.portrait_id
+ LEFT JOIN LATERAL(SELECT title,location FROM life_events WHERE companion_id=c.id AND status='active' AND start_time<=CURRENT_TIMESTAMP AND end_time>CURRENT_TIMESTAMP ORDER BY CASE WHEN event_type='shared_activity' AND generation_source='user_purchase' THEN 0 ELSE 1 END,start_time DESC,id DESC LIMIT 1) e ON true
+ WHERE c.id=$1 AND c.user_id=$2`, companionID, userID).Scan(&name, &portrait, &title, &location); err != nil {
+		c.JSON(500, gin.H{"error": "failed to load experience context"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"balance": balance, "is_subscribed": subscribed, "products": products, "owned_outfits": owned, "equipped_outfit": equipped, "companion": gin.H{"name": name, "portrait_url": portrait}, "scene": gin.H{"title": title, "location": location}})
 }
 
 func PurchaseCompanionExperience(c *gin.Context) {
@@ -72,6 +81,13 @@ func PurchaseCompanionExperience(c *gin.Context) {
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "idempotency_key is required", "code": "invalid_request"})
 		return
+	}
+	if raw, exists := input.Input["custom_request"]; exists {
+		text, ok := raw.(string)
+		if !ok || utf8.RuneCountInString(text) > 500 {
+			c.JSON(400, gin.H{"error": "custom request must be text up to 500 characters", "code": "invalid_request"})
+			return
+		}
 	}
 	var subscriptionOnly, launched bool
 	err := db.Get().QueryRowContext(ctx, `SELECT subscription_only,is_launched FROM credit_products WHERE environment=$1 AND product_key=$2 AND enabled=true`, currentEnvironment(), productKey).Scan(&subscriptionOnly, &launched)
@@ -169,7 +185,8 @@ func PurchaseCompanionExperience(c *gin.Context) {
 func fulfillExperience(ctx context.Context, userID, companionID string, product credits.Product, input map[string]any) (map[string]any, string, error) {
 	switch product.Category {
 	case "gift":
-		return fulfillCatalogGift(ctx, userID, companionID, product)
+		note, _ := input["custom_request"].(string)
+		return fulfillCatalogGift(ctx, userID, companionID, product, note)
 	case "photo", "voice", "outfit":
 		return nil, "", fmt.Errorf("media experiences require transactional delivery")
 	case "keepsake":
@@ -181,7 +198,7 @@ func fulfillExperience(ctx context.Context, userID, companionID string, product 
 	}
 }
 
-func fulfillCatalogGift(ctx context.Context, userID, companionID string, product credits.Product) (map[string]any, string, error) {
+func fulfillCatalogGift(ctx context.Context, userID, companionID string, product credits.Product, preferences ...string) (map[string]any, string, error) {
 	intimacy := metadataInt(product.Metadata, "intimacy", 1)
 	enthusiasm := metadataInt(product.Metadata, "enthusiasm", 2)
 	id := uuid.New().String()
@@ -191,10 +208,15 @@ func fulfillCatalogGift(ctx context.Context, userID, companionID string, product
 	}
 	reaction := ""
 	if companionAgent != nil {
-		reaction = companionAgent.ComposeInteractionReaction(ctx, userID, companionID, "gift", product.NameKey, "")
+		note := ""
+		if len(preferences) > 0 {
+			note = strings.TrimSpace(preferences[0])
+		}
+		reaction = companionAgent.ComposeInteractionReaction(ctx, userID, companionID, "gift", product.NameKey, note)
 	}
 	messageID := uuid.New().String()
 	reactionID := uuid.New().String()
+	memoryID := uuid.New().String()
 	createdAt := time.Now().UTC()
 	messageData := map[string]any{
 		"product_key": product.Key,
@@ -231,7 +253,7 @@ func fulfillCatalogGift(ctx context.Context, userID, companionID string, product
 		}
 		memoryMetadata, _ := json.Marshal(map[string]any{"gift_id": id, "product_key": product.Key, "source": "gift_reaction"})
 		if _, err := tx.ExecContext(ctx, `INSERT INTO memories(id,companion_id,type,content,importance,event_time,metadata)
-			VALUES($1,$2,'gift_received',$3,60,$4,$5)`, uuid.New().String(), companionID, reaction, createdAt, string(memoryMetadata)); err != nil {
+			VALUES($1,$2,'gift_received',$3,60,$4,$5)`, memoryID, companionID, reaction, createdAt, string(memoryMetadata)); err != nil {
 			return nil, "", err
 		}
 	}
@@ -260,7 +282,12 @@ func fulfillCatalogGift(ctx context.Context, userID, companionID string, product
 		"gift_id": id, "message_id": messageID, "emoji": product.Emoji,
 		"reaction": reaction, "reaction_message_id": reactionID, "gesture": "receive_gift",
 		"intimacy_delta": intimacy, "enthusiasm_delta": enthusiasm,
-		"message": message, "reaction_message": reactionMessage,
+		"message": message, "reaction_message": reactionMessage, "memory_id": func() string {
+			if reaction != "" {
+				return memoryID
+			}
+			return ""
+		}(),
 	}, id, nil
 }
 
@@ -446,6 +473,8 @@ func writeSpendError(c *gin.Context, err error) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "experience is unavailable", "code": "product_unavailable"})
 	case errors.Is(err, credits.ErrInsufficientCredit):
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "insufficient credits", "code": "insufficient_credits", "action": "open_credits"})
+	case errors.Is(err, credits.ErrPriceChanged):
+		c.JSON(409, gin.H{"error": "experience price changed; confirm the new price", "code": "experience_price_changed"})
 	case errors.Is(err, credits.ErrSpendInProgress):
 		c.JSON(http.StatusConflict, gin.H{"error": "experience is still processing", "code": "spend_in_progress"})
 	case errors.Is(err, credits.ErrSpendRefunded):

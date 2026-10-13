@@ -14,7 +14,6 @@ import '../chat/chat_list_controller.dart';
 import '../chat/chat_list_presentation.dart';
 import '../chat/chat_page.dart';
 import '../chat/experience_sheet.dart';
-import '../chat/gift_reveal_page.dart';
 import '../chat/gift_visual.dart';
 import '../companion/companion_create_method_page.dart';
 import '../shell/shell_page.dart';
@@ -158,18 +157,8 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
           await ChatListController.to.load();
           if (mounted && _sceneCompanionId == id) await _loadScene(id);
           if (!mounted) return;
-          final product = response['product'];
-          if (product is Map && product['category'] == 'gift') {
-            Navigator.of(context).pop();
-            final action = await Get.to<String>(
-                () => GiftRevealPage(
-                      name: '${companion['name'] ?? ''}',
-                      portraitUrl: companion['portrait_url'] as String?,
-                      response: response,
-                    ),
-                transition: Transition.cupertino);
-            if (mounted && action == 'chat') await _openChat(companion);
-          }
+          Navigator.of(context).pop();
+          await _openChat(companion);
         },
       ),
     );
