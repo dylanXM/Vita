@@ -1381,6 +1381,7 @@ type SendMessageRequest struct {
 	LifeEventID        string `json:"life_event_id"`
 	LifeEventContextID string `json:"life_event_context_id"`
 	JourneyVisitID     string `json:"journey_visit_id"`
+	ExperienceSpendID  string `json:"shared_experience_spend_id"`
 }
 
 type SendMessageResponse struct {
@@ -1520,6 +1521,15 @@ func SendMessage(c *gin.Context) {
 			return
 		}
 		messagePayload["journey_visit_id"] = visitID
+	}
+	if req.ExperienceSpendID != "" {
+		var spendID string
+		err := tx.QueryRowContext(c.Request.Context(), `SELECT id FROM credit_spends WHERE id=$1 AND user_id=$2 AND companion_id=$3 AND status='completed' AND reference_type='companion_experience'`, req.ExperienceSpendID, userID, companionID).Scan(&spendID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "shared experience not found", "code": "experience_not_found"})
+			return
+		}
+		messagePayload["shared_experience_spend_id"] = spendID
 	}
 	payloadJSON, _ := json.Marshal(messagePayload)
 	_, err = tx.ExecContext(c.Request.Context(), query, msgID, conversationID, req.MessageType, req.Content, mediaURL, createdAt, activeLifeID.String, string(payloadJSON))

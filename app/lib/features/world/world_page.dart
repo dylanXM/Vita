@@ -13,6 +13,8 @@ import '../billing/subscription_page.dart';
 import '../chat/chat_list_controller.dart';
 import '../chat/chat_list_presentation.dart';
 import '../chat/chat_page.dart';
+import '../chat/experience_encounter_page.dart';
+import '../chat/companion_moment_page.dart';
 import '../chat/experience_sheet.dart';
 import '../chat/gift_visual.dart';
 import '../companion/companion_create_method_page.dart';
@@ -157,8 +159,28 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
           await ChatListController.to.load();
           if (mounted && _sceneCompanionId == id) await _loadScene(id);
           if (!mounted) return;
-          Navigator.of(context).pop();
-          await _openChat(companion);
+          if (response['already_owned'] == true) {
+            await _openChat(companion);
+            return;
+          }
+          final result = response['result'];
+          final product = response['product'];
+          final eventId = result is Map ? result['event_id'] : null;
+          if (product is Map &&
+              product['category'] == 'date' &&
+              eventId is String) {
+            await Get.to(() => CompanionMomentPage(
+                companionId: id,
+                eventId: eventId,
+                name: '${companion['name'] ?? ''}',
+                avatarUrl: companion['portrait_url'] as String?));
+          } else {
+            await Get.to(() => ExperienceEncounterPage(
+                companionId: id,
+                name: '${companion['name'] ?? ''}',
+                portrait: companion['portrait_url'] as String?,
+                response: response));
+          }
         },
       ),
     );

@@ -13,7 +13,12 @@ class ChatController extends GetxController {
   final String companionName;
   bool Function()? isVisible;
 
-  ChatController({required this.companionId, required this.companionName});
+  ChatController(
+      {required this.companionId,
+      required this.companionName,
+      this.pollInterval = const Duration(seconds: 5)});
+
+  final Duration pollInterval;
 
   final loading = false.obs;
   final sending = false.obs;
@@ -65,8 +70,7 @@ class ChatController extends GetxController {
         } catch (_) {
           // Message loading and polling must survive a status fetch failure.
         }
-        _pollTimer ??=
-            Timer.periodic(const Duration(seconds: 5), (_) => poll());
+        _pollTimer ??= Timer.periodic(pollInterval, (_) => poll());
       }
     } on ApiException catch (e) {
       if (e.action == 'open_subscription') {
@@ -258,7 +262,8 @@ class ChatController extends GetxController {
   Future<bool> send(String text,
       {String? momentEventId,
       String? journeyVisitId,
-      String? lifeEventContextId}) async {
+      String? lifeEventContextId,
+      String? experienceSpendId}) async {
     final content = text.trim();
     if (content.isEmpty) return false;
     if (sending.value) return false;
@@ -289,6 +294,8 @@ class ChatController extends GetxController {
         if (journeyVisitId != null) 'journey_visit_id': journeyVisitId,
         if (lifeEventContextId != null)
           'life_event_context_id': lifeEventContextId,
+        if (experienceSpendId != null)
+          'shared_experience_spend_id': experienceSpendId,
       },
       'delivery_status': 'sending',
       'created_at': DateTime.now().toUtc().toIso8601String(),
@@ -304,6 +311,8 @@ class ChatController extends GetxController {
           if (journeyVisitId != null) 'journey_visit_id': journeyVisitId,
           if (lifeEventContextId != null)
             'life_event_context_id': lifeEventContextId,
+          if (experienceSpendId != null)
+            'shared_experience_spend_id': experienceSpendId,
         },
       );
       if (data is Map) {
@@ -472,7 +481,8 @@ class ChatController extends GetxController {
   }
 
   void _markDisplayedMessagesRead(Iterable<Map<String, dynamic>> displayed) {
-    if (isVisible?.call() != true || !Get.isRegistered<ChatListController>()) return;
+    if (isVisible?.call() != true || !Get.isRegistered<ChatListController>())
+      return;
     ChatListController.to.markMessagesRead(companionId, displayed);
   }
 

@@ -151,7 +151,7 @@ func equipOwnedMediaOutfit(c *gin.Context, userID, companionID, key string) {
 		var style string
 		err = db.Get().QueryRowContext(ctx, `SELECT COALESCE(metadata->>'style','') FROM credit_products WHERE environment=$1 AND product_key=$2`, currentEnvironment(), key).Scan(&style)
 		if err == nil && companionAgent != nil {
-			message, err = companionAgent.GenerateOutfitPhoto(ctx, userID, companionID, key, style, preferences)
+			message, err = companionAgent.GenerateOutfitPhoto(ctx, userID, companionID, key, style, "")
 		} else if err == nil {
 			err = fmt.Errorf("media service is unavailable")
 		}

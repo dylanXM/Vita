@@ -156,6 +156,10 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
       final saved = jsonDecode(raw);
       if (saved is! Map || saved['request'] is! Map || saved['product'] is! Map)
         return;
+      final requestKey = saved['request']['idempotency_key'];
+      if (requestKey is! String ||
+          requestKey.isEmpty ||
+          saved['product']['key'] is! String) return;
       setState(() {
         _attempt = Map<String, dynamic>.from(saved['request']);
         _attemptProduct = Map<String, dynamic>.from(saved['product']);
@@ -313,6 +317,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
         throw ApiException('experience.flow.uncertain'.tr,
             code: 'settlement_pending');
       final response = Map<String, dynamic>.from(raw);
+      response.putIfAbsent('product', () => product);
       await _clearPending();
       if (!mounted) return;
       setState(() {
@@ -351,20 +356,21 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
   }
 
   Future<void> _continue() async {
-    if (_response == null || _continuing) return;
+    final response = _response;
+    if (response == null || _continuing) return;
     setState(() => _continuing = true);
+    final onResult = widget.onResult;
+    final onCompleted = widget.onCompleted;
+    Navigator.pop(context);
     try {
-      if (widget.onResult != null)
-        await widget.onResult!(_response!);
-      else
-        await widget.onCompleted();
-      if (mounted) Navigator.pop(context);
+      if (onResult != null) {
+        await onResult(response);
+      } else {
+        await onCompleted();
+      }
     } catch (_) {
-      if (mounted)
-        VitaNotice.error(
-            'experience.failed'.tr, 'experience.flow.followupFailed'.tr);
-    } finally {
-      if (mounted) setState(() => _continuing = false);
+      VitaNotice.error(
+          'experience.failed'.tr, 'experience.flow.followupFailed'.tr);
     }
   }
 

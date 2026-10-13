@@ -13,6 +13,12 @@ class VitaTranslations extends Translations {
 
   static const Map<String, Map<String, String>> _keys = {
     'en': {
+      "moment.scene.history": "Our conversation",
+      "moment.scene.you": "You",
+      "moment.scene.responding": "Waiting for a response…",
+      "moment.scene.listen": "Listen to this moment",
+      "moment.scene.audioFailed": "Audio could not play. Please retry.",
+      "moment.scene.send": "Send",
       "experience.flow.group.gift": "A little care",
       "experience.flow.group.date": "Time together",
       "experience.flow.group.other": "Capture this moment",
@@ -889,6 +895,12 @@ class VitaTranslations extends Translations {
       'stage.partner': 'Partner',
     },
     'zh_CN': {
+      "moment.scene.history": "这段对话",
+      "moment.scene.you": "你",
+      "moment.scene.responding": "正在等待 TA 的回应…",
+      "moment.scene.listen": "聆听这一刻",
+      "moment.scene.audioFailed": "语音暂时无法播放，请重试。",
+      "moment.scene.send": "发送",
       "experience.flow.group.gift": "心意",
       "experience.flow.group.date": "一起度过",
       "experience.flow.group.other": "留下此刻",

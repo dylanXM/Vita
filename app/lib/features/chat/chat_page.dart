@@ -25,6 +25,7 @@ import 'chat_message_content.dart';
 import 'chat_photo.dart';
 import 'companion_moment_page.dart';
 import 'companion_transfer_sheet.dart';
+import 'experience_encounter_page.dart';
 import 'experience_sheet.dart';
 import 'gift_visual.dart';
 
@@ -859,7 +860,6 @@ class _ChatPageState extends State<ChatPage> {
                             product is Map &&
                             product['category'] == 'date' &&
                             eventId is String) {
-                          Navigator.of(context).pop();
                           Get.to(() => CompanionMomentPage(
                                 companionId: widget.companionId,
                                 eventId: eventId,
@@ -868,6 +868,14 @@ class _ChatPageState extends State<ChatPage> {
                                     as String?,
                                 controller: ctrl,
                               ));
+                        } else if (mounted &&
+                            response['already_owned'] != true) {
+                          Get.to(() => ExperienceEncounterPage(
+                              companionId: widget.companionId,
+                              name: widget.name,
+                              portrait:
+                                  widget.companion?['portrait_url'] as String?,
+                              response: response));
                         }
                       }));
             },

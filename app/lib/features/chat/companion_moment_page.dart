@@ -10,6 +10,7 @@ import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
 import 'chat_controller.dart';
 import 'chat_page.dart';
+import 'shared_experience_stage.dart';
 
 enum _MomentPhase { booked, ready, together, keepsake }
 
@@ -34,11 +35,11 @@ class CompanionMomentPage extends StatefulWidget {
   State<CompanionMomentPage> createState() => _CompanionMomentPageState();
 }
 
-class _CompanionMomentPageState extends State<CompanionMomentPage> {
+class _CompanionMomentPageState extends State<CompanionMomentPage>
+    with WidgetsBindingObserver {
   final _message = TextEditingController();
   final _artifact = TextEditingController();
   Map<String, dynamic>? _moment;
-  Timer? _timer;
   Timer? _countdownTimer;
   final _clock = ValueNotifier<DateTime>(DateTime.now());
   bool _loading = true;
@@ -50,23 +51,23 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
   bool _finishing = false;
   bool _finishFailed = false;
   late final ChatController _chat;
-  bool _ownsChat = false;
   late final String _chatTag;
 
   @override
   void initState() {
     super.initState();
     _chatTag = 'moment-${widget.eventId}-${identityHashCode(this)}';
-    _ownsChat = widget.controller == null;
-    _chat = widget.controller ??
-        Get.put(
-            ChatController(
-                companionId: widget.companionId, companionName: widget.name),
-            tag: _chatTag);
+    WidgetsBinding.instance.addObserver(this);
+    final controller = ChatController(
+        companionId: widget.companionId,
+        companionName: widget.name,
+        pollInterval: const Duration(seconds: 10));
+    controller.isVisible = () =>
+        mounted &&
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed &&
+        (ModalRoute.of(context)?.isCurrent ?? false);
+    _chat = Get.put(controller, tag: _chatTag);
     _load();
-    _timer = Timer.periodic(const Duration(seconds: 15), (_) {
-      if (mounted && _started && !_ended) _chat.poll();
-    });
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       final previous = _clock.value;
@@ -88,13 +89,21 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _chat.poll();
+      _load();
+    }
+  }
+
+  @override
   void dispose() {
-    _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _countdownTimer?.cancel();
     _clock.dispose();
     _message.dispose();
     _artifact.dispose();
-    if (_ownsChat) Get.delete<ChatController>(tag: _chatTag);
+    Get.delete<ChatController>(tag: _chatTag);
     super.dispose();
   }
 
@@ -467,6 +476,99 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
     );
   }
 
+  Widget _immersive(String title, String location) => Obx(() {
+        final messages = _chat.messages
+            .where((m) =>
+                m['life_event_id'] == widget.eventId &&
+                m['message_type'] == 'text')
+            .toList();
+        final reply =
+            messages.where((m) => m['sender_type'] == 'assistant').lastOrNull;
+        final user =
+            messages.where((m) => m['sender_type'] == 'user').lastOrNull;
+        final scene = ['cafe', 'cinema', 'restaurant'].contains(location)
+            ? location
+            : 'general';
+        final choices = sharedSceneActions(reply);
+        final initial = user == null;
+        final busy = _sending ||
+            _chat.sending.value ||
+            ['pending', 'processing', 'scheduled']
+                .contains(_chat.replyStatus.value);
+        return SharedExperienceStage(
+          name: widget.name,
+          portrait: widget.avatarUrl,
+          title: title,
+          reply: '${reply?['content'] ?? _moment?['opening'] ?? ''}',
+          lastAction: '${user?['content'] ?? ''}',
+          input: _message,
+          busy: busy,
+          actions: choices.isNotEmpty
+              ? choices
+              : initial
+                  ? [
+                      {
+                        'label': 'moment.choice.$scene.first'.tr,
+                        'message': 'moment.choice.$scene.firstMessage'.tr
+                      },
+                      {
+                        'label': 'moment.choice.$scene.second'.tr,
+                        'message': 'moment.choice.$scene.secondMessage'.tr
+                      },
+                    ]
+                  : [],
+          onSend: (text) => _sendChoice(text),
+          onHistory: () => showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              showDragHandle: true,
+              backgroundColor: context.vita.surface,
+              builder: (_) => SizedBox(
+                  height: MediaQuery.sizeOf(context).height * .65,
+                  child: ListView(
+                      padding: const EdgeInsets.all(20),
+                      children: messages
+                          .map((m) => ListTile(
+                              title: Text('${m['content'] ?? ''}'),
+                              subtitle: Text(m['sender_type'] == 'user'
+                                  ? 'moment.scene.you'.tr
+                                  : widget.name)))
+                          .toList()))),
+          onKeepsake: () => showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              showDragHandle: true,
+              backgroundColor: context.vita.surface,
+              builder: (sheetContext) => Padding(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20,
+                      MediaQuery.viewInsetsOf(sheetContext).bottom + 20),
+                  child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text('moment.create'.tr,
+                            style: const TextStyle(
+                                fontSize: 20, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 16),
+                        TextField(
+                            controller: _artifact,
+                            maxLength: 2000,
+                            maxLines: 3,
+                            onChanged: (_) => _artifactDirty = true,
+                            decoration: InputDecoration(
+                                hintText: 'moment.createHint'.tr)),
+                        const SizedBox(height: 12),
+                        FilledButton(
+                            onPressed: () async {
+                              await _saveArtifact();
+                              if (sheetContext.mounted)
+                                Navigator.pop(sheetContext);
+                            },
+                            child: Text('moment.save'.tr))
+                      ]))),
+        );
+      });
+
   @override
   Widget build(BuildContext context) {
     final vita = context.vita;
@@ -475,382 +577,402 @@ class _CompanionMomentPageState extends State<CompanionMomentPage> {
     return Scaffold(
       backgroundColor: vita.pageBg,
       appBar: AppBar(leading: const VitaBackButton(), title: Text(widget.name)),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _moment == null
-              ? Center(child: Text('experience.failed'.tr))
-              : SafeArea(
-                  child: Column(children: [
-                  Expanded(
-                      child: ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-                    children: [
-                      _scene(context, title, location),
-                      const SizedBox(height: 12),
-                      _journey(context),
-                      const SizedBox(height: 12),
-                      if (_phase == _MomentPhase.booked) ...[
-                        Text('moment.prepareTitle'.tr,
-                            style: TextStyle(
-                                color: vita.text,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700)),
-                        const SizedBox(height: 10),
-                        if ('${_moment?['preparation'] ?? ''}'.isEmpty) ...[
-                          _MomentChoice(
-                              icon: Icons.chat_bubble_outline_rounded,
-                              label: 'moment.prepareTalk'.tr,
-                              detail: 'moment.prepareTalkHint'.tr,
-                              onTap:
-                                  _preparing ? null : () => _prepare('talk')),
-                          const SizedBox(height: 8),
-                          _MomentChoice(
-                              icon: Icons.auto_awesome_rounded,
-                              label: 'moment.prepareSurprise'.tr,
-                              detail: 'moment.prepareSurpriseHint'.tr,
-                              onTap: _preparing
-                                  ? null
-                                  : () => _prepare('surprise')),
-                        ] else
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 450),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                                color: vita.greenTint,
-                                borderRadius: BorderRadius.circular(18)),
-                            child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(Icons.favorite_rounded,
-                                      color: vita.green, size: 21),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                      child: Text(
-                                          '${_moment?['preparation_reaction'] ?? ''}'
-                                                  .isEmpty
-                                              ? 'moment.prepareReceived'.tr
-                                              : '${_moment?['preparation_reaction']}',
-                                          style: TextStyle(
-                                              color: vita.text,
-                                              fontSize: 14,
-                                              height: 1.45))),
-                                ]),
-                          ),
-                        const SizedBox(height: 14),
-                      ],
-                      if ('${_moment?['invitation'] ?? ''}'.isNotEmpty) ...[
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            color: vita.surface,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: vita.divider),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              VitaAvatar(
-                                name: widget.name,
-                                radius: 20,
-                                imageUrl: widget.avatarUrl,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(widget.name,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          color: vita.text,
-                                        )),
-                                    const SizedBox(height: 5),
-                                    Text('${_moment?['invitation']}',
-                                        style: TextStyle(
-                                          color: vita.text,
-                                          fontSize: 15,
-                                          height: 1.5,
-                                        )),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text('${_moment?['description_key'] ?? ''}'.tr,
-                            style:
-                                TextStyle(color: vita.subText, height: 1.45)),
-                      ),
-                      if (_phase == _MomentPhase.ready) ...[
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: _starting ? null : _start,
-                            icon: const Icon(Icons.auto_awesome_rounded),
-                            label: Text(_starting
-                                ? 'moment.starting'.tr
-                                : 'moment.start'.tr),
-                          ),
-                        ),
-                      ],
-                      if (_phase == _MomentPhase.keepsake &&
-                          '${_moment?['artifact'] ?? ''}'.isNotEmpty) ...[
-                        const SizedBox(height: 22),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: vita.greenTint,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(children: [
-                                Icon(Icons.auto_awesome_rounded,
-                                    size: 18, color: vita.green),
-                                const SizedBox(width: 8),
-                                Text('moment.phase.keepsake'.tr,
-                                    style: TextStyle(
-                                        color: vita.text,
-                                        fontWeight: FontWeight.w700)),
-                              ]),
-                              const SizedBox(height: 12),
-                              Text('${_moment?['artifact']}',
-                                  style: TextStyle(
-                                      color: vita.text,
-                                      fontSize: 16,
-                                      height: 1.55)),
-                            ],
-                          ),
-                        ),
-                      ],
-                      if (_phase == _MomentPhase.keepsake) ...[
-                        const SizedBox(height: 16),
-                        if ('${_moment?['closing'] ?? ''}'.isNotEmpty)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                    colors: [vita.greenTint, vita.surface]),
-                                borderRadius: BorderRadius.circular(20)),
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('moment.closingTitle'.tr,
-                                      style: TextStyle(
-                                          color: vita.green,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700)),
-                                  const SizedBox(height: 10),
-                                  Text('${_moment?['closing']}',
-                                      style: TextStyle(
-                                          color: vita.text,
-                                          fontSize: 16,
-                                          height: 1.5)),
-                                  if ('${_moment?['next_topic'] ?? ''}'
-                                      .isNotEmpty) ...[
-                                    const SizedBox(height: 18),
-                                    Text('moment.nextTopic'.tr,
-                                        style: TextStyle(
-                                            color: vita.subText, fontSize: 12)),
-                                    const SizedBox(height: 5),
-                                    Text('${_moment?['next_topic']}',
-                                        style: TextStyle(
-                                            color: vita.text,
-                                            fontSize: 14,
-                                            height: 1.4)),
-                                    const SizedBox(height: 14),
-                                    TextButton.icon(
-                                        onPressed: () {
-                                          if (widget.controller != null) {
-                                            Get.back();
-                                            return;
-                                          }
-                                          Get.to(
-                                              () => ChatPage(
-                                                    companionId:
-                                                        widget.companionId,
-                                                    name: widget.name,
-                                                    companion: {
-                                                      'id': widget.companionId,
-                                                      'name': widget.name,
-                                                      'portrait_url':
-                                                          widget.avatarUrl,
-                                                    },
-                                                  ),
-                                              transition: Transition.cupertino);
-                                        },
-                                        icon: const Icon(
-                                            Icons.arrow_forward_rounded),
-                                        label: Text('moment.continueChat'.tr)),
-                                  ],
-                                ]),
-                          )
-                        else if (_finishing)
-                          Center(
-                              child: Text('moment.finishing'.tr,
-                                  style: TextStyle(color: vita.subText)))
-                        else if (_finishFailed)
-                          TextButton.icon(
-                              onPressed: _finish,
-                              icon: const Icon(Icons.refresh_rounded),
-                              label: Text('moment.finishRetry'.tr)),
-                      ],
-                      if (_started) ...[
-                        const SizedBox(height: 26),
-                        Text('moment.together'.tr,
-                            style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                                color: vita.text)),
-                        const SizedBox(height: 12),
-                        Obx(() {
-                          final lines = _chat.messages
-                              .where((m) =>
-                                  m['life_event_id'] == widget.eventId &&
-                                  (m['message_type'] == 'text' ||
-                                      m['message_type'] == 'voice' ||
-                                      m['source'] == 'moment_opening'))
-                              .toList();
-                          if (lines.isEmpty) {
-                            return Text('${_moment?['opening'] ?? ''}',
-                                style:
-                                    TextStyle(color: vita.text, height: 1.5));
-                          }
-                          return Column(
-                              children: lines.map((m) {
-                            final isUser = m['sender_type'] == 'user';
-                            return Align(
-                              alignment: isUser
-                                  ? Alignment.centerRight
-                                  : Alignment.centerLeft,
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 10),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 12),
-                                constraints: BoxConstraints(
-                                    maxWidth:
-                                        MediaQuery.of(context).size.width *
-                                            .78),
-                                decoration: BoxDecoration(
-                                  color: isUser ? vita.greenTint : vita.surface,
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                                child: Text('${m['content'] ?? ''}',
-                                    style: TextStyle(
-                                        color: vita.text, height: 1.4)),
-                              ),
-                            );
-                          }).toList());
-                        }),
-                        if (_phase == _MomentPhase.together)
-                          Obx(() {
-                            final alreadyChose = _chat.messages.any((m) =>
-                                m['life_event_id'] == widget.eventId &&
-                                m['sender_type'] == 'user' &&
-                                m['message_type'] == 'text');
-                            if (alreadyChose) return const SizedBox.shrink();
-                            final scene = switch (location) {
-                              'cafe' || 'cinema' || 'restaurant' => location,
-                              _ => 'general',
-                            };
-                            return Column(children: [
-                              const SizedBox(height: 10),
+      body: _phase == _MomentPhase.together && !_loading
+          ? _immersive(title, location)
+          : _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _moment == null
+                  ? Center(child: Text('experience.failed'.tr))
+                  : SafeArea(
+                      child: Column(children: [
+                      Expanded(
+                          child: ListView(
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+                        children: [
+                          _scene(context, title, location),
+                          const SizedBox(height: 12),
+                          _journey(context),
+                          const SizedBox(height: 12),
+                          if (_phase == _MomentPhase.booked) ...[
+                            Text('moment.prepareTitle'.tr,
+                                style: TextStyle(
+                                    color: vita.text,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 10),
+                            if ('${_moment?['preparation'] ?? ''}'.isEmpty) ...[
                               _MomentChoice(
-                                  icon: Icons.question_answer_rounded,
-                                  label: 'moment.choice.$scene.first'.tr,
-                                  detail: 'moment.choiceTalkHint'.tr,
-                                  onTap: _sending
+                                  icon: Icons.chat_bubble_outline_rounded,
+                                  label: 'moment.prepareTalk'.tr,
+                                  detail: 'moment.prepareTalkHint'.tr,
+                                  onTap: _preparing
                                       ? null
-                                      : () => _sendChoice(
-                                          'moment.choice.$scene.firstMessage'
-                                              .tr)),
+                                      : () => _prepare('talk')),
                               const SizedBox(height: 8),
                               _MomentChoice(
                                   icon: Icons.auto_awesome_rounded,
-                                  label: 'moment.choice.$scene.second'.tr,
-                                  detail: 'moment.choiceNoticeHint'.tr,
-                                  onTap: _sending
+                                  label: 'moment.prepareSurprise'.tr,
+                                  detail: 'moment.prepareSurpriseHint'.tr,
+                                  onTap: _preparing
                                       ? null
-                                      : () => _sendChoice(
-                                          'moment.choice.$scene.secondMessage'
-                                              .tr)),
-                            ]);
-                          }),
-                        const SizedBox(height: 20),
-                        Text('moment.create'.tr,
-                            style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                                color: vita.text)),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: _artifact,
-                          maxLines: 3,
-                          onChanged: (_) => _artifactDirty = true,
-                          decoration: InputDecoration(
-                            hintText: 'moment.createHint'.tr,
-                            filled: true,
-                            fillColor: vita.surface,
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(color: vita.divider)),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                                onPressed: _saving ? null : _saveArtifact,
-                                child: Text(_saving
-                                    ? 'moment.saving'.tr
-                                    : 'moment.save'.tr))),
-                        if ('${_moment?['companion_text'] ?? ''}'.isNotEmpty)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                                color: vita.greenTint,
-                                borderRadius: BorderRadius.circular(16)),
+                                      : () => _prepare('surprise')),
+                            ] else
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 450),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                    color: vita.greenTint,
+                                    borderRadius: BorderRadius.circular(18)),
+                                child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(Icons.favorite_rounded,
+                                          color: vita.green, size: 21),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                          child: Text(
+                                              '${_moment?['preparation_reaction'] ?? ''}'
+                                                      .isEmpty
+                                                  ? 'moment.prepareReceived'.tr
+                                                  : '${_moment?['preparation_reaction']}',
+                                              style: TextStyle(
+                                                  color: vita.text,
+                                                  fontSize: 14,
+                                                  height: 1.45))),
+                                    ]),
+                              ),
+                            const SizedBox(height: 14),
+                          ],
+                          if ('${_moment?['invitation'] ?? ''}'.isNotEmpty) ...[
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(18),
+                              decoration: BoxDecoration(
+                                color: vita.surface,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: vita.divider),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  VitaAvatar(
+                                    name: widget.name,
+                                    radius: 20,
+                                    imageUrl: widget.avatarUrl,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(widget.name,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              color: vita.text,
+                                            )),
+                                        const SizedBox(height: 5),
+                                        Text('${_moment?['invitation']}',
+                                            style: TextStyle(
+                                              color: vita.text,
+                                              fontSize: 15,
+                                              height: 1.5,
+                                            )),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
                             child: Text(
-                                '${widget.name}: ${_moment?['companion_text']}',
-                                style:
-                                    TextStyle(color: vita.text, height: 1.45)),
+                                '${_moment?['description_key'] ?? ''}'.tr,
+                                style: TextStyle(
+                                    color: vita.subText, height: 1.45)),
                           ),
-                      ],
-                    ],
-                  )),
-                  if (_active && _started)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                      child: Row(children: [
-                        Expanded(
-                            child: TextField(
-                          controller: _message,
-                          decoration: InputDecoration(
-                              hintText: 'moment.messageHint'.tr,
-                              filled: true,
-                              fillColor: vita.surface,
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                  borderSide: BorderSide(color: vita.divider))),
-                          onSubmitted: (_) => _send(),
-                        )),
-                        const SizedBox(width: 8),
-                        IconButton.filled(
-                            onPressed: _sending ? null : _send,
-                            icon: const Icon(Icons.arrow_upward_rounded)),
-                      ]),
-                    ),
-                ])),
+                          if (_phase == _MomentPhase.ready) ...[
+                            const SizedBox(height: 14),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                onPressed: _starting ? null : _start,
+                                icon: const Icon(Icons.auto_awesome_rounded),
+                                label: Text(_starting
+                                    ? 'moment.starting'.tr
+                                    : 'moment.start'.tr),
+                              ),
+                            ),
+                          ],
+                          if (_phase == _MomentPhase.keepsake &&
+                              '${_moment?['artifact'] ?? ''}'.isNotEmpty) ...[
+                            const SizedBox(height: 22),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: vita.greenTint,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(children: [
+                                    Icon(Icons.auto_awesome_rounded,
+                                        size: 18, color: vita.green),
+                                    const SizedBox(width: 8),
+                                    Text('moment.phase.keepsake'.tr,
+                                        style: TextStyle(
+                                            color: vita.text,
+                                            fontWeight: FontWeight.w700)),
+                                  ]),
+                                  const SizedBox(height: 12),
+                                  Text('${_moment?['artifact']}',
+                                      style: TextStyle(
+                                          color: vita.text,
+                                          fontSize: 16,
+                                          height: 1.55)),
+                                ],
+                              ),
+                            ),
+                          ],
+                          if (_phase == _MomentPhase.keepsake) ...[
+                            const SizedBox(height: 16),
+                            if ('${_moment?['closing'] ?? ''}'.isNotEmpty)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                        colors: [vita.greenTint, vita.surface]),
+                                    borderRadius: BorderRadius.circular(20)),
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text('moment.closingTitle'.tr,
+                                          style: TextStyle(
+                                              color: vita.green,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700)),
+                                      const SizedBox(height: 10),
+                                      Text('${_moment?['closing']}',
+                                          style: TextStyle(
+                                              color: vita.text,
+                                              fontSize: 16,
+                                              height: 1.5)),
+                                      if ('${_moment?['next_topic'] ?? ''}'
+                                          .isNotEmpty) ...[
+                                        const SizedBox(height: 18),
+                                        Text('moment.nextTopic'.tr,
+                                            style: TextStyle(
+                                                color: vita.subText,
+                                                fontSize: 12)),
+                                        const SizedBox(height: 5),
+                                        Text('${_moment?['next_topic']}',
+                                            style: TextStyle(
+                                                color: vita.text,
+                                                fontSize: 14,
+                                                height: 1.4)),
+                                        const SizedBox(height: 14),
+                                        TextButton.icon(
+                                            onPressed: () {
+                                              if (widget.controller != null) {
+                                                Get.back();
+                                                return;
+                                              }
+                                              Get.to(
+                                                  () => ChatPage(
+                                                        companionId:
+                                                            widget.companionId,
+                                                        name: widget.name,
+                                                        companion: {
+                                                          'id': widget
+                                                              .companionId,
+                                                          'name': widget.name,
+                                                          'portrait_url':
+                                                              widget.avatarUrl,
+                                                        },
+                                                      ),
+                                                  transition:
+                                                      Transition.cupertino);
+                                            },
+                                            icon: const Icon(
+                                                Icons.arrow_forward_rounded),
+                                            label:
+                                                Text('moment.continueChat'.tr)),
+                                      ],
+                                    ]),
+                              )
+                            else if (_finishing)
+                              Center(
+                                  child: Text('moment.finishing'.tr,
+                                      style: TextStyle(color: vita.subText)))
+                            else if (_finishFailed)
+                              TextButton.icon(
+                                  onPressed: _finish,
+                                  icon: const Icon(Icons.refresh_rounded),
+                                  label: Text('moment.finishRetry'.tr)),
+                          ],
+                          if (_started) ...[
+                            const SizedBox(height: 26),
+                            Text('moment.together'.tr,
+                                style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                    color: vita.text)),
+                            const SizedBox(height: 12),
+                            Obx(() {
+                              final lines = _chat.messages
+                                  .where((m) =>
+                                      m['life_event_id'] == widget.eventId &&
+                                      (m['message_type'] == 'text' ||
+                                          m['message_type'] == 'voice' ||
+                                          m['source'] == 'moment_opening'))
+                                  .toList();
+                              if (lines.isEmpty) {
+                                return Text('${_moment?['opening'] ?? ''}',
+                                    style: TextStyle(
+                                        color: vita.text, height: 1.5));
+                              }
+                              return Column(
+                                  children: lines.map((m) {
+                                final isUser = m['sender_type'] == 'user';
+                                return Align(
+                                  alignment: isUser
+                                      ? Alignment.centerRight
+                                      : Alignment.centerLeft,
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 10),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 12),
+                                    constraints: BoxConstraints(
+                                        maxWidth:
+                                            MediaQuery.of(context).size.width *
+                                                .78),
+                                    decoration: BoxDecoration(
+                                      color: isUser
+                                          ? vita.greenTint
+                                          : vita.surface,
+                                      borderRadius: BorderRadius.circular(18),
+                                    ),
+                                    child: Text('${m['content'] ?? ''}',
+                                        style: TextStyle(
+                                            color: vita.text, height: 1.4)),
+                                  ),
+                                );
+                              }).toList());
+                            }),
+                            if (_phase == _MomentPhase.together)
+                              Obx(() {
+                                final alreadyChose = _chat.messages.any((m) =>
+                                    m['life_event_id'] == widget.eventId &&
+                                    m['sender_type'] == 'user' &&
+                                    m['message_type'] == 'text');
+                                if (alreadyChose)
+                                  return const SizedBox.shrink();
+                                final scene = switch (location) {
+                                  'cafe' ||
+                                  'cinema' ||
+                                  'restaurant' =>
+                                    location,
+                                  _ => 'general',
+                                };
+                                return Column(children: [
+                                  const SizedBox(height: 10),
+                                  _MomentChoice(
+                                      icon: Icons.question_answer_rounded,
+                                      label: 'moment.choice.$scene.first'.tr,
+                                      detail: 'moment.choiceTalkHint'.tr,
+                                      onTap: _sending
+                                          ? null
+                                          : () => _sendChoice(
+                                              'moment.choice.$scene.firstMessage'
+                                                  .tr)),
+                                  const SizedBox(height: 8),
+                                  _MomentChoice(
+                                      icon: Icons.auto_awesome_rounded,
+                                      label: 'moment.choice.$scene.second'.tr,
+                                      detail: 'moment.choiceNoticeHint'.tr,
+                                      onTap: _sending
+                                          ? null
+                                          : () => _sendChoice(
+                                              'moment.choice.$scene.secondMessage'
+                                                  .tr)),
+                                ]);
+                              }),
+                            const SizedBox(height: 20),
+                            Text('moment.create'.tr,
+                                style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                    color: vita.text)),
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: _artifact,
+                              maxLines: 3,
+                              onChanged: (_) => _artifactDirty = true,
+                              decoration: InputDecoration(
+                                hintText: 'moment.createHint'.tr,
+                                filled: true,
+                                fillColor: vita.surface,
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide:
+                                        BorderSide(color: vita.divider)),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                    onPressed: _saving ? null : _saveArtifact,
+                                    child: Text(_saving
+                                        ? 'moment.saving'.tr
+                                        : 'moment.save'.tr))),
+                            if ('${_moment?['companion_text'] ?? ''}'
+                                .isNotEmpty)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                    color: vita.greenTint,
+                                    borderRadius: BorderRadius.circular(16)),
+                                child: Text(
+                                    '${widget.name}: ${_moment?['companion_text']}',
+                                    style: TextStyle(
+                                        color: vita.text, height: 1.45)),
+                              ),
+                          ],
+                        ],
+                      )),
+                      if (_active && _started)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                          child: Row(children: [
+                            Expanded(
+                                child: TextField(
+                              controller: _message,
+                              decoration: InputDecoration(
+                                  hintText: 'moment.messageHint'.tr,
+                                  filled: true,
+                                  fillColor: vita.surface,
+                                  border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                      borderSide:
+                                          BorderSide(color: vita.divider))),
+                              onSubmitted: (_) => _send(),
+                            )),
+                            const SizedBox(width: 8),
+                            IconButton.filled(
+                                onPressed: _sending ? null : _send,
+                                icon: const Icon(Icons.arrow_upward_rounded)),
+                          ]),
+                        ),
+                    ])),
     );
   }
 }
