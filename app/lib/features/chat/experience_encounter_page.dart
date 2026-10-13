@@ -13,6 +13,7 @@ import '../../core/notice.dart';
 import '../../core/theme.dart';
 import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
+import '../auth/auth_controller.dart';
 import 'chat_controller.dart';
 import 'shared_experience_stage.dart';
 
@@ -58,7 +59,11 @@ class _ExperienceEncounterPageState extends State<ExperienceEncounterPage>
         companionName: widget.name,
         pollInterval: const Duration(seconds: 10));
     controller.isVisible = () =>
-        mounted && _foreground && (ModalRoute.of(context)?.isCurrent ?? false);
+        Get.isRegistered<AuthController>() &&
+        AuthController.to.profile.value != null &&
+        mounted &&
+        _foreground &&
+        (ModalRoute.of(context)?.isCurrent ?? false);
     _chat = Get.put(controller, tag: _tag);
     _audioCompleted = _player.onPlayerComplete.listen((_) {
       if (mounted) setState(() => _playing = false);

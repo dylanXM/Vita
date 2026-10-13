@@ -441,7 +441,12 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 		}
 	} else {
 		text, _, err = s.generateTextWithFallback(ctx, profile.ID, "reply", models, GenerateRequest{
-			System: system, Messages: recent, Temperature: 0.9, MaxTokens: 320,
+			System: system, Messages: recent, Temperature: 0.9, MaxTokens: func() int {
+				if immersive {
+					return 600
+				}
+				return 320
+			}(),
 		})
 		if err != nil {
 			return nil, err
@@ -453,6 +458,13 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 			}
 		}
 		replyLocale := detectSupportedLocale(latestQuestion, preferredLocale)
+		validActions := sceneActions[:0]
+		for _, action := range sceneActions {
+			if responseUsesRequiredScript(action.Label, replyLocale) && responseUsesRequiredScript(action.Message, replyLocale) {
+				validActions = append(validActions, action)
+			}
+		}
+		sceneActions = validActions
 		if !responseUsesRequiredScript(text, replyLocale) {
 			sceneActions = nil
 			text, err = s.repairMessageLanguage(ctx, profile.ID, "reply_language", models, text, replyLocale)

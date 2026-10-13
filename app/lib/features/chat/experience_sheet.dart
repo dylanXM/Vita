@@ -342,7 +342,10 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
         _phase = uncertain ? ExperiencePhase.uncertain : ExperiencePhase.failed;
         _errorKey = switch (error.code) {
           'experience_price_changed' => 'experience.flow.priceChanged',
-          'experience_failed' || 'spend_refunded' => 'experience.flow.refunded',
+          'experience_failed' => _owned[product['key']] == true
+              ? 'experience.flow.failed'
+              : 'experience.flow.refunded',
+          'spend_refunded' => 'experience.flow.refunded',
           'date_declined' => 'experience.date.declinedSchedule',
           _ => 'experience.flow.failed'
         };
