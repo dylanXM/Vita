@@ -12,9 +12,11 @@ class ExperienceEnvironment extends StatelessWidget {
       required this.name,
       this.portrait,
       this.focus = 'ambient',
-      this.narration = ''});
+      this.narration = '',
+      this.height = 300});
   final String location, name, focus, narration;
   final String? portrait;
+  final double height;
 
   static String kind(String location) => switch (location) {
         'cafe' || 'cinema' || 'restaurant' => location,
@@ -29,7 +31,7 @@ class ExperienceEnvironment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-      height: 300,
+      height: height,
       child: Stack(children: [
         Positioned.fill(
             child: RepaintBoundary(
@@ -38,10 +40,10 @@ class ExperienceEnvironment extends StatelessWidget {
                         Directionality.of(context) == TextDirection.rtl)))),
         PositionedDirectional(
             end: 24,
-            top: 20,
-            bottom: 74,
+            top: height < 250 ? 8 : 20,
+            bottom: height < 250 ? 18 : 74,
             child: SizedBox(
-                width: 126,
+                width: height < 250 ? (height * .5).clamp(44.0, 110.0) : 126,
                 child: Column(children: [
                   Expanded(
                       child: Container(
@@ -65,21 +67,24 @@ class ExperienceEnvironment extends StatelessWidget {
                                       errorBuilder: (_, __, ___) =>
                                           _missingPerson())
                                   : _missingPerson()))),
-                  const SizedBox(height: 8),
-                  Text(name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600)),
+                  if (height >= 120) const SizedBox(height: 8),
+                  if (height >= 120)
+                    Text(name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600)),
                 ]))),
-        PositionedDirectional(
-            start: 16,
-            bottom: 58,
-            child: Text('moment.environment.${kind(location)}'.tr,
-                style: TextStyle(
-                    color: Colors.white.withValues(alpha: .7), fontSize: 12))),
+        if (height >= 120)
+          PositionedDirectional(
+              start: 16,
+              bottom: height < 250 ? 12 : 58,
+              child: Text('moment.environment.${kind(location)}'.tr,
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: .7),
+                      fontSize: 12))),
         if (narration.trim().isNotEmpty)
           Positioned(
               left: 0,

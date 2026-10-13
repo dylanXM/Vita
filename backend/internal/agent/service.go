@@ -320,7 +320,12 @@ func (s *Service) CheckChatRoute(ctx context.Context, companionID, userID string
 }
 
 func (s *Service) replyNow(ctx context.Context, conversationID, userID string, profile companionContext) (*SavedMessage, error) {
-	recent, err := s.loadRecentMessages(ctx, conversationID, 24)
+	lifeEventID, spendID := "", ""
+	var dateChannel bool
+	if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(m.life_event_id,''),COALESCE(m.payload->>'shared_experience_spend_id',''),`+companion.DateMessageSQL("m")+` FROM messages m WHERE m.conversation_id=$1 AND m.sender_type='user' ORDER BY m.created_at DESC,m.id DESC LIMIT 1`, conversationID).Scan(&lifeEventID, &spendID, &dateChannel); err != nil {
+		return nil, err
+	}
+	recent, err := s.loadRecentReplyMessages(ctx, conversationID, 24, dateChannel, lifeEventID)
 	if err != nil {
 		return nil, err
 	}
@@ -376,12 +381,9 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 				title, description, location, startTime.UTC().Format(time.RFC3339), endTime.UTC().Format(time.RFC3339))
 		}
 	}
-	lifeEventID, spendID := "", ""
-	_ = s.db.QueryRowContext(ctx, `SELECT COALESCE(life_event_id,''),COALESCE(payload->>'shared_experience_spend_id','') FROM messages
-		WHERE conversation_id=$1 AND sender_type='user' ORDER BY created_at DESC,id DESC LIMIT 1`, conversationID).Scan(&lifeEventID, &spendID)
 	immersive := false
 	var sceneTitle, sceneLocation string
-	if lifeEventID != "" {
+	if dateChannel && lifeEventID != "" {
 		sceneErr := s.db.QueryRowContext(ctx, `SELECT COALESCE(e.title,''),COALESCE(e.location,'')
  FROM life_events e JOIN companion_moment_sessions session ON session.event_id=e.id AND session.user_id=$3
  WHERE e.id=$1 AND e.companion_id=$2 AND e.event_type='shared_activity' AND e.generation_source='user_purchase'
@@ -446,7 +448,7 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 	var sceneActions []momentSceneAction
 	var situation, focus string
 	surpriseNow := false
-	if lifeEventID != "" {
+	if dateChannel && lifeEventID != "" {
 		var exchanged int
 		_ = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM messages m JOIN life_events e ON e.id=m.life_event_id
 			WHERE m.conversation_id=$1 AND e.id=$2 AND m.sender_type='user'
@@ -532,7 +534,12 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 			experienceScene.Proposal = nil
 		}
 	}
-	payload := map[string]any{"gesture": gesture, "interaction_stage": "chat"}
+	payload := map[string]any{"gesture": gesture, "interaction_stage": "chat", "conversation_channel": func() string {
+		if dateChannel {
+			return "date"
+		}
+		return "chat"
+	}()}
 	if immersive {
 		payload["interaction_stage"] = "shared_scene"
 		payload["scene_actions"] = sceneActions
@@ -2587,6 +2594,36 @@ func (s *Service) loadRecentMessages(ctx context.Context, conversationID string,
 	return messages, rows.Err()
 }
 
+func (s *Service) loadRecentReplyMessages(ctx context.Context, conversationID string, limit int, dateChannel bool, eventID string) ([]ChatMessage, error) {
+	query := `SELECT sender_type,COALESCE(content,'') FROM (SELECT m.sender_type,m.content,m.created_at,m.id FROM messages m WHERE m.conversation_id=$1`
+	args := []any{conversationID, limit}
+	if dateChannel {
+		query += " AND " + companion.DateMessageSQL("m") + " AND m.life_event_id=$3"
+		args = append(args, eventID)
+	} else {
+		query += " AND NOT " + companion.DateMessageSQL("m")
+	}
+	query += ` ORDER BY m.created_at DESC,m.id DESC LIMIT $2) recent ORDER BY created_at ASC,id ASC`
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var messages []ChatMessage
+	for rows.Next() {
+		var sender, content string
+		if err := rows.Scan(&sender, &content); err != nil {
+			return nil, err
+		}
+		role := "assistant"
+		if sender == "user" {
+			role = "user"
+		}
+		messages = append(messages, ChatMessage{Role: role, Content: content})
+	}
+	return messages, rows.Err()
+}
+
 func (s *Service) loadModelRouteModels(ctx context.Context, routeKey, userID string) ([]Model, error) {
 	var enabled bool
 	var primary sql.NullString
@@ -2840,7 +2877,7 @@ func (s *Service) insertMessage(ctx context.Context, conversationID, sender, mes
 
 func (s *Service) getOrCreateConversation(ctx context.Context, userID, companionID string) (string, error) {
 	var id string
-	err := s.db.QueryRowContext(ctx, `SELECT id FROM conversations WHERE user_id = $1 AND companion_id = $2 LIMIT 1`, userID, companionID).Scan(&id)
+	err := s.db.QueryRowContext(ctx, `SELECT id FROM conversations WHERE user_id = $1 AND companion_id = $2 AND id NOT LIKE 'date:%' LIMIT 1`, userID, companionID).Scan(&id)
 	if err == nil {
 		return id, nil
 	}

@@ -60,7 +60,7 @@ func loadCompanionMoment(ctx context.Context, userID, companionID, eventID strin
 		FROM life_events e JOIN companions c ON c.id=e.companion_id
 		LEFT JOIN companion_moment_sessions s ON s.event_id=e.id AND s.user_id=$1
 		LEFT JOIN messages m ON m.id=s.opening_message_id
-		LEFT JOIN LATERAL(SELECT sm.payload FROM messages sm WHERE sm.conversation_id=(SELECT cv.id FROM conversations cv WHERE cv.user_id=$1 AND cv.companion_id=e.companion_id ORDER BY cv.created_at LIMIT 1) AND sm.life_event_id=e.id AND sm.sender_type='assistant' AND COALESCE(sm.payload->>'scene_situation','')<>'' ORDER BY sm.created_at DESC,sm.id DESC LIMIT 1) scene ON true
+		LEFT JOIN LATERAL(SELECT sm.payload FROM messages sm WHERE EXISTS(SELECT 1 FROM conversations cv WHERE cv.id=sm.conversation_id AND cv.user_id=$1 AND cv.companion_id=e.companion_id) AND sm.life_event_id=e.id AND sm.sender_type='assistant' AND COALESCE(sm.payload->>'scene_situation','')<>'' ORDER BY sm.created_at DESC,sm.id DESC LIMIT 1) scene ON true
 		WHERE e.id=$3 AND e.companion_id=$2 AND c.user_id=$1 AND c.active=true
 		AND e.event_type='shared_activity' AND e.generation_source='user_purchase'`,
 		userID, companionID, eventID).Scan(&moment.ID, &moment.ProductKey, &moment.MemoryID, &moment.TitleKey,
@@ -121,7 +121,7 @@ func PrepareCompanionMoment(c *gin.Context) {
 	}
 	conversationID := ""
 	if reaction != "" {
-		conversationID, err = experienceConversation(ctx, userID, companionID)
+		conversationID, err = dateConversation(ctx, userID, companionID, eventID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to open conversation"})
 			return
@@ -141,7 +141,7 @@ func PrepareCompanionMoment(c *gin.Context) {
 	}
 	count, _ := updated.RowsAffected()
 	if count > 0 && reaction != "" {
-		payload, _ := json.Marshal(map[string]any{"event_id": eventID, "choice": input.Choice, "gesture": "anticipating"})
+		payload, _ := json.Marshal(map[string]any{"event_id": eventID, "choice": input.Choice, "gesture": "anticipating", "conversation_channel": "date"})
 		if _, err := tx.ExecContext(ctx, `INSERT INTO messages(id,conversation_id,sender_type,message_type,content,payload,source,life_event_id,delivery_status)
 			VALUES($1,$2,'assistant','text',$3,$4,'moment_preparation',$5,'delivered')`, uuid.New().String(), conversationID, reaction, payload, eventID); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save preparation"})
@@ -182,7 +182,7 @@ func FinishCompanionMoment(c *gin.Context) {
 		c.JSON(http.StatusOK, moment)
 		return
 	}
-	conversationID, err := experienceConversation(ctx, userID, companionID)
+	conversationID, err := dateConversation(ctx, userID, companionID, eventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load conversation"})
 		return
@@ -335,7 +335,7 @@ func StartCompanionMoment(c *gin.Context) {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "agent service is unavailable"})
 		return
 	}
-	conversationID, err := experienceConversation(ctx, userID, companionID)
+	conversationID, err := dateConversation(ctx, userID, companionID, eventID)
 	if err != nil {
 		_, _ = db.Get().ExecContext(ctx, `DELETE FROM companion_moment_sessions WHERE event_id=$1 AND opening_message_id IS NULL`, eventID)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to open conversation"})
@@ -350,7 +350,7 @@ func StartCompanionMoment(c *gin.Context) {
 		return
 	}
 	messageID := uuid.New().String()
-	messagePayload, _ := json.Marshal(map[string]any{"event_id": eventID})
+	messagePayload, _ := json.Marshal(map[string]any{"event_id": eventID, "conversation_channel": "date"})
 	startedAt := time.Now().UTC()
 	endsAt := startedAt.Add(moment.duration())
 	var timezone string
@@ -430,7 +430,7 @@ func SaveCompanionMomentArtifact(c *gin.Context) {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "agent service is unavailable"})
 		return
 	}
-	conversationID, err := experienceConversation(ctx, userID, companionID)
+	conversationID, err := dateConversation(ctx, userID, companionID, eventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to open conversation"})
 		return

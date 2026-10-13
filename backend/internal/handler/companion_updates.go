@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"vita/internal/companion"
 	"vita/internal/db"
 )
 
@@ -33,11 +34,11 @@ func CompanionUpdates(c *gin.Context) {
  FROM companions c
  LEFT JOIN LATERAL (
  SELECT m.content,m.message_type,m.created_at FROM conversations cv JOIN messages m ON m.conversation_id=cv.id
- WHERE cv.user_id=$1 AND cv.companion_id=c.id ORDER BY m.created_at DESC,m.id DESC LIMIT 1
+ WHERE cv.user_id=$1 AND cv.companion_id=c.id AND NOT `+companion.DateMessageSQL("m")+` ORDER BY m.created_at DESC,m.id DESC LIMIT 1
  ) latest ON true
  LEFT JOIN LATERAL (
  SELECT COUNT(*) AS count FROM conversations cv JOIN messages m ON m.conversation_id=cv.id
- WHERE cv.user_id=$1 AND cv.companion_id=c.id AND m.sender_type='assistant'
+ WHERE cv.user_id=$1 AND cv.companion_id=c.id AND NOT `+companion.DateMessageSQL("m")+` AND m.sender_type='assistant'
  AND m.created_at>COALESCE(cv.last_read_at,cv.created_at)
  ) unread ON true
  WHERE c.user_id=$1 AND c.active=true AND COALESCE(c.creation_source,'')<>'ai_pet'

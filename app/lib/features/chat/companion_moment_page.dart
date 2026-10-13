@@ -65,7 +65,8 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
     final controller = ChatController(
         companionId: widget.companionId,
         companionName: widget.name,
-        pollInterval: const Duration(seconds: 10));
+        pollInterval: const Duration(seconds: 10),
+        dateEventId: widget.eventId);
     controller.isVisible = () =>
         Get.isRegistered<AuthController>() &&
         AuthController.to.profile.value != null &&
@@ -240,6 +241,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
     if (_starting) return;
     setState(() => _starting = true);
     try {
+      await _chat.ensureConversation();
       final data = await ApiClient.instance.post(
           '/v1/companions/${widget.companionId}/moments/${widget.eventId}/start');
       if (!mounted || data is! Map) return;
@@ -260,6 +262,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
     }
     setState(() => _preparing = true);
     try {
+      await _chat.ensureConversation();
       final data = await ApiClient.instance.post(
           '/v1/companions/${widget.companionId}/moments/${widget.eventId}/prepare',
           data: {'choice': choice});
@@ -483,11 +486,11 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
   }
 
   Widget _immersive(String title, String location) => Obx(() {
-        final messages = _chat.messages
+        final messages = chronologicalSceneMessages(_chat.messages
             .where((m) =>
                 m['life_event_id'] == widget.eventId &&
                 m['message_type'] == 'text')
-            .toList();
+            .toList());
         final reply =
             messages.where((m) => m['sender_type'] == 'assistant').lastOrNull;
         final user =
@@ -495,7 +498,10 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
         final scene = ['cafe', 'cinema', 'restaurant'].contains(location)
             ? location
             : 'general';
-        final choices = sharedSceneActions(reply);
+        final choices =
+            messages.isNotEmpty && messages.last['sender_type'] == 'assistant'
+                ? sharedSceneActions(reply)
+                : <Map<String, String>>[];
         final initial = user == null;
         final busy = _confirmingDecision ||
             _sending ||
@@ -513,7 +519,8 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
           focus: reply == null
               ? '${_moment?['scene_focus'] ?? 'ambient'}'
               : sharedSceneFocus(reply),
-          reply: '${reply?['content'] ?? _moment?['opening'] ?? ''}',
+          reply: '${_moment?['opening'] ?? ''}',
+          messages: messages,
           lastAction: '${user?['content'] ?? ''}',
           input: _message,
           busy: busy,
@@ -619,6 +626,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
                           _journey(context),
                           if (_phase == _MomentPhase.keepsake)
                             ExperienceDecisionPanel(
+                                compact: false,
                                 companionId: widget.companionId,
                                 eventId: widget.eventId,
                                 busy: true),

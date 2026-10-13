@@ -1263,13 +1263,13 @@ func ListCompanions(c *gin.Context) {
 		LEFT JOIN LATERAL (
 			SELECT m.content,m.message_type,m.created_at
 			FROM conversations conversation JOIN messages m ON m.conversation_id=conversation.id
-			WHERE conversation.user_id=$1 AND conversation.companion_id=c.id
+			WHERE conversation.user_id=$1 AND conversation.companion_id=c.id AND NOT `+companion.DateMessageSQL("m")+`
 			ORDER BY m.created_at DESC LIMIT 1
 		) latest ON true
 		LEFT JOIN LATERAL (
 			SELECT COUNT(*) AS count
 			FROM conversations conversation JOIN messages m ON m.conversation_id=conversation.id
-			WHERE conversation.user_id=$1 AND conversation.companion_id=c.id
+			WHERE conversation.user_id=$1 AND conversation.companion_id=c.id AND NOT `+companion.DateMessageSQL("m")+`
 			  AND m.sender_type='assistant' AND m.created_at>COALESCE(conversation.last_read_at,conversation.created_at)
 		) unread ON true
 		WHERE c.user_id=$1 AND c.active=true
@@ -1503,7 +1503,14 @@ func SendMessage(c *gin.Context) {
 		}
 		trialExpiresAt = expires
 	}
-	messagePayload := map[string]any{}
+	if strings.HasPrefix(conversationID, "date:") && conversationID != "date:"+req.LifeEventID {
+		c.JSON(400, gin.H{"error": "date conversation requires its event"})
+		return
+	}
+	messagePayload := map[string]any{"conversation_channel": "chat"}
+	if req.LifeEventID != "" {
+		messagePayload["conversation_channel"] = "date"
+	}
 	if req.LifeEventContextID != "" {
 		var contextEventID string
 		if err := tx.QueryRowContext(c.Request.Context(), `SELECT e.id FROM life_events e
@@ -1680,8 +1687,15 @@ func GetReplyStatus(c *gin.Context) {
 	var status string
 	var ageSeconds int
 	var triggerMessageID string
-	if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT p.status,GREATEST(0,EXTRACT(EPOCH FROM CURRENT_TIMESTAMP-m.created_at)::int),p.trigger_message_id
-		FROM pending_agent_replies p JOIN messages m ON m.id=p.trigger_message_id WHERE p.conversation_id=$1`, conversationID).Scan(&status, &ageSeconds, &triggerMessageID); errors.Is(err, sql.ErrNoRows) {
+	statusQuery := `SELECT p.status,GREATEST(0,EXTRACT(EPOCH FROM CURRENT_TIMESTAMP-m.created_at)::int),p.trigger_message_id FROM pending_agent_replies p JOIN messages m ON m.id=p.trigger_message_id WHERE p.conversation_id=$1`
+	statusArgs := []any{conversationID}
+	if c.Query("channel") == "date" {
+		statusQuery += " AND " + companion.DateMessageSQL("m") + " AND m.life_event_id=$2"
+		statusArgs = append(statusArgs, c.Query("event_id"))
+	} else if c.Query("channel") == "chat" {
+		statusQuery += " AND NOT " + companion.DateMessageSQL("m")
+	}
+	if err := db.Get().QueryRowContext(c.Request.Context(), statusQuery, statusArgs...).Scan(&status, &ageSeconds, &triggerMessageID); errors.Is(err, sql.ErrNoRows) {
 		status = "none"
 	} else if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load reply status"})
@@ -1727,13 +1741,25 @@ func GetMessages(c *gin.Context) {
 	userID := c.GetString("user_id")
 	query := `SELECT m.id,m.conversation_id,m.sender_type,m.message_type,COALESCE(m.content,''),COALESCE(m.media_url,''),m.payload::text,m.source,COALESCE(m.life_event_id,''),m.delivery_status,m.created_at FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE m.conversation_id=$1 AND c.user_id=$2`
 	args := []any{conversationID, userID}
+	dateChannel := c.Query("channel") == "date"
+	if dateChannel {
+		if c.Query("event_id") == "" {
+			c.JSON(400, gin.H{"error": "date event is required"})
+			return
+		}
+		query += " AND " + companion.DateMessageSQL("m") + " AND m.life_event_id=$3"
+		args = append(args, c.Query("event_id"))
+	} else if c.Query("channel") == "chat" {
+		query += " AND NOT " + companion.DateMessageSQL("m")
+	}
+
 	if after := c.Query("after"); after != "" {
 		if parsed, parseErr := time.Parse(time.RFC3339Nano, after); parseErr == nil {
-			query += ` AND m.created_at > $3`
+			query += fmt.Sprintf(" AND m.created_at > $%d", len(args)+1)
 			args = append(args, parsed)
 		}
 	}
-	query += ` ORDER BY m.created_at ASC`
+	query += ` ORDER BY m.created_at ASC,m.id ASC`
 	rows, err := db.Get().Query(query, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get messages"})
@@ -1761,7 +1787,7 @@ func GetMessages(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get messages"})
 		return
 	}
-	if !latestRead.IsZero() {
+	if !dateChannel && !latestRead.IsZero() {
 		_, _ = db.Get().Exec(`UPDATE conversations SET last_read_at=GREATEST(last_read_at,$3),updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$2`, conversationID, userID, latestRead)
 	}
 	c.JSON(http.StatusOK, messages)
@@ -1843,6 +1869,7 @@ func GetOrCreateConversation(c *gin.Context) {
 	userID := c.GetString("user_id")
 	var req struct {
 		CompanionID string `json:"companion_id" binding:"required"`
+		EventID     string `json:"date_event_id"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1914,9 +1941,22 @@ func GetOrCreateConversation(c *gin.Context) {
 		}
 	}
 
+	if req.EventID != "" {
+		if _, err := loadCompanionMoment(c.Request.Context(), userID, req.CompanionID, req.EventID); err != nil {
+			c.JSON(404, gin.H{"error": "date not found"})
+			return
+		}
+		id, err := dateConversation(c.Request.Context(), userID, req.CompanionID, req.EventID, true)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "failed to open date conversation"})
+			return
+		}
+		c.JSON(200, gin.H{"conversation_id": id, "can_send": canSend, "access_code": accessCode, "trial_status": trialStatus, "trial_expires_at": trialExpiresAt})
+		return
+	}
 	var conversationID string
 	err := db.Get().QueryRow(
-		`SELECT id FROM conversations WHERE user_id = $1 AND companion_id = $2 LIMIT 1`,
+		`SELECT id FROM conversations WHERE user_id = $1 AND companion_id = $2 AND id NOT LIKE 'date:%' LIMIT 1`,
 		userID, req.CompanionID).Scan(&conversationID)
 	if err == nil {
 		response := gin.H{"conversation_id": conversationID, "can_send": canSend, "access_code": accessCode,

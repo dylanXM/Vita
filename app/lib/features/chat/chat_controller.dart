@@ -16,9 +16,15 @@ class ChatController extends GetxController {
   ChatController(
       {required this.companionId,
       required this.companionName,
-      this.pollInterval = const Duration(seconds: 5)});
+      this.pollInterval = const Duration(seconds: 5),
+      this.dateEventId});
 
   final Duration pollInterval;
+  final String? dateEventId;
+  Map<String, dynamic> get _channelQuery => {
+        'channel': dateEventId == null ? 'chat' : 'date',
+        if (dateEventId != null) 'event_id': dateEventId
+      };
 
   final loading = false.obs;
   final sending = false.obs;
@@ -88,7 +94,10 @@ class ChatController extends GetxController {
   Future<void> _syncConversation() async {
     final conv = await ApiClient.instance.post(
       '/v1/conversations/',
-      data: {'companion_id': companionId},
+      data: {
+        'companion_id': companionId,
+        if (dateEventId != null) 'date_event_id': dateEventId
+      },
     );
     final rawId = conv is Map ? conv['conversation_id'] : null;
     _conversationId = rawId is String && rawId.isNotEmpty ? rawId : null;
@@ -125,8 +134,9 @@ class ChatController extends GetxController {
   }
 
   Future<void> _loadMessages() async {
-    final data = await ApiClient.instance
-        .get('/v1/conversations/$_conversationId/messages');
+    final data = await ApiClient.instance.get(
+        '/v1/conversations/$_conversationId/messages',
+        query: _channelQuery);
     if (data is List) {
       messages.assignAll(
         data
@@ -155,7 +165,7 @@ class ChatController extends GetxController {
       }
       final data = await ApiClient.instance.get(
         '/v1/conversations/$_conversationId/messages',
-        query: latest == null ? null : {'after': latest},
+        query: {..._channelQuery, if (latest != null) 'after': latest},
       );
       // A send can start while this GET is in flight. Its committed row may
       // already be in the response while POST still hasn't replaced the local
@@ -187,8 +197,9 @@ class ChatController extends GetxController {
 
   Future<void> _loadReplyStatus() async {
     if (_conversationId == null) return;
-    final data = await ApiClient.instance
-        .get('/v1/conversations/$_conversationId/reply-status');
+    final data = await ApiClient.instance.get(
+        '/v1/conversations/$_conversationId/reply-status',
+        query: _channelQuery);
     if (data is Map && data['status'] is String) {
       replyPendingMessageId = data['trigger_message_id'] as String?;
       replyPendingAgeSeconds = (data['age_seconds'] as num?)?.toInt() ?? 0;
@@ -481,8 +492,9 @@ class ChatController extends GetxController {
   }
 
   void _markDisplayedMessagesRead(Iterable<Map<String, dynamic>> displayed) {
-    if (isVisible?.call() != true || !Get.isRegistered<ChatListController>())
-      return;
+    if (dateEventId != null ||
+        isVisible?.call() != true ||
+        !Get.isRegistered<ChatListController>()) return;
     ChatListController.to.markMessagesRead(companionId, displayed);
   }
 

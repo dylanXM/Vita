@@ -486,7 +486,8 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
                                         scene: id == currentId
                                             ? activeScene
                                             : null,
-                                        onChat: () => _openCard(item),
+                                        onChat: () => _openChat(item),
+                                        onAppointment: () => _openCard(item),
                                         onDate: () => _openDate(item),
                                         onNote: () => _leaveNote(item),
                                         visitBusy: _visitBusy,
@@ -646,6 +647,7 @@ class _RelationshipCard extends StatelessWidget {
     required this.companion,
     required this.scene,
     required this.onChat,
+    required this.onAppointment,
     required this.onDate,
     required this.onNote,
     required this.visitBusy,
@@ -656,6 +658,7 @@ class _RelationshipCard extends StatelessWidget {
   final Map<String, dynamic> companion;
   final Map<String, dynamic>? scene;
   final VoidCallback onChat;
+  final VoidCallback onAppointment;
   final VoidCallback onDate;
   final VoidCallback onNote;
   final bool visitBusy;
@@ -844,19 +847,33 @@ class _RelationshipCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 SizedBox(
-                  height: 23,
+                  height: 44,
                   child: appointment != null
-                      ? Text(
-                          (appointmentReady
-                                  ? 'world.appointment.ready'
-                                  : 'world.appointment.booked')
-                              .tr,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600))
+                      ? Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                              onTap: onAppointment,
+                              borderRadius: BorderRadius.circular(12),
+                              child: Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 8),
+                                  child: Row(children: [
+                                    Expanded(
+                                        child: Text(
+                                            (appointmentReady
+                                                    ? 'world.appointment.ready'
+                                                    : 'world.appointment.booked')
+                                                .tr,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600))),
+                                    const SizedBox(width: 8),
+                                    const Icon(Icons.north_east,
+                                        size: 16, color: Colors.white)
+                                  ]))))
                       : visited
                           ? Row(children: [
                               Icon(
@@ -919,10 +936,7 @@ class _RelationshipCard extends StatelessWidget {
               child: Row(children: [
                 Expanded(
                   child: _WorldUtilityAction(
-                    label: (appointment == null
-                            ? 'world.cardChat'
-                            : 'world.appointment.enter')
-                        .tr,
+                    label: 'world.cardChat'.tr,
                     primary: true,
                     icon: Icons.chat_bubble_outline_rounded,
                     onTap: onChat,

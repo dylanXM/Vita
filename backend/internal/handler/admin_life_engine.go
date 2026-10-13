@@ -556,7 +556,7 @@ func AdminLifeEngineBroadcast(c *gin.Context) {
 	}
 	conversationID := strings.TrimSpace(in.ConversationID)
 	if conversationID == "" {
-		if err := db.Get().QueryRow(`SELECT id FROM conversations WHERE user_id=$1 AND companion_id=$2 ORDER BY created_at LIMIT 1`, userID, companionID).Scan(&conversationID); errors.Is(err, sql.ErrNoRows) {
+		if err := db.Get().QueryRow(`SELECT id FROM conversations WHERE user_id=$1 AND companion_id=$2 AND id NOT LIKE 'date:%' ORDER BY created_at LIMIT 1`, userID, companionID).Scan(&conversationID); errors.Is(err, sql.ErrNoRows) {
 			conversationID = uuid.New().String()
 			if _, err := db.Get().Exec(`INSERT INTO conversations (id, user_id, companion_id) VALUES ($1,$2,$3)`, conversationID, userID, companionID); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to open conversation"})

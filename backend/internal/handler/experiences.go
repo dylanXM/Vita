@@ -382,7 +382,7 @@ func fulfillKeepsake(ctx context.Context, userID, companionID string, product cr
 
 func experienceConversation(ctx context.Context, userID, companionID string) (string, error) {
 	var id string
-	err := db.Get().QueryRowContext(ctx, `SELECT id FROM conversations WHERE user_id=$1 AND companion_id=$2 ORDER BY created_at LIMIT 1`, userID, companionID).Scan(&id)
+	err := db.Get().QueryRowContext(ctx, `SELECT id FROM conversations WHERE user_id=$1 AND companion_id=$2 AND id NOT LIKE 'date:%' ORDER BY created_at LIMIT 1`, userID, companionID).Scan(&id)
 	if err == nil {
 		return id, nil
 	}

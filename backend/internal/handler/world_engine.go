@@ -59,6 +59,26 @@ func worldSceneKind(eventType string) string {
 	}
 }
 
+// Prefer the event's actual location over its activity category.
+func worldEventPlace(eventType, location string) (string, string) {
+	switch strings.ToLower(strings.TrimSpace(location)) {
+	case "home", "work", "cafe", "outdoors", "story":
+		kind := strings.ToLower(strings.TrimSpace(location))
+		return kind, "world.place." + kind
+	case "coffee":
+		return "cafe", "world.place.cafe"
+	case "cinema":
+		return "story", "experience.date.movie"
+	case "restaurant":
+		return "cafe", "experience.date.dinner"
+	}
+	kind := worldSceneKind(eventType)
+	if strings.TrimSpace(location) != "" {
+		return kind, strings.TrimSpace(location)
+	}
+	return kind, "world.place." + kind
+}
+
 func worldUserSettings(userID string) (string, string, time.Time, error) {
 	var timezone, region string
 	err := db.Get().QueryRow(`SELECT COALESCE(timezone,'UTC'),world_region FROM users WHERE id=$1`, userID).Scan(&timezone, &region)
@@ -128,25 +148,21 @@ func GetWorldScene(c *gin.Context) {
 	var startsAt, endsAt time.Time
 	err = db.Get().QueryRowContext(c.Request.Context(), `SELECT id,COALESCE(event_type,''),COALESCE(title,''),COALESCE(description,''),COALESCE(location,''),COALESCE(emotion,''),start_time,end_time
 		FROM life_events WHERE companion_id=$1 AND status='active' AND start_time<=CURRENT_TIMESTAMP AND end_time>CURRENT_TIMESTAMP
-		ORDER BY start_time DESC,id DESC LIMIT 1`, companionID).Scan(&eventID, &eventType, &title, &description, &location, &emotion, &startsAt, &endsAt)
+		ORDER BY CASE WHEN event_type='shared_activity' AND generation_source='user_purchase' THEN 0 ELSE 1 END,start_time DESC,id DESC LIMIT 1`, companionID).Scan(&eventID, &eventType, &title, &description, &location, &emotion, &startsAt, &endsAt)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load current world event"})
 		return
 	}
 	active := err == nil
-	kind := worldSceneKind(eventType)
+	kind, eventPlaceTitle := worldEventPlace(eventType, location)
 	var placeTitle, placeDescription string
 	err = db.Get().QueryRowContext(c.Request.Context(), `SELECT title,description FROM world_places WHERE environment=$1 AND scene_kind=$2 AND enabled=true`, currentEnvironment(), kind).Scan(&placeTitle, &placeDescription)
-	if errors.Is(err, sql.ErrNoRows) && kind != "home" {
-		kind = "home"
-		err = db.Get().QueryRowContext(c.Request.Context(), `SELECT title,description FROM world_places WHERE environment=$1 AND scene_kind='home' AND enabled=true`, currentEnvironment()).Scan(&placeTitle, &placeDescription)
-	}
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load world place"})
 		return
 	}
-	if placeTitle == "" {
-		placeTitle = "world.place.home"
+	if placeTitle == "" || strings.TrimSpace(location) != "" {
+		placeTitle = eventPlaceTitle
 	}
 	var mood int
 	if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT COALESCE((SELECT mood FROM companion_states WHERE companion_id=$1),50)`, companionID).Scan(&mood); err != nil {

@@ -179,7 +179,12 @@ func ConfirmExperienceOutcome(c *gin.Context) {
 	outcome.EventID = input.EventID
 	outcome.SpendID = input.SpendID
 	outcome.ProposalMessageID = input.ProposalMessageID
-	payload, _ := json.Marshal(map[string]any{"experience_outcome": outcome, "shared_experience_spend_id": input.SpendID, "interaction_stage": "keepsake"})
+	payload, _ := json.Marshal(map[string]any{"experience_outcome": outcome, "shared_experience_spend_id": input.SpendID, "interaction_stage": "keepsake", "conversation_channel": func() string {
+		if input.EventID != "" {
+			return "date"
+		}
+		return "chat"
+	}()})
 	// This records a confirmed virtual experience, never a real physical meeting
 	// or a permanent user preference inferred from a single decision.
 	memory := fmt.Sprintf("Confirmed in-app shared experience %q. Situation: %s. The companion proposed and the user explicitly confirmed this joint decision: %s. Companion's note: %s. This was one virtual experience; do not infer lasting preferences or a real-world meeting.", outcome.Title, outcome.Challenge, outcome.Decision, outcome.Note)

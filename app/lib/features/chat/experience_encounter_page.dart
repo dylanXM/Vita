@@ -175,9 +175,11 @@ class _ExperienceEncounterPageState extends State<ExperienceEncounterPage>
           final reply = replies.lastOrNull;
           final user =
               messages.where((m) => m['sender_type'] == 'user').lastOrNull;
-          final actions = sharedSceneActions(reply);
-          final history = [...messages, ...replies]..sort(
-              (a, b) => '${a['created_at']}'.compareTo('${b['created_at']}'));
+          final history = chronologicalSceneMessages([...messages, ...replies]);
+          final actions =
+              history.isNotEmpty && history.last['sender_type'] == 'assistant'
+                  ? sharedSceneActions(history.last)
+                  : <Map<String, String>>[];
           return SharedExperienceStage(
             name: widget.name,
             portrait: widget.portrait,
@@ -186,7 +188,16 @@ class _ExperienceEncounterPageState extends State<ExperienceEncounterPage>
                 '${(widget.response['scene'] as Map?)?['location'] ?? 'general'}',
             situation: sharedSceneSituation(reply),
             focus: sharedSceneFocus(reply),
-            reply: '${reply?['content'] ?? initial}',
+            reply: initial,
+            messages: [
+              {
+                'id': 'experience-opening',
+                'sender_type': 'assistant',
+                'content': initial,
+                'created_at': reaction['created_at'] ?? _message['created_at']
+              },
+              ...history
+            ],
             lastAction: '${user?['content'] ?? ''}',
             input: _input,
             journey: ExperienceDecisionPanel(

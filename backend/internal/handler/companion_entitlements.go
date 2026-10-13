@@ -195,7 +195,7 @@ func syncUserCompanionEntitlement(userID string, active bool) error {
 			return err
 		}
 		var conversationID string
-		err = tx.QueryRow(`SELECT id FROM conversations WHERE user_id=$1 AND companion_id=$2 LIMIT 1`, userID, item.id).Scan(&conversationID)
+		err = tx.QueryRow(`SELECT id FROM conversations WHERE user_id=$1 AND companion_id=$2 AND id NOT LIKE 'date:%' LIMIT 1`, userID, item.id).Scan(&conversationID)
 		if err == sql.ErrNoRows {
 			conversationID = uuid.New().String()
 			_, err = tx.Exec(`INSERT INTO conversations(id,user_id,companion_id) VALUES($1,$2,$3)`, conversationID, userID, item.id)
