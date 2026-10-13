@@ -4,6 +4,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     "world.appointment.booked": "Cita reservada · entra a la hora prevista",
     "world.appointment.ready": "Es la hora · entra en la escena",
     "world.appointment.enter": "Entrar en la cita",
+    "world.appointment.continue": "Continuar la cita",
     "experience.slots.title": "Elige un horario disponible",
     "experience.slots.hint":
         "Los horarios vienen de la agenda de tu compañero y usan la hora local de tu dispositivo. Toca uno para continuar.",
@@ -901,6 +902,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
         "Encontro reservado · entre no horário combinado",
     "world.appointment.ready": "Chegou a hora · entre no cenário",
     "world.appointment.enter": "Entrar no encontro",
+    "world.appointment.continue": "Continuar encontro",
     "experience.slots.title": "Escolha um horário disponível",
     "experience.slots.hint":
         "Os horários vêm da agenda do seu companheiro e usam a hora local do dispositivo. Toque em um para continuar.",
@@ -1800,6 +1802,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     "world.appointment.booked": "予約済み · 時間になったら場面へ",
     "world.appointment.ready": "約束の時間です · 場面に入る",
     "world.appointment.enter": "約会の場面へ",
+    "world.appointment.continue": "約会を続ける",
     "experience.slots.title": "予約できる時間を選ぶ",
     "experience.slots.hint": "パートナーの予定に基づく空き時間を端末の現地時間で表示します。タップして確認へ進みます。",
     "experience.slots.failed": "空き時間を読み込めませんでした。再読み込みしてください。",
@@ -2624,6 +2627,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     "world.appointment.booked": "약속 예약 완료 · 시간에 맞춰 입장",
     "world.appointment.ready": "약속 시간이에요 · 장면으로 입장",
     "world.appointment.enter": "약속 장면으로 입장",
+    "world.appointment.continue": "약속 이어가기",
     "experience.slots.title": "예약 가능한 시간 선택",
     "experience.slots.hint":
         "파트너의 일정에 따른 시간을 기기의 현지 시간으로 표시해요. 시간을 눌러 확인해 주세요.",
@@ -3452,6 +3456,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     "world.appointment.booked": "الموعد محجوز · ادخل في الوقت المحدد",
     "world.appointment.ready": "حان الموعد · ادخل المشهد",
     "world.appointment.enter": "دخول مشهد الموعد",
+    "world.appointment.continue": "متابعة الموعد",
     "experience.slots.title": "اختر موعدًا متاحًا",
     "experience.slots.hint":
         "هذه المواعيد من جدول رفيقك وتُعرض بالتوقيت المحلي لجهازك. اضغط موعدًا للمتابعة.",
@@ -4308,6 +4313,7 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     "world.appointment.booked": "已預約約會 · 到時進入場景",
     "world.appointment.ready": "約會時間已到 · 進入場景",
     "world.appointment.enter": "進入約會場景",
+    "world.appointment.continue": "繼續約會",
     "experience.slots.title": "選擇可預約時段",
     "experience.slots.hint": "以下時段來自 TA 的日程，以裝置本地時間顯示。點選一個時段繼續確認。",
     "experience.slots.failed": "暫時無法讀取可預約時段，請重新整理。",

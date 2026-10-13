@@ -680,7 +680,7 @@ class _RelationshipCard extends StatelessWidget {
     final appointmentReady = appointment?['can_enter'] == true;
     final appointmentLine = appointment == null
         ? ''
-        : '${'${appointment['title_key'] ?? ''}'.tr} · ${appointmentTime == null ? '' : '${MaterialLocalizations.of(context).formatMediumDate(appointmentTime)} ${TimeOfDay.fromDateTime(appointmentTime).format(context)}'}';
+        : '${appointmentTime == null ? '' : '${MaterialLocalizations.of(context).formatMediumDate(appointmentTime)} ${TimeOfDay.fromDateTime(appointmentTime).format(context)}'}';
 
     final placeTitle = '${place?['title'] ?? ''}'.trim();
     final hour = scene?['local_hour'] is num
@@ -849,31 +849,18 @@ class _RelationshipCard extends StatelessWidget {
                 SizedBox(
                   height: 44,
                   child: appointment != null
-                      ? Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                              onTap: onAppointment,
-                              borderRadius: BorderRadius.circular(12),
-                              child: Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(horizontal: 8),
-                                  child: Row(children: [
-                                    Expanded(
-                                        child: Text(
-                                            (appointmentReady
-                                                    ? 'world.appointment.ready'
-                                                    : 'world.appointment.booked')
-                                                .tr,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600))),
-                                    const SizedBox(width: 8),
-                                    const Icon(Icons.north_east,
-                                        size: 16, color: Colors.white)
-                                  ]))))
+                      ? _AppointmentEntrance(
+                          title: '${appointment['title_key'] ?? ''}'.tr,
+                          sceneKey: '${appointment['title_key'] ?? ''}',
+                          ready: appointmentReady,
+                          label: (appointment['started'] == true
+                                  ? 'world.appointment.continue'
+                                  : appointmentReady
+                                      ? 'world.appointment.enter'
+                                      : 'world.appointment.booked')
+                              .tr,
+                          onTap: onAppointment,
+                        )
                       : visited
                           ? Row(children: [
                               Icon(
@@ -1124,4 +1111,117 @@ class _WorldNoteSheetState extends State<_WorldNoteSheet> {
           ),
         ),
       );
+}
+
+/// A quiet scene cue; motion stops off screen and when reduced motion is enabled.
+class _AppointmentEntrance extends StatefulWidget {
+  const _AppointmentEntrance(
+      {required this.title,
+      required this.sceneKey,
+      required this.ready,
+      required this.label,
+      required this.onTap});
+  final String title, sceneKey, label;
+  final bool ready;
+  final VoidCallback onTap;
+  @override
+  State<_AppointmentEntrance> createState() => _AppointmentEntranceState();
+}
+
+class _AppointmentEntranceState extends State<_AppointmentEntrance>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _motion = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 1800));
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncMotion();
+  }
+
+  @override
+  void didUpdateWidget(covariant _AppointmentEntrance oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncMotion();
+  }
+
+  void _syncMotion() {
+    if (widget.ready &&
+        !MediaQuery.of(context).disableAnimations &&
+        TickerMode.of(context)) {
+      if (!_motion.isAnimating) _motion.repeat(reverse: true);
+    } else {
+      _motion.stop();
+      _motion.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _motion.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = widget.sceneKey.contains('coffee')
+        ? Icons.local_cafe_outlined
+        : widget.sceneKey.contains('movie')
+            ? Icons.movie_outlined
+            : widget.sceneKey.contains('dinner')
+                ? Icons.restaurant_outlined
+                : Icons.auto_awesome_outlined;
+    return Semantics(
+        container: true,
+        excludeSemantics: true,
+        button: true,
+        onTap: widget.onTap,
+        label: '${widget.title}, ${widget.label}',
+        child: Material(
+            color: const Color(0xDD302823),
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+                onTap: widget.onTap,
+                borderRadius: BorderRadius.circular(14),
+                child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Row(children: [
+                      // Decorative motion must not dirty the button semantics.
+                      ExcludeSemantics(
+                          child: AnimatedBuilder(
+                              animation: _motion,
+                              builder: (context, child) => Transform.translate(
+                                  offset: Offset(
+                                      0,
+                                      -2 *
+                                          Curves.easeInOut
+                                              .transform(_motion.value)),
+                                  child: Transform.scale(
+                                      scale: 1 + .06 * _motion.value,
+                                      child: child)),
+                              child: Icon(icon,
+                                  size: 24, color: const Color(0xFFFFDFB5)))),
+                      const SizedBox(width: 9),
+                      Expanded(
+                          child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            Text(widget.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600)),
+                            Text(widget.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: Color(0xFFFFDFB5), fontSize: 11)),
+                          ])),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.north_east,
+                          size: 15, color: Color(0xFFFFDFB5)),
+                    ])))));
+  }
 }

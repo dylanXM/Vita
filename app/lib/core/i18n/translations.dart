@@ -17,6 +17,7 @@ class VitaTranslations extends Translations {
       "world.appointment.booked": "Date booked · enter at the scheduled time",
       "world.appointment.ready": "Your date is ready · enter the scene",
       "world.appointment.enter": "Enter date scene",
+      "world.appointment.continue": "Continue date",
       "experience.slots.title": "Choose an available time",
       "experience.slots.hint":
           "These times come from your companion’s schedule and use your device’s local time. Tap one to continue.",
@@ -941,6 +942,7 @@ class VitaTranslations extends Translations {
       "world.appointment.booked": "已预约约会 · 到时进入场景",
       "world.appointment.ready": "约会时间已到 · 进入场景",
       "world.appointment.enter": "进入约会场景",
+      "world.appointment.continue": "继续约会",
       "experience.slots.title": "选择可预约时段",
       "experience.slots.hint": "以下时段来自 TA 的日程，按你的设备本地时间显示。点击一个时段继续确认。",
       "experience.slots.failed": "暂时无法读取可预约时段，请刷新重试。",
