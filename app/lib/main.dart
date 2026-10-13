@@ -25,12 +25,12 @@ import 'features/shell/shell_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  installSemanticsDiagnostics();
   await PushNotificationService.instance.initialize();
   initControllers();
   // Wait for persisted language/theme preferences before the first frame
   // so the app boots directly into the user's settings.
   await VitaSettingsController.to.ready.future;
+  installSemanticsDiagnostics();
   runApp(const VitaApp());
 }
 
