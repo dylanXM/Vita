@@ -36,7 +36,7 @@ void main() {
                 textDirection: TextDirection.rtl,
                 child: ExperienceEnvironment(location: 'cafe', name: 'TA')))));
     expect(find.byIcon(Icons.person_outline), findsOneWidget);
-    expect(tester.getSize(find.byType(ExperienceEnvironment)).height, 260);
+    expect(tester.getSize(find.byType(ExperienceEnvironment)).height, 300);
     expect(tester.takeException(), isNull);
   });
 }

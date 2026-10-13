@@ -11,8 +11,9 @@ class ExperienceEnvironment extends StatelessWidget {
       required this.location,
       required this.name,
       this.portrait,
-      this.focus = 'ambient'});
-  final String location, name, focus;
+      this.focus = 'ambient',
+      this.narration = ''});
+  final String location, name, focus, narration;
   final String? portrait;
 
   static String kind(String location) => switch (location) {
@@ -28,7 +29,7 @@ class ExperienceEnvironment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-      height: 260,
+      height: 300,
       child: Stack(children: [
         Positioned.fill(
             child: RepaintBoundary(
@@ -38,7 +39,7 @@ class ExperienceEnvironment extends StatelessWidget {
         PositionedDirectional(
             end: 24,
             top: 20,
-            bottom: 34,
+            bottom: 74,
             child: SizedBox(
                 width: 126,
                 child: Column(children: [
@@ -75,10 +76,65 @@ class ExperienceEnvironment extends StatelessWidget {
                 ]))),
         PositionedDirectional(
             start: 16,
-            bottom: 18,
+            bottom: 58,
             child: Text('moment.environment.${kind(location)}'.tr,
                 style: TextStyle(
                     color: Colors.white.withValues(alpha: .7), fontSize: 12))),
+        if (narration.trim().isNotEmpty)
+          Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 96,
+              child: IgnorePointer(
+                  child: DecoratedBox(
+                      decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                    Colors.transparent,
+                    background(location).withValues(alpha: .88)
+                  ]))))),
+        if (narration.trim().isNotEmpty)
+          PositionedDirectional(
+              start: 16,
+              end: 16,
+              bottom: 14,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => showModalBottomSheet<void>(
+                    context: context,
+                    showDragHandle: true,
+                    isScrollControlled: true,
+                    builder: (sheetContext) => SafeArea(
+                        top: false,
+                        child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                                maxHeight:
+                                    MediaQuery.sizeOf(sheetContext).height *
+                                        .6),
+                            child: SingleChildScrollView(
+                                padding:
+                                    const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                                child: SelectableText(narration,
+                                    style: const TextStyle(
+                                        fontSize: 16, height: 1.6)))))),
+                child: SizedBox(
+                    height: 44,
+                    child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text(narration,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: .76),
+                                fontSize: 13,
+                                height: 1.55,
+                                shadows: const [
+                                  Shadow(color: Colors.black38, blurRadius: 6)
+                                ])))),
+              )),
       ]));
 
   Widget _missingPerson() => ColoredBox(

@@ -77,35 +77,8 @@ class SharedExperienceStage extends StatelessWidget {
                                 location: location,
                                 name: name,
                                 portrait: portrait,
-                                focus: focus),
-                            ...[
-                              Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                      color:
-                                          Colors.white.withValues(alpha: .08),
-                                      borderRadius: BorderRadius.circular(16)),
-                                  child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text('moment.environment.situation'.tr,
-                                            style: TextStyle(
-                                                color: Colors.white
-                                                    .withValues(alpha: .6),
-                                                fontSize: 11)),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                            situation.isEmpty
-                                                ? 'moment.environment.begin'.tr
-                                                : situation,
-                                            style: const TextStyle(
-                                                color: Colors.white,
-                                                height: 1.6,
-                                                fontSize: 14))
-                                      ])),
-                              const SizedBox(height: 16),
-                            ],
+                                focus: focus,
+                                narration: situation),
                             if (lastAction.isNotEmpty)
                               Text(lastAction,
                                   maxLines: 3,
