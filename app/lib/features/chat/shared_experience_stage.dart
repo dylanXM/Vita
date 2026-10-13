@@ -3,7 +3,8 @@ import 'package:get/get.dart';
 
 import '../../core/theme.dart';
 import 'experience_environment.dart';
-import '../../shared/media_image.dart';
+import '../../shared/widgets.dart';
+import '../auth/auth_controller.dart';
 
 List<Map<String, dynamic>> chronologicalSceneMessages(
     Iterable<Map<String, dynamic>> messages) {
@@ -89,28 +90,48 @@ class _SharedExperienceStageState extends State<SharedExperienceStage> {
 
   Widget _line(Map<String, dynamic> message) {
     final user = message['sender_type'] == 'user';
-    final foreground = user ? context.vita.text : Colors.white;
-    return Align(
-        alignment: user
-            ? AlignmentDirectional.centerEnd
-            : AlignmentDirectional.centerStart,
-        child: FractionallySizedBox(
-            widthFactor: .92,
-            child: Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
+    final vita = context.vita;
+    final avatarName = user ? '' : widget.name;
+    final avatar = user
+        ? (Get.isRegistered<AuthController>()
+            ? AuthController.to.avatarUrl
+            : null)
+        : widget.portrait;
+    final bubble = Flexible(
+        child: Container(
+            constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width * .66),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+                color: user ? vita.greenTint : vita.surface,
+                border: Border.all(
                     color: user
-                        ? context.vita.greenTint
-                        : Colors.white.withValues(alpha: .07),
-                    borderRadius: BorderRadius.circular(16)),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SelectableText('${message['content'] ?? ''}',
-                          style: TextStyle(
-                              color: foreground, fontSize: 16, height: 1.5)),
-                    ]))));
+                        ? vita.green.withValues(alpha: .18)
+                        : vita.text.withValues(alpha: .06)),
+                borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(20),
+                    topRight: const Radius.circular(20),
+                    bottomLeft: Radius.circular(user ? 20 : 7),
+                    bottomRight: Radius.circular(user ? 7 : 20))),
+            child: SelectableText('${message['content'] ?? ''}',
+                style:
+                    TextStyle(color: vita.text, fontSize: 16, height: 1.4))));
+    final portrait = VitaAvatar(
+        name: avatarName,
+        radius: 22,
+        imageUrl: avatar,
+        borderRadius: BorderRadius.circular(10));
+    return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+            mainAxisAlignment:
+                user ? MainAxisAlignment.end : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!user) ...[portrait, const SizedBox(width: 8)],
+              bubble,
+              if (user) ...[const SizedBox(width: 8), portrait],
+            ]));
   }
 
   @override
@@ -198,56 +219,7 @@ class _SharedExperienceStageState extends State<SharedExperienceStage> {
                           Padding(
                               padding: const EdgeInsets.only(bottom: 12),
                               child: widget.attachment!),
-                        if (widget.compactDate)
-                          Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: Row(children: [
-                                SizedBox(
-                                    width: 28,
-                                    height: 28,
-                                    child: ClipOval(
-                                        child: widget.portrait?.isNotEmpty ==
-                                                true
-                                            ? VitaMediaImage(
-                                                url: widget.portrait!,
-                                                fit: BoxFit.cover)
-                                            : const Icon(Icons.person_outline,
-                                                color: Colors.white70))),
-                                const SizedBox(width: 8),
-                                Text(widget.name,
-                                    style: const TextStyle(
-                                        color: Colors.white70, fontSize: 13)),
-                              ])),
                         ...messages.map(_line),
-                        if (widget.compactDate &&
-                            !keyboard &&
-                            (widget.onHistory != null ||
-                                widget.onKeepsake != null))
-                          Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                if (widget.onHistory != null)
-                                  TextButton.icon(
-                                      onPressed: widget.onHistory,
-                                      icon: const Icon(Icons.history_outlined,
-                                          size: 16),
-                                      label: Text('moment.scene.history'.tr),
-                                      style: TextButton.styleFrom(
-                                          foregroundColor: Colors.white70)),
-                                if (widget.onKeepsake != null)
-                                  Flexible(
-                                      child: TextButton.icon(
-                                          onPressed: widget.onKeepsake,
-                                          icon: const Icon(
-                                              Icons.bookmark_border,
-                                              size: 16),
-                                          label: Text('moment.create'.tr,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis),
-                                          style: TextButton.styleFrom(
-                                              foregroundColor:
-                                                  Colors.white70))),
-                              ]),
                         if (widget.compactDate &&
                             !keyboard &&
                             widget.journey != null)
@@ -289,6 +261,20 @@ class _SharedExperienceStageState extends State<SharedExperienceStage> {
                                     constraints:
                                         const BoxConstraints(maxWidth: 180),
                                     child: Text(widget.actions[index]['label'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis))))),
+                  if (widget.compactDate && widget.onKeepsake != null)
+                    Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: TextButton.icon(
+                                onPressed: widget.onKeepsake,
+                                icon:
+                                    const Icon(Icons.bookmark_border, size: 16),
+                                label: Text('moment.create'.tr,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis),
+                                style: TextButton.styleFrom(
+                                    foregroundColor: Colors.white70)))),
                   Padding(
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                       child: Row(children: [
@@ -298,22 +284,32 @@ class _SharedExperienceStageState extends State<SharedExperienceStage> {
                                 enabled: !widget.busy,
                                 maxLength: 2000,
                                 minLines: 1,
-                                maxLines: constraints.maxHeight < 400 ? 1 : 3,
-                                style: const TextStyle(color: Colors.white),
+                                maxLines: constraints.maxHeight < 400 ? 1 : 5,
+                                textInputAction: TextInputAction.send,
+                                style: TextStyle(
+                                    color: context.vita.text,
+                                    fontSize: 16,
+                                    height: 1.4),
                                 decoration: InputDecoration(
-                                    focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(18),
-                                        borderSide: const BorderSide(
-                                            color: Colors.white38)),
                                     counterText: '',
-                                    hintText: 'moment.messageHint'.tr,
-                                    hintStyle:
-                                        const TextStyle(color: Colors.white54),
+                                    hintText: 'chat.message'.tr,
+                                    hintStyle: TextStyle(
+                                        color: context.vita.hint,
+                                        fontSize: 16,
+                                        height: 1.4),
+                                    isCollapsed: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
                                     filled: true,
-                                    fillColor:
-                                        Colors.white.withValues(alpha: .1),
+                                    fillColor: context.vita.surface,
                                     border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(18),
+                                        borderRadius: BorderRadius.circular(20),
+                                        borderSide: BorderSide.none),
+                                    enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(20),
+                                        borderSide: BorderSide.none),
+                                    focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(20),
                                         borderSide: BorderSide.none)),
                                 onSubmitted: widget.onSend)),
                         const SizedBox(width: 8),

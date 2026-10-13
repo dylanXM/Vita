@@ -52,6 +52,27 @@ class _ExperienceEncounterPageState extends State<ExperienceEncounterPage>
 
   bool _confirmingDecision = false;
 
+  ModalRoute<dynamic>? _chatRoute;
+  bool _treeActive = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _chatRoute = ModalRoute.of(context);
+  }
+
+  @override
+  void deactivate() {
+    _treeActive = false;
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _treeActive = true;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -66,7 +87,7 @@ class _ExperienceEncounterPageState extends State<ExperienceEncounterPage>
         AuthController.to.profile.value != null &&
         mounted &&
         _foreground &&
-        (ModalRoute.of(context)?.isCurrent ?? false);
+        (_treeActive && (_chatRoute?.isCurrent ?? false));
     _chat = Get.put(controller, tag: _tag);
     _audioCompleted = _player.onPlayerComplete.listen((_) {
       if (mounted) setState(() => _playing = false);

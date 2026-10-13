@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../shared/media_image.dart';
+import '../../shared/widgets.dart';
 
 /// Lightweight authored environments, independent of the companion portrait.
 /// Repaints only when the location or the recorded scene focus changes.
@@ -67,6 +68,42 @@ class ExperienceEnvironment extends StatelessWidget {
                   Colors.transparent,
                   background(location).withValues(alpha: .65)
                 ]))))),
+            if (sceneFirst && height >= 120)
+              PositionedDirectional(
+                  end: 14,
+                  bottom: 12,
+                  child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                          maxWidth: MediaQuery.sizeOf(context).width * .42),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Container(
+                            decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: .22),
+                                      blurRadius: 8)
+                                ]),
+                            child: VitaAvatar(
+                                name: name,
+                                radius: 17,
+                                imageUrl: portrait,
+                                borderRadius: BorderRadius.circular(17))),
+                        const SizedBox(width: 8),
+                        Flexible(
+                            child: Text(name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    shadows: [
+                                      Shadow(
+                                          color: Colors.black54, blurRadius: 6)
+                                    ]))),
+                      ]))),
             if (!sceneFirst)
               PositionedDirectional(
                   end: 24,

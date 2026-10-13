@@ -1189,17 +1189,10 @@ class _AppointmentEntranceState extends State<_AppointmentEntrance>
                       ExcludeSemantics(
                           child: AnimatedBuilder(
                               animation: _motion,
-                              builder: (context, child) => Transform.translate(
-                                  offset: Offset(
-                                      0,
-                                      -2 *
-                                          Curves.easeInOut
-                                              .transform(_motion.value)),
-                                  child: Transform.scale(
-                                      scale: 1 + .06 * _motion.value,
-                                      child: child)),
-                              child:
-                                  Icon(icon, size: 20, color: Colors.white))),
+                              builder: (context, child) => Icon(icon,
+                                  size: 20,
+                                  color: Colors.white.withValues(
+                                      alpha: .72 + .28 * _motion.value)))),
                       const SizedBox(width: 9),
                       Flexible(
                           child: Text(widget.label,

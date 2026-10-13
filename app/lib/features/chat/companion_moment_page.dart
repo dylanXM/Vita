@@ -58,6 +58,27 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
 
   bool _confirmingDecision = false;
 
+  ModalRoute<dynamic>? _chatRoute;
+  bool _treeActive = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _chatRoute = ModalRoute.of(context);
+  }
+
+  @override
+  void deactivate() {
+    _treeActive = false;
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _treeActive = true;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -73,7 +94,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
         AuthController.to.profile.value != null &&
         mounted &&
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed &&
-        (ModalRoute.of(context)?.isCurrent ?? false);
+        (_treeActive && (_chatRoute?.isCurrent ?? false));
     _chat = Get.put(controller, tag: _chatTag);
     _load();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {

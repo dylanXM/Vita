@@ -99,13 +99,12 @@ class _ChatPageState extends State<ChatPage> {
     final controller = ChatController(
         companionId: widget.companionId, companionName: widget.name);
     controller.isVisible =
-        () => mounted && (ModalRoute.of(context)?.isCurrent ?? false);
+        () => mounted && (_treeActive && (_chatRoute?.isCurrent ?? false));
     controller.revealChat = () {
-      if (!mounted) return;
-      final route = ModalRoute.of(context);
+      if (!mounted || !_treeActive) return;
+      final route = _chatRoute;
       if (route == null) return;
-      Navigator.of(context)
-          .popUntil((candidate) => identical(candidate, route));
+      _chatNavigator?.popUntil((candidate) => identical(candidate, route));
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _scrollToBottom();
       });
@@ -131,6 +130,29 @@ class _ChatPageState extends State<ChatPage> {
   String? _autoLifeEventPrompt;
   final ValueNotifier<String?> _panel = ValueNotifier(null);
   static const double _panelHeight = 210;
+
+  ModalRoute<dynamic>? _chatRoute;
+  NavigatorState? _chatNavigator;
+  bool _treeActive = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _chatRoute = ModalRoute.of(context);
+    _chatNavigator = Navigator.of(context);
+  }
+
+  @override
+  void deactivate() {
+    _treeActive = false;
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _treeActive = true;
+  }
 
   @override
   void initState() {
@@ -268,6 +290,18 @@ class _ChatPageState extends State<ChatPage> {
     _input.selection = TextSelection.collapsed(offset: text.length);
   }
 
+  Future<void> _openDateEvent(String eventId) async {
+    await Get.to(
+        () => CompanionMomentPage(
+              companionId: widget.companionId,
+              eventId: eventId,
+              name: widget.name,
+              controller: ctrl,
+              avatarUrl: widget.companion?['portrait_url'] as String?,
+            ),
+        preventDuplicates: false);
+  }
+
   Future<void> _openLifeEvent(Map<String, dynamic> message) async {
     final rawPayload = message['payload'];
     final referenceId =
@@ -288,9 +322,15 @@ class _ChatPageState extends State<ChatPage> {
         name: widget.name,
         avatarUrl: widget.companion?['portrait_url'] as String?,
         allowDiscuss: message['sender_type'] != 'user',
+        dateReminder: message['source'] == 'date_attendance' ||
+            payload['attendance_stage'] != null,
       ),
     );
     if (!mounted || selected == null) return;
+    if (selected['enter_scene'] == 'true') {
+      await _openDateEvent(eventId);
+      return;
+    }
     final title = selected['title'] ?? '';
     final oldAutoPrompt = _autoLifeEventPrompt;
     final shouldReplaceDraft = _input.text.trim().isEmpty ||
@@ -1193,6 +1233,7 @@ class _LifeEventSheet extends StatefulWidget {
     required this.name,
     this.avatarUrl,
     this.allowDiscuss = true,
+    this.dateReminder = false,
   });
 
   final String companionId;
@@ -1200,7 +1241,7 @@ class _LifeEventSheet extends StatefulWidget {
   final Map<String, dynamic> fallback;
   final String name;
   final String? avatarUrl;
-  final bool allowDiscuss;
+  final bool allowDiscuss, dateReminder;
 
   @override
   State<_LifeEventSheet> createState() => _LifeEventSheetState();
@@ -1225,6 +1266,9 @@ class _LifeEventSheetState extends State<_LifeEventSheet> {
         future: _event,
         builder: (context, snapshot) {
           final event = snapshot.data;
+          final isDate = widget.dateReminder ||
+              (event?['event_type'] == 'shared_activity' &&
+                  event?['generation_source'] == 'user_purchase');
           final title = _eventText(
               '${event?['title'] ?? widget.fallback['event_title'] ?? ''}');
           final description = _eventText(
@@ -1329,7 +1373,7 @@ class _LifeEventSheetState extends State<_LifeEventSheet> {
                       const SizedBox(height: 18),
                       const LinearProgressIndicator(minHeight: 2),
                     ],
-                    if (widget.allowDiscuss) ...[
+                    if (isDate || widget.allowDiscuss) ...[
                       const SizedBox(height: 26),
                       SizedBox(
                         width: double.infinity,
@@ -1339,12 +1383,15 @@ class _LifeEventSheetState extends State<_LifeEventSheet> {
                               : () => Navigator.of(context).pop({
                                     'title': title,
                                     'event_id': widget.eventId,
+                                    if (isDate) 'enter_scene': 'true',
                                   }),
                           icon: const Icon(Icons.chat_bubble_outline_rounded,
                               size: 17),
-                          label: Text(isActive
-                              ? 'chat.event.discussNow'.tr
-                              : 'chat.event.discuss'.tr),
+                          label: Text(isDate
+                              ? 'world.appointment.enter'.tr
+                              : isActive
+                                  ? 'chat.event.discussNow'.tr
+                                  : 'chat.event.discuss'.tr),
                         ),
                       ),
                     ],
