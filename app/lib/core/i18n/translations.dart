@@ -13,6 +13,14 @@ class VitaTranslations extends Translations {
 
   static const Map<String, Map<String, String>> _keys = {
     'en': {
+      "experience.journey.preview.cafe":
+          "The drink is unavailable. Discuss an alternative with your companion, name the moment and confirm a personal keepsake.",
+      "experience.journey.preview.cinema":
+          "You prefer different kinds of films. Agree on your movie night and save a keepsake of the plan.",
+      "experience.journey.preview.restaurant":
+          "You want different dishes. Agree on something to share and save a keepsake of this imagined dinner.",
+      "experience.journey.preview.general":
+          "Build on the delivered gift or media: agree on its meaning and name, then confirm your personal keepsake.",
       "experience.journey.confirmTitle": "Our joint decision",
       "experience.journey.name": "Name this moment",
       "experience.journey.confirmHint":
@@ -914,6 +922,14 @@ class VitaTranslations extends Translations {
       'stage.partner': 'Partner',
     },
     'zh_CN': {
+      "experience.journey.preview.cafe":
+          "想喝的饮品售罄了。和 TA 商量替代口味，为这一刻取名，确认后留下专属纪念卡。",
+      "experience.journey.preview.cinema":
+          "你们喜欢的电影类型不同。一起商量今晚的选择，留下属于这场约定的纪念卡。",
+      "experience.journey.preview.restaurant":
+          "你们想吃的菜不同。商量一份一起分享的选择，为这顿虚拟晚餐留下纪念卡。",
+      "experience.journey.preview.general":
+          "从这次礼物或生成内容出发，和 TA 一起决定它的意义与名字，确认后保存专属纪念卡。",
       "experience.journey.confirmTitle": "我们的共同决定",
       "experience.journey.name": "为这一刻取个名字",
       "experience.journey.confirmHint": "确认后保存这次决定与纪念卡，并加入 TA 的记忆，不额外扣除金币。",

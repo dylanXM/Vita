@@ -34,3 +34,14 @@ func TestDecodeMomentSceneKeepsSituationAndValidatesFocus(t *testing.T) {
 		t.Fatalf("invalid focus accepted: %+v %v", scene, err)
 	}
 }
+
+func TestSceneProposalMustContainACompleteKeepsake(t *testing.T) {
+	scene, err := decodeMomentSceneState(`{"reply":"我们试试这个方案？","goal":"一起选一杯饮品","challenge":"原来的饮品售罄了","proposal":{"title":"窗边的名字","challenge":"原来的饮品售罄了","decision":"一起选热可可","note":"我喜欢你替这一刻取的名字。"}}`)
+	if err != nil || scene.Proposal == nil || scene.Proposal.Decision != "一起选热可可" {
+		t.Fatalf("lost joint proposal: %+v %v", scene, err)
+	}
+	scene, err = decodeMomentSceneState(`{"reply":"再商量一下。","proposal":{"title":"缺失决定"}}`)
+	if err != nil || scene.Proposal != nil {
+		t.Fatalf("accepted incomplete proposal: %+v %v", scene, err)
+	}
+}

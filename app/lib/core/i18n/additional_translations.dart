@@ -1,5 +1,13 @@
 const Map<String, Map<String, String>> additionalVitaTranslations = {
   'es': {
+    "experience.journey.preview.cafe":
+        "La bebida no está disponible. Elijan una alternativa, nombren el momento y confirmen un recuerdo personal.",
+    "experience.journey.preview.cinema":
+        "Prefieren películas diferentes. Acuerden su noche de cine y guarden un recuerdo del plan.",
+    "experience.journey.preview.restaurant":
+        "Quieren platos diferentes. Acuerden algo para compartir y guarden un recuerdo de esta cena imaginada.",
+    "experience.journey.preview.general":
+        "Partan del regalo o contenido recibido: acuerden su significado y nombre y confirmen su recuerdo.",
     "experience.journey.confirmTitle": "Nuestra decisión conjunta",
     "experience.journey.name": "Ponle nombre al momento",
     "experience.journey.confirmHint":
@@ -872,6 +880,14 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'Sin configurar',
   },
   'pt': {
+    "experience.journey.preview.cafe":
+        "A bebida não está disponível. Escolham uma alternativa, deem nome ao momento e confirmem uma lembrança pessoal.",
+    "experience.journey.preview.cinema":
+        "Vocês preferem filmes diferentes. Combinem a noite de cinema e guardem uma lembrança do plano.",
+    "experience.journey.preview.restaurant":
+        "Vocês querem pratos diferentes. Escolham algo para compartilhar e guardem uma lembrança deste jantar imaginado.",
+    "experience.journey.preview.general":
+        "A partir do presente ou conteúdo recebido, decidam seu significado e nome e confirmem a lembrança.",
     "experience.journey.confirmTitle": "Nossa decisão conjunta",
     "experience.journey.name": "Dê um nome ao momento",
     "experience.journey.confirmHint":
@@ -1748,6 +1764,14 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'Não definido',
   },
   'ja': {
+    "experience.journey.preview.cafe":
+        "飲みたいものが売り切れ。代わりの味を相談して、この瞬間に名前をつけ、記念カードを確認して残しましょう。",
+    "experience.journey.preview.cinema":
+        "好きな映画の種類が違う二人。今夜の楽しみ方を相談して、約束の記念カードを残しましょう。",
+    "experience.journey.preview.restaurant":
+        "食べたい料理が違う二人。一緒に楽しむものを相談して、想像の夕食の記念カードを残しましょう。",
+    "experience.journey.preview.general":
+        "届いた贈り物やコンテンツの意味と名前を二人で決めて、記念カードを確認して保存しましょう。",
     "experience.journey.confirmTitle": "二人で決めたこと",
     "experience.journey.name": "この瞬間に名前をつける",
     "experience.journey.confirmHint":
@@ -2552,6 +2576,14 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': '未設定',
   },
   'ko': {
+    "experience.journey.preview.cafe":
+        "원하는 음료가 품절됐어요. 대안을 함께 이야기하고 순간에 이름을 붙여 기념 카드를 확인해 보세요.",
+    "experience.journey.preview.cinema":
+        "좋아하는 영화가 달라요. 영화의 밤을 함께 정하고 약속의 기념 카드를 남겨보세요.",
+    "experience.journey.preview.restaurant":
+        "먹고 싶은 요리가 달라요. 함께 나눌 메뉴를 정하고 가상의 저녁 식사 기념 카드를 남겨보세요.",
+    "experience.journey.preview.general":
+        "전달된 선물이나 콘텐츠의 의미와 이름을 함께 정하고 기념 카드를 확인해 보세요.",
     "experience.journey.confirmTitle": "함께 내린 결정",
     "experience.journey.name": "이 순간에 이름 붙이기",
     "experience.journey.confirmHint":
@@ -3359,6 +3391,14 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': '미설정',
   },
   'ar': {
+    "experience.journey.preview.cafe":
+        "المشروب غير متاح. اتفقا على بديل واسم للحظة ثم أكدا بطاقة ذكرى خاصة.",
+    "experience.journey.preview.cinema":
+        "تفضلان أنواعًا مختلفة من الأفلام. اتفقا على سهرتكما واحفظا ذكرى الخطة.",
+    "experience.journey.preview.restaurant":
+        "ترغبان في أطباق مختلفة. اتفقا على شيء تتشاركانه واحفظا ذكرى هذا العشاء المتخيل.",
+    "experience.journey.preview.general":
+        "انطلاقًا من الهدية أو المحتوى المستلم، اتفقا على معناه واسمه ثم أكدا بطاقة الذكرى.",
     "experience.journey.confirmTitle": "قرارنا المشترك",
     "experience.journey.name": "امنح هذه اللحظة اسمًا",
     "experience.journey.confirmHint":
@@ -4193,6 +4233,13 @@ const Map<String, Map<String, String>> additionalVitaTranslations = {
     'contactDetail.notSet': 'غير محدد',
   },
   'zh_TW': {
+    "experience.journey.preview.cafe":
+        "想喝的飲品售罄了。和 TA 商量替代口味，為這一刻取名，確認後留下專屬紀念卡。",
+    "experience.journey.preview.cinema": "你們喜歡的電影類型不同。一起商量今晚的選擇，留下屬於這場約定的紀念卡。",
+    "experience.journey.preview.restaurant":
+        "你們想吃的菜不同。商量一份一起分享的選擇，為這頓虛擬晚餐留下紀念卡。",
+    "experience.journey.preview.general":
+        "從這次禮物或生成內容出發，和 TA 一起決定它的意義與名字，確認後儲存專屬紀念卡。",
     "experience.journey.confirmTitle": "我們的共同決定",
     "experience.journey.name": "為這一刻取個名字",
     "experience.journey.confirmHint": "確認後儲存這次決定與紀念卡，並加入 TA 的記憶，不額外扣除金幣。",

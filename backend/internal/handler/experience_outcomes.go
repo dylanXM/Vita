@@ -139,7 +139,7 @@ func ConfirmExperienceOutcome(c *gin.Context) {
 	}
 	var allowed bool
 	if input.EventID != "" {
-		err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM life_events e JOIN companions cp ON cp.id=e.companion_id JOIN companion_moment_sessions session ON session.event_id=e.id WHERE e.id=$1 AND cp.id=$2 AND cp.user_id=$3 AND e.event_type='shared_activity' AND e.generation_source='user_purchase' AND session.opening_message_id IS NOT NULL AND e.start_time<=CURRENT_TIMESTAMP AND e.end_time>CURRENT_TIMESTAMP)`, input.EventID, companionID, userID).Scan(&allowed)
+		err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM life_events e JOIN companions cp ON cp.id=e.companion_id JOIN companion_moment_sessions session ON session.event_id=e.id WHERE e.id=$1 AND cp.id=$2 AND cp.user_id=$3 AND e.event_type='shared_activity' AND e.generation_source='user_purchase' AND session.user_id=$3 AND session.opening_message_id IS NOT NULL AND e.start_time<=CURRENT_TIMESTAMP AND e.end_time>CURRENT_TIMESTAMP AND EXISTS(SELECT 1 FROM credit_spends paid WHERE paid.user_id=$3 AND paid.companion_id=$2 AND paid.reference_id=e.id AND paid.reference_type='companion_experience' AND paid.status='completed'))`, input.EventID, companionID, userID).Scan(&allowed)
 	} else {
 		err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM credit_spends WHERE id=$1 AND companion_id=$2 AND user_id=$3 AND status='completed' AND reference_type='companion_experience')`, input.SpendID, companionID, userID).Scan(&allowed)
 	}

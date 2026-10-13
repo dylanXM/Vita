@@ -578,6 +578,17 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
             '${selected['description_key'] ?? selected['name_key'] ?? selected['key']}'
                 .tr,
             style: TextStyle(color: context.vita.subText, height: 1.5)),
+        if (_owned[selected['key']] != true)
+          Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                  'experience.journey.preview.${selected['category'] == 'date' && selected['metadata'] is Map && [
+                            'cafe',
+                            'cinema',
+                            'restaurant'
+                          ].contains((selected['metadata'] as Map)['location']) ? (selected['metadata'] as Map)['location'] : 'general'}'
+                      .tr,
+                  style: TextStyle(color: context.vita.text, height: 1.5))),
         if (custom) ...[
           const SizedBox(height: 16),
           TextField(
