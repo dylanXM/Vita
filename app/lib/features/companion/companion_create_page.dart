@@ -110,7 +110,7 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
           source: ImageSource.gallery, imageQuality: 90, maxWidth: 1024);
       if (image == null || !mounted) return;
       final result = await ApiClient.instance
-          .upload('/v1/media/upload', image.path, kind: 'image');
+          .upload('/v1/companions/image', image.path, kind: 'image');
       final id = result is Map ? result['id'] : null;
       if (id is! String || id.isEmpty) {
         throw ApiException('profile.uploadFailed'.tr);
@@ -123,8 +123,15 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
       });
     } catch (e) {
       if (!mounted) return;
-      VitaNotice.error('companion.create.chooseImage'.tr,
-          e is ApiException ? e.message : 'profile.uploadFailed'.tr);
+      VitaNotice.error(
+          'companion.create.chooseImage'.tr,
+          e is ApiException
+              ? (e.code == 'character_image_invalid'
+                  ? 'companion.create.imageInvalid'.tr
+                  : e.code == 'character_image_validation_unavailable'
+                      ? 'companion.create.imageValidationUnavailable'.tr
+                      : e.message)
+              : 'profile.uploadFailed'.tr);
     } finally {
       if (mounted) setState(() => _uploadingAvatar = false);
     }
@@ -183,6 +190,11 @@ class _CompanionCreatePageState extends State<CompanionCreatePage> {
 
   Future<void> _submit() async {
     if (_busy || _uploadingAvatar) return;
+    if (_portraitId == null && _avatarMediaId == null) {
+      VitaNotice.warning('companion.create.imageRequired'.tr,
+          'companion.create.imageRequiredMessage'.tr);
+      return;
+    }
     if (_name.text.trim().isEmpty) {
       VitaNotice.warning('companion.create.nameRequired'.tr,
           'companion.create.nameRequiredMessage'.tr);

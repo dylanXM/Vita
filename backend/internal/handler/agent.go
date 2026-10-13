@@ -295,24 +295,25 @@ const (
 )
 
 var modelScenarioCapabilities = map[string]string{
-	"text_chat":              "text",
-	"text_life_plan":         "text",
-	"text_proactive":         "text",
-	"text_memory":            "text",
-	"text_character_profile": "text",
-	"text_story_chapter":     "text",
-	"text_storyboard":        "text",
-	"image_life_photo":       "image",
-	"image_requested_photo":  "image",
-	"image_storyboard_sheet": "image",
-	"audio_transcription":    "audio",
-	"audio_speech":           "audio",
-	"video_life_clip":        "video",
-	"video_realtime_avatar":  "video",
+	"text_chat":                       "text",
+	"text_life_plan":                  "text",
+	"text_proactive":                  "text",
+	"text_memory":                     "text",
+	"text_character_profile":          "text",
+	"text_character_image_validation": "text",
+	"text_story_chapter":              "text",
+	"text_storyboard":                 "text",
+	"image_life_photo":                "image",
+	"image_requested_photo":           "image",
+	"image_storyboard_sheet":          "image",
+	"audio_transcription":             "audio",
+	"audio_speech":                    "audio",
+	"video_life_clip":                 "video",
+	"video_realtime_avatar":           "video",
 }
 
 var orderedModelScenarios = []string{
-	"text_chat", "text_life_plan", "text_proactive", "text_memory", "text_character_profile", "text_story_chapter", "text_storyboard",
+	"text_chat", "text_life_plan", "text_proactive", "text_memory", "text_character_profile", "text_character_image_validation", "text_story_chapter", "text_storyboard",
 	"image_life_photo", "image_requested_photo", "image_storyboard_sheet",
 	"audio_transcription", "audio_speech",
 	"video_life_clip", "video_realtime_avatar",
@@ -702,20 +703,21 @@ type mediaModelRoute struct {
 }
 
 var mediaRouteTypes = map[string]string{
-	"text_chat":              "text",
-	"text_life_plan":         "text",
-	"text_proactive":         "text",
-	"text_memory":            "text",
-	"text_character_profile": "text",
-	"text_story_chapter":     "text",
-	"text_storyboard":        "text",
-	"image_life_photo":       "image",
-	"image_requested_photo":  "image",
-	"image_storyboard_sheet": "image",
-	"audio_transcription":    "audio",
-	"audio_speech":           "audio",
-	"video_life_clip":        "video",
-	"video_realtime_avatar":  "video",
+	"text_chat":                       "text",
+	"text_life_plan":                  "text",
+	"text_proactive":                  "text",
+	"text_memory":                     "text",
+	"text_character_profile":          "text",
+	"text_character_image_validation": "text",
+	"text_story_chapter":              "text",
+	"text_storyboard":                 "text",
+	"image_life_photo":                "image",
+	"image_requested_photo":           "image",
+	"image_storyboard_sheet":          "image",
+	"audio_transcription":             "audio",
+	"audio_speech":                    "audio",
+	"video_life_clip":                 "video",
+	"video_realtime_avatar":           "video",
 }
 
 func AdminListMediaModelRoutes(c *gin.Context) {
@@ -898,7 +900,7 @@ func AdminUpdateAgentSettings(c *gin.Context) {
 	_, err = tx.ExecContext(c.Request.Context(), `
 		UPDATE agent_settings SET daily_event_min=$1,daily_event_max=$2,daily_proactive_limit=$3,daily_life_photo_limit=$4,
 		quiet_hours_start=$5,quiet_hours_end=$6,free_default_chat_hours=$7,updated_at=CURRENT_TIMESTAMP WHERE id='default'`,
-		input.DailyEventMin, input.DailyEventMax, input.DailyProactiveLimit, input.DailyLifePhotoLimit, input.QuietHoursStart, input.QuietHoursEnd, input.FreeDefaultChatHours)
+		input.DailyEventMin, input.DailyEventMax, input.DailyProactiveLimit, input.DailyLifePhotoLimit, input.QuietHoursStart, input.QuietHoursEnd, 12)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to save agent settings"})
 		return

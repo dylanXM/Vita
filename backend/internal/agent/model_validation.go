@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -54,6 +56,21 @@ func TestModelScenario(ctx context.Context, client *Client, model Model, scenari
 			_, err = parseMemoryExtraction(out, map[string]bool{}, now)
 		}
 		return textTranscript(model, req, out), err
+	case "text_character_image_validation":
+		image, _ := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aYfkAAAAASUVORK5CYII=")
+		req := GenerateRequest{System: "Inspect this image. Return only JSON with accepted (boolean) and person_count (integer). Accept only exactly one human character; a blank image must be rejected.", Image: &ImageReference{Data: image, MIME: "image/png"}, MaxTokens: 120}
+		out, err := client.GenerateText(ctx, model, req)
+		if err != nil {
+			return textTranscript(model, req, out), err
+		}
+		var result struct {
+			Accepted *bool `json:"accepted"`
+			Count    *int  `json:"person_count"`
+		}
+		if json.Unmarshal([]byte(out), &result) != nil || result.Accepted == nil || result.Count == nil || *result.Accepted || *result.Count != 0 {
+			return textTranscript(model, req, out), fmt.Errorf("vision validation test did not reject blank image")
+		}
+		return textTranscript(model, req, out), nil
 	case "text_character_profile":
 		req := GenerateRequest{
 			System:      "You create editable fictional AI character profiles. Output strict JSON only.",

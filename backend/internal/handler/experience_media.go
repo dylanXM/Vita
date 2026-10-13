@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"vita/internal/agent"
@@ -17,6 +18,12 @@ import (
 
 func purchaseMediaExperience(c *gin.Context, userID, companionID, key string, input experienceRequest) {
 	ctx := c.Request.Context()
+	preferences, valid := input.Input["custom_request"].(string)
+	if input.Input["custom_request"] != nil && !valid || utf8.RuneCountInString(preferences) > 500 {
+		c.JSON(400, gin.H{"error": "custom request must be text up to 500 characters", "code": "invalid_request"})
+		return
+	}
+	preferences = strings.TrimSpace(preferences)
 	params := credits.ReserveParams{UserID: userID, CompanionID: companionID, Environment: currentEnvironment(), Platform: requestPlatform(c), ProductKey: key, IdempotencyKey: input.IdempotencyKey, ReferenceType: "companion_experience", Metadata: input.Input}
 	reservation, err := credits.Reserve(ctx, db.Get(), params)
 	if err != nil {
@@ -29,6 +36,9 @@ func purchaseMediaExperience(c *gin.Context, userID, companionID, key string, in
 	}
 	product := reservation.Product
 	var errGeneration error
+	if reservation.Product.Coins <= 0 {
+		errGeneration = fmt.Errorf("media generation requires a paid coin experience")
+	}
 	if companionAgent == nil {
 		errGeneration = fmt.Errorf("media service is unavailable")
 	}
@@ -37,13 +47,13 @@ func purchaseMediaExperience(c *gin.Context, userID, companionID, key string, in
 	if errGeneration == nil {
 		switch product.Category {
 		case "photo":
-			message, err = companionAgent.PrepareRequestedLifePhoto(ctx, userID, companionID)
+			message, err = companionAgent.PrepareRequestedLifePhoto(ctx, userID, companionID, preferences)
 		case "voice":
-			message, err = companionAgent.PrepareLatestReplySpeech(ctx, userID, companionID)
+			message, err = companionAgent.PrepareLatestReplySpeech(ctx, userID, companionID, preferences)
 		case "outfit":
 			outfitKey = key
 			style, _ := product.Metadata["style"].(string)
-			message, err = companionAgent.GenerateOutfitPhoto(ctx, userID, companionID, key, style)
+			message, err = companionAgent.GenerateOutfitPhoto(ctx, userID, companionID, key, style, preferences)
 		default:
 			err = fmt.Errorf("unsupported media product")
 		}
@@ -135,7 +145,7 @@ func equipOwnedMediaOutfit(c *gin.Context, userID, companionID, key string) {
 		var style string
 		err = db.Get().QueryRowContext(ctx, `SELECT COALESCE(metadata->>'style','') FROM credit_products WHERE environment=$1 AND product_key=$2`, currentEnvironment(), key).Scan(&style)
 		if err == nil && companionAgent != nil {
-			message, err = companionAgent.GenerateOutfitPhoto(ctx, userID, companionID, key, style)
+			message, err = companionAgent.GenerateOutfitPhoto(ctx, userID, companionID, key, style, preferences)
 		} else if err == nil {
 			err = fmt.Errorf("media service is unavailable")
 		}

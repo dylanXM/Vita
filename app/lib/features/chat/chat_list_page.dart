@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../core/notice.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../companion/companion_create_method_page.dart';
-import '../billing/billing_controller.dart';
 import 'chat_list_controller.dart';
 import 'chat_list_presentation.dart';
 import 'chat_page.dart';
@@ -32,12 +30,6 @@ class ChatListPage extends StatelessWidget {
               actions: IconButton.filledTonal(
                 tooltip: 'world.create'.tr,
                 onPressed: () {
-                  if (!BillingController.to.isSubscribed) {
-                    VitaNotice.warning('subscription.required.title'.tr,
-                        'subscription.required.create'.tr);
-                    Get.toNamed('/subscription');
-                    return;
-                  }
                   Get.to(
                     () => const CompanionCreateMethodPage(),
                     transition: Transition.cupertino,

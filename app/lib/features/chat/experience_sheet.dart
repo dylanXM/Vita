@@ -107,6 +107,17 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
       Get.toNamed('/credits/buy');
       return;
     }
+    String? customRequest;
+    if (['photo', 'voice', 'outfit'].contains(product['category'])) {
+      customRequest = await showModalBottomSheet<String>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        backgroundColor: context.vita.surface,
+        builder: (_) => const _MediaRequestSheet(),
+      );
+      if (customRequest == null || !mounted) return;
+    }
     final owned = _owned[key] == true;
     final appointment =
         product['category'] == 'date' ? await _chooseAppointment() : null;
@@ -156,6 +167,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
           'idempotency_key':
               '${widget.companionId}-$key-${DateTime.now().microsecondsSinceEpoch}',
           'input': <String, dynamic>{
+            if (customRequest != null) 'custom_request': customRequest,
             if (appointment != null)
               'scheduled_at': appointment.toUtc().toIso8601String(),
           }
@@ -745,4 +757,61 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
       ),
     );
   }
+}
+
+class _MediaRequestSheet extends StatefulWidget {
+  const _MediaRequestSheet();
+  @override
+  State<_MediaRequestSheet> createState() => _MediaRequestSheetState();
+}
+
+class _MediaRequestSheetState extends State<_MediaRequestSheet> {
+  final _text = TextEditingController();
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: EdgeInsets.fromLTRB(
+            20, 8, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+        child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+                child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('experience.mediaRequest.title'.tr,
+                    style: TextStyle(
+                        color: context.vita.text,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                Text('experience.mediaRequest.hint'.tr,
+                    style:
+                        TextStyle(color: context.vita.subText, fontSize: 13)),
+                const SizedBox(height: 16),
+                TextField(
+                    controller: _text,
+                    minLines: 3,
+                    maxLines: 5,
+                    maxLength: 500,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        counterText: '${_text.text.runes.length}/500')),
+                const SizedBox(height: 12),
+                SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                        onPressed: _text.text.runes.length > 500
+                            ? null
+                            : () => Navigator.pop(context, _text.text.trim()),
+                        child: Text('experience.mediaRequest.continue'.tr))),
+              ],
+            ))),
+      );
 }

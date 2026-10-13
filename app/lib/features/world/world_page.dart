@@ -9,7 +9,6 @@ import '../../core/analytics_service.dart';
 import '../../core/theme.dart';
 import '../../shared/media_image.dart';
 import '../../shared/widgets.dart';
-import '../billing/billing_controller.dart';
 import '../billing/subscription_page.dart';
 import '../chat/chat_list_controller.dart';
 import '../chat/chat_list_presentation.dart';
@@ -279,10 +278,6 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
   }
 
   Future<void> _createCompanion() async {
-    if (!BillingController.to.isSubscribed) {
-      await showSubscriptionPrompt(context, 'subscription.required.create'.tr);
-      return;
-    }
     await Get.to(() => const CompanionCreateMethodPage(),
         transition: Transition.cupertino);
     await ChatListController.to.load();

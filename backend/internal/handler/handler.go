@@ -1087,7 +1087,7 @@ func CreateCompanion(c *gin.Context) {
 	}
 	companionID := uuid.New().String()
 	userID := c.GetString("user_id")
-	subscribed, err := userHasActiveSubscription(userID)
+	subscribed, err := canCreatePersonalCompanion(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check subscription"})
 		return
@@ -1099,6 +1099,22 @@ func CreateCompanion(c *gin.Context) {
 	if len(req.PersonalityTags) > 8 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "choose no more than 8 personality tags"})
 		return
+	}
+	if (req.AvatarMediaID == nil || strings.TrimSpace(*req.AvatarMediaID) == "") && (req.PortraitID == nil || strings.TrimSpace(*req.PortraitID) == "") {
+		c.JSON(400, gin.H{"error": "character image is required", "code": "character_image_required"})
+		return
+	}
+	if req.PortraitID != nil && strings.TrimSpace(*req.PortraitID) != "" {
+		var usable bool
+		err := db.Get().QueryRowContext(c.Request.Context(), `SELECT EXISTS(SELECT 1 FROM companion_portraits WHERE id=$1 AND enabled=true AND image_url<>'' AND gender<>'pet')`, strings.TrimSpace(*req.PortraitID)).Scan(&usable)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "failed to verify character image"})
+			return
+		}
+		if !usable {
+			c.JSON(400, gin.H{"error": "choose an available human portrait", "code": "character_image_invalid"})
+			return
+		}
 	}
 	if err := alignCompanionRelationship(c.Request.Context(), &req); err != nil {
 		status := http.StatusInternalServerError
@@ -1119,10 +1135,30 @@ func CreateCompanion(c *gin.Context) {
 	avatarURL := ""
 	if req.AvatarMediaID != nil && strings.TrimSpace(*req.AvatarMediaID) != "" {
 		mediaID := strings.TrimSpace(*req.AvatarMediaID)
-		var exists bool
-		if err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM media_assets WHERE id=$1 AND user_id=$2 AND kind='image')`, mediaID, userID).Scan(&exists); err != nil || !exists {
+		var exists, validated bool
+		if err := db.Get().QueryRow(`SELECT true,character_image_validated FROM media_assets WHERE id=$1 AND user_id=$2 AND kind='image'`, mediaID, userID).Scan(&exists, &validated); err != nil || !exists {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "character image is unavailable"})
 			return
+		}
+		if !validated {
+			if mediaStorage == nil {
+				c.JSON(503, gin.H{"error": "image validation unavailable", "code": "character_image_validation_unavailable"})
+				return
+			}
+			media, err := mediaStorage.Open(c.Request.Context(), mediaID, userID)
+			if err != nil {
+				c.JSON(400, gin.H{"error": "character image unavailable", "code": "character_image_invalid"})
+				return
+			}
+			data, err := io.ReadAll(io.LimitReader(media.Body, maxCharacterImageBytes+1))
+			media.Body.Close()
+			if err != nil || len(data) > maxCharacterImageBytes {
+				c.JSON(400, gin.H{"error": "invalid character image", "code": "character_image_invalid"})
+				return
+			}
+			if !validateCharacterImage(c, data, http.DetectContentType(data)) || !markCharacterImage(c, mediaID) {
+				return
+			}
 		}
 		avatarURL = "/v1/media/" + mediaID
 		req.AvatarMediaID = &mediaID
@@ -1134,12 +1170,29 @@ func CreateCompanion(c *gin.Context) {
 	tags, _ := json.Marshal(req.PersonalityTags)
 	tx, err := db.Get().Begin()
 	if err == nil {
-		_, err = tx.Exec(`INSERT INTO companions
+		var claimed, entitled bool
+		err = tx.QueryRow(`SELECT free_companion_claimed,created_at + INTERVAL '12 hours'>CURRENT_TIMESTAMP FROM users WHERE id=$1 FOR UPDATE`, userID).Scan(&claimed, &entitled)
+		var subscribed bool
+		if err == nil {
+			err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM subscriptions WHERE user_id=$1 AND status='active' AND (current_period_end IS NULL OR current_period_end>CURRENT_TIMESTAMP))`, userID).Scan(&subscribed)
+		}
+		if err == nil && !subscribed && (claimed || !entitled) {
+			_ = tx.Rollback()
+			subscriptionRequired(c, "companion_creation_requires_subscription", "Free companion allowance is unavailable; subscribe to create another companion")
+			return
+		}
+		freeTrial := !subscribed
+		if err == nil && freeTrial {
+			_, err = tx.Exec(`UPDATE users SET free_companion_claimed=true WHERE id=$1`, userID)
+		}
+		if err == nil {
+			_, err = tx.Exec(`INSERT INTO companions
 			(id,user_id,name,gender,persona,appearance,city,occupation,interests,relationship_stage,
-			 personality_tags,speaking_style,likes,dislikes,life_habits,life_goal,backstory,portrait_id,avatar_url,creation_source,proactive_enabled,active)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,true,true)`,
-			companionID, userID, req.Name, req.Gender, req.Persona, req.Appearance, req.City, req.Occupation, req.Interests,
-			req.RelationshipStage, tags, req.SpeakingStyle, req.Likes, req.Dislikes, req.LifeHabits, req.LifeGoal, req.Backstory, req.PortraitID, avatarURL, creationSource)
+			 personality_tags,speaking_style,likes,dislikes,life_habits,life_goal,backstory,portrait_id,avatar_url,creation_source,proactive_enabled,active,free_trial_companion)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,true,true,$21)`,
+				companionID, userID, req.Name, req.Gender, req.Persona, req.Appearance, req.City, req.Occupation, req.Interests,
+				req.RelationshipStage, tags, req.SpeakingStyle, req.Likes, req.Dislikes, req.LifeHabits, req.LifeGoal, req.Backstory, req.PortraitID, avatarURL, creationSource, freeTrial)
+		}
 	}
 	if err == nil {
 		_, err = tx.Exec(`INSERT INTO relationship_states (companion_id) VALUES ($1)`, companionID)
@@ -1156,7 +1209,7 @@ func CreateCompanion(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create companion"})
 		return
 	}
-	c.JSON(http.StatusCreated, Companion{
+	created := Companion{
 		ID: companionID, UserID: userID, Name: req.Name,
 		Gender: req.Gender, Persona: req.Persona,
 		RelationshipStage: req.RelationshipStage, PersonalityTags: req.PersonalityTags,
@@ -1164,7 +1217,9 @@ func CreateCompanion(c *gin.Context) {
 		LifeHabits: req.LifeHabits, LifeGoal: req.LifeGoal, Backstory: req.Backstory,
 		PortraitID: req.PortraitID, PortraitURL: avatarURL, CreationSource: creationSource, ProactiveEnabled: true, Active: true,
 		LifeEnabled: true, FriendshipActive: true, CanChat: true,
-	})
+	}
+	decorateCompanionAccess(userID, &created)
+	c.JSON(http.StatusCreated, created)
 }
 
 func GetCompanion(c *gin.Context) {
@@ -1202,7 +1257,7 @@ func ListCompanions(c *gin.Context) {
 		return
 	}
 	rows, err := db.Get().QueryContext(c.Request.Context(), `SELECT c.id,c.user_id,c.name,COALESCE(c.gender,''),COALESCE(c.persona,''),COALESCE(c.appearance,''),COALESCE(c.city,''),COALESCE(c.occupation,''),COALESCE(c.interests,''),COALESCE(c.relationship_stage,'stranger'),c.personality_tags::text,c.speaking_style,c.likes,c.dislikes,c.life_habits,c.life_goal,c.backstory,c.portrait_id,COALESCE(NULLIF(c.avatar_url,''),p.image_url,''),c.model_id,c.creation_source,c.proactive_enabled,c.active,c.is_default,c.life_enabled,c.friendship_active,c.created_at,c.updated_at,
-		COALESCE(latest.content,''),COALESCE(latest.message_type,'text'),latest.created_at,COALESCE(unread.count,0)
+		COALESCE(latest.content,''),COALESCE(latest.message_type,'text'),latest.created_at,COALESCE(unread.count,0),vita_companion_access(c.user_id,c.id)
 		FROM companions c
 		LEFT JOIN companion_portraits p ON p.id=c.portrait_id
 		LEFT JOIN LATERAL (
@@ -1230,7 +1285,8 @@ func ListCompanions(c *gin.Context) {
 		var tags string
 		var portraitID, modelID sql.NullString
 		var lastMessageAt sql.NullTime
-		if err := rows.Scan(&comp.ID, &comp.UserID, &comp.Name, &comp.Gender, &comp.Persona, &comp.Appearance, &comp.City, &comp.Occupation, &comp.Interests, &comp.RelationshipStage, &tags, &comp.SpeakingStyle, &comp.Likes, &comp.Dislikes, &comp.LifeHabits, &comp.LifeGoal, &comp.Backstory, &portraitID, &comp.PortraitURL, &modelID, &comp.CreationSource, &comp.ProactiveEnabled, &comp.Active, &comp.IsDefault, &comp.LifeEnabled, &comp.FriendshipActive, &comp.CreatedAt, &comp.UpdatedAt, &comp.LastMessage, &comp.LastMessageType, &lastMessageAt, &comp.UnreadCount); err != nil {
+		var access bool
+		if err := rows.Scan(&comp.ID, &comp.UserID, &comp.Name, &comp.Gender, &comp.Persona, &comp.Appearance, &comp.City, &comp.Occupation, &comp.Interests, &comp.RelationshipStage, &tags, &comp.SpeakingStyle, &comp.Likes, &comp.Dislikes, &comp.LifeHabits, &comp.LifeGoal, &comp.Backstory, &portraitID, &comp.PortraitURL, &modelID, &comp.CreationSource, &comp.ProactiveEnabled, &comp.Active, &comp.IsDefault, &comp.LifeEnabled, &comp.FriendshipActive, &comp.CreatedAt, &comp.UpdatedAt, &comp.LastMessage, &comp.LastMessageType, &lastMessageAt, &comp.UnreadCount, &access); err != nil {
 			continue
 		}
 		_ = json.Unmarshal([]byte(tags), &comp.PersonalityTags)
@@ -1242,9 +1298,13 @@ func ListCompanions(c *gin.Context) {
 			comp.RequiresSubscription = !allowed
 			comp.TrialExpiresAt = expires
 		} else {
-			comp.CanChat = subscribed
-			comp.RequiresSubscription = !subscribed
-			comp.FriendshipActive = subscribed && comp.FriendshipActive
+			comp.CanChat = access
+			comp.RequiresSubscription = !access
+			comp.FriendshipActive = access && comp.FriendshipActive
+			comp.LifeEnabled = access && comp.LifeEnabled
+			if !subscribed {
+				comp.TrialExpiresAt = expires
+			}
 		}
 		companions = append(companions, comp)
 	}
@@ -1367,7 +1427,7 @@ func SendMessage(c *gin.Context) {
 	}
 	var trialExpiresAt *time.Time
 	if !isDefault {
-		subscribed, err := userHasActiveSubscription(userID)
+		subscribed, err := companionHasAccess(userID, companionID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check subscription"})
 			return
@@ -1377,6 +1437,9 @@ func SendMessage(c *gin.Context) {
 			subscriptionRequired(c, "friendship_inactive", "You are no longer friends, so messages cannot be sent. Subscribe to reconnect")
 			return
 		}
+	}
+	if !isDefault {
+		_, trialExpiresAt, _ = defaultChatAccess(userID, false)
 	}
 	createdAt := time.Now().UTC()
 	appLocale := language.Normalize(c.GetHeader("Accept-Language"))
@@ -1807,7 +1870,14 @@ func GetOrCreateConversation(c *gin.Context) {
 		}
 	}
 	if !isDefault {
-		active, accessErr := userHasActiveSubscription(userID)
+		_, trialExpiresAt, _ = defaultChatAccess(userID, false)
+		if trialExpiresAt != nil {
+			trialStatus = "active"
+			if !time.Now().Before(*trialExpiresAt) {
+				trialStatus = "expired"
+			}
+		}
+		active, accessErr := companionHasAccess(userID, req.CompanionID)
 		if accessErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check subscription"})
 			return
@@ -2155,9 +2225,23 @@ func UploadMedia(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "media content type does not match kind"})
 		return
 	}
+	characterImage := c.GetBool("character_image")
+	if characterImage {
+		mimeType = http.DetectContentType(data)
+		if kind != "image" {
+			c.JSON(400, gin.H{"error": "character image is required", "code": "character_image_invalid"})
+			return
+		}
+		if !validateCharacterImage(c, data, mimeType) {
+			return
+		}
+	}
 	id := uuid.New().String()
 	if err := mediaStorage.Store(c.Request.Context(), c.GetString("user_id"), id, kind, mimeType, data); err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to store media"})
+		return
+	}
+	if characterImage && !markCharacterImage(c, id) {
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"id": id, "url": "/v1/media/" + id, "mime_type": mimeType, "size_bytes": len(data)})
@@ -2183,7 +2267,7 @@ func GetMedia(c *gin.Context) {
 }
 
 func GenerateMedia(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"job_id": uuid.New().String(), "status": "queued"})
+	c.JSON(http.StatusPaymentRequired, gin.H{"error": "Generate media through Shared Experiences after paying coins", "code": "media_requires_paid_experience", "action": "open_experiences"})
 }
 
 // --- Token Generation ---

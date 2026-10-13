@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,6 +41,7 @@ type Model struct {
 }
 
 type GenerateRequest struct {
+	Image       *ImageReference `json:",omitempty"`
 	System      string
 	Messages    []ChatMessage
 	Temperature float64
@@ -172,6 +174,9 @@ func (c *Client) generateText(ctx context.Context, model Model, input GenerateRe
 		copyClient.httpClient = &httpClient
 		c = &copyClient
 	}
+	if input.Image != nil && model.Kind != "openai" {
+		return "", fmt.Errorf("image validation requires an OpenAI-compatible vision model")
+	}
 	switch model.Kind {
 	case "openai":
 		return c.openAI(ctx, model, input)
@@ -233,6 +238,15 @@ func (c *Client) openAI(ctx context.Context, model Model, input GenerateRequest)
 		"messages":    messages,
 		"temperature": input.Temperature,
 		"max_tokens":  input.MaxTokens,
+	}
+	if input.Image != nil {
+		body["messages"] = []any{
+			map[string]any{"role": "system", "content": input.System},
+			map[string]any{"role": "user", "content": []any{
+				map[string]any{"type": "text", "text": "Assess this image against the required single-person criteria."},
+				map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:" + input.Image.MIME + ";base64," + base64.StdEncoding.EncodeToString(input.Image.Data)}},
+			}},
+		}
 	}
 	var response struct {
 		Choices []struct {

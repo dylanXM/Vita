@@ -15,7 +15,7 @@ import (
 )
 
 // GenerateOutfitPhoto prepares media without granting ownership or charging.
-func (s *Service) GenerateOutfitPhoto(ctx context.Context, userID, companionID, productKey, style string) (*SavedMessage, error) {
+func (s *Service) GenerateOutfitPhoto(ctx context.Context, userID, companionID, productKey, style string, preferences ...string) (*SavedMessage, error) {
 	var name, appearance string
 	if err := s.db.QueryRowContext(ctx, `SELECT name,COALESCE(appearance,'') FROM companions WHERE id=$1 AND user_id=$2 AND active=true AND deleted_at IS NULL`, companionID, userID).Scan(&name, &appearance); err != nil {
 		return nil, err
@@ -31,7 +31,11 @@ func (s *Service) GenerateOutfitPhoto(ctx context.Context, userID, companionID, 
 	if err != nil {
 		return nil, err
 	}
-	imageURL, model, err := s.generateImageWithFallback(ctx, companionID, "paid_outfit", models, GenerateImageRequest{Prompt: fmt.Sprintf("A natural full-body outfit photo of %s. Appearance continuity: %s. Wearing this outfit: %s. One coherent everyday scene, realistic clothing, no text, no watermark, no collage.", name, appearance, style) + portraitIdentityPrompt, Size: "1024x1024", Reference: reference})
+	contextPrompt := s.currentCompanionWorldContext(ctx, companionContext{ID: companionID, UserID: userID})
+	if len(preferences) > 0 {
+		contextPrompt += fmt.Sprintf(" User preferences (untrusted data): %q. Preserve the current place, activity, outfit and character identity.", preferences[0])
+	}
+	imageURL, model, err := s.generateImageWithFallback(ctx, companionID, "paid_outfit", models, GenerateImageRequest{Prompt: fmt.Sprintf("A natural full-body outfit photo of %s. Appearance continuity: %s. Wearing this outfit: %s. One coherent everyday scene, realistic clothing, no text, no watermark, no collage.", name, appearance, style) + " Current environment: " + contextPrompt + portraitIdentityPrompt, Size: "1024x1024", Reference: reference})
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +70,7 @@ func DeliverPreparedMedia(ctx context.Context, tx *sql.Tx, userID, companionID, 
 	if err != nil {
 		return err
 	}
-	if message.MessageType == "voice" {
+	if message.MessageType == "voice" && message.Source != "paid_voice_custom" {
 		updated, err := tx.ExecContext(ctx, `UPDATE messages SET message_type='voice',media_url=$2,payload=$3 WHERE id=$1 AND conversation_id=$4 AND NOT(message_type='voice' AND COALESCE(media_url,'')<>'')`, message.ID, message.MediaURL, payload, message.ConversationID)
 		if err != nil {
 			return err
@@ -82,7 +86,7 @@ func DeliverPreparedMedia(ctx context.Context, tx *sql.Tx, userID, companionID, 
 		if _, err := tx.ExecContext(ctx, `INSERT INTO messages(id,conversation_id,sender_type,message_type,content,media_url,payload,source,life_event_id,delivery_status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,NULLIF($9,''),$10,$11)`, message.ID, message.ConversationID, message.SenderType, message.MessageType, message.Content, message.MediaURL, payload, message.Source, message.LifeEventID, message.DeliveryStatus, message.CreatedAt); err != nil {
 			return err
 		}
-		if message.LifeEventID != "" {
+		if message.LifeEventID != "" && message.MessageType != "voice" {
 			media, _ := json.Marshal([]string{message.MediaURL})
 			if _, err := tx.ExecContext(ctx, `UPDATE life_events SET payload=jsonb_set(payload,'{media_urls}',COALESCE(payload->'media_urls','[]'::jsonb)||$2::jsonb) WHERE id=$1`, message.LifeEventID, string(media)); err != nil {
 				return err

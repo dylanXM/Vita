@@ -94,7 +94,7 @@ func defaultChatAccess(userID string, _ bool) (bool, *time.Time, error) {
 	// Registration is the authoritative start, including accounts created
 	// before the registration-time trial migration.
 	if _, err = db.Get().Exec(`INSERT INTO default_companion_trials(user_id,started_at,expires_at)
-		SELECT u.id,u.created_at,u.created_at + GREATEST(s.free_default_chat_hours,1) * INTERVAL '1 hour'
+		SELECT u.id,u.created_at,u.created_at + INTERVAL '12 hours'
 		FROM users u CROSS JOIN agent_settings s WHERE u.id=$1 AND s.id='default'
 		ON CONFLICT(user_id) DO NOTHING`, userID); err != nil {
 		return false, nil, err
@@ -115,9 +115,11 @@ func decorateCompanionAccess(userID string, companion *Companion) {
 		companion.TrialExpiresAt = expires
 		return
 	}
-	active, _ := userHasActiveSubscription(userID)
+	active, _ := companionHasAccess(userID, companion.ID)
+	_, companion.TrialExpiresAt, _ = defaultChatAccess(userID, false)
 	companion.CanChat = active
 	companion.FriendshipActive = active && companion.FriendshipActive
+	companion.LifeEnabled = active && companion.LifeEnabled
 	companion.RequiresSubscription = !active
 }
 
@@ -128,7 +130,7 @@ func requireCompanionLifeAccess(c *gin.Context, companionID string) bool {
 		c.JSON(http.StatusNotFound, gin.H{"error": "companion not found"})
 		return false
 	}
-	active, err := userHasActiveSubscription(userID)
+	active, err := companionHasAccess(userID, companionID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check subscription"})
 		return false
@@ -142,8 +144,8 @@ func requireCompanionLifeAccess(c *gin.Context, companionID string) bool {
 
 func syncUserCompanionEntitlement(userID string, active bool) error {
 	if !active {
-		_, err := db.Get().Exec(`UPDATE companions SET life_enabled=false,friendship_active=false,
-			subscription_paused_at=COALESCE(subscription_paused_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP
+		_, err := db.Get().Exec(`UPDATE companions SET life_enabled=vita_companion_access(user_id,id),friendship_active=(deleted_at IS NULL AND vita_companion_access(user_id,id)),
+			subscription_paused_at=CASE WHEN vita_companion_access(user_id,id) THEN NULL ELSE COALESCE(subscription_paused_at,CURRENT_TIMESTAMP) END,updated_at=CURRENT_TIMESTAMP
 			WHERE user_id=$1 AND is_default=false AND (active=true OR deleted_at IS NOT NULL)`, userID)
 		return err
 	}
@@ -222,4 +224,16 @@ func syncUserCompanionEntitlement(userID string, active bool) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+func companionHasAccess(userID, companionID string) (bool, error) {
+	var allowed bool
+	err := db.Get().QueryRow(`SELECT vita_companion_access($1,$2)`, userID, companionID).Scan(&allowed)
+	return allowed, err
+}
+
+func canCreatePersonalCompanion(userID string) (bool, error) {
+	var allowed bool
+	err := db.Get().QueryRow(`SELECT EXISTS(SELECT 1 FROM subscriptions WHERE user_id=$1 AND status='active' AND (current_period_end IS NULL OR current_period_end>CURRENT_TIMESTAMP)) OR EXISTS(SELECT 1 FROM users WHERE id=$1 AND free_companion_claimed=false AND created_at + INTERVAL '12 hours'>CURRENT_TIMESTAMP)`, userID).Scan(&allowed)
+	return allowed, err
 }

@@ -172,6 +172,7 @@ func main() {
 		{
 			companions.Use(middleware.RequireAuth())
 			companions.POST("/", handler.CreateCompanion)
+			companions.POST("/image", handler.UploadCharacterImage)
 			companions.GET("/:id", handler.GetCompanion)
 			companions.GET("/", handler.ListCompanions)
 			companions.GET("/updates", handler.CompanionUpdates)

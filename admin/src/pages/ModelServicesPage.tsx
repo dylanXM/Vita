@@ -39,7 +39,7 @@ const ALL_SCENARIOS: AIModelScenario[] = [
   "text_life_plan",
   "text_proactive",
   "text_memory",
-  "text_character_profile",
+  "text_character_profile", "text_character_image_validation",
   "text_story_chapter",
   "text_storyboard",
   "image_life_photo",

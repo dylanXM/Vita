@@ -13,11 +13,24 @@ class VitaTranslations extends Translations {
 
   static const Map<String, Map<String, String>> _keys = {
     'en': {
+      "experience.mediaRequest.title": "Your preferences (optional)",
+      "experience.mediaRequest.hint":
+          "Tell us what you would like. Generation stays grounded in your companion’s current surroundings and appearance.",
+      "experience.mediaRequest.continue": "Continue to coin confirmation",
+
+      "companion.create.imageInvalid":
+          "Use an image with exactly one person. Photos, AI portraits and anime characters are supported.",
+      "companion.create.imageValidationUnavailable":
+          "Image verification is unavailable. Please retry later.",
+
       "billing.nothingToRestore": "No restorable purchases were found.",
-      "billing.fulfillmentPending": "Payment succeeded. Your coins or subscription are syncing. Please do not buy again while you wait.",
+      "billing.fulfillmentPending":
+          "Payment succeeded. Your coins or subscription are syncing. Please do not buy again while you wait.",
       "billing.purchaseCancelled": "Purchase cancelled.",
-      "billing.purchaseErrorMessage": "The purchase could not be completed. Please try again later.",
-      "billing.identityNotReady": "Your purchase account could not be verified. Please sign in again or retry.",
+      "billing.purchaseErrorMessage":
+          "The purchase could not be completed. Please try again later.",
+      "billing.identityNotReady":
+          "Your purchase account could not be verified. Please sign in again or retry.",
       "billing.retrySync": "Check delivery again",
       "feedback.title": "Feedback",
       "feedback.hint": "Tell us about your experience (up to 2000 characters).",
@@ -34,7 +47,8 @@ class VitaTranslations extends Translations {
       "relation.family": "Family",
       "relation.mentor": "Mentor",
       "relation.colleague": "Colleague",
-      "companion.create.optionsUnavailable": "Relationship options could not be loaded. Please retry before creating your companion.",
+      "companion.create.optionsUnavailable":
+          "Relationship options could not be loaded. Please retry before creating your companion.",
       "companion.create.retryOptions": "Reload relationship options",
       // Shell tabs.
       'tab.chat': 'Chat',
@@ -223,7 +237,7 @@ class VitaTranslations extends Translations {
       'chat.photoMessage': 'Photo',
       'subscription.required.title': 'Subscription required',
       'subscription.required.create':
-          'Subscribe before creating your own companion.',
+          'Your free creation allowance or trial has ended. Subscribe to create another companion.',
       'subscription.continue': 'Subscribe',
       'subscription.active': 'Your plan is active',
       'subscription.hero': 'More life, more memories, more of her.',
@@ -838,6 +852,13 @@ class VitaTranslations extends Translations {
       'stage.partner': 'Partner',
     },
     'zh_CN': {
+      "experience.mediaRequest.title": "自定义需求（可选）",
+      "experience.mediaRequest.hint": "描述你想要的内容，生成将结合TA当前环境与形象。",
+      "experience.mediaRequest.continue": "继续确认金币花费",
+
+      "companion.create.imageInvalid": "请上传单个人物形象，支持真人、AI写实和动漫人物。",
+      "companion.create.imageValidationUnavailable": "人物检测暂不可用，请稍后重试。",
+
       "billing.nothingToRestore": "未找到可恢复的购买。",
       "billing.fulfillmentPending": "支付成功，金币或订阅权益正在同步。请勿重复购买。",
       "billing.purchaseCancelled": "已取消购买。",
@@ -1032,7 +1053,7 @@ class VitaTranslations extends Translations {
       'chat.replyFailed': '暂时还没有收到回复，请稍后再来看看',
       'chat.photoMessage': '图片',
       'subscription.required.title': '需要订阅',
-      'subscription.required.create': '订阅后才能创建自己的角色。',
+      'subscription.required.create': '免费创建名额已用完或试用已结束，订阅后可继续创建伴侣。',
       'subscription.continue': '继续订阅',
       'subscription.active': '你的订阅已生效',
       'subscription.hero': '更多生活、更多回忆，也更了解她。',

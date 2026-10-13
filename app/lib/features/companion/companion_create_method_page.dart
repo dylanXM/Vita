@@ -268,7 +268,13 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
       AnalyticsService.to.track('companion_draft_generated',
           category: 'companion', properties: {'creation_source': mode});
     } on ApiException catch (error) {
-      VitaNotice.error('companion.create.generateFailed'.tr, error.message);
+      VitaNotice.error(
+          'companion.create.generateFailed'.tr,
+          (error.code == 'character_image_invalid'
+              ? 'companion.create.imageInvalid'.tr
+              : error.code == 'character_image_validation_unavailable'
+                  ? 'companion.create.imageValidationUnavailable'.tr
+                  : error.message));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -307,7 +313,13 @@ class _AICompanionCreatePageState extends State<AICompanionCreatePage> {
       VitaNotice.success(
           'companion.create.success'.tr, 'companion.create.successMessage'.tr);
     } on ApiException catch (error) {
-      VitaNotice.error('companion.create.failed'.tr, error.message);
+      VitaNotice.error(
+          'companion.create.failed'.tr,
+          (error.code == 'character_image_invalid'
+              ? 'companion.create.imageInvalid'.tr
+              : error.code == 'character_image_validation_unavailable'
+                  ? 'companion.create.imageValidationUnavailable'.tr
+                  : error.message));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

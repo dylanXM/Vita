@@ -32,7 +32,7 @@ func GenerateCompanionDraft(c *gin.Context) {
 		return
 	}
 	userID := c.GetString("user_id")
-	subscribed, err := userHasActiveSubscription(userID)
+	subscribed, err := canCreatePersonalCompanion(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check subscription"})
 		return
@@ -102,6 +102,9 @@ func GenerateCompanionDraft(c *gin.Context) {
 		return
 	}
 
+	if !validateCharacterImage(c, imageData, mimeType) {
+		return
+	}
 	profile, err := companionAgent.GenerateCharacterProfile(c.Request.Context(), userID, mode, source, characterName)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to generate character profile"})
@@ -114,6 +117,9 @@ func GenerateCompanionDraft(c *gin.Context) {
 	}
 	if err := mediaStorage.Store(c.Request.Context(), userID, mediaID, "image", mimeType, imageData); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store character image"})
+		return
+	}
+	if !markCharacterImage(c, mediaID) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
