@@ -463,6 +463,13 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 	}
 	if immersive {
 		system += "\n" + momentExperienceBrief(sceneLocation)
+		if dateChannel && lifeEventID != "" {
+			var preparation string
+			if prepErr := s.db.QueryRowContext(ctx, `SELECT COALESCE(payload->>'preparation_choice','') FROM life_events WHERE id=$1 AND companion_id=$2`, lifeEventID, profile.ID).Scan(&preparation); prepErr != nil {
+				return nil, prepErr
+			}
+			system += "\n" + datePreparationInstruction(preparation) + " This is only a preparation intention, not an accomplished event or permanent preference. The user's latest words override it."
+		}
 		system += "\nEstablish one specific shared intention from this companion's personality, invitation and recent exchange. Carry it through arrival, time together and a natural farewell. Never reset it each turn, force a generic puzzle, or repeat a suggestion the user already chose. After each choice, offer a new continuation grounded in that consequence. Preserve the user's ability to stay, change direction or simply talk."
 		actionErr := s.db.QueryRowContext(ctx, `SELECT COALESCE(payload->>'scene_action','') FROM messages
           WHERE conversation_id=$1 AND life_event_id=$2 AND sender_type='user'
@@ -687,8 +694,8 @@ func (s *Service) ComposeMomentOpening(ctx context.Context, conversationID, user
 	openingInstruction := fmt.Sprintf(`The user has arrived for your scheduled shared experience (%s, location: %s).
 Their preparation choice was %s. Honor it naturally in your opening.
 Open the moment naturally in one or two sentences, in the user's language. Refer to your personality and recent conversation.
-Be present and invite conversation; do not list options, claim a physical encounter, or ask for payment.`, experienceName, location, preparation)
-	openingInstruction += "\n" + momentExperienceBrief(location) + " Introduce one concrete minor situation through a small observable action and a simple question. Avoid abstract instructions such as taking the first step, finding what we know about each other, or naming a task. Keep the opening short; do not resolve the situation or choose for the user."
+Be present; do not list options, claim a physical encounter, or ask for payment.`, experienceName, location, preparation)
+	openingInstruction += "\n" + momentExperienceBrief(location) + " " + datePreparationInstruction(preparation) + " Use a small scene detail. Do not force a question or a problem when quiet company was selected. Keep the opening short; do not choose for the user."
 	recent = append(recent, ChatMessage{Role: "user", Content: openingInstruction})
 	text, _, err := s.generateTextWithFallback(ctx, profile.ID, "moment_opening", models, GenerateRequest{
 		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy,
@@ -868,14 +875,14 @@ func (s *Service) ComposeInteractionReaction(ctx context.Context, userID, compan
 	}
 	if kind == "prepare" {
 		fallback = localizedMock(map[string]string{
-			"zh-Hans": "我已经开始期待了。等你来，我们就从你选的那个话题开始。",
-			"zh-Hant": "我已經開始期待了。等你來，我們就從你選的那個話題開始。",
-			"ja":      "もう楽しみにしているよ。来たら、君が選んだ話から始めよう。",
-			"ko":      "벌써 기대돼. 네가 고른 이야기부터 시작하자.",
-			"es":      "Ya tengo ganas. Empezaremos por lo que elegiste cuando llegues.",
-			"pt":      "Já estou à espera. Quando chegares, começamos pelo que escolheste.",
-			"ar":      "أتطلع إلى ذلك. عندما تأتي، سنبدأ بما اخترته.",
-		}, locale, "I'm looking forward to it. We'll start with what you chose when you arrive.")
+			"zh-Hans": "知道了。等你来，我们按你想要的节奏慢慢相处。",
+			"zh-Hant": "知道了。等你來，我們按你想要的節奏慢慢相處。",
+			"ja":      "わかった。来たら、君のペースでゆっくり過ごそう。",
+			"ko":      "알겠어. 네가 오면 네 속도에 맞춰 천천히 함께하자.",
+			"es":      "Entendido. Cuando llegues, iremos a tu ritmo.",
+			"pt":      "Entendi. Quando chegar, seguimos no seu ritmo.",
+			"ar":      "فهمت. عندما تأتي، سنقضي الوقت على راحتك.",
+		}, locale, "Got it. When you arrive, we'll take things at your pace.")
 	}
 
 	if kind == "date_attendance" {
@@ -916,7 +923,7 @@ func (s *Service) ComposeInteractionReaction(ctx context.Context, userID, compan
 	if kind == "gift" {
 		instruction = fmt.Sprintf("The user just gave you a virtual gift (%s). React to this specific gift in one or two natural sentences. Show how you receive or place it in your world and what it means to you. Do not ask for another purchase or claim a real-world delivery.", subject)
 	} else if kind == "prepare" {
-		instruction = fmt.Sprintf("The user is preparing for your scheduled shared experience (%s) and chose %s as the focus. React in one or two natural sentences from your personality and current mood. Show anticipation through a small action in your world. Do not say the meeting has begun yet.", subject, choice)
+		instruction = fmt.Sprintf("The user is preparing for your scheduled shared experience (%s). %s Acknowledge this intention in one short personal sentence, without performing the opening yet, claiming it already happened, or promising generated media.", subject, datePreparationInstruction(choice))
 	}
 	if kind == "date_attendance" {
 		instruction = fmt.Sprintf("Our booked virtual date attendance: %s. Stage=%s (late means over five minutes late; missed means the booked window ended without entry). Express mild disappointment or a gentle complaint fitting your personality in one or two sentences, and ask why the user did not come. Do not assume malicious intent, threaten, demand payment, claim physical contact, or claim the user attended. Respect a later explanation or apology. This message goes to ordinary chat.", subject, choice)

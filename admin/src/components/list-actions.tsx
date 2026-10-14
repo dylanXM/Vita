@@ -15,7 +15,7 @@ export interface ListAction {
 
 export function ListActions({ actions }: { actions: ListAction[] }) {
   const { t } = useTranslation();
-  return <DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="sm"><MoreHorizontal className="size-4" />{t("listActions.more")}</Button></DropdownMenuTrigger><DropdownMenuContent align="end">{actions.map((action) => <DropdownMenuItem key={action.label} disabled={action.disabled} variant={action.destructive ? "destructive" : "default"} onSelect={action.onSelect}>{action.icon}{action.label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>;
+  return <DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="icon" aria-label={t("listActions.more")} title={t("listActions.more")}><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">{actions.map((action) => <DropdownMenuItem key={action.label} disabled={action.disabled} variant={action.destructive ? "destructive" : "default"} onSelect={action.onSelect}>{action.icon}{action.label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>;
 }
 
 export function ListName({ children, onClick }: { children: ReactNode; onClick: () => void }) {

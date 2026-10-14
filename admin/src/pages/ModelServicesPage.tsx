@@ -298,8 +298,8 @@ export function ModelServicesPage() {
                     <TableCell className="text-end">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button type="button" size="sm" variant="ghost">
-                            <MoreHorizontal className="size-4" />{t("listActions.more")}
+                          <Button type="button" size="icon" variant="ghost" aria-label={t("listActions.more")} title={t("listActions.more")}>
+                            <MoreHorizontal className="size-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">

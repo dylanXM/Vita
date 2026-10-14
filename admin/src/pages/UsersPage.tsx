@@ -471,8 +471,8 @@ export function UsersPage() {
                     <TableCell className="text-end">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="size-4" />{t("listActions.more")}
+                          <Button variant="ghost" size="icon" aria-label={t("listActions.more")} title={t("listActions.more")}>
+                            <MoreHorizontal className="size-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">

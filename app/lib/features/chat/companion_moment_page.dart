@@ -53,6 +53,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
   bool _sending = false;
   bool _artifactDirty = false;
   bool _preparing = false;
+  bool _editingPreparation = false;
   bool _finishing = false;
   bool _finishFailed = false;
   late final ChatController _chat;
@@ -279,9 +280,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
   }
 
   Future<void> _prepare(String choice) async {
-    if (_preparing ||
-        !_scheduled ||
-        '${_moment?['preparation'] ?? ''}'.isNotEmpty) {
+    if (_preparing || !_scheduled) {
       return;
     }
     setState(() => _preparing = true);
@@ -291,7 +290,10 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
           '/v1/companions/${widget.companionId}/moments/${widget.eventId}/prepare',
           data: {'choice': choice});
       if (!mounted || data is! Map) return;
-      setState(() => _moment = Map<String, dynamic>.from(data));
+      setState(() {
+        _moment = Map<String, dynamic>.from(data);
+        _editingPreparation = false;
+      });
       await _chat.poll();
     } on ApiException catch (error) {
       VitaNotice.error('experience.failed'.tr, error.message);
@@ -721,28 +723,37 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
                                 busy: true),
                           const SizedBox(height: 12),
                           if (_phase == _MomentPhase.booked) ...[
-                            Text('moment.prepareTitle'.tr,
+                            Text('date.prep.title'.tr,
                                 style: TextStyle(
                                     color: vita.text,
                                     fontSize: 17,
                                     fontWeight: FontWeight.w700)),
                             const SizedBox(height: 10),
-                            if ('${_moment?['preparation'] ?? ''}'.isEmpty) ...[
+                            Text('date.prep.hint'.trParams({'name': widget.name}),
+                                style: TextStyle(color: vita.subText, fontSize: 13)),
+                            const SizedBox(height: 10),
+                            if (_editingPreparation || '${_moment?['preparation'] ?? ''}'.isEmpty) ...[
                               _MomentChoice(
                                   icon: Icons.chat_bubble_outline_rounded,
-                                  label: 'moment.prepareTalk'.tr,
-                                  detail: 'moment.prepareTalkHint'.tr,
+                                  label: 'date.prep.talk'.tr,
+                                  detail: 'date.prep.talkHint'.tr,
                                   onTap: _preparing
                                       ? null
                                       : () => _prepare('talk')),
                               const SizedBox(height: 8),
                               _MomentChoice(
-                                  icon: Icons.auto_awesome_rounded,
-                                  label: 'moment.prepareSurprise'.tr,
-                                  detail: 'moment.prepareSurpriseHint'.tr,
+                                  icon: Icons.local_cafe_outlined,
+                                  label: 'date.prep.quiet'.tr,
+                                  detail: 'date.prep.quietHint'.tr,
                                   onTap: _preparing
                                       ? null
-                                      : () => _prepare('surprise')),
+                                      : () => _prepare('quiet')),
+                              const SizedBox(height: 8),
+                              _MomentChoice(
+                                  icon: Icons.auto_stories_outlined,
+                                  label: 'date.prep.story'.tr,
+                                  detail: 'date.prep.storyHint'.tr,
+                                  onTap: _preparing ? null : () => _prepare('story')),
                             ] else
                               AnimatedContainer(
                                 duration: const Duration(milliseconds: 450),
@@ -758,7 +769,13 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
                                           color: vita.green, size: 21),
                                       const SizedBox(width: 12),
                                       Expanded(
-                                          child: Text(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text('date.prep.selected'.trParams({'name': widget.name, 'choice': 'date.prep.${_moment?['preparation'] == 'surprise' ? 'story' : _moment?['preparation']}'.tr}),
+                                                  style: TextStyle(color: vita.text, fontWeight: FontWeight.w600)),
+                                              const SizedBox(height: 6),
+                                              Text(
                                               '${_moment?['preparation_reaction'] ?? ''}'
                                                       .isEmpty
                                                   ? 'moment.prepareReceived'.tr
@@ -766,7 +783,11 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
                                               style: TextStyle(
                                                   color: vita.text,
                                                   fontSize: 14,
-                                                  height: 1.45))),
+                                                  height: 1.45)),
+                                              TextButton(
+                                                onPressed: _preparing ? null : () => setState(() => _editingPreparation = true),
+                                                child: Text('date.prep.modify'.tr)),
+                                            ])),
                                     ]),
                               ),
                             const SizedBox(height: 14),
@@ -830,7 +851,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
                                 icon: const Icon(Icons.auto_awesome_rounded),
                                 label: Text(_starting
                                     ? 'moment.starting'.tr
-                                    : 'moment.start'.tr),
+                                    : 'world.appointment.enter'.tr),
                               ),
                             ),
                           ],

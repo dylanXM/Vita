@@ -101,7 +101,7 @@ func PrepareCompanionMoment(c *gin.Context) {
 	var input struct {
 		Choice string `json:"choice" binding:"required"`
 	}
-	if c.ShouldBindJSON(&input) != nil || (input.Choice != "talk" && input.Choice != "surprise") {
+	if c.ShouldBindJSON(&input) != nil || (input.Choice != "talk" && input.Choice != "quiet" && input.Choice != "story" && input.Choice != "surprise") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid preparation choice"})
 		return
 	}
@@ -114,7 +114,7 @@ func PrepareCompanionMoment(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load moment"})
 		return
 	}
-	if moment.Preparation != "" {
+	if moment.Preparation == input.Choice {
 		c.JSON(http.StatusOK, moment)
 		return
 	}
@@ -140,15 +140,24 @@ func PrepareCompanionMoment(c *gin.Context) {
 		return
 	}
 	defer tx.Rollback()
-	updated, err := tx.ExecContext(ctx, `UPDATE life_events SET payload=jsonb_set(payload,'{preparation_choice}',to_jsonb($2::text))
-		WHERE id=$1 AND companion_id=$3 AND NOT payload ? 'preparation_choice'`, eventID, input.Choice, companionID)
+	updated, err := tx.ExecContext(ctx, `UPDATE life_events SET payload=jsonb_set(COALESCE(payload,'{}'::jsonb),'{preparation_choice}',to_jsonb($2::text))
+		WHERE id=$1 AND companion_id=$3 AND start_time>CURRENT_TIMESTAMP
+		AND COALESCE(payload->>'preparation_choice','')=$4`, eventID, input.Choice, companionID, moment.Preparation)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to prepare moment"})
 		return
 	}
-	count, _ := updated.RowsAffected()
+	count, countErr := updated.RowsAffected()
+	if countErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save preparation"})
+		return
+	}
+	if count == 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "preparation changed or appointment has started"})
+		return
+	}
 	if count > 0 && reaction != "" {
-		payload, _ := json.Marshal(map[string]any{"event_id": eventID, "choice": input.Choice, "gesture": "anticipating", "conversation_channel": "date"})
+		payload, _ := json.Marshal(map[string]any{"event_id": eventID, "choice": input.Choice, "gesture": "anticipating", "conversation_channel": "date", "preparation_intent": true})
 		if _, err := tx.ExecContext(ctx, `INSERT INTO messages(id,conversation_id,sender_type,message_type,content,payload,source,life_event_id,delivery_status)
 			VALUES($1,$2,'assistant','text',$3,$4,'moment_preparation',$5,'delivered')`, uuid.New().String(), conversationID, reaction, payload, eventID); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save preparation"})
@@ -197,7 +206,7 @@ func FinishCompanionMoment(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load conversation"})
 		return
 	}
-	rows, err := db.Get().QueryContext(ctx, `SELECT sender_type,COALESCE(content,''),COALESCE(payload->>'scene_situation','') FROM (SELECT sender_type,content,payload,created_at,id FROM messages WHERE conversation_id=$1 AND life_event_id=$2 AND message_type IN ('text','voice') ORDER BY created_at DESC,id DESC LIMIT 40) recent ORDER BY created_at,id`, conversationID, eventID)
+	rows, err := db.Get().QueryContext(ctx, `SELECT sender_type,COALESCE(content,''),COALESCE(payload->>'scene_situation','') FROM (SELECT sender_type,content,payload,created_at,id FROM messages WHERE conversation_id=$1 AND life_event_id=$2 AND message_type IN ('text','voice') AND source<>'moment_preparation' ORDER BY created_at DESC,id DESC LIMIT 40) recent ORDER BY created_at,id`, conversationID, eventID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load moment conversation"})
 		return
