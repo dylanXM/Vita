@@ -66,8 +66,16 @@ class _EncounterDockState extends State<EncounterDock>
         Positioned.fill(child:AdaptiveGlass(shape:const LiquidRoundedRectangle(borderRadius:36),
           settings:LiquidGlassSettings(glassColor:const Color(0xFF33202C).withValues(alpha:.42),blur:8),
           child:const SizedBox.expand())),
-        Positioned.fill(child:IgnorePointer(child:DecoratedBox(decoration:BoxDecoration(
-          borderRadius:BorderRadius.circular(36),border:Border.all(color:const Color(0x36FFE6F0))))),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(36),
+                border: Border.all(color: const Color(0x36FFE6F0)),
+              ),
+            ),
+          ),
+        ),
         Padding(padding:const EdgeInsets.symmetric(horizontal:10,vertical:8),child:Row(children:[
           _tab(0,Icons.explore_outlined,'encounter.explore'.tr),
           const SizedBox(width:84),
