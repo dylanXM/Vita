@@ -13,6 +13,7 @@ class WorldClock extends ChangeNotifier {
   late final Ticker _ticker;
   Duration _elapsed = Duration.zero;
   Duration _elapsedBeforeResume = Duration.zero;
+  double get elapsedSeconds => _elapsed.inMicroseconds / 1000000;
 
   /// 0..1 循环时间，驱动云漂移、星星闪烁、粒子等。
   double get worldTime =>

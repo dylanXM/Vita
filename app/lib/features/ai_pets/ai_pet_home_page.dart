@@ -10,8 +10,7 @@ import '../../core/theme.dart';
 import 'animation/brain/pet_brain.dart';
 import 'animation/pet/pet_motion_spec.dart';
 import 'animation/pet/pet_state_machine.dart';
-import 'animation/scene/pet_stage.dart';
-import 'animation/scene/weather_particles.dart';
+import 'animation/scene/pixel_pet_room.dart';
 import 'animation/ui/pet_action_menu.dart';
 import 'animation/world_clock.dart';
 import 'ai_pet_desktop_controller.dart';
@@ -47,7 +46,6 @@ class _AIPetHomePageState extends State<AIPetHomePage>
   late final PetStateMachine _machine;
   final LocalPetBrain _brain = LocalPetBrain();
   final PetAmbientBehavior _ambientBehavior = const PetAmbientBehavior();
-  final Weather _weather = Weather.none;
   Timer? _vitalsTimer;
   Timer? _ambientTimer;
   int _ambientTurn = 0;
@@ -337,16 +335,18 @@ class _AIPetHomePageState extends State<AIPetHomePage>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          PetStage(
+          PixelPetRoom(
             name: widget.name,
-            imageUrl: _currentAvatarUrl,
-            spriteSheetUrl: _state?['sprite_sheet_url'] as String? ?? '',
-            actionSheetUrl: _state?['action_sheet_url'] as String? ?? '',
+            identity: _currentAvatarUrl,
+            species: widget.species,
             machine: _machine,
             clock: _worldClock,
-            weather: _weather,
             onTap: _petTap,
-            onLook: _machine.lookAt,
+            onFeed: _feed,
+            onDrink: _drink,
+            onRest: _rest,
+            onSit: _sit,
+            busy: _feeding || _caring,
             onBack: () => Get.back(),
           ),
           // 右下角悬浮操作按钮（喂食/生活/刷新 + 状态面板）。

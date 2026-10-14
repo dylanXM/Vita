@@ -3,8 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../core/theme.dart';
-import 'ai_pet_avatar.dart';
+import 'animation/pet/pixel_pet.dart';
 import 'ai_pet_desktop_controller.dart';
 import 'ai_pet_home_page.dart';
 import '../shell/shell_page.dart';
@@ -48,30 +47,42 @@ class _DraggablePet extends StatefulWidget {
 }
 
 class _DraggablePetState extends State<_DraggablePet>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   static const _size = 84.0;
   Offset? _position;
   late final AnimationController _controller;
+  bool _reduced = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 4200),
+      duration: const Duration(seconds: 6),
     )..repeat();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     super.dispose();
   }
 
-  double _blinkAmount(double progress) {
-    if (progress < .86 || progress > .96) return 0;
-    if (progress < .91) return (progress - .86) / .05;
-    return 1 - ((progress - .91) / .05);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _reduced = MediaQuery.disableAnimationsOf(context);
+    if (_reduced) { _controller.stop(); }
+    else if (!_controller.isAnimating) { _controller.repeat(); }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && !_reduced) {
+      _controller.repeat();
+    } else { _controller.stop(); }
   }
 
   void _openHome() {
@@ -122,32 +133,10 @@ class _DraggablePetState extends State<_DraggablePet>
           child: AnimatedBuilder(
             animation: _controller,
             builder: (context, _) {
-              final float = math.sin(_controller.value * math.pi * 2) * 3;
-              final blink = _blinkAmount(_controller.value);
-              return Transform.translate(
-                offset: Offset(0, float),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: context.vita.surface.withValues(alpha: .9),
-                    shape: BoxShape.circle,
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x24000000),
-                        blurRadius: 14,
-                        offset: Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(5),
-                    child: AIPetAvatar(
-                      name:
-                          '${widget.pet['adopted_companion_name'] ?? widget.pet['name'] ?? ''}',
-                      imageUrl: '${widget.pet['avatar_url'] ?? ''}',
-                      blinkAmount: blink,
-                    ),
-                  ),
-                ),
+              return PixelPet(
+                identity: '${widget.pet['avatar_url'] ?? ''} ${widget.pet['name'] ?? ''}',
+                species: '${widget.pet['species'] ?? ''}',
+                seconds: _controller.value * 6,
               );
             },
           ),
