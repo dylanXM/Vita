@@ -141,9 +141,10 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _openDate(Map<String, dynamic> companion) async {
+  Future<void> _openDate(Map<String, dynamic> companion,
+      {String category = 'date'}) async {
     final id = '${companion['id'] ?? ''}';
-    AnalyticsService.to.track('world_date_opened', category: 'life');
+    AnalyticsService.to.track('world_${category}_opened', category: 'life');
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -151,7 +152,7 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
       backgroundColor: context.vita.surface,
       builder: (_) => ExperienceSheet(
         companionId: id,
-        categoryFilter: 'date',
+        categoryFilter: category,
         onCompleted: () async {
           await ChatListController.to.load();
           if (mounted && _sceneCompanionId == id) await _loadScene(id);
@@ -489,6 +490,7 @@ class _WorldPageState extends State<WorldPage> with WidgetsBindingObserver {
                                         onChat: () => _openChat(item),
                                         onAppointment: () => _openCard(item),
                                         onDate: () => _openDate(item),
+                                        onGift: () => _openDate(item, category: 'gift'),
                                         onNote: () => _leaveNote(item),
                                         visitBusy: _visitBusy,
                                         visitResult: _visitResults[id],
@@ -649,6 +651,7 @@ class _RelationshipCard extends StatelessWidget {
     required this.onChat,
     required this.onAppointment,
     required this.onDate,
+    required this.onGift,
     required this.onNote,
     required this.visitBusy,
     required this.visitResult,
@@ -660,6 +663,7 @@ class _RelationshipCard extends StatelessWidget {
   final VoidCallback onChat;
   final VoidCallback onAppointment;
   final VoidCallback onDate;
+  final VoidCallback onGift;
   final VoidCallback onNote;
   final bool visitBusy;
   final Map<String, dynamic>? visitResult;
@@ -927,6 +931,15 @@ class _RelationshipCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
+                SizedBox(
+                  width: 56,
+                  child: _WorldUtilityAction(
+                    label: 'world.cardGift'.tr,
+                    icon: Icons.card_giftcard_outlined,
+                    onTap: onGift,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 SizedBox(
                   width: 56,
                   child: _WorldUtilityAction(

@@ -16,6 +16,8 @@ import (
 )
 
 type companionMoment struct {
+	SceneImageURL      string    `json:"scene_image_url"`
+	SceneImagePhase    string    `json:"scene_image_phase"`
 	SceneAudioURL      string    `json:"scene_audio_url"`
 	SceneBackgroundURL string    `json:"scene_background_url"`
 	ID                 string    `json:"id"`
@@ -69,6 +71,9 @@ func loadCompanionMoment(ctx context.Context, userID, companionID, eventID strin
 		&moment.Description, &moment.Location, &moment.StartsAt, &moment.EndsAt,
 		&moment.Artifact, &moment.UserText, &moment.CompanionText, &moment.Invitation, &moment.Opening,
 		&moment.Closing, &moment.NextTopic, &moment.Preparation, &moment.PrepReaction, &moment.SceneSituation, &moment.SceneFocus)
+	if err == nil {
+		err = db.Get().QueryRowContext(ctx, `SELECT COALESCE(payload->'date_images'->>'farewell',payload->'date_images'->>'together',payload->'date_images'->>'arrival',''),CASE WHEN payload->'date_images' ? 'farewell' THEN 'farewell' WHEN payload->'date_images' ? 'together' THEN 'together' ELSE 'arrival' END FROM life_events WHERE id=$1`, eventID).Scan(&moment.SceneImageURL, &moment.SceneImagePhase)
+	}
 	return moment, err
 }
 
@@ -181,6 +186,9 @@ func FinishCompanionMoment(c *gin.Context) {
 		return
 	}
 	if moment.Closing != "" {
+		if companionAgent != nil {
+			_ = companionAgent.QueueDateSceneImage(ctx, userID, companionID, eventID, "farewell")
+		}
 		c.JSON(http.StatusOK, moment)
 		return
 	}
@@ -215,12 +223,12 @@ func FinishCompanionMoment(c *gin.Context) {
 		return
 	}
 	rows.Close()
-	closing, nextTopic := moment.Opening, ""
+	closing, nextTopic := transcript.String(), ""
 	if companionAgent != nil {
 		closing, nextTopic = companionAgent.ComposeMomentClosing(ctx, conversationID, userID, moment.TitleKey, transcript.String())
 	}
 	if strings.TrimSpace(closing) == "" {
-		closing = moment.Opening
+		closing = transcript.String()
 	}
 	tx, err := db.Get().BeginTx(ctx, nil)
 	if err != nil {
@@ -270,6 +278,9 @@ func FinishCompanionMoment(c *gin.Context) {
 	} else {
 		moment.Closing, moment.NextTopic = closing, nextTopic
 	}
+	if companionAgent != nil {
+		_ = companionAgent.QueueDateSceneImage(ctx, userID, companionID, eventID, "farewell")
+	}
 	c.JSON(http.StatusOK, moment)
 }
 
@@ -302,6 +313,9 @@ func StartCompanionMoment(c *gin.Context) {
 		return
 	}
 	if moment.Opening != "" {
+		if companionAgent != nil {
+			_ = companionAgent.QueueDateSceneImage(ctx, userID, companionID, eventID, "arrival")
+		}
 		c.JSON(http.StatusOK, moment)
 		return
 	}
@@ -420,6 +434,9 @@ func StartCompanionMoment(c *gin.Context) {
 	moment.Opening = text
 	moment.StartsAt = startedAt
 	moment.EndsAt = endsAt
+	// Fulfilled text and attendance remain valid if the image provider is down.
+	// A retry never charges again and uses the stored milestone image.
+	_ = companionAgent.QueueDateSceneImage(ctx, userID, companionID, eventID, "arrival")
 	c.JSON(http.StatusOK, moment)
 }
 

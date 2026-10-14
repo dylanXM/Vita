@@ -68,6 +68,39 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
       };
   String _groupLabel(String group) => 'experience.flow.group.$group'.tr;
 
+  Widget _datePreview(Map<String, dynamic> product) {
+    final metadata = product['metadata'];
+    final location = metadata is Map ? '${metadata['location'] ?? ''}' : '';
+    final background = metadata is Map
+        ? '${metadata['scene_background_url'] ?? ''}' : '';
+    final asset = switch (location) {
+      'restaurant' => 'dinner',
+      'ballroom' => 'ballroom',
+      'cinema' => 'cinema',
+      _ => 'cafe',
+    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: SizedBox(height: 128,
+            child: background.isEmpty
+                ? Image.asset('assets/scenes/$asset.png', fit: BoxFit.cover)
+                : VitaMediaImage(url: background, fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Image.asset(
+                        'assets/scenes/$asset.png', fit: BoxFit.cover))),
+        ),
+        const SizedBox(height: 6),
+        Text('experience.flow.datePreview'.tr,
+            style: TextStyle(color: context.vita.subText, fontSize: 12)),
+        const SizedBox(height: 8),
+        Text('experience.flow.dateIncludes'.tr,
+            style: TextStyle(color: context.vita.text, height: 1.5)),
+      ]),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -261,6 +294,13 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
                         style: TextStyle(
                             fontSize: 15, color: sheetContext.vita.text)),
                     const SizedBox(height: 8),
+                    if (product['category'] == 'date')
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text('experience.flow.dateIncludes'.tr,
+                            style: TextStyle(color: sheetContext.vita.text,
+                                fontSize: 13, height: 1.5)),
+                      ),
                     Text(
                         (product['category'] == 'date'
                                 ? 'experience.flow.dateCharge'
@@ -553,6 +593,7 @@ class _ExperienceSheetState extends State<ExperienceSheet> {
               })),
       const SizedBox(height: 16),
       if (selected != null) ...[
+        if (selected['category'] == 'date') _datePreview(selected),
         Text(
             '${selected['description_key'] ?? selected['name_key'] ?? selected['key']}'
                 .tr,

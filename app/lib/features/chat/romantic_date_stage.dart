@@ -15,6 +15,8 @@ class RomanticDateStage extends StatefulWidget {
       required this.location,
       required this.backgroundUrl,
       required this.audioUrl,
+      this.sceneImageUrl = '',
+      this.sceneImagePhase = 'arrival',
       this.portraitUrl,
       required this.companionName,
       required this.messages,
@@ -25,6 +27,8 @@ class RomanticDateStage extends StatefulWidget {
       this.onKeepsake,
       this.journey});
   final String title, location, backgroundUrl, audioUrl, companionName;
+  final String sceneImageUrl;
+  final String sceneImagePhase;
   final String? portraitUrl;
   final List<Map<String, dynamic>> messages;
   final TextEditingController input;
@@ -51,7 +55,7 @@ class RomanticDateStageState extends State<RomanticDateStage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _history.value = widget.messages;
+    _history.value = widget.messages.where((m) => m['message_type'] != 'scene_image').toList();
   }
 
   @override
@@ -80,7 +84,7 @@ class RomanticDateStageState extends State<RomanticDateStage>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _historyUpdateScheduled = false;
       if (!mounted) return;
-      _history.value = List<Map<String, dynamic>>.of(widget.messages);
+      _history.value = widget.messages.where((m) => m['message_type'] != 'scene_image').toList();
     });
   }
 
@@ -133,6 +137,22 @@ class RomanticDateStageState extends State<RomanticDateStage>
     _audio.dispose();
     _history.dispose();
     super.dispose();
+  }
+
+  String get _sceneImageUrl {
+    int rank(dynamic phase) => phase == 'farewell' ? 2 : phase == 'together' ? 1 : 0;
+    var url = widget.sceneImageUrl;
+    var currentRank = url.isEmpty ? -1 : rank(widget.sceneImagePhase);
+    for (final message in widget.messages.reversed) {
+      final payload = message['payload'];
+      if (payload is Map && payload['scene_image_url'] is String &&
+          (payload['scene_image_url'] as String).isNotEmpty &&
+          rank(payload['scene_phase']) > currentRank) {
+        url = payload['scene_image_url'] as String;
+        currentRank = rank(payload['scene_phase']);
+      }
+    }
+    return url;
   }
 
   String? get _action {
@@ -312,28 +332,36 @@ class RomanticDateStageState extends State<RomanticDateStage>
       _ => ['coffee', 'tea', 'toast']
     };
     final latest = widget.messages
-        .where((m) => m['sender_type'] == 'assistant')
+        .where((m) => m['sender_type'] == 'assistant' && m['message_type'] != 'scene_image')
         .lastOrNull;
     final reply = '${latest?['content'] ?? ''}';
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
-    final latestIsAssistant = widget.messages.isNotEmpty &&
-        widget.messages.last['sender_type'] == 'assistant';
+    final conversation = widget.messages.where((m) => m['message_type'] != 'scene_image');
+    final latestIsAssistant = conversation.isNotEmpty &&
+        conversation.last['sender_type'] == 'assistant';
     final suggestions = latestIsAssistant
         ? sharedSceneActions(latest)
         : <Map<String, String>>[];
+    final usedActions = widget.messages
+        .where((m) => m['sender_type'] == 'user' &&
+            m['delivery_status'] != 'failed' && m['delivery_status'] != 'sending')
+        .map((m) => m['payload'])
+        .whereType<Map>()
+        .map((p) => p['scene_action'])
+        .toSet();
     final availableActions =
-        actions.where((action) => action != _action).toList();
+        actions.where((action) => !usedActions.contains(action)).toList();
     return Stack(children: [
       Positioned.fill(
           child: ExcludeSemantics(
               child: RepaintBoundary(
                   child: AnimatedBuilder(
                       animation: _motion,
-                      child: widget.backgroundUrl.isEmpty
+                      child: _sceneImageUrl.isEmpty && widget.backgroundUrl.isEmpty
                           ? Image.asset('assets/scenes/$asset.png',
                               fit: BoxFit.cover)
                           : VitaMediaImage(
-                              url: widget.backgroundUrl,
+                              url: _sceneImageUrl.isNotEmpty ? _sceneImageUrl : widget.backgroundUrl,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => Image.asset(
                                   'assets/scenes/$asset.png',
@@ -366,7 +394,7 @@ class RomanticDateStageState extends State<RomanticDateStage>
                             Colors.transparent,
                             const Color(0xEE17130F)
                           ])))))),
-      if (!keyboard)
+      if (!keyboard && _sceneImageUrl.isEmpty)
         Positioned.fill(
             child: IgnorePointer(
                 child: AnimatedBuilder(
@@ -375,6 +403,7 @@ class RomanticDateStageState extends State<RomanticDateStage>
                         painter: _DateForeground(
                             widget.location, _action, _motion.value))))),
       if (!keyboard &&
+          _sceneImageUrl.isEmpty &&
           !['ballroom', 'cinema'].contains(widget.location) &&
           _action != null)
         Positioned(
@@ -421,7 +450,7 @@ class RomanticDateStageState extends State<RomanticDateStage>
                             Row(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  ClipRRect(
+                                  if (_sceneImageUrl.isEmpty) ClipRRect(
                                       borderRadius: BorderRadius.circular(8),
                                       child: SizedBox.square(
                                           dimension: 96,
@@ -433,7 +462,7 @@ class RomanticDateStageState extends State<RomanticDateStage>
                                                   fit: BoxFit.cover)
                                               : const ColoredBox(
                                                   color: Color(0xFF46382D)))),
-                                  const SizedBox(width: 10),
+                                  if (_sceneImageUrl.isEmpty) const SizedBox(width: 10),
                                   Expanded(
                                       child: Padding(
                                           padding:

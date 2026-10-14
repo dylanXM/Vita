@@ -13,6 +13,8 @@ class VitaTranslations extends Translations {
 
   static const Map<String, Map<String, String>> _keys = {
     'en': {
+      'experience.flow.datePreview': 'Setting preview · your companion’s scene images are prepared after entry.',
+      'experience.flow.dateIncludes': 'Includes scene images with your companion at arrival, a shared moment and farewell, choices that continue your date, and a shared memory. No extra image charge. Video is not included.',
       "world.cardDate": "Date",
       "world.appointment.booked": "Date booked · enter at the scheduled time",
       "world.appointment.ready": "Your date is ready · enter the scene",
@@ -186,7 +188,7 @@ class VitaTranslations extends Translations {
       'world.otherCompanions': 'Other companions',
       'world.talk': 'Talk together',
       'world.cardChat': 'Talk to them',
-      'world.cardGift': 'Send a gift',
+      'world.cardGift': 'Gift',
       'world.cardJourney': 'View moments',
       'world.talkHint': 'Continue your conversation',
       'world.journey': 'Our moments',
@@ -967,6 +969,8 @@ class VitaTranslations extends Translations {
       'stage.partner': 'Partner',
     },
     'zh_CN': {
+      'experience.flow.datePreview': '环境预览 · 含伴侣的场景图片将在入场后生成。',
+      'experience.flow.dateIncludes': '包含伴侣入场、相处与告别的场景图片、推动约会的互动选择，以及共同记忆。图片不另扣金币，暂不包含视频。',
       "world.cardDate": "约会",
       "world.appointment.booked": "已预约约会 · 到时进入场景",
       "world.appointment.ready": "约会时间已到 · 进入场景",
@@ -1114,7 +1118,7 @@ class VitaTranslations extends Translations {
       'world.otherCompanions': '其他伙伴',
       'world.talk': '一起聊聊',
       'world.cardChat': '和TA聊聊',
-      'world.cardGift': '送礼物',
+      'world.cardGift': '礼物',
       'world.cardJourney': '看时光',
       'world.talkHint': '继续你们的对话',
       'world.journey': '我们的时光',

@@ -149,6 +149,20 @@ func (s *Service) Run(ctx context.Context, interval time.Duration) {
 	if interval <= 0 {
 		interval = time.Minute
 	}
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := s.processDateSceneImageJob(ctx); err != nil {
+					log.Printf("agent date scene image: %v", err)
+				}
+			}
+		}
+	}()
 	// Direct chat recovery must not wait behind image, story, or life jobs.
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
@@ -435,6 +449,7 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 		}
 	}
 	var previousSituation, previousFocus, previousGoal, previousChallenge string
+	var executedAction string
 	if immersive {
 		situationErr := s.db.QueryRowContext(ctx, `SELECT COALESCE(payload->>'scene_situation',''),COALESCE(payload->>'scene_focus','ambient'),COALESCE(payload->>'scene_goal',''),COALESCE(payload->>'scene_challenge','') FROM messages
  WHERE conversation_id=$1 AND sender_type='assistant' AND COALESCE(payload->>'scene_situation','')<>''
@@ -448,7 +463,7 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 	}
 	if immersive {
 		system += "\n" + momentExperienceBrief(sceneLocation)
-		var executedAction string
+		system += "\nEstablish one specific shared intention from this companion's personality, invitation and recent exchange. Carry it through arrival, time together and a natural farewell. Never reset it each turn, force a generic puzzle, or repeat a suggestion the user already chose. After each choice, offer a new continuation grounded in that consequence. Preserve the user's ability to stay, change direction or simply talk."
 		actionErr := s.db.QueryRowContext(ctx, `SELECT COALESCE(payload->>'scene_action','') FROM messages
           WHERE conversation_id=$1 AND life_event_id=$2 AND sender_type='user'
           ORDER BY created_at DESC,id DESC LIMIT 1`, conversationID, lifeEventID).Scan(&executedAction)
@@ -612,6 +627,15 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 		}
 	}
 	var reply *SavedMessage
+	if immersive && dateChannel && lifeEventID != "" {
+		phase := "arrival"
+		if executedAction != "" || surpriseNow {
+			phase = "together"
+		}
+		if imageErr := s.QueueDateSceneImage(ctx, userID, profile.ID, lifeEventID, phase); imageErr != nil {
+			log.Printf("queue date scene image: %v", imageErr)
+		}
+	}
 	if !immersive && !dateChannel {
 		if len(turn.Messages) == 0 {
 			turn.Messages = []string{text}
@@ -2668,7 +2692,7 @@ func (s *Service) currentCompanionWorldContext(ctx context.Context, profile comp
 func (s *Service) loadRecentMessages(ctx context.Context, conversationID string, limit int) ([]ChatMessage, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT sender_type, COALESCE(content, '') FROM (
-			SELECT sender_type, content, created_at FROM messages WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT $2
+			SELECT sender_type, content, created_at FROM messages WHERE conversation_id = $1 AND message_type<>'scene_image' ORDER BY created_at DESC LIMIT $2
 		) recent ORDER BY created_at ASC`, conversationID, limit)
 	if err != nil {
 		return nil, err
@@ -2690,7 +2714,7 @@ func (s *Service) loadRecentMessages(ctx context.Context, conversationID string,
 }
 
 func (s *Service) loadRecentReplyMessages(ctx context.Context, conversationID string, limit int, dateChannel bool, eventID string) ([]ChatMessage, error) {
-	query := `SELECT sender_type,COALESCE(content,'') FROM (SELECT m.sender_type,m.content,m.created_at,m.id FROM messages m WHERE m.conversation_id=$1`
+	query := `SELECT sender_type,COALESCE(content,'') FROM (SELECT m.sender_type,m.content,m.created_at,m.id FROM messages m WHERE m.conversation_id=$1 AND m.message_type<>'scene_image'`
 	args := []any{conversationID, limit}
 	if dateChannel {
 		query += " AND " + companion.DateMessageSQL("m") + " AND m.life_event_id=$3"

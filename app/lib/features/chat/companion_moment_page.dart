@@ -513,10 +513,11 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
         final messages = chronologicalSceneMessages(_chat.messages
             .where((m) =>
                 m['life_event_id'] == widget.eventId &&
-                m['message_type'] == 'text')
+                (m['message_type'] == 'text' || m['message_type'] == 'scene_image'))
             .toList());
         final reply =
-            messages.where((m) => m['sender_type'] == 'assistant').lastOrNull;
+            messages.where((m) => m['sender_type'] == 'assistant' &&
+                m['message_type'] == 'text').lastOrNull;
         final user =
             messages.where((m) => m['sender_type'] == 'user').lastOrNull;
         final scene = ['cafe', 'cinema', 'restaurant'].contains(location)
@@ -538,6 +539,8 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
             title: title,
             location: location,
             backgroundUrl: '${_moment?["scene_background_url"] ?? ""}',
+            sceneImageUrl: '${_moment?["scene_image_url"] ?? ""}',
+            sceneImagePhase: '${_moment?["scene_image_phase"] ?? "arrival"}',
             audioUrl: '${_moment?["scene_audio_url"] ?? ""}',
             portraitUrl: widget.avatarUrl,
             companionName: widget.name,
