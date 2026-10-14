@@ -5,6 +5,7 @@ import { legalDocumentsApi } from "@/api/admin";
 import type { Environment, LegalDocument, LegalDocumentInput, LegalDocumentType } from "@/api/types";
 import { errorMessage } from "@/api/client";
 import { PageHeader } from "@/components/page-header";
+import { ListActions, ListDetails, ListName } from "@/components/list-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -24,6 +25,7 @@ export function LegalDocumentsPage() {
   const queryClient = useQueryClient();
   const [documentType, setDocumentType] = useState<LegalDocumentType>("privacy");
   const [editing, setEditing] = useState<LegalDocument | "new" | null>(null);
+  const [details, setDetails] = useState<LegalDocument | null>(null);
   const activeEnv: Environment = "prod";
   const queryKey = ["legal-documents", activeEnv, documentType];
   const query = useQuery({
@@ -44,12 +46,16 @@ export function LegalDocumentsPage() {
     {query.isLoading ? <Skeleton className="h-56 w-full" /> : <div className="overflow-hidden rounded-lg border"><Table>
       <TableHeader><TableRow><TableHead>{t("legal.version")}</TableHead><TableHead>{t("content.title")}</TableHead><TableHead>{t("content.status")}</TableHead><TableHead>{t("legal.updatedAt")}</TableHead><TableHead>{t("content.operator")}</TableHead><TableHead className="text-end">{t("content.actions")}</TableHead></TableRow></TableHeader>
       <TableBody>{query.data?.items.length ? query.data.items.map((item) => <TableRow key={item.id}>
-        <TableCell className="font-mono">{item.version}</TableCell><TableCell>{item.title}</TableCell><TableCell>{item.is_effective ? <Badge>{t("legal.effective")}</Badge> : item.published_at ? <Badge variant="secondary">{t("legal.historical")}</Badge> : <Badge variant="outline">{t("legal.draft")}</Badge>}</TableCell>
+        <TableCell className="font-mono">{item.version}</TableCell><TableCell><ListName onClick={() => setDetails(item)}>{item.title}</ListName></TableCell><TableCell>{item.is_effective ? <Badge>{t("legal.effective")}</Badge> : item.published_at ? <Badge variant="secondary">{t("legal.historical")}</Badge> : <Badge variant="outline">{t("legal.draft")}</Badge>}</TableCell>
         <TableCell>{new Date(item.updated_at).toLocaleString()}</TableCell><TableCell>{item.updated_by || "system"}</TableCell>
-        <TableCell><div className="flex justify-end gap-2">{!item.is_effective && <Button size="sm" variant="outline" disabled={activate.isPending} onClick={() => activate.mutate(item.id)}>{t("legal.activate")}</Button>}{!item.published_at && <><Button size="sm" variant="outline" onClick={() => setEditing(item)}>{t("legal.edit")}</Button><Button size="sm" variant="destructive" disabled={remove.isPending} onClick={() => { if (window.confirm(t("legal.deleteConfirm"))) remove.mutate(item.id); }}>{t("legal.delete")}</Button></>}</div></TableCell>
+        <TableCell className="text-end"><ListActions actions={[{ label: t("listActions.details"), onSelect: () => setDetails(item) }, ...(!item.published_at ? [{ label: t("legal.edit"), onSelect: () => setEditing(item) }] : [])]} /></TableCell>
       </TableRow>) : <TableRow><TableCell colSpan={6} className="h-28 text-center text-muted-foreground">{t("legal.empty")}</TableCell></TableRow>}</TableBody>
     </Table></div>}
     {activeEnv && editing && <LegalDocumentDialog environment={activeEnv} documentType={documentType} document={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void refresh(); }} />}
+    {details && <ListDetails title={details.title} onClose={() => setDetails(null)} fields={[{ label: t("legal.version"), value: details.version }, { label: t("legal.summary"), value: details.summary }, { label: t("legal.content"), value: details.content }]} actions={[
+      ...(!details.is_effective ? [{ label: t("legal.activate"), disabled: activate.isPending, onSelect: () => { activate.mutate(details.id); setDetails(null); } }] : []),
+      ...(!details.published_at ? [{ label: t("legal.edit"), onSelect: () => { setEditing(details); setDetails(null); } }, { label: t("legal.delete"), destructive: true, disabled: remove.isPending, onSelect: () => { if (window.confirm(t("legal.deleteConfirm"))) { remove.mutate(details.id); setDetails(null); } } }] : []),
+    ]} />}
   </div>;
 }
 

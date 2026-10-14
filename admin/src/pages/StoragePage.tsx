@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Switch } from "@/components/ui/switch";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { storageApi } from "@/api/admin";
@@ -128,7 +129,7 @@ function ProviderCard({ provider, title, description, value, saved, onChange, on
       <CardDescription>{description}</CardDescription>
     </CardHeader>
     <CardContent className="space-y-4">
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={value.enabled} onChange={(event) => set("enabled", event.target.checked)} />{t("storage.enabled")}</label>
+      <label className="flex items-center gap-2 text-sm"><Switch checked={value.enabled} onCheckedChange={(checked) => set("enabled", checked)} />{t("storage.enabled")}</label>
       <Field label={t("storage.endpoint")}><Input type="url" value={value.endpoint} onChange={(event) => set("endpoint", event.target.value)} placeholder={provider === "r2" ? "https://ACCOUNT_ID.r2.cloudflarestorage.com" : "https://cos.ap-guangzhou.myqcloud.com"} /></Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t("storage.bucket")}><Input value={value.bucket} onChange={(event) => set("bucket", event.target.value)} /></Field>

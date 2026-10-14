@@ -10,6 +10,8 @@ import type { AIPetBreed, AIPetBreedInput, Environment } from "@/api/types";
 import { ConfigurationButton } from "@/components/configuration-button";
 import { AdminImageInput, isAdminImageURL } from "@/components/admin-image-input";
 import { PageHeader } from "@/components/page-header";
+import { ListActions, ListDetails, ListName } from "@/components/list-actions";
+import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,6 +37,7 @@ export function AIPetsPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AIPetBreed | null>(null);
+  const [details, setDetails] = useState<AIPetBreed | null>(null);
   const [form, setForm] = useState<AIPetBreedInput>(emptyForm("prod"));
   const [imageUploading, setImageUploading] = useState(false);
 
@@ -102,24 +105,20 @@ export function AIPetsPage() {
           <TableCell><div className="flex items-center gap-3">
             <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted">
               {breed.avatar_url && !breed.avatar_url.startsWith("asset://") ? <img src={breed.avatar_url} alt="" className="size-full object-cover" /> : <PawPrint className="size-5 text-muted-foreground" />}
-            </div><div><div className="flex items-center gap-2 font-medium">{breed.name}</div><div className="line-clamp-1 max-w-72 text-xs text-muted-foreground">{breed.description}</div></div>
+            </div><div><ListName onClick={() => setDetails(breed)}>{breed.name}</ListName><div className="line-clamp-1 max-w-72 text-xs text-muted-foreground">{breed.description}</div></div>
           </div></TableCell>
           <TableCell>{breed.species}</TableCell>
           <TableCell>{breed.subscription_plan_ids.length ? t("aiPets.selectedPlans", { count: breed.subscription_plan_ids.length }) : t("aiPets.allPlans")}</TableCell>
-          <TableCell><Badge variant={breed.enabled ? "success" : "outline"}>{t(breed.enabled ? "content.enabled" : "content.disabled")}</Badge></TableCell>
-          <TableCell className="text-end"><div className="flex items-center justify-end gap-2"><ConfigurationButton label={t("users.edit")} icon={<Pencil />} onClick={() => edit(breed)}
-            details={[
-              `${t("aiPets.name")}: ${breed.name}`,
-              `${t("aiPets.species")}: ${breed.species}`,
-              `${t("aiPets.personality")}: ${breed.personality || "—"}`,
-              `${t("aiPets.description")}: ${breed.description || "—"}`,
-              `${t("aiPets.avatarUrl")}: ${breed.avatar_url || "—"}`,
-              `${t("aiPets.subscriptionAccess")}: ${breed.subscription_plan_ids.length ? breed.subscription_plan_ids.map((id) => plans.data?.items.find((plan) => plan.id === id)?.name ?? id).join(", ") : t("aiPets.allPlans")}`,
-              `${t("aiPets.sortOrder")}: ${breed.sort_order}`,
-              `${t("content.enabled")}: ${t(breed.enabled ? "content.enabled" : "content.disabled")}`,
-            ]} /><Button size="sm" variant="ghost" disabled={remove.isPending} onClick={() => setDeleteTarget(breed)}><Trash2 /></Button></div></TableCell>
+          <TableCell><Switch checked={breed.enabled} disabled aria-label={t("content.enabled")} /></TableCell>
+          <TableCell className="text-end"><ListActions actions={[{ label: t("listActions.details"), onSelect: () => setDetails(breed) }, { label: t("users.edit"), icon: <Pencil />, onSelect: () => edit(breed) }]} /></TableCell>
         </TableRow>)}</TableBody></Table>}
     </CardContent></Card>
+    {details && <ListDetails title={details.name} onClose={() => setDetails(null)} fields={[
+      { label: t("aiPets.species"), value: details.species }, { label: t("aiPets.personality"), value: details.personality }, { label: t("aiPets.description"), value: details.description },
+      { label: t("aiPets.avatarUrl"), value: details.avatar_url }, { label: t("aiPets.sortOrder"), value: details.sort_order },
+      { label: t("content.enabled"), value: <Badge variant={details.enabled ? "success" : "outline"}>{t(details.enabled ? "content.enabled" : "content.disabled")}</Badge> },
+      { label: t("aiPets.subscriptionAccess"), value: details.subscription_plan_ids.length ? details.subscription_plan_ids.map((id) => plans.data?.items.find((plan) => plan.id === id)?.name ?? id).join(", ") : t("aiPets.allPlans") },
+    ]} actions={[{ label: t("users.edit"), icon: <Pencil />, onSelect: () => { edit(details); setDetails(null); } }, { label: t("common.delete"), icon: <Trash2 />, destructive: true, disabled: remove.isPending, onSelect: () => { setDeleteTarget(details); setDetails(null); } }]} />}
     <Dialog open={open} onOpenChange={(next) => { if (!next) close(); }}>
       <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
         <DialogHeader><DialogTitle>{editing ? t("aiPets.edit") : t("aiPets.create")}</DialogTitle><DialogDescription>{t("aiPets.formDesc")}</DialogDescription></DialogHeader>
@@ -131,7 +130,7 @@ export function AIPetsPage() {
             <Field label={t("aiPets.avatarUrl")}><AdminImageInput value={form.avatar_url} onChange={(url) => setForm((current) => current.avatar_url === url ? current : ({ ...current, avatar_url: url, sprite_sheet_url: "", action_sheet_url: "" }))} onUploadingChange={setImageUploading} /><p className="text-xs text-muted-foreground">{t("aiPets.avatarHint")}</p></Field>
             <Field wide label={t("aiPets.description")}><textarea className="min-h-24 w-full rounded-md border bg-background p-3 text-sm" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
             <Field label={t("aiPets.sortOrder")}><Input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) || 0 })} /></Field>
-            <div className="flex items-end"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />{t("content.enabled")}</label></div>
+            <div className="flex items-end"><label className="flex items-center gap-2 text-sm"><Switch checked={form.enabled} onCheckedChange={(checked) => setForm({ ...form, enabled: checked })} />{t("content.enabled")}</label></div>
           </div>
           <div className="rounded-md border p-4"><div className="font-medium">{t("aiPets.subscriptionAccess")}</div><p className="mt-1 text-xs text-muted-foreground">{t("aiPets.subscriptionAccessDesc")}</p>
             <div className="mt-3 grid max-h-52 gap-2 overflow-y-auto md:grid-cols-2">

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { PageHeader } from "@/components/page-header";
+import { ListActions, ListName } from "@/components/list-actions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { agentApi } from "@/api/admin";
@@ -85,7 +86,7 @@ function ModelUsageContent({ model }: { model: AIModel }) {
               <TableBody>
                 {!usage.data.items.length && <TableRow><TableCell colSpan={5} className="h-16 text-center text-muted-foreground">{t("modelUsage.empty")}</TableCell></TableRow>}
                 {usage.data.items.map((item) => <TableRow key={item.id} className="h-14">
-                  <TableCell className="whitespace-nowrap">{formatDate(item.started_at)}</TableCell><TableCell>{item.kind}</TableCell><TableCell>{item.status === "succeeded" ? t("modelServices.ok") : t("modelServices.failed")}</TableCell><TableCell className="text-end whitespace-nowrap">{item.estimated_cost_usd == null ? t("modelUsage.unpriced") : money(item.estimated_cost_usd)}</TableCell><TableCell className="text-end"><Button variant="ghost" size="sm" onClick={() => setSelected(item.id)}>{t("modelUsage.details")}</Button></TableCell>
+                  <TableCell className="whitespace-nowrap">{formatDate(item.started_at)}</TableCell><TableCell><ListName onClick={() => setSelected(item.id)}>{item.kind}</ListName></TableCell><TableCell>{item.status === "succeeded" ? t("modelServices.ok") : t("modelServices.failed")}</TableCell><TableCell className="text-end whitespace-nowrap">{item.estimated_cost_usd == null ? t("modelUsage.unpriced") : money(item.estimated_cost_usd)}</TableCell><TableCell className="text-end"><ListActions actions={[{ label: t("listActions.details"), onSelect: () => setSelected(item.id) }]} /></TableCell>
                 </TableRow>)}
               </TableBody>
             </Table>
@@ -96,7 +97,7 @@ function ModelUsageContent({ model }: { model: AIModel }) {
             <div className="rounded-md border"><Table>
               <TableHeader><TableRow><TableHead>{t("modelUsage.time")}</TableHead><TableHead>{t("modelUsage.kind")}</TableHead><TableHead>{t("modelUsage.status")}</TableHead><TableHead className="text-end">{t("users.actions")}</TableHead></TableRow></TableHeader>
               <TableBody>{usage.data.legacy_runs.slice((legacyPage - 1) * 10, legacyPage * 10).map((run, index) => <TableRow key={`${run.finished_at}-${(legacyPage - 1) * 10 + index}`} className="h-14">
-                <TableCell className="whitespace-nowrap">{formatDate(run.finished_at)}</TableCell><TableCell>{run.kind}</TableCell><TableCell>{run.status === "succeeded" ? t("modelServices.ok") : t("modelServices.failed")}</TableCell><TableCell className="text-end"><Button variant="ghost" size="sm" onClick={() => setLegacySelected((legacyPage - 1) * 10 + index)}>{t("modelUsage.details")}</Button></TableCell>
+                <TableCell className="whitespace-nowrap">{formatDate(run.finished_at)}</TableCell><TableCell><ListName onClick={() => setLegacySelected((legacyPage - 1) * 10 + index)}>{run.kind}</ListName></TableCell><TableCell>{run.status === "succeeded" ? t("modelServices.ok") : t("modelServices.failed")}</TableCell><TableCell className="text-end"><ListActions actions={[{ label: t("listActions.details"), onSelect: () => setLegacySelected((legacyPage - 1) * 10 + index) }]} /></TableCell>
               </TableRow>)}</TableBody>
             </Table></div>
             <Pagination page={legacyPage} totalPages={Math.ceil(usage.data.legacy_runs.length / 10)} total={usage.data.legacy_runs.length} onChange={(next) => { setLegacySelected(null); setLegacyPage(next); }} />

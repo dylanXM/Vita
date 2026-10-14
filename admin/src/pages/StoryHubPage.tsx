@@ -10,6 +10,8 @@ import type { Environment, StoryBackground, StoryBackgroundInput, StoryConfig } 
 import { ConfigurationButton } from "@/components/configuration-button";
 import { AdminImageInput, isAdminImageURL } from "@/components/admin-image-input";
 import { PageHeader } from "@/components/page-header";
+import { ListActions, ListDetails, ListName } from "@/components/list-actions";
+import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -42,6 +44,7 @@ export function StoryHubPage() {
   const [rules, setRules] = useState<StoryConfig | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StoryBackground | null>(null);
+  const [details, setDetails] = useState<StoryBackground | null>(null);
   const [form, setForm] = useState<StoryBackgroundInput>(blank("prod"));
   const [coverUploading, setCoverUploading] = useState(false);
 
@@ -88,22 +91,18 @@ export function StoryHubPage() {
         </TableRow></TableHeader><TableBody>{backgrounds.data.items.map((item) => <TableRow key={item.id}>
           <TableCell><div className="flex items-center gap-3">
             {item.cover_url ? <img src={item.cover_url} alt="" className="size-12 shrink-0 rounded-lg object-cover" /> : <span className="grid size-12 shrink-0 place-items-center rounded-lg bg-muted"><BookOpen className="size-5" /></span>}
-            <div><div className="font-medium">{item.title}</div><div className="line-clamp-1 max-w-72 text-xs text-muted-foreground">{item.synopsis || item.world_setting}</div></div>
+            <div><ListName onClick={() => setDetails(item)}>{item.title}</ListName><div className="line-clamp-1 max-w-72 text-xs text-muted-foreground">{item.synopsis || item.world_setting}</div></div>
           </div></TableCell>
           <TableCell>{item.genre || "—"}</TableCell><TableCell>{item.sort_order}</TableCell>
-          <TableCell><Badge variant={item.enabled ? "success" : "outline"}>{t(item.enabled ? "content.enabled" : "content.disabled")}</Badge></TableCell>
-          <TableCell className="text-end"><div className="inline-flex items-center gap-2">
-            <ConfigurationButton label={t("users.edit")} icon={<Pencil />} onClick={() => edit(item)} details={[
-              `${t("storyHub.name")}: ${item.title}`, `${t("storyHub.genre")}: ${item.genre || "—"}`,
-              `${t("storyHub.sort")}: ${item.sort_order}`, `${t("storyHub.enabled")}: ${t(item.enabled ? "content.enabled" : "content.disabled")}`,
-              `${t("storyHub.cover")}: ${item.cover_url || "—"}`, `${t("storyHub.synopsis")}: ${item.synopsis || "—"}`,
-              `${t("storyHub.world")}: ${item.world_setting}`, `${t("storyHub.opening")}: ${item.opening}`,
-              `${t("storyHub.constraints")}: ${item.character_constraints || "—"}`, `${t("storyHub.goal")}: ${item.story_goal || "—"}`,
-            ]} />
-            <Button size="sm" variant="destructive" disabled={remove.isPending} onClick={() => setDeleteTarget(item)}><Trash2 />{t("storyHub.delete")}</Button>
-          </div></TableCell>
+          <TableCell><Switch checked={item.enabled} disabled aria-label={t("storyHub.enabled")} /></TableCell>
+          <TableCell className="text-end"><ListActions actions={[{ label: t("listActions.details"), onSelect: () => setDetails(item) }, { label: t("users.edit"), icon: <Pencil />, onSelect: () => edit(item) }]} /></TableCell>
         </TableRow>)}</TableBody></Table>}
     </CardContent></Card>
+    {details && <ListDetails title={details.title} onClose={() => setDetails(null)} fields={[
+      { label: t("storyHub.genre"), value: details.genre }, { label: t("storyHub.synopsis"), value: details.synopsis }, { label: t("storyHub.world"), value: details.world_setting }, { label: t("storyHub.opening"), value: details.opening },
+      { label: t("storyHub.cover"), value: details.cover_url }, { label: t("storyHub.constraints"), value: details.character_constraints }, { label: t("storyHub.goal"), value: details.story_goal },
+      { label: t("storyHub.enabled"), value: <Badge variant={details.enabled ? "success" : "outline"}>{t(details.enabled ? "content.enabled" : "content.disabled")}</Badge> },
+    ]} actions={[{ label: t("users.edit"), icon: <Pencil />, onSelect: () => { edit(details); setDetails(null); } }, { label: t("storyHub.delete"), icon: <Trash2 />, destructive: true, disabled: remove.isPending, onSelect: () => { setDeleteTarget(details); setDetails(null); } }]} />}
     <Dialog open={rulesOpen} onOpenChange={(next) => { if (!next) { setRulesOpen(false); setRules(savedRules ?? null); } }}>
       <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
         <DialogHeader><DialogTitle>{t("storyHub.rules")}</DialogTitle><DialogDescription>{t("storyHub.customLimitHint")}</DialogDescription></DialogHeader>
@@ -127,7 +126,7 @@ export function StoryHubPage() {
           <Field label={t("storyHub.constraints")}><textarea className={area} value={form.character_constraints} onChange={(e) => setForm({ ...form, character_constraints: e.target.value })} /></Field>
           <Field label={t("storyHub.goal")}><textarea className={area} value={form.story_goal} onChange={(e) => setForm({ ...form, story_goal: e.target.value })} /></Field>
         </div>
-        <label className="flex gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />{t("storyHub.enabled")}</label>
+        <label className="flex gap-2 text-sm"><Switch checked={form.enabled} onCheckedChange={(checked) => setForm({ ...form, enabled: checked })} />{t("storyHub.enabled")}</label>
         <DialogFooter><Button variant="outline" disabled={coverUploading} onClick={closeBackground}>{t("users.cancel")}</Button><Button disabled={coverUploading || Boolean(form.cover_url && !isAdminImageURL(form.cover_url)) || !form.title.trim() || !form.world_setting.trim() || !form.opening.trim() || save.isPending} onClick={() => save.mutate()}>{editing ? <Save /> : <Plus />}{t("storyHub.saveBackground")}</Button></DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Switch } from "@/components/ui/switch";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { usersApi } from "@/api/admin";
@@ -34,7 +35,7 @@ export function UserContactPreferences({ userID }: { userID: string }) {
           <label className="space-y-2 text-sm">{t("contact.dailyLimit")}<Input type="number" min={0} max={8} value={form.daily_limit} disabled={save.isPending} onChange={(e) => setForm({ ...form, daily_limit: e.target.valueAsNumber })} /></label>
           <label className="space-y-2 text-sm">{t("contact.gap")}<Input type="number" min={30} max={1440} value={form.minimum_gap_minutes} disabled={save.isPending} onChange={(e) => setForm({ ...form, minimum_gap_minutes: e.target.valueAsNumber })} /></label>
         </div>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.quiet_enabled} disabled={save.isPending} onChange={(e) => setForm({ ...form, quiet_enabled: e.target.checked })} />{t("contact.quiet")}</label>
+        <label className="flex items-center gap-2 text-sm"><Switch checked={form.quiet_enabled} disabled={save.isPending} onCheckedChange={(checked) => setForm({ ...form, quiet_enabled: checked })} />{t("contact.quiet")}</label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="space-y-2 text-sm">{t("contact.start")}<Input type="number" min={0} max={23} value={form.quiet_start} disabled={!form.quiet_enabled || save.isPending} onChange={(e) => setForm({ ...form, quiet_start: e.target.valueAsNumber })} /></label>
           <label className="space-y-2 text-sm">{t("contact.end")}<Input type="number" min={0} max={23} value={form.quiet_end} disabled={!form.quiet_enabled || save.isPending} onChange={(e) => setForm({ ...form, quiet_end: e.target.valueAsNumber })} /></label>

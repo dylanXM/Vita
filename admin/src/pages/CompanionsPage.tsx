@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Bot, Eye, RefreshCw, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { companionsApi } from "@/api/admin";
 import { PageHeader } from "@/components/page-header";
+import { ListActions } from "@/components/list-actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +19,7 @@ import { formatDate } from "@/lib/format";
 const PAGE_SIZE = 20;
 
 export function CompanionsPage() {
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const [params] = useSearchParams();
   const userID = params.get("user_id") ?? "";
@@ -105,7 +107,7 @@ export function CompanionsPage() {
                   <TableCell><div className="flex flex-wrap gap-1"><Badge variant={item.active ? "success" : "muted"}>{t(item.active ? "companions.active" : "companions.inactive")}</Badge>{item.proactive_enabled && <Badge variant="outline">{t("companions.proactive")}</Badge>}</div></TableCell>
                   <TableCell>{item.conversations} / {item.messages}</TableCell>
                   <TableCell className="hidden text-muted-foreground xl:table-cell">{formatDate(item.created_at)}</TableCell>
-                  <TableCell className="text-end"><Button variant="ghost" size="sm" asChild><Link to={`/companions/${item.id}`}><Eye />{t("users.view")}</Link></Button></TableCell>
+                  <TableCell className="text-end"><ListActions actions={[{ label: t("listActions.details"), icon: <Eye />, onSelect: () => navigate(`/companions/${item.id}`) }]} /></TableCell>
                 </TableRow>
               ))}</TableBody>
             </Table>

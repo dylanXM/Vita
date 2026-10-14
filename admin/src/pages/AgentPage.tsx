@@ -13,7 +13,9 @@ import type {
 } from "@/api/types";
 import { errorMessage } from "@/api/client";
 import { PageHeader } from "@/components/page-header";
+import { ListActions, ListDetails, ListName } from "@/components/list-actions";
 import { ConfigurationButton } from "@/components/configuration-button";
+import { Switch } from "@/components/ui/switch";
 import { AdminImageInput, isAdminImageURL } from "@/components/admin-image-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -137,17 +139,31 @@ function NumberField({ label, value, min, max, onChange }: { label: string; valu
 
 function PortraitSection({ portraits, onSaved }: { portraits: CompanionPortrait[]; onSaved: () => void }) {
   const { t } = useTranslation();
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [details, setDetails] = useState<CompanionPortrait | null>(null);
   const [editing, setEditing] = useState<CompanionPortrait | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [name, setName] = useState(""); const [imageUrl, setImageUrl] = useState(""); const [gender, setGender] = useState("custom"); const [tags, setTags] = useState(""); const [isDefault, setIsDefault] = useState(false);
-  const reset = () => { setEditing(null); setName(""); setImageUrl(""); setGender("custom"); setTags(""); setIsDefault(false); };
-  const edit = (portrait: CompanionPortrait) => { setEditing(portrait); setName(portrait.name); setImageUrl(portrait.image_url); setGender(portrait.gender); setTags(portrait.personality_tags.join(", ")); setIsDefault(portrait.is_default); };
+  const reset = () => { setEditorOpen(false); setEditing(null); setName(""); setImageUrl(""); setGender("custom"); setTags(""); setIsDefault(false); };
+  const edit = (portrait: CompanionPortrait) => { setEditorOpen(true); setEditing(portrait); setName(portrait.name); setImageUrl(portrait.image_url); setGender(portrait.gender); setTags(portrait.personality_tags.join(", ")); setIsDefault(portrait.is_default); };
   const save = useMutation({ mutationFn: () => {
     const body = { name, image_url: imageUrl, gender, personality_tags: tags.split(",").map((v) => v.trim()).filter(Boolean), is_default: isDefault, enabled: editing?.enabled ?? true, sort_order: editing?.sort_order ?? portraits.length };
     return editing ? agentApi.updatePortrait(editing.id, body) : agentApi.createPortrait(body);
   }, onSuccess: () => { reset(); toast.success(t("agent.saved")); onSaved(); }, onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))) });
   const toggleDefault = useMutation({ mutationFn: (portrait: CompanionPortrait) => agentApi.updatePortrait(portrait.id, { ...portrait, is_default: !portrait.is_default }), onSuccess: onSaved, onError: (e) => toast.error(errorMessage(e, t("common.failedToLoad"))) });
-  return <Card><CardHeader><CardTitle>{t("agent.portraits")}</CardTitle><CardDescription>{t("agent.portraitsDesc")}</CardDescription></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 md:grid-cols-4"><Field label={t("agent.portraitName")}><Input value={name} onChange={(e) => setName(e.target.value)} /></Field><Field label={t("agent.imageUrl")}><AdminImageInput value={imageUrl} onChange={setImageUrl} onUploadingChange={setImageUploading} /></Field><Field label={t("agent.gender")}><Input value={gender} onChange={(e) => setGender(e.target.value)} /></Field><Field label={t("agent.tags")}><Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="warm, calm" /></Field></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />{t("agent.defaultCompanion")}</label><div className="flex gap-2"><Button disabled={!name.trim() || !isAdminImageURL(imageUrl.trim()) || imageUploading || save.isPending} onClick={() => save.mutate()}>{editing ? <Save /> : <ImagePlus />}{editing ? t("users.save") : t("agent.addPortrait")}</Button>{editing && <Button variant="outline" onClick={reset}>{t("users.cancel")}</Button>}</div><div className="flex flex-wrap gap-3">{portraits.map((portrait) => <div key={portrait.id} className="flex items-center gap-3 rounded-md border p-2">{portrait.image_url.startsWith("asset://") ? <div className="grid size-12 place-items-center rounded-full bg-muted"><Bot className="size-5" /></div> : <img className="size-12 rounded-full object-cover" src={portrait.image_url} alt="" />}<div><div className="text-sm font-medium">{portrait.name}{portrait.is_default ? <Badge className="ms-2" variant="outline">{t("agent.defaultCompanionBadge")}</Badge> : null}</div><div className="text-xs text-muted-foreground">{portrait.personality_tags.join(" · ")}</div></div><Button size="sm" variant="ghost" onClick={() => edit(portrait)}><Pencil />{t("users.edit")}</Button><Button size="sm" variant="ghost" disabled={toggleDefault.isPending} onClick={() => toggleDefault.mutate(portrait)}>{portrait.is_default ? t("agent.removeDefaultCompanion") : t("agent.makeDefaultCompanion")}</Button></div>)}</div></CardContent></Card>;
+  return <Card><CardHeader><CardTitle>{t("agent.portraits")}</CardTitle><CardDescription>{t("agent.portraitsDesc")}</CardDescription></CardHeader><CardContent className="space-y-4">
+    <Button onClick={() => { reset(); setEditorOpen(true); }}><ImagePlus />{t("agent.addPortrait")}</Button>
+    <div className="space-y-3">{portraits.map((portrait) => <div key={portrait.id} className="flex h-20 items-center justify-between gap-3 rounded-md border p-3">
+      <div className="flex min-w-0 items-center gap-3">{portrait.image_url.startsWith("asset://") ? <div className="grid size-12 shrink-0 place-items-center rounded-full bg-muted"><Bot className="size-5" /></div> : <img className="size-12 shrink-0 rounded-full object-cover" src={portrait.image_url} alt="" />}<div className="min-w-0"><ListName onClick={() => setDetails(portrait)}>{portrait.name}</ListName><div className="truncate text-xs text-muted-foreground">{portrait.personality_tags.join(" · ")}</div></div></div>
+      <div className="flex shrink-0 items-center gap-3"><Switch checked={portrait.is_default} disabled={toggleDefault.isPending} aria-label={t("agent.defaultCompanion")} onCheckedChange={() => toggleDefault.mutate(portrait)} /><ListActions actions={[{ label: t("listActions.details"), onSelect: () => setDetails(portrait) }, { label: t("users.edit"), icon: <Pencil />, onSelect: () => edit(portrait) }]} /></div>
+    </div>)}</div>
+    {details && <ListDetails title={details.name} onClose={() => setDetails(null)} fields={[{ label: t("agent.imageUrl"), value: details.image_url }, { label: t("agent.gender"), value: details.gender }, { label: t("agent.tags"), value: details.personality_tags.join(" · ") }, { label: t("agent.defaultCompanion"), value: <Badge variant="outline">{t(details.is_default ? "content.enabled" : "content.disabled")}</Badge> }]} actions={[{ label: t("users.edit"), icon: <Pencil />, onSelect: () => { edit(details); setDetails(null); } }]} />}
+    <Dialog open={editorOpen} onOpenChange={(open) => { if (!open && !save.isPending && !imageUploading) reset(); }}><DialogContent className="max-h-[85vh] overflow-y-auto"><DialogHeader><DialogTitle>{editing ? t("users.edit") : t("agent.addPortrait")}</DialogTitle><DialogDescription>{t("agent.portraitsDesc")}</DialogDescription></DialogHeader>
+      <div className="grid gap-3"><Field label={t("agent.portraitName")}><Input value={name} onChange={(e) => setName(e.target.value)} /></Field><Field label={t("agent.imageUrl")}><AdminImageInput value={imageUrl} onChange={setImageUrl} onUploadingChange={setImageUploading} /></Field><Field label={t("agent.gender")}><Input value={gender} onChange={(e) => setGender(e.target.value)} /></Field><Field label={t("agent.tags")}><Input value={tags} onChange={(e) => setTags(e.target.value)} /></Field></div>
+      <label className="flex items-center gap-2 text-sm"><Switch checked={isDefault} onCheckedChange={setIsDefault} />{t("agent.defaultCompanion")}</label>
+      <div className="flex justify-end gap-2"><Button variant="outline" disabled={save.isPending || imageUploading} onClick={reset}>{t("users.cancel")}</Button><Button disabled={!name.trim() || !isAdminImageURL(imageUrl.trim()) || imageUploading || save.isPending} onClick={() => save.mutate()}><Save />{t("users.save")}</Button></div>
+    </DialogContent></Dialog>
+  </CardContent></Card>;
 }
 
 function CompanionSection({ companions, models, portraits, loading, onSaved }: {
@@ -159,6 +175,7 @@ function CompanionSection({ companions, models, portraits, loading, onSaved }: {
 }) {
   const { t } = useTranslation();
   const [form, setForm] = useState<AdminCompanion | null>(null);
+  const [details, setDetails] = useState<{ companion: AdminCompanion; summary: string[] } | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
   const chatModels = models.filter((model) => (model.configured_scenarios ?? []).includes("text_chat"));
   const save = useMutation({
@@ -201,15 +218,16 @@ function CompanionSection({ companions, models, portraits, loading, onSaved }: {
               {imageURL.startsWith("http://") || imageURL.startsWith("https://")
                 ? <img src={imageURL} alt="" className="size-10 rounded-full object-cover" />
                 : <span className="grid size-10 place-items-center rounded-full bg-muted"><Bot className="size-5" /></span>}
-              <div><div className="font-medium">{item.name}</div><div className="text-xs text-muted-foreground">{item.occupation || "—"}</div></div>
+              <div><ListName onClick={() => setDetails({ companion: item, summary })}>{item.name}</ListName><div className="text-xs text-muted-foreground">{item.occupation || "—"}</div></div>
             </div></TableCell>
             <TableCell>{item.user_email}</TableCell><TableCell>{item.city || "—"}</TableCell>
             <TableCell>{model?.display_name ?? t("agent.useDefault")}</TableCell>
-            <TableCell><Badge variant={item.proactive_enabled ? "success" : "outline"}>{t(item.proactive_enabled ? "content.enabled" : "content.disabled")}</Badge></TableCell>
-            <TableCell className="text-end"><ConfigurationButton label={t("users.edit")} icon={<Bot />} onClick={() => setForm({ ...item, personality_tags: [...item.personality_tags] })} details={summary} /></TableCell>
+            <TableCell><Switch checked={item.proactive_enabled} disabled aria-label={t("agent.proactiveEnabled")} /></TableCell>
+            <TableCell className="text-end"><ListActions actions={[{ label: t("listActions.details"), onSelect: () => setDetails({ companion: item, summary }) }, { label: t("users.edit"), icon: <Bot />, onSelect: () => setForm({ ...item, personality_tags: [...item.personality_tags] }) }]} /></TableCell>
           </TableRow>;
         })}</TableBody></Table>}
     </CardContent></Card>
+    {details && <ListDetails title={details.companion.name} onClose={() => setDetails(null)} fields={[{ label: t("agent.companion"), value: details.summary.join("\n") }]} actions={[{ label: t("users.edit"), icon: <Bot />, onSelect: () => { setForm({ ...details.companion, personality_tags: [...details.companion.personality_tags] }); setDetails(null); } }]} />}
     <Dialog open={form !== null} onOpenChange={(next) => { if (!next) setForm(null); }}>
       <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
         <DialogHeader><DialogTitle>{t("agent.saveCompanion")}</DialogTitle><DialogDescription>{t("agent.companionsDesc")}</DialogDescription></DialogHeader>
@@ -236,7 +254,7 @@ function CompanionSection({ companions, models, portraits, loading, onSaved }: {
             <Field label={t("agent.speakingStyle")}><textarea className={textareaClass} value={form.speaking_style} onChange={(e) => setForm({ ...form, speaking_style: e.target.value })} /></Field>
             <Field label={t("agent.habitsGoal")}><textarea className={textareaClass} value={`${form.life_habits}\n${form.life_goal}`} onChange={(e) => { const [life_habits, ...rest] = e.target.value.split("\n"); setForm({ ...form, life_habits, life_goal: rest.join("\n") }); }} /></Field>
           </div>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.proactive_enabled} onChange={(e) => setForm({ ...form, proactive_enabled: e.target.checked })} />{t("agent.proactiveEnabled")}</label>
+          <label className="flex items-center gap-2 text-sm"><Switch checked={form.proactive_enabled} onCheckedChange={(checked) => setForm({ ...form, proactive_enabled: checked })} />{t("agent.proactiveEnabled")}</label>
           <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setForm(null)}>{t("users.cancel")}</Button><Button disabled={save.isPending || imageUploading || (form.avatar_url.trim() !== "" && form.avatar_url !== companions.find((item) => item.id === form.id)?.avatar_url && !isAdminImageURL(form.avatar_url.trim()))} onClick={() => save.mutate()}><Save />{t("agent.saveCompanion")}</Button></div>
         </div>}
       </DialogContent>

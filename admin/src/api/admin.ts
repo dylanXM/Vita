@@ -153,7 +153,7 @@ export const creditLedgerApi = {
 export const creditProductsApi = {
   list: (environment: Environment, signal?: AbortSignal) =>
     http.get<BillingList<CreditProduct>>("/admin/credit-products", { params: { environment }, signal }),
-  update: (environment: Environment, key: string, body: Pick<CreditProduct, "coins" | "enabled" | "sort_order">) =>
+  update: (environment: Environment, key: string, body: Pick<CreditProduct, "coins" | "enabled" | "sort_order"> & Partial<Pick<CreditProduct, "subscription_only" | "is_launched" | "scene_background_url" | "scene_audio_url">>) =>
     http.put<BillingList<CreditProduct>>(`/admin/credit-products/${key}`, body, { params: { environment } }),
 };
 
@@ -240,8 +240,8 @@ export const legalDocumentsApi = {
 };
 
 export const agentApi = {
-  config: (env?: string, signal?: AbortSignal) =>
-    http.get<AgentConfig>("/admin/agent/config", { signal, params: env ? { environment: env } : undefined }),
+  config: (env?: string, signal?: AbortSignal, includeUsage = false) =>
+    http.get<AgentConfig>("/admin/agent/config", { signal, params: { ...(env ? { environment: env } : {}), ...(includeUsage ? { include_usage: true } : {}) } }),
   saveSettings: (body: AgentSettings) => http.put<AgentSettings>("/admin/agent/settings", body),
   createProvider: (body: AIProviderInput) => http.post<AIProvider>("/admin/agent/providers", body),
   updateProvider: (id: string, body: AIProviderInput) =>

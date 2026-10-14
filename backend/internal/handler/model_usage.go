@@ -21,6 +21,44 @@ type modelCostTotals struct {
 	Unpriced int64   `json:"unpriced_calls"`
 }
 
+type modelUsageSummary struct {
+	Tokens       int64   `json:"tokens"`
+	Calls        int64   `json:"calls"`
+	UnknownUsage int64   `json:"unknown_usage_calls"`
+	Unpriced     int64   `json:"unpriced_calls"`
+	Cost         float64 `json:"estimated_cost_usd"`
+}
+
+// One grouped query for the management list, not a request per model.
+func attachModelUsageSummaries(ctx context.Context, models []adminModel) error {
+	rows, err := db.Get().QueryContext(ctx, `SELECT model_id,
+		COALESCE(SUM(input_tokens+output_tokens+cache_read_tokens+cache_write_tokens) FILTER (WHERE usage_known),0),
+		COUNT(*),COUNT(*) FILTER (WHERE NOT usage_known),
+		COUNT(*) FILTER (WHERE estimated_cost_usd IS NULL),COALESCE(SUM(estimated_cost_usd),0)
+		FROM model_calls WHERE model_id IS NOT NULL GROUP BY model_id`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	summaries := make(map[string]modelUsageSummary)
+	for rows.Next() {
+		var id string
+		var summary modelUsageSummary
+		if err := rows.Scan(&id, &summary.Tokens, &summary.Calls, &summary.UnknownUsage, &summary.Unpriced, &summary.Cost); err != nil {
+			return err
+		}
+		summaries[id] = summary
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for i := range models {
+		summary := summaries[models[i].ID]
+		models[i].Usage = &summary
+	}
+	return nil
+}
+
 func collectModelCost(ctx context.Context, id string) (modelCostTotals, error) {
 	var totals modelCostTotals
 	err := db.Get().QueryRowContext(ctx, `SELECT

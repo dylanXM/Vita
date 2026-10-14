@@ -1,6 +1,12 @@
 // English — the master key set. Every other locale mirrors this structure.
 const en = {
   brand: "Vita Admin",
+  listActions: { more: "More", details: "Details", close: "Close" },
+  creditProductClose: "Close",
+  creditProductDialog: { details: "Experience details", edit: "Edit experience", sortOrder: "Sort order", metadata: "Experience configuration", empty: "No credit experiences.", invalidCoins: "Enter an integer from 1 to 100,000." },
+  modelUsageTokens: "Cumulative tokens",
+  modelUsageUnknownCount: "{{count}} calls without token usage",
+  modelUsageList: "Cumulative recorded usage · Tokens include input, output, cache reads and cache writes. Missing usage and unpriced calls are excluded from their respective totals. Estimates are in USD, not supplier invoices.",
 
   feedback: {
     title: "Feedback",

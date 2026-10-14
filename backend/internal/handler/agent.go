@@ -40,6 +40,7 @@ type adminProvider struct {
 }
 
 type adminModel struct {
+	Usage               *modelUsageSummary `json:"usage,omitempty"`
 	ID                  string          `json:"id"`
 	ProviderID          string          `json:"provider_id"`
 	ProviderName        string          `json:"provider_name"`
@@ -110,6 +111,12 @@ func AdminAgentConfig(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load portraits"})
 		return
+	}
+	if c.Query("include_usage") == "true" {
+		if err := attachModelUsageSummaries(c.Request.Context(), models); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load model usage totals"})
+			return
+		}
 	}
 	plans, err := loadModelSubscriptionPlans(currentEnvironment())
 	if err != nil {

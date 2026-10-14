@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Bot, Brain, CircleDot, CloudUpload, HeartPulse, Moon, Pause, Play,
+  Bot, Brain, CircleDot, CloudUpload, HeartPulse, Moon, Pause,
   Radio, RefreshCw, Send, Settings2, Trash2, Users,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -11,6 +11,8 @@ import { lifeEngineApi } from "@/api/admin";
 import { errorMessage } from "@/api/client";
 import type { LifeEngineCompanion, LifeEngineEvent } from "@/api/types";
 import { PageHeader } from "@/components/page-header";
+import { ListActions, ListDetails, ListName } from "@/components/list-actions";
+import { Switch } from "@/components/ui/switch";
 import { StatCard } from "@/components/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -164,6 +166,7 @@ function CompanionRow({ companion, onOpenEvents, onBroadcast, onChanged }: {
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const takeover = useMutation({
     mutationFn: () => companion.admin_takeover ? lifeEngineApi.exitTakeover(companion.id) : lifeEngineApi.enterTakeover(companion.id),
     onSuccess: () => { toast.success(t(companion.admin_takeover ? "lifeEngine.takeoverEnded" : "lifeEngine.takeoverStarted")); onChanged(); },
@@ -183,7 +186,7 @@ function CompanionRow({ companion, onOpenEvents, onBroadcast, onChanged }: {
             {companion.admin_takeover ? <Pause className="size-4" /> : <Bot className="size-4" />}
           </span>
           <div>
-            <div className="font-medium">{companion.name}</div>
+            <ListName onClick={() => setDetailsOpen(true)}>{companion.name}</ListName>
             <div className="text-xs text-muted-foreground">{companion.user_email} · {companion.city || "—"}</div>
           </div>
         </div>
@@ -195,6 +198,7 @@ function CompanionRow({ companion, onOpenEvents, onBroadcast, onChanged }: {
             : <Badge variant="success">{t("lifeEngine.automatic")}</Badge>}
           {!companion.life_enabled && <Badge variant="muted">{t("lifeEngine.lifeOff")}</Badge>}
           {!companion.proactive_enabled && <Badge variant="muted">{t("lifeEngine.proactiveOff")}</Badge>}
+          <Switch checked={companion.admin_takeover} disabled={takeover.isPending} aria-label={t("lifeEngine.takeover")} onCheckedChange={() => takeover.mutate()} />
         </div>
       </TableCell>
       <TableCell>
@@ -220,15 +224,13 @@ function CompanionRow({ companion, onOpenEvents, onBroadcast, onChanged }: {
         {companion.last_run_status && <Badge variant={companion.last_run_status === "succeeded" ? "outline" : "destructive"} className="ml-2">{companion.last_run_status}</Badge>}
       </TableCell>
       <TableCell className="text-end">
-        <div className="flex justify-end gap-1">
-          <Button size="sm" variant="ghost" onClick={onOpenEvents}><Moon />{t("lifeEngine.events")}</Button>
-          <Button size="sm" variant="ghost" onClick={onBroadcast}><Send />{t("lifeEngine.broadcast")}</Button>
-          <Button size="sm" variant="ghost" onClick={() => resend.mutate()} disabled={resend.isPending}><CloudUpload />{t("lifeEngine.resend")}</Button>
-          <Button size="sm" variant={companion.admin_takeover ? "outline" : "ghost"} onClick={() => takeover.mutate()} disabled={takeover.isPending}>
-            {companion.admin_takeover ? <Play /> : <Pause />}
-            {companion.admin_takeover ? t("lifeEngine.resume") : t("lifeEngine.takeover")}
-          </Button>
-        </div>
+        <ListActions actions={[{ label: t("listActions.details"), onSelect: () => setDetailsOpen(true) }, { label: t("lifeEngine.events"), icon: <Moon />, onSelect: onOpenEvents }, { label: t("lifeEngine.broadcast"), icon: <Send />, onSelect: onBroadcast }]} />
+        {detailsOpen && <ListDetails title={companion.name} onClose={() => setDetailsOpen(false)} fields={[
+          { label: t("users.email"), value: companion.user_email }, { label: t("companions.city"), value: companion.city },
+          { label: t("lifeEngine.events"), value: `${companion.today_shared}/${companion.today_events}` },
+          { label: t("lifeEngine.takeover"), value: <Switch checked={companion.admin_takeover} disabled={takeover.isPending} aria-label={t("lifeEngine.takeover")} onCheckedChange={() => takeover.mutate()} /> },
+          { label: t("lifeEngine.lastRunCol"), value: companion.last_run_at ? formatDate(companion.last_run_at) : "—" },
+        ]} actions={[{ label: t("lifeEngine.events"), icon: <Moon />, onSelect: () => { setDetailsOpen(false); onOpenEvents(); } }, { label: t("lifeEngine.broadcast"), icon: <Send />, onSelect: () => { setDetailsOpen(false); onBroadcast(); } }, { label: t("lifeEngine.resend"), icon: <CloudUpload />, disabled: resend.isPending, onSelect: () => resend.mutate() }]} />}
       </TableCell>
     </TableRow>
   );
@@ -242,6 +244,8 @@ function EventsDialog({ companion, onClose, onChanged }: {
   const { t } = useTranslation();
   const events = useQuery({ queryKey: ["life-engine-events", companion.id], queryFn: ({ signal }) => lifeEngineApi.events(companion.id, signal) });
   const [draft, setDraft] = useState({ title: "", description: "", location: "", importance: 50, shareability: true });
+  const [selected, setSelected] = useState<LifeEngineEvent | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const create = useMutation({
     mutationFn: () => lifeEngineApi.createEvent(companion.id, {
@@ -253,12 +257,12 @@ function EventsDialog({ companion, onClose, onChanged }: {
       start_time: new Date().toISOString(),
       end_time: new Date(Date.now() + 3600_000).toISOString(),
     }),
-    onSuccess: () => { toast.success(t("lifeEngine.eventAdded")); setDraft({ title: "", description: "", location: "", importance: 50, shareability: true }); void events.refetch(); onChanged(); },
+    onSuccess: () => { setCreating(false); toast.success(t("lifeEngine.eventAdded")); setDraft({ title: "", description: "", location: "", importance: 50, shareability: true }); void events.refetch(); onChanged(); },
     onError: (e) => toast.error(errorMessage(e)),
   });
   const remove = useMutation({
     mutationFn: (id: string) => lifeEngineApi.deleteEvent(id),
-    onSuccess: () => { toast.success(t("lifeEngine.eventDeleted")); void events.refetch(); onChanged(); },
+    onSuccess: () => { setSelected(null); toast.success(t("lifeEngine.eventDeleted")); void events.refetch(); onChanged(); },
     onError: (e) => toast.error(errorMessage(e)),
   });
 
@@ -276,7 +280,7 @@ function EventsDialog({ companion, onClose, onChanged }: {
               <div key={e.id} className="flex items-start justify-between gap-3 rounded-lg border p-3 text-sm">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium">{e.title}</span>
+                    <ListName onClick={() => setSelected(e)}>{e.title}</ListName>
                     {e.shared_at ? <Badge variant="success">{t("lifeEngine.shared")}</Badge>
                       : e.shareability ? <Badge variant="outline">{t("lifeEngine.shareable")}</Badge> : null}
                     <Badge variant="muted">{e.generation_source}</Badge>
@@ -286,14 +290,15 @@ function EventsDialog({ companion, onClose, onChanged }: {
                     {formatDate(e.start_time)} · {e.emotion || "—"} · {t("lifeEngine.importance", { n: e.importance })}
                   </p>
                 </div>
-                {!e.shared_at && (
-                  <Button size="sm" variant="ghost" onClick={() => remove.mutate(e.id)}><Trash2 /></Button>
-                )}
+                <ListActions actions={[{ label: t("listActions.details"), onSelect: () => setSelected(e) }]} />
               </div>
             ))}
         </div>
 
-        <div className="mt-2 space-y-2 border-t pt-4">
+        <DialogFooter><Button variant="outline" onClick={onClose}>{t("listActions.close")}</Button><Button onClick={() => setCreating(true)}>{t("lifeEngine.addEvent")}</Button></DialogFooter>
+        {selected && <ListDetails title={selected.title} onClose={() => setSelected(null)} fields={[{ label: t("lifeEngine.descriptionPlaceholder"), value: selected.description }, { label: t("lifeEngine.locationPlaceholder"), value: selected.location }, { label: t("modelUsage.time"), value: formatDate(selected.start_time) }, { label: t("lifeEngine.importance", { n: selected.importance }), value: selected.importance }]} actions={!selected.shared_at ? [{ label: t("common.delete"), icon: <Trash2 />, destructive: true, disabled: remove.isPending, onSelect: () => { if (window.confirm(t("common.delete"))) remove.mutate(selected.id); } }] : []} />}
+        <Dialog open={creating} onOpenChange={(open) => { if (!open && !create.isPending) setCreating(false); }}><DialogContent><DialogHeader><DialogTitle>{t("lifeEngine.addEventTitle")}</DialogTitle></DialogHeader>
+        <div className="space-y-2">
           <Label>{t("lifeEngine.addEventTitle")}</Label>
           <Input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder={t("lifeEngine.titlePlaceholder")} />
           <Input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder={t("lifeEngine.descriptionPlaceholder")} />
@@ -302,17 +307,18 @@ function EventsDialog({ companion, onClose, onChanged }: {
             <Input type="number" value={draft.importance} onChange={(e) => setDraft({ ...draft, importance: Number(e.target.value) })} />
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={draft.shareability} onChange={(e) => setDraft({ ...draft, shareability: e.target.checked })} />
+            <Switch checked={draft.shareability} onCheckedChange={(checked) => setDraft({ ...draft, shareability: checked })} />
             {t("lifeEngine.shareableHint")}
           </label>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>{t("common.refresh") /* reuse close */}</Button>
+          <Button variant="outline" disabled={create.isPending} onClick={() => setCreating(false)}>{t("common.cancel")}</Button>
           <Button onClick={() => create.mutate()} disabled={!draft.title.trim() || create.isPending}>
             {t("lifeEngine.addEvent")}
           </Button>
         </DialogFooter>
+        </DialogContent></Dialog>
       </DialogContent>
     </Dialog>
   );

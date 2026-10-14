@@ -430,6 +430,13 @@ export interface AIProviderInput {
 }
 
 export interface AIModel {
+  usage?: {
+    tokens: number;
+    calls: number;
+    unknown_usage_calls: number;
+    unpriced_calls: number;
+    estimated_cost_usd: number;
+  };
   id: string;
   provider_id: string;
   provider_name: string;

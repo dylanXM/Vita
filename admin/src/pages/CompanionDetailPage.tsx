@@ -8,11 +8,14 @@ import { agentApi, companionsApi } from "@/api/admin";
 import type { AdminCompanionInput } from "@/api/types";
 import { errorMessage } from "@/api/client";
 import { PageHeader } from "@/components/page-header";
+import { ListActions } from "@/components/list-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/sonner";
@@ -98,8 +101,8 @@ export function CompanionDetailPage() {
           <Field label={t("agent.occupation")}><Input value={form.occupation} onChange={(e) => setForm({ ...form, occupation: e.target.value })} /></Field>
           <Field label={t("companions.relationshipStage")}><Input value={form.relationship_stage} readOnly /></Field>
           <Field label={t("agent.tags")}><Input value={tags} onChange={(e) => setForm({ ...form, personality_tags: e.target.value.split(",").map((tag) => tag.trim()).filter(Boolean) })} /></Field>
-          <Field label={t("agent.model")}><select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={form.model_id ?? ""} onChange={(e) => setForm({ ...form, model_id: e.target.value || null })}><option value="">{t("agent.useDefault")}</option>{config.data?.models.map((model) => <option key={model.id} value={model.id}>{model.display_name}</option>)}</select></Field>
-          <Field label={t("agent.portrait")}><select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={form.portrait_id ?? ""} onChange={(e) => setForm({ ...form, portrait_id: e.target.value || null })}><option value="">{t("agent.noPortrait")}</option>{config.data?.portraits.map((portrait) => <option key={portrait.id} value={portrait.id}>{portrait.name}</option>)}</select></Field>
+          <Field label={t("agent.model")}><Select value={form.model_id || "none"} onValueChange={(id) => setForm({ ...form, model_id: id === "none" ? null : id })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">{t("agent.useDefault")}</SelectItem>{config.data?.models.map((model) => <SelectItem key={model.id} value={model.id}>{model.display_name}</SelectItem>)}</SelectContent></Select></Field>
+          <Field label={t("agent.portrait")}><Select value={form.portrait_id || "none"} onValueChange={(id) => setForm({ ...form, portrait_id: id === "none" ? null : id })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">{t("agent.noPortrait")}</SelectItem>{config.data?.portraits.map((portrait) => <SelectItem key={portrait.id} value={portrait.id}>{portrait.name}</SelectItem>)}</SelectContent></Select></Field>
           <Field label={t("companions.interests")}><Input value={form.interests} onChange={(e) => setForm({ ...form, interests: e.target.value })} /></Field>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
@@ -110,7 +113,7 @@ export function CompanionDetailPage() {
           <Field label={t("companions.likes")}><textarea className={textareaClass} value={form.likes} onChange={(e) => setForm({ ...form, likes: e.target.value })} /></Field>
           <Field label={t("companions.dislikes")}><textarea className={textareaClass} value={form.dislikes} onChange={(e) => setForm({ ...form, dislikes: e.target.value })} /></Field>
         </div>
-        <div className="flex flex-wrap gap-6 text-sm"><label className="flex items-center gap-2"><input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />{t("companions.roleEnabled")}</label><label className="flex items-center gap-2"><input type="checkbox" checked={form.proactive_enabled} onChange={(e) => setForm({ ...form, proactive_enabled: e.target.checked })} />{t("agent.proactiveEnabled")}</label></div>
+        <div className="flex flex-wrap gap-6 text-sm"><label className="flex items-center gap-2"><Switch checked={form.active} onCheckedChange={(checked) => setForm({ ...form, active: checked })} />{t("companions.roleEnabled")}</label><label className="flex items-center gap-2"><Switch checked={form.proactive_enabled} onCheckedChange={(checked) => setForm({ ...form, proactive_enabled: checked })} />{t("agent.proactiveEnabled")}</label></div>
         <Button disabled={!form.name.trim() || save.isPending} onClick={() => save.mutate()}><Save />{t("users.save")}</Button>
       </CardContent></Card>
 
@@ -120,7 +123,7 @@ export function CompanionDetailPage() {
           <Metric label={t("companions.intimacy")} value={companion.relationship.intimacy} /><Metric label={t("companions.enthusiasm")} value={companion.relationship.enthusiasm} /><Metric label={t("companions.mood")} value={companion.state.mood} /><Metric label={t("companions.energy")} value={companion.state.energy} />
           <div className="col-span-2 border-t pt-3 text-xs text-muted-foreground">{t("companions.createdUpdated", { created: formatDate(companion.created_at), updated: formatDate(companion.updated_at) })}</div>
         </CardContent></Card>
-        <Card><CardHeader><CardTitle className="flex items-center gap-2"><Volume2 className="size-5" />{t("companions.voice")}</CardTitle></CardHeader><CardContent className="space-y-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.voice_enabled} onChange={(e) => setForm({ ...form, voice_enabled: e.target.checked })} />{t("companions.voiceEnabled")}</label><Field label={t("companions.voiceConfig")}><textarea className={`${textareaClass} font-mono text-xs`} value={voiceJSON} onChange={(e) => setVoiceJSON(e.target.value)} /></Field></CardContent></Card>
+        <Card><CardHeader><CardTitle className="flex items-center gap-2"><Volume2 className="size-5" />{t("companions.voice")}</CardTitle></CardHeader><CardContent className="space-y-4"><label className="flex items-center gap-2 text-sm"><Switch checked={form.voice_enabled} onCheckedChange={(checked) => setForm({ ...form, voice_enabled: checked })} />{t("companions.voiceEnabled")}</label><Field label={t("companions.voiceConfig")}><textarea className={`${textareaClass} font-mono text-xs`} value={voiceJSON} onChange={(e) => setVoiceJSON(e.target.value)} /></Field></CardContent></Card>
       </div>
     </div>
 
@@ -143,7 +146,7 @@ function ConversationPanel({ companionID, companionName }: { companionID: string
   const ordered = [...(messages.data?.items ?? [])].reverse();
   return <Card><CardHeader><CardTitle className="flex items-center gap-2"><MessageSquare className="size-5" />{t("companions.chatHistory")}</CardTitle><CardDescription>{t("companions.chatHistoryDesc")}</CardDescription></CardHeader><CardContent>
     {conversations.isLoading ? <Skeleton className="h-64 w-full" /> : !selected ? <p className="py-10 text-center text-sm text-muted-foreground">{t("companions.noConversations")}</p> : <div className="grid min-h-96 gap-4 lg:grid-cols-[280px_1fr]">
-      <div className="divide-y rounded-md border">{conversations.data?.items.map((conversation) => <button key={conversation.id} type="button" onClick={() => setSelectedID(conversation.id)} className={`block w-full p-3 text-start text-sm hover:bg-muted/60 ${conversation.id === selected.id ? "bg-muted" : ""}`}><div className="font-medium">{t("companions.conversation")}</div><div className="mt-1 truncate text-xs text-muted-foreground">{conversation.last_message || t("companions.noMessages")}</div><div className="mt-1 text-xs text-muted-foreground">{conversation.message_count} · {conversation.last_message_at ? formatDate(conversation.last_message_at) : "—"}</div></button>)}</div>
+      <div className="divide-y rounded-md border">{conversations.data?.items.map((conversation) => <div key={conversation.id} className={`flex items-center gap-2 p-3 text-sm ${conversation.id === selected.id ? "bg-muted" : ""}`}><button type="button" onClick={() => setSelectedID(conversation.id)} className="min-w-0 flex-1 text-start hover:text-primary"><div className="font-medium">{t("companions.conversation")}</div><div className="mt-1 truncate text-xs text-muted-foreground">{conversation.last_message || t("companions.noMessages")}</div><div className="mt-1 text-xs text-muted-foreground">{conversation.message_count} · {conversation.last_message_at ? formatDate(conversation.last_message_at) : "—"}</div></button><ListActions actions={[{ label: t("listActions.details"), onSelect: () => setSelectedID(conversation.id) }]} /></div>)}</div>
       <div className="flex min-h-96 flex-col rounded-md border bg-muted/30">
         <div className="border-b px-4 py-3 text-sm font-medium">{t("companions.userAndRole", { name: companionName })}</div>
         <div className="flex-1 space-y-3 overflow-y-auto p-4">{messages.isLoading ? <Skeleton className="h-40 w-full" /> : ordered.length === 0 ? <p className="py-10 text-center text-sm text-muted-foreground">{t("companions.noMessages")}</p> : ordered.map((message) => { const fromUser = message.sender_type === "user"; const proactive = isProactiveMessage(message.source, message.life_event_id); return <div key={message.id} className={`flex ${fromUser ? "justify-end" : "justify-start"}`}><div className={`max-w-[80%] rounded-md px-3 py-2 text-sm ${fromUser ? "bg-primary text-primary-foreground" : "border bg-background"}`}><div className="mb-1 flex flex-wrap items-center gap-1.5 text-[11px] opacity-80"><span>{fromUser ? t("companions.user") : companionName} · {message.message_type}</span>{!fromUser && <Badge variant={proactive ? "warning" : "secondary"}>{t(proactive ? "companions.proactiveMessage" : "companions.replyToUser")}</Badge>}</div>{message.content && <div className="whitespace-pre-wrap break-words">{message.content}</div>}{message.media_url && <a href={message.media_url} target="_blank" rel="noreferrer" className="mt-1 block underline">{t("companions.media")}</a>}<div className="mt-1 text-[10px] opacity-60">{formatDate(message.created_at)} · {message.delivery_status}</div></div></div>; })}</div>

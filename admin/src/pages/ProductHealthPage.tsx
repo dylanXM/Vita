@@ -5,6 +5,7 @@ import { Activity, HeartHandshake, MessageCircle, RefreshCw, ShoppingBag, UserRo
 import { statsApi } from "@/api/admin";
 import type { ProductMetrics } from "@/api/types";
 import { PageHeader } from "@/components/page-header";
+import { ListActions, ListDetails, ListName } from "@/components/list-actions";
 import { StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +24,7 @@ function ratio(part: number | undefined, total: number | undefined): string {
 export function ProductHealthPage() {
   const { t } = useTranslation();
   const [days, setDays] = useState<7 | 30>(7);
+  const [selected, setSelected] = useState<ProductMetrics["daily"][number] | null>(null);
   const query = useQuery({
     queryKey: ["admin-product-metrics", days],
     queryFn: ({ signal }) => statsApi.product(days, signal),
@@ -107,17 +109,19 @@ export function ProductHealthPage() {
           <table className="w-full min-w-[650px] text-left text-sm tabular-nums">
             <thead><tr className="border-b text-xs text-muted-foreground">
               {["date", "activeUsers", "newUsers", "payingUsers", "messages", "visits", "gifts"].map((key) =>
-                <th key={key} className="px-2 py-2 font-medium">{t(`productMetrics.${key}`)}</th>)}</tr></thead>
+                <th key={key} className="px-2 py-2 font-medium">{t(`productMetrics.${key}`)}</th>)}<th className="px-2 py-2 text-end font-medium">{t("users.actions")}</th></tr></thead>
             <tbody>{[...(data?.daily ?? [])].reverse().map((day) => <tr key={day.date} className="border-b last:border-0">
-              <td className="px-2 py-2">{day.date}</td>
+              <td className="px-2 py-2"><ListName onClick={() => setSelected(day)}>{day.date}</ListName></td>
               <td className="px-2 py-2">{formatNumber(day.active_users)}</td>
               <td className="px-2 py-2">{formatNumber(day.new_users)}</td>
               <td className="px-2 py-2">{formatNumber(day.paying_users)}</td>
               <td className="px-2 py-2">{formatNumber(day.messages)}</td>
               <td className="px-2 py-2">{formatNumber(day.visits)}</td>
               <td className="px-2 py-2">{formatNumber(day.gifts)}</td>
+              <td className="px-2 py-2 text-end"><ListActions actions={[{ label: t("listActions.details"), onSelect: () => setSelected(day) }]} /></td>
             </tr>)}</tbody>
           </table>
+          {selected && <ListDetails title={selected.date} onClose={() => setSelected(null)} fields={[{ label: t("productMetrics.activeUsers"), value: formatNumber(selected.active_users) }, { label: t("productMetrics.newUsers"), value: formatNumber(selected.new_users) }, { label: t("productMetrics.payingUsers"), value: formatNumber(selected.paying_users) }, { label: t("productMetrics.messages"), value: formatNumber(selected.messages) }, { label: t("productMetrics.visits"), value: formatNumber(selected.visits) }, { label: t("productMetrics.gifts"), value: formatNumber(selected.gifts) }]} />}
         </CardContent>
       </Card>
       <div className="space-y-1 text-xs leading-relaxed text-muted-foreground">

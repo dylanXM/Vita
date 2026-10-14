@@ -8,6 +8,7 @@ import { agentApi } from "@/api/admin";
 import { type AIProvider, type AIModel, type AIModelScenario, type AIModelTestResult, type BillingProduct } from "@/api/types";
 import { errorMessage } from "@/api/client";
 import { PageHeader } from "@/components/page-header";
+import { ListName } from "@/components/list-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -90,8 +91,8 @@ export function ModelServicesPage() {
 
 
   const config = useQuery({
-    queryKey: ["agent-config", activeEnv],
-    queryFn: ({ signal }) => agentApi.config(activeEnv ?? undefined, signal),
+    queryKey: ["agent-config", activeEnv, "usage"],
+    queryFn: ({ signal }) => agentApi.config(activeEnv ?? undefined, signal, true),
     enabled: Boolean(activeEnv),
   });
 
@@ -231,6 +232,7 @@ export function ModelServicesPage() {
           </>
         }
       />
+      <p className="text-xs text-muted-foreground">{t("modelUsageList")}</p>
       <Card>
         <CardContent className="p-0">
           {config.isLoading ? (
@@ -249,6 +251,8 @@ export function ModelServicesPage() {
                   <TableHead>{t("modelServices.apiKey")}</TableHead>
                   <TableHead>{t("modelServices.remoteId")}</TableHead>
                   <TableHead>{t("modelServices.displayName")}</TableHead>
+                  <TableHead className="text-end">{t("modelUsageTokens")}</TableHead>
+                  <TableHead className="text-end">{t("modelUsage.total")}</TableHead>
                   <TableHead>{t("modelServices.enabled")}</TableHead>
                   <TableHead className="text-end">{t("users.actions")}</TableHead>
                 </TableRow>
@@ -256,7 +260,7 @@ export function ModelServicesPage() {
               <TableBody>
                 {rows.map((row) => (
                   <TableRow key={row.model.id}>
-                    <TableCell className="font-medium">{row.provider.name}</TableCell>
+                    <TableCell><ListName onClick={() => navigate(`/model-services/${encodeURIComponent(row.model.id)}`)}>{row.provider.name}</ListName></TableCell>
                     <TableCell><Badge variant="muted">{row.provider.kind}</Badge></TableCell>
                     <TableCell className="max-w-56 truncate text-muted-foreground" title={row.provider.base_url || undefined}>
                       {row.provider.base_url || t("modelServices.defaultEndpoint")}
@@ -276,6 +280,14 @@ export function ModelServicesPage() {
                         {row.model.display_name}
                       </button>
                     </TableCell>
+                    <TableCell className="text-end tabular-nums whitespace-nowrap">
+                      {row.model.usage ? row.model.usage.tokens.toLocaleString() : "—"}
+                      {!!row.model.usage?.unknown_usage_calls && <div className="text-xs text-muted-foreground">{t("modelUsageUnknownCount", { count: row.model.usage.unknown_usage_calls })}</div>}
+                    </TableCell>
+                    <TableCell className="text-end tabular-nums whitespace-nowrap">
+                      {!row.model.usage ? "—" : row.model.usage.calls > 0 && row.model.usage.unpriced_calls === row.model.usage.calls ? t("modelUsage.unpriced") : `USD ${row.model.usage.estimated_cost_usd.toFixed(6)}`}
+                      {!!row.model.usage?.unpriced_calls && <div className="text-xs text-muted-foreground">{t("modelUsage.unpricedCount", { count: row.model.usage.unpriced_calls })}</div>}
+                    </TableCell>
                     <TableCell>
                       <Switch
                         checked={row.model.enabled}
@@ -286,8 +298,8 @@ export function ModelServicesPage() {
                     <TableCell className="text-end">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button type="button" size="icon" variant="ghost" aria-label={t("users.actions")}>
-                            <MoreHorizontal className="size-4" />
+                          <Button type="button" size="sm" variant="ghost">
+                            <MoreHorizontal className="size-4" />{t("listActions.more")}
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">

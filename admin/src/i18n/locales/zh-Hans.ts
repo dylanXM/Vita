@@ -1,6 +1,12 @@
 // 简体中文 — mirrors the key set in en.ts.
 const zhHans = {
   brand: "Vita Admin",
+  listActions: { more: "更多", details: "详情", close: "关闭" },
+  creditProductClose: "关闭",
+  creditProductDialog: { details: "体验详情", edit: "编辑体验", sortOrder: "排序", metadata: "体验配置", empty: "暂无金币体验。", invalidCoins: "请输入 1 至 100,000 的整数。" },
+  modelUsageTokens: "累计 Token",
+  modelUsageUnknownCount: "{{count}} 次调用缺失 Token 用量",
+  modelUsageList: "累计已采集用量 · Token 包含输入、输出、缓存读取及缓存写入；缺失用量与未计价调用分别不计入对应合计。预计成本单位为美元，不是供应商账单。",
 
   feedback: {
     title: "意见反馈",

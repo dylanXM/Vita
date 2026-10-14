@@ -6,17 +6,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useTranslation } from "react-i18next";
 import {
-  Ban,
   Eye,
   MoreHorizontal,
   Pencil,
   Plus,
   RefreshCw,
   Search,
-  ShieldCheck,
   Trash2,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { Switch } from "@/components/ui/switch";
 import { Pagination } from "@/components/pagination";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -455,7 +454,7 @@ export function UsersPage() {
                       )}
                     </TableCell>
                     <TableCell><RoleBadge role={u.role} /></TableCell>
-                    <TableCell><StatusBadge banned={u.banned} /></TableCell>
+                    <TableCell><div className="flex items-center gap-2"><Switch checked={!u.banned} disabled={u.role === "admin" || runMutation.isPending || confirmTarget !== null} aria-label={t("users.status")} onCheckedChange={() => setConfirmTarget({ user: u, action: u.banned ? "unban" : "ban" })} /><StatusBadge banned={u.banned} /></div></TableCell>
                     <TableCell>{u.is_subscribed === undefined ? "—" : <Badge variant={u.is_subscribed ? "default" : "secondary"}>{t(u.is_subscribed ? "users.subscribed" : "users.unsubscribed")}</Badge>}</TableCell>
                     <TableCell className="text-xs">
                       {u.is_subscribed ? <div className="space-y-2">
@@ -472,8 +471,8 @@ export function UsersPage() {
                     <TableCell className="text-end">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" aria-label={t("users.actions")}>
-                            <MoreHorizontal className="size-4" />
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="size-4" />{t("listActions.more")}
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
@@ -490,13 +489,6 @@ export function UsersPage() {
                                 {t("users.edit")}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                variant={u.banned ? "default" : "destructive"}
-                                onClick={() => setConfirmTarget({ user: u, action: u.banned ? "unban" : "ban" })}
-                              >
-                                {u.banned ? <ShieldCheck /> : <Ban />}
-                                {u.banned ? t("users.unban") : t("users.ban")}
-                              </DropdownMenuItem>
                               <DropdownMenuItem
                                 variant="destructive"
                                 onClick={() => setConfirmTarget({ user: u, action: "delete" })}
