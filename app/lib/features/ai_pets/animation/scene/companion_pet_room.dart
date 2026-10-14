@@ -28,8 +28,10 @@ class CompanionPetRoom extends StatefulWidget {
 
 class _CompanionPetRoomState extends State<CompanionPetRoom> {
   static const _rug = Offset(.55, .81);
-  static const _food = Offset(.145, .71);
-  static const _water = Offset(.29, .71);
+  // Actual food/water surfaces in the authored 1024 x 1536 room, not the
+  // front wall/base of each bowl.
+  static const _food = Offset(144.0 / 1024, 1045.0 / 1536);
+  static const _water = Offset(295.0 / 1024, 1046.0 / 1536);
   static const _bed = Offset(.84, .65);
   Offset _position = _rug;
   Offset _velocity = Offset.zero;
@@ -41,6 +43,7 @@ class _CompanionPetRoomState extends State<CompanionPetRoom> {
   PetState _requested = PetState.standing;
   PetState _display = PetState.standing;
   List<Offset> _route = const [];
+  Offset _mouthDelta = const Offset(.24, .08);
   static const _walkRoute = [Offset(.40, .79), Offset(.25, .74),
     Offset(.47, .86), Offset(.70, .81)];
 
@@ -50,11 +53,30 @@ class _CompanionPetRoomState extends State<CompanionPetRoom> {
       ? 'summer' : month >= 9 && month <= 11 ? 'autumn' : 'winter';
   }
 
+  double _extentAt(double y) => 210.0 + (y - .65).clamp(0.0, .2).toDouble() * 150;
+
+  Offset _bowlStand(Offset surface) {
+    // Solve the depth-dependent size and mouth-to-paws offset together.
+    final y = (surface.dy + _mouthDelta.dy * 112.5 / 1536) /
+      (1 - _mouthDelta.dy * 150 / 1536);
+    final extent = _extentAt(y);
+    return Offset(surface.dx + _mouthDelta.dx * extent / 1024,
+      surface.dy + _mouthDelta.dy * extent / 1536);
+  }
+
+  void _mouthReady(Offset delta) {
+    if (!mounted || (_mouthDelta - delta).distance < .001) return;
+    setState(() {
+      _mouthDelta = delta;
+      if (_requested == PetState.feeding || _requested == PetState.drinking) {
+        _route = [_destination(_requested)];
+      }
+    });
+  }
+
   Offset _destination(PetState state) => switch (state) {
-    // The atlas muzzle is to the left of the planted paws. Place the muzzle at
-    // the existing bowl rather than placing the pet's feet inside the bowl.
-    PetState.feeding => const Offset(.205, .735),
-    PetState.drinking => const Offset(.35, .735),
+    PetState.feeding => _bowlStand(_food),
+    PetState.drinking => _bowlStand(_water),
     PetState.sleeping => _bed,
     PetState.walking => _walkRoute[_walkIndex],
     PetState.happy || PetState.levelUp || PetState.thinking ||
@@ -93,6 +115,11 @@ class _CompanionPetRoomState extends State<CompanionPetRoom> {
       return;
     }
     if (dt == 0 || now < _departureAt) return;
+    if (now < _turnUntil) {
+      _velocity = Offset.zero;
+      _display = PetState.standing;
+      return;
+    }
     if (_route.isEmpty) {
       if (requested == PetState.walking) _route = [_walkRoute[_walkIndex]];
       else { _display = requested; return; }
@@ -106,19 +133,28 @@ class _CompanionPetRoomState extends State<CompanionPetRoom> {
         if (requested == PetState.walking) {
           _walkIndex = (_walkIndex + 1) % _walkRoute.length;
         } else {
-          _display = requested;
-          // All stationary frames face their nearby prop/owner to the left.
-          _facingLeft = true;
+          if (!_facingLeft) {
+            _facingLeft = true;
+            _turnUntil = now + .54;
+            _display = PetState.standing;
+          } else { _display = requested; }
         }
       }
       return;
     }
     final left = delta.dx < 0;
     if (delta.dx.abs() > .012 && left != _facingLeft) {
+      // Brake before the authored pivot; never glide while turning.
+      _velocity = Offset.lerp(_velocity, Offset.zero, 1 - math.exp(-dt * 12))!;
+      _position += _velocity * dt;
+      _display = PetState.standing;
+      if (_velocity.distance > .025) return;
+      _velocity = Offset.zero;
       _facingLeft = left;
-      _turnUntil = now + .24;
+      _turnUntil = now + .54;
+      return;
     }
-    final speed = now < _turnUntil ? 0.0 : math.min(.30, distance * 5);
+    final speed = math.min(.30, distance * 5);
     final desired = delta / distance * speed;
     _velocity = Offset.lerp(_velocity, desired, 1 - math.exp(-dt * 10))!;
     _position += _velocity * dt;
@@ -146,8 +182,13 @@ class _CompanionPetRoomState extends State<CompanionPetRoom> {
       final hour = widget.clock.dayProgress * 24;
       final night = hour < 6 ? 1.0 : hour < 8 ? (8 - hour) / 2
         : hour < 18 ? 0.0 : hour < 20 ? (hour - 18) / 2 : 1.0;
-      final extent = 210.0 + (_position.dy - .65).clamp(0.0, .2).toDouble() * 150;
+      final extent = _extentAt(_position.dy);
       final contact = Offset(_position.dx * 1024, _position.dy * 1536);
+      final surface = _display == PetState.feeding ? _food :
+        _display == PetState.drinking ? _water : null;
+      final mouthTarget = surface == null ? null :
+        Offset(surface.dx * 1024 - (contact.dx - extent / 2),
+          surface.dy * 1536 - (contact.dy - extent));
       final tint = <double>[
         1.0 - night * .15, 0, 0, 0, 0,
         0, .96 - night * .12, 0, 0, 0,
@@ -175,7 +216,7 @@ class _CompanionPetRoomState extends State<CompanionPetRoom> {
             Positioned.fill(child: IgnorePointer(child: CustomPaint(
               painter: _RoomContactPainter(contact: contact, extent: extent,
                 state: _display, time: widget.clock.elapsedSeconds,
-                night: night, reduced: reduced)))),
+                night: night, reduced: reduced, water: _water)))),
             Positioned(left: contact.dx - extent / 2,
               top: contact.dy - extent, width: extent, height: extent,
               child: Semantics(button: true, label: widget.name,
@@ -188,7 +229,20 @@ class _CompanionPetRoomState extends State<CompanionPetRoom> {
                     child: CompanionPetArt(name: widget.name, imageUrl: widget.imageUrl,
                       seconds: widget.clock.elapsedSeconds, state: _display,
                       look: widget.machine.look, facingLeft: _facingLeft,
-                      reducedMotion: reduced))))),
+                      reducedMotion: reduced, mouthTarget: mouthTarget,
+                      onMouthOffsetReady: _mouthReady))))),
+            // The near rim belongs in front of the lowered muzzle. Reuse the
+            // exact room pixels so the bowl is neither redrawn nor duplicated.
+            if (surface != null)
+              Positioned.fill(child: IgnorePointer(child: ClipPath(
+                clipper: _BowlFrontClipper(surface: surface),
+                child: Stack(fit: StackFit.expand, children: [
+                  Image.asset('assets/ai_pets/cottage_v2/${_season}_day.png',
+                    filterQuality: FilterQuality.none, fit: BoxFit.fill),
+                  Opacity(opacity: night, child: Image.asset(
+                    'assets/ai_pets/cottage_v2/${_season}_night.png',
+                    filterQuality: FilterQuality.none, fit: BoxFit.fill)),
+                ])))),
           ]))))),
         SafeArea(child: Padding(padding: const EdgeInsets.all(16), child: Row(children: [
           IconButton(onPressed: widget.onBack, icon: const Icon(Icons.arrow_back),
@@ -205,8 +259,8 @@ class _CompanionPetRoomState extends State<CompanionPetRoom> {
 
 class _RoomContactPainter extends CustomPainter {
   const _RoomContactPainter({required this.contact, required this.extent,
-    required this.state, required this.time, required this.night, required this.reduced});
-  final Offset contact;
+    required this.state, required this.time, required this.night, required this.reduced, required this.water});
+  final Offset contact, water;
   final double extent, time, night;
   final PetState state;
   final bool reduced;
@@ -222,7 +276,7 @@ class _RoomContactPainter extends CustomPainter {
       final phase = (time * 1.3) % 1;
       final ripple = Paint()..color = Color.fromRGBO(194, 224, 232, (1 - phase) * .5)
         ..style = PaintingStyle.stroke..strokeWidth = 1.8;
-      canvas.drawOval(Rect.fromCenter(center: const Offset(.29 * 1024, .70 * 1536),
+      canvas.drawOval(Rect.fromCenter(center: Offset(water.dx * 1024, water.dy * 1536),
         width: 12 + phase * 32, height: 3 + phase * 9), ripple);
     }
     if (state == PetState.happy || state == PetState.levelUp) {
@@ -238,5 +292,20 @@ class _RoomContactPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _RoomContactPainter old) => contact != old.contact ||
     extent != old.extent || state != old.state || time != old.time ||
-    night != old.night || reduced != old.reduced;
+    night != old.night || reduced != old.reduced || water != old.water;
+}
+
+class _BowlFrontClipper extends CustomClipper<Path> {
+  const _BowlFrontClipper({required this.surface});
+  final Offset surface;
+  @override
+  Path getClip(Size size) {
+    final center = Offset(surface.dx * size.width, surface.dy * size.height);
+    final bowl = Path()..addOval(Rect.fromCenter(center: center + const Offset(0, 20),
+      width: 128, height: 84));
+    final front = Path()..addRect(Rect.fromLTWH(center.dx - 70, center.dy + 10, 140, 64));
+    return Path.combine(PathOperation.intersect, bowl, front);
+  }
+  @override
+  bool shouldReclip(covariant _BowlFrontClipper old) => surface != old.surface;
 }

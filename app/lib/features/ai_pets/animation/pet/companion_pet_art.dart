@@ -310,7 +310,7 @@ class _CompanionPetArtState extends State<CompanionPetArt> {
       columns: turning ? 3 : 4, rows: turning ? 2 : 6,
       baseline: turning ? _turnBaselines[frame] : _baselines[frame],
       mouth: turning ? null : _mouths[frame], mouthTarget: widget.mouthTarget,
-      sleep: _row == 4, facing: turning || _facingLeft! ? 1.0 : -1.0, look: widget.look,
+      sleep: _row == 4, facing: (turning || _facingLeft!) ? 1.0 : -1.0, look: widget.look,
       reduced: widget.reducedMotion), size: Size.infinite));
   }
 
@@ -350,7 +350,7 @@ class _CompanionPetPainter extends CustomPainter {
     final muzzle = mouth;
     final contact = mouthTarget;
     final eating = muzzle != null && contact != null;
-    if (eating) {
+    if (muzzle != null && contact != null) {
       final actual = Offset(target.left + muzzle.dx * extent, target.top + muzzle.dy * extent);
       canvas.translate(contact.dx - actual.dx, contact.dy - actual.dy);
     }
