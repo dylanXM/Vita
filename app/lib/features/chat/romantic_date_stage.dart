@@ -468,7 +468,14 @@ class RomanticDateStageState extends State<RomanticDateStage>
                                 : Icons.volume_off_outlined,
                             color: Colors.white)),
                 ])),
-            const Spacer(),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (ctx, constraints) => SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
             if (reply.isNotEmpty && !keyboard)
               Padding(
                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
@@ -539,6 +546,12 @@ class RomanticDateStageState extends State<RomanticDateStage>
                               .map((action) => _choice('date.scene.$action'.tr,
                                   () => _perform(action)))
                               .toList())),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
             if (widget.busy || _sending)
               Padding(
                   padding: const EdgeInsets.all(8),
