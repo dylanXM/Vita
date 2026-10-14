@@ -1,7 +1,7 @@
 // 简体中文 — mirrors the key set in en.ts.
 const zhHans = {
   encounter: {video:"角色视频"},
-  encounters: {imagesHint:"最多三张图片，第一张为封面。",extraImage:"附加图片",title:"萍水相逢",description:"专用成年虚拟角色，仅回复用户消息，不生成生活事件、不主动触达。",create:"新建角色",name:"名称",gender:"性别",male:"男",female:"女",other:"其他",personality:"性格",persona:"人设与说话风格",cover:"封面",avatar:"头像",sort:"排序",enabled:"启用",actions:"操作",videoSettings:"视频配置",videoHint:"先在模型管理配置 KIE 服务和 kling/v2-1-master-image-to-video 模型，再设置金币价格、时长并启用。照片和礼物沿用现有价格。",coins:"每次视频金币",model:"视频模型",duration:"视频时长"},
+  encounters: {contact:"联系方式",reviewer:"审核人",reviewedAt:"处理时间","age":"年龄","tags":"标签","followers":"粉丝数","reports":"角色投诉","reportPolicy":"提交后降低对本人推荐，确认为有效后全局降权；同一用户重复有效投诉全局只计一次。","reporter":"提交者","reason":"投诉原因","status":"状态","time":"时间","reviewNote":"处理说明（必填）","reason_inappropriate":"内容不当","reason_harassment":"骚扰","reason_misleading":"虚假或误导信息","reason_other":"其他","status_pending":"待处理","status_valid":"有效投诉","status_dismissed":"不予采纳",imagesHint:"最多三张图片，第一张为封面。",extraImage:"附加图片",title:"萍水相逢",description:"专用成年虚拟角色，仅回复用户消息，不生成生活事件、不主动触达。",create:"新建角色",name:"名称",gender:"性别",male:"男",female:"女",other:"其他",personality:"性格",persona:"人设与说话风格",cover:"封面",avatar:"头像",sort:"排序",enabled:"启用",actions:"操作",videoSettings:"视频配置",videoHint:"先在模型管理配置 KIE 服务和 kling/v2-1-master-image-to-video 模型，再设置金币价格、时长并启用。照片和礼物沿用现有价格。",coins:"每次视频金币",model:"视频模型",duration:"视频时长"},
   brand: "Vita Admin",
   modelCallTokens: "Token 用量",
   modelCallTokenUnknown: "未知",
@@ -41,6 +41,7 @@ const zhHans = {
   },
 
   nav: {
+    encounterReports: "角色投诉",
     encounters: "萍水相逢角色",
     feedback: "意见反馈",
     overview: "概览",

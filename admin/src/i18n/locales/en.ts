@@ -1,7 +1,7 @@
 // English — the master key set. Every other locale mirrors this structure.
 const en = {
   encounter: {video:"Character video"},
-  encounters: {imagesHint:"Up to three images. The first image is the cover.",extraImage:"Additional image",title:"Chance encounters",description:"Dedicated adult fictional characters. Only reply to user messages; no life events or proactive contact.",create:"New character",name:"Name",gender:"Gender",male:"Male",female:"Female",other:"Other",personality:"Personality",persona:"Character and speaking style",cover:"Cover",avatar:"Avatar",sort:"Sort order",enabled:"Enabled",actions:"Actions",videoSettings:"Video settings",videoHint:"Configure a KIE service with model kling/v2-1-master-image-to-video in Model management. Set the price and duration here before enabling video. Photos and gifts use existing prices.",coins:"Coins per video",model:"Video model",duration:"Video duration"},
+  encounters: {contact:"Contact",reviewer:"Reviewer",reviewedAt:"Reviewed at","age":"Age","tags":"Tags","followers":"Followers","reports":"Character reports","reportPolicy":"A submitted report lowers recommendations to its author; confirmed valid reports lower global ranking. Repeated reports by one user count once globally.","reporter":"Reporter","reason":"Reason","status":"Status","time":"Time","reviewNote":"Review note (required)","reason_inappropriate":"Inappropriate content","reason_harassment":"Harassment","reason_misleading":"Misleading information","reason_other":"Other","status_pending":"Pending","status_valid":"Valid","status_dismissed":"Dismissed",imagesHint:"Up to three images. The first image is the cover.",extraImage:"Additional image",title:"Chance encounters",description:"Dedicated adult fictional characters. Only reply to user messages; no life events or proactive contact.",create:"New character",name:"Name",gender:"Gender",male:"Male",female:"Female",other:"Other",personality:"Personality",persona:"Character and speaking style",cover:"Cover",avatar:"Avatar",sort:"Sort order",enabled:"Enabled",actions:"Actions",videoSettings:"Video settings",videoHint:"Configure a KIE service with model kling/v2-1-master-image-to-video in Model management. Set the price and duration here before enabling video. Photos and gifts use existing prices.",coins:"Coins per video",model:"Video model",duration:"Video duration"},
   brand: "Vita Admin",
   modelCallTokens: "Token usage",
   modelCallTokenUnknown: "Unknown",
@@ -41,6 +41,7 @@ const en = {
   },
 
   nav: {
+    encounterReports: "Character reports",
     encounters: "Chance encounters",
     feedback: "Feedback",
     overview: "Overview",

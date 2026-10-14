@@ -2,6 +2,8 @@
 
 ## 文件范围
 
+资料与社交扩展：`20261014_encounters_social.sql`，Backend `encounter_social.go`、`encounter_share.go`、`encounter_admin_image.go`；Admin `EncounterReportsPage.tsx`、`encounter-image.tsx`；App `encounter_profile.dart`。同步修改角色资料接口、推荐排序、角色配置、导航、创建及聊天头像和全部相关语言。
+
 本次 Dock／三图／默认人物扩展新增：App `encounter_dock.dart`、`encounter_portrait.dart`；Backend `20261014_encounters_gallery.sql`、`20261014_encounters_presets.sql`、`internal/encounterart/assets.go`、`images/` 四张 PNG、`internal/handler/encounter_art.go`。同步修改角色接口、Admin 编辑弹窗、App 创建和卡片展示、多语言及人物参考图片读取。
 
 - Backend：`migrations/20261014_encounters.sql`，`cmd/server/main.go`，`internal/handler/encounters.go`、`encounter_catalog.go`、`encounter_video_media.go`，`internal/agent/encounters.go`、`client.go`。
@@ -16,6 +18,8 @@
 未执行 Git、测试、静态检查、构建、依赖解析、迁移、外部供应商调用或设备验证。源码复核不能证明这些步骤通过。
 
 ## 最快验证路径
+
+社交扩展：先部署 social 新迁移和 Backend／Admin／Webapp，再更新 App。配置不同头像和封面、年龄和标签；验证聊天／列表用头像，卡片用封面。两个账号分别关注／取消，检查真实计数；分享公开角色链接，私有角色只分享用户主动选择的图文。修改喜好观察 Backend 顺序；提交投诉后本人排序下降、其他账号不变；Admin 确认有效后其他账号排序下降，驳回后恢复。Admin 详情能看私有资料图片，未授权普通用户不能读取该图片接口。
 
 1. 按已有发布流程执行新迁移并更新 Backend、Admin、Webapp；App 随后更新，没有新增 Webapp 界面。
 2. Admin → 萍水相逢，新建公开角色，上传封面，启用；确认名称开详情、图标 More、弹窗编辑和状态 Switch。
