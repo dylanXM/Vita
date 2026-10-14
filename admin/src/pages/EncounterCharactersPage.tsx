@@ -15,18 +15,23 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 
 type Character = { id: string; name: string; gender: string; personality: string; persona: string; description: string; cover_url: string; avatar_url: string; enabled: boolean; sort_order: number };
+type VideoSettings = {coins:number; model_id:string; duration:number; enabled:boolean};
 const empty = (): Character => ({ id: "", name: "", gender: "female", personality: "", persona: "", description: "", cover_url: "", avatar_url: "", enabled: true, sort_order: 0 });
 export function EncounterCharactersPage() {
  const { t } = useTranslation(); const cache = useQueryClient();
  const [form, setForm] = useState<Character | null>(null);
  const [detail, setDetail] = useState<Character | null>(null);
  const [uploading, setUploading] = useState(false);
+ const [video,setVideo]=useState<VideoSettings|null>(null);
+ const settings=useQuery({queryKey:["encounter-video"],queryFn:()=>http.get<VideoSettings>("/admin/encounter-video")});
+ const models=useQuery({queryKey:["encounter-models"],queryFn:()=>http.get<{models:{id:string;model_name:string;display_name:string;enabled:boolean}[]}>("/admin/agent/config")});
+ const saveVideo=useMutation({mutationFn:(value:VideoSettings)=>http.put("/admin/encounter-video",value),onSuccess:()=>{setVideo(null);void cache.invalidateQueries({queryKey:["encounter-video"]});},onError:err=>toast.error(errorMessage(err))});
  const list = useQuery({ queryKey: ["encounter-characters"], queryFn: () => http.get<{items: Character[]}>("/admin/encounter-characters") });
  const save = useMutation({ mutationFn: (value: Character) => value.id ? http.put(`/admin/encounter-characters/${value.id}`, value) : http.post("/admin/encounter-characters", value),
   onSuccess: () => { setForm(null); void cache.invalidateQueries({queryKey:["encounter-characters"]}); }, onError: (err) => toast.error(errorMessage(err)) });
  const edit = (value: Character) => { setDetail(null); setForm({...value}); };
  const fields = ["name", "personality", "description", "persona"] as const;
- return <div className="space-y-6"><PageHeader title={t("encounters.title")} description={t("encounters.description")} actions={<Button onClick={() => setForm(empty())}>{t("encounters.create")}</Button>} />
+ return <div className="space-y-6"><PageHeader title={t("encounters.title")} description={t("encounters.description")} actions={<><Button variant="outline" disabled={!settings.data} onClick={()=>{if(settings.data)setVideo({...settings.data});}}>{t("encounters.videoSettings")}</Button><Button onClick={() => setForm(empty())}>{t("encounters.create")}</Button></>} />
  {list.isError && <Button variant="outline" onClick={() => void list.refetch()}>{t("common.refresh")}</Button>}
  <Table><TableHeader><TableRow>{["name", "gender", "personality", "enabled", "actions"].map(k=><TableHead key={k}>{t(`encounters.${k}`)}</TableHead>)}</TableRow></TableHeader><TableBody>
  {(list.data?.items??[]).map(value=><TableRow key={value.id}><TableCell><ListName onClick={()=>setDetail(value)}>{value.name}</ListName></TableCell><TableCell>{t(`encounters.${value.gender}`)}</TableCell><TableCell className="max-w-48 truncate">{value.personality}</TableCell><TableCell><Switch checked={value.enabled} disabled={save.isPending} onCheckedChange={enabled=>save.mutate({...value,enabled})} aria-label={t("encounters.enabled")} /></TableCell><TableCell><ListActions actions={[{label:t("listActions.details"),onSelect:()=>setDetail(value)},{label:t("common.edit"),onSelect:()=>edit(value)}]} /></TableCell></TableRow>)}
@@ -40,5 +45,11 @@ export function EncounterCharactersPage() {
  <Label>{t("encounters.sort")}</Label><Input type="number" value={form.sort_order} onChange={event=>setForm({...form,sort_order:Number(event.target.value)})}/>
  <div className="flex items-center gap-3"><Switch checked={form.enabled} onCheckedChange={enabled=>setForm({...form,enabled})}/><Label>{t("encounters.enabled")}</Label></div>
  <Button type="submit" disabled={save.isPending||uploading||!form.cover_url}>{t("common.save")}</Button></form>}
+ </DialogContent></Dialog>
+ <Dialog open={video!==null} onOpenChange={open=>{if(!open&&!saveVideo.isPending)setVideo(null);}}><DialogContent><DialogHeader><DialogTitle>{t("encounters.videoSettings")}</DialogTitle><DialogDescription>{t("encounters.videoHint")}</DialogDescription></DialogHeader>
+ {video && <form className="space-y-4" onSubmit={event=>{event.preventDefault();saveVideo.mutate(video);}}><Label>{t("encounters.coins")}</Label><Input type="number" min={1} max={100000} required value={video.coins} onChange={event=>setVideo({...video,coins:Number(event.target.value)})}/>
+ <Label>{t("encounters.model")}</Label><Select value={video.model_id} onValueChange={model_id=>setVideo({...video,model_id})}><SelectTrigger><SelectValue placeholder={t("encounters.model")}/></SelectTrigger><SelectContent>{(models.data?.models??[]).filter(m=>m.enabled&&m.model_name==="kling/v2-1-master-image-to-video").map(m=><SelectItem key={m.id} value={m.id}>{m.display_name||m.model_name}</SelectItem>)}</SelectContent></Select>
+ <Label>{t("encounters.duration")}</Label><Select value={String(video.duration)} onValueChange={duration=>setVideo({...video,duration:Number(duration)})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="5">5s</SelectItem><SelectItem value="10">10s</SelectItem></SelectContent></Select>
+ <div className="flex items-center gap-3"><Switch checked={video.enabled} onCheckedChange={enabled=>setVideo({...video,enabled})}/><Label>{t("encounters.enabled")}</Label></div><Button type="submit" disabled={saveVideo.isPending}>{t("common.save")}</Button></form>}
  </DialogContent></Dialog></div>;
 }

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../encounters/encounters_page.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -261,6 +262,13 @@ class ExplorePage extends StatelessWidget {
                 Get.to(() => const MomentsPage(),
                     transition: Transition.cupertino);
               },
+            ),
+            _PlaceCard(
+              icon: Icons.auto_awesome_outlined,
+              title: 'encounter.title'.tr,
+              subtitle: 'encounter.welcome'.tr,
+              onTap: () => Get.to(() => const EncountersPage(),
+                  transition: Transition.cupertino),
             ),
           ],
         ),

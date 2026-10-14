@@ -565,12 +565,14 @@ func (c *Client) kieCreateTask(ctx context.Context, model Model, input map[strin
 }
 
 // kiePollResult waits for a task to reach success/fail and returns its resultJson.
-func (c *Client) kiePollResult(ctx context.Context, model Model, taskID string) (string, error) {
+func (c *Client) kiePollResult(ctx context.Context, model Model, taskID string, waitLimit ...time.Duration) (string, error) {
 	signal := make(chan struct{}, 1)
 	kiePendingTasks.Store(taskID, signal)
 	defer kiePendingTasks.Delete(taskID)
 	endpoint := kieBase(model) + "/api/v1/jobs/recordInfo?taskId=" + url.QueryEscape(taskID)
-	deadline := time.Now().Add(90 * time.Second)
+	wait := 90 * time.Second
+	if len(waitLimit) > 0 && waitLimit[0] > 0 { wait = waitLimit[0] }
+	deadline := time.Now().Add(wait)
 	for {
 		if time.Now().After(deadline) {
 			return "", fmt.Errorf("kie task %s timed out", taskID)

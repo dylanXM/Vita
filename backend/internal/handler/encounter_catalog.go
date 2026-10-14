@@ -21,7 +21,8 @@ func EncounterCatalog(c *gin.Context) {
  if video,e:=loadEncounterVideo(c.Request.Context()); e==nil && video.Enabled && video.IsLaunched && companionAgent!=nil { modelID,_:=video.Metadata["model_id"].(string); duration,_:=video.Metadata["duration"].(float64); if companionAgent.CheckEncounterVideo(c.Request.Context(),modelID,int(duration))==nil { items=append(items,*video) } }
  var balance int
  if db.Get().QueryRowContext(c.Request.Context(),`SELECT credits_balance FROM users WHERE id=$1`,c.GetString("user_id")).Scan(&balance)!=nil { c.JSON(500,gin.H{"error":"balance unavailable"}); return }
- c.JSON(200,gin.H{"products":items,"balance":balance})
+ subscribed,err:=userHasActiveSubscription(c.GetString("user_id"));if err!=nil { c.JSON(500,gin.H{"error":"subscription unavailable"});return }
+ c.JSON(200,gin.H{"products":items,"balance":balance,"is_subscribed":subscribed})
 }
 func AdminEncounterVideo(c *gin.Context) {
  if c.Request.Method=="PUT" {

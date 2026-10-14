@@ -1,5 +1,7 @@
 // 简体中文 — mirrors the key set in en.ts.
 const zhHans = {
+  encounter: {video:"角色视频"},
+  encounters: {title:"萍水相逢",description:"专用成年虚拟角色，仅回复用户消息，不生成生活事件、不主动触达。",create:"新建角色",name:"名称",gender:"性别",male:"男",female:"女",other:"其他",personality:"性格",persona:"人设与说话风格",cover:"封面",avatar:"头像",sort:"排序",enabled:"启用",actions:"操作",videoSettings:"视频配置",videoHint:"先在模型管理配置 KIE 服务和 kling/v2-1-master-image-to-video 模型，再设置金币价格、时长并启用。照片和礼物沿用现有价格。",coins:"每次视频金币",model:"视频模型",duration:"视频时长"},
   brand: "Vita Admin",
   modelCallTokens: "Token 用量",
   modelCallTokenUnknown: "未知",

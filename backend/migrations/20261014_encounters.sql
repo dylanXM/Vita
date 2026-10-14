@@ -18,7 +18,7 @@ CREATE TABLE encounter_conversations (
 );
 CREATE TABLE encounter_requests (
  id UUID PRIMARY KEY, conversation_id UUID NOT NULL REFERENCES encounter_conversations(id) ON DELETE CASCADE,
- request_key TEXT NOT NULL, content TEXT NOT NULL, product_key TEXT NOT NULL DEFAULT '',
+ request_key TEXT NOT NULL, content TEXT NOT NULL, product_key TEXT NOT NULL DEFAULT '', media_request TEXT NOT NULL DEFAULT '',
  quoted_coins INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'processing'
  CHECK(status IN ('processing','completed','failed')), spend_id TEXT REFERENCES credit_spends(id),
  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -35,5 +35,7 @@ CREATE INDEX encounter_messages_history ON encounter_messages(conversation_id,cr
 CREATE INDEX encounter_conversations_user ON encounter_conversations(user_id,updated_at DESC);
 CREATE UNIQUE INDEX encounter_one_processing ON encounter_requests(conversation_id) WHERE status='processing';
 INSERT INTO credit_products(environment,product_key,category,name_key,description_key,emoji,coins,enabled,sort_order,metadata,subscription_only,is_launched)
-VALUES('prod','encounter_video','photo','encounter.video','encounter.video','🎬',1,false,100,'{"hidden_from_catalog":true,"media_type":"video","model_id":"","duration":5}',false,false)
+VALUES('prod','encounter_video','photo','encounter.video','encounter.video','🎬',1,false,100,'{"hidden_from_catalog":true,"media_type":"video","model_id":"","duration":5}',true,false)
 ON CONFLICT(environment,product_key) DO NOTHING;
+ALTER TABLE media_assets DROP CONSTRAINT media_assets_kind_check;
+ALTER TABLE media_assets ADD CONSTRAINT media_assets_kind_check CHECK (kind IN ('image','audio','video'));

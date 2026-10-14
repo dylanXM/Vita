@@ -154,6 +154,7 @@ func main() {
 	encounters := api.Group("/encounters", middleware.RequireAuth())
 	encounters.GET("/characters", handler.ListEncounterCharacters)
 	encounters.GET("/catalog", handler.EncounterCatalog)
+	encounters.GET("/media/:id", handler.EncounterVideoMedia)
 	encounters.POST("/characters", middleware.RateLimit(10, time.Minute), handler.CreateCustomEncounterCharacter)
 	encounters.GET("/preferences", handler.EncounterPreferences)
 	encounters.PUT("/preferences", handler.EncounterPreferences)

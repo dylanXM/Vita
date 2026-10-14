@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 
 import 'additional_translations.dart';
 import 'date_preparation_translations.dart';
+import 'encounter_translations.dart';
 
 /// App translations for Arabic, English, Spanish, Japanese, Korean,
 /// Portuguese, Simplified Chinese and Traditional Chinese.
@@ -1834,6 +1835,6 @@ class VitaTranslations extends Translations {
   @override
   Map<String, Map<String, String>> get keys => {
     for (final entry in _keys.entries)
-      entry.key: {...entry.value, ...?datePreparationTranslations[entry.key]},
+      entry.key: {...entry.value, ...?datePreparationTranslations[entry.key], ...?encounterTranslations[entry.key]},
   };
 }

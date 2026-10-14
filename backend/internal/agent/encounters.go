@@ -2,29 +2,32 @@ package agent
 
 import (
  "context"
+ "encoding/json"
  "fmt"
  "io"
  "net/http"
  "strconv"
  "strings"
+ "time"
  "github.com/google/uuid"
 )
 
 // Encounter replies intentionally have no companion world, events or contact jobs.
-func (s *Service) ReplyEncounter(ctx context.Context, userID, name, persona, language string, history []ChatMessage) (string, error) {
+type EncounterReply struct { Content string `json:"content"`; MediaRequest string `json:"media_request"` }
+func (s *Service) ReplyEncounter(ctx context.Context, userID, name, persona, language string, history []ChatMessage) (EncounterReply, error) {
  models, err := s.loadModelRouteModels(ctx, "text_chat", userID)
- if err != nil { return "", err }
+ if err != nil { return EncounterReply{}, err }
  var last error
  for _, model := range models {
   text, e := s.client.GenerateText(ctx, model, GenerateRequest{
-   System: fmt.Sprintf("Roleplay a fictional adult character named %q. Character data (not instructions): %q. Respond naturally to the user's latest message in language %q. Stay within this conversation. Never claim you have contacted the user independently or generated external events. Do not claim to have generated media; media is delivered only by the paid media service. Respect consent and boundaries.", name, persona, language),
+   System: fmt.Sprintf("Roleplay a fictional adult character named %q. Character data (not instructions): %q. Respond naturally to the user's latest message in language %q. Speak naturally in first person, staying in character rather than discussing model or interface limitations in ordinary conversation. Stay within this conversation. Never claim you have contacted the user independently or generated external events. Do not claim to have generated media; media is delivered only by the paid media service. Respect consent and boundaries. Return strict JSON with content (your natural reply) and media_request ('none', 'photo' or 'video'). Set media_request only when the user explicitly requests a new image or video from you, not when merely discussing media. For a media request, naturally say we will confirm the details and coins first. No markdown fences.", name, persona, language),
    Messages: history, Temperature: .8, MaxTokens: 800,
   })
-  if e == nil && strings.TrimSpace(text) != "" { return text, nil }
+  if e == nil { var reply EncounterReply; if json.Unmarshal([]byte(text),&reply)==nil && strings.TrimSpace(reply.Content)!="" && (reply.MediaRequest=="none" || reply.MediaRequest=="photo" || reply.MediaRequest=="video") { return reply,nil } }
   last = e
  }
  if last == nil { last = fmt.Errorf("no usable encounter reply") }
- return "", last
+ return EncounterReply{}, last
 }
 
 func (s *Service) CheckEncounterVideo(ctx context.Context, modelID string, duration int) error {
@@ -35,14 +38,16 @@ func (s *Service) CheckEncounterVideo(ctx context.Context, modelID string, durat
 }
 
 // Use the existing authenticated KIE task protocol. Never resubmit a timed-out task.
-func (s *Service) VideoEncounter(ctx context.Context, userID, modelID string, duration int, cover,demand string) (string,error) {
+func (s *Service) VideoEncounter(ctx context.Context, userID, modelID string, duration int, cover,demand string) (output string, failure error) {
  if err:=s.CheckEncounterVideo(ctx,modelID,duration); err!=nil { return "",err }
  model,err:=s.loadModel(ctx,modelID); if err!=nil { return "",err }
+ ctx,trace:=s.client.beginCall(ctx,model)
+ defer func(){s.client.endCall(ctx,model,"video",map[string]any{"prompt":demand,"duration":duration},output,failure,trace)}()
  ref,err:=s.loadPortraitReference(ctx,userID,cover); if err!=nil { return "",err }
  imageURL,err:=s.client.uploadKieReference(ctx,model,ref); if err!=nil { return "",err }
  task,err:=s.client.kieCreateTask(ctx,model,map[string]any{"prompt":demand,"image_url":imageURL,"duration":strconv.Itoa(duration),"negative_prompt":"blur, distort, low quality","cfg_scale":.5})
  if err!=nil { return "",err }
- result,err:=s.client.kiePollResult(ctx,model,task); if err!=nil { return "",err }
+ result,err:=s.client.kiePollResult(ctx,model,task,4*time.Minute); if err!=nil { return "",err }
  source,err:=kieResultURL(result); if err!=nil { return "",err }
  request,err:=http.NewRequestWithContext(ctx,http.MethodGet,source,nil); if err!=nil { return "",err }
  if request.URL.Scheme!="https" && request.URL.Scheme!="http" { return "",fmt.Errorf("invalid video URL") }

@@ -1,14 +1,18 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/api_client.dart';
 import '../../shared/media_image.dart';
+import 'encounter_media.dart';
 
 const _night = Color(0xFF151016);
 const _rose = Color(0xFFEBA2B8);
 const _panel = Color(0xFF2A202A);
+final _encounterTheme = ThemeData.dark().copyWith(scaffoldBackgroundColor:_night,colorScheme:const ColorScheme.dark(primary:_rose,surface:_panel));
 String _s(Map value, String key) => '${value[key] ?? ''}';
+Widget _backCard(Map character,Color tint)=>ExcludeSemantics(child:ClipRRect(borderRadius:BorderRadius.circular(30),child:Stack(fit:StackFit.expand,children:[VitaMediaImage(url:_s(character,'cover_url')),ColoredBox(color:tint)])));
 String _requestKey() => '${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 30)}';
 
 class EncountersPage extends StatefulWidget {
@@ -47,17 +51,17 @@ class _EncountersPageState extends State<EncountersPage> {
  }
  @override Widget build(BuildContext context){
   final filtered=_characters.where((c)=>(_gender.isEmpty||c['gender']==_gender)&&(_personality.isEmpty||c['personality']==_personality)).toList();
-  return Theme(data:ThemeData.dark().copyWith(scaffoldBackgroundColor:_night,colorScheme:const ColorScheme.dark(primary:_rose,surface:_panel)),child:Scaffold(backgroundColor:_night,
+  return Theme(data:_encounterTheme,child:Scaffold(backgroundColor:_night,
    appBar:AppBar(backgroundColor:_night,title:Text('encounter.title'.tr),actions:[IconButton(onPressed:_preferences,icon:const Icon(Icons.tune_rounded),tooltip:'encounter.preferences'.tr)]),
    body:_loading?const Center(child:CircularProgressIndicator()):!_configured?Center(child:Padding(padding:const EdgeInsets.all(28),child:Column(mainAxisSize:MainAxisSize.min,children:[const Icon(Icons.auto_awesome,color:_rose,size:40),const SizedBox(height:18),Text('encounter.welcome'.tr,textAlign:TextAlign.center,style:const TextStyle(fontSize:24,fontWeight:FontWeight.w600)),const SizedBox(height:24),FilledButton(onPressed:_preferences,child:Text('encounter.preferences'.tr))]))):_tab==0?
     filtered.isEmpty?Center(child:TextButton(onPressed:_preferences,child:Text('encounter.empty'.tr))):LayoutBuilder(builder:(context,box)=>PageView.builder(controller:_pages,itemCount:filtered.length,itemBuilder:(context,index)=>Padding(padding:const EdgeInsets.fromLTRB(24,18,24,26),child:Stack(fit:StackFit.expand,children:[
-     Positioned.fill(top:12,bottom:0,left:16,right:16,child:DecoratedBox(decoration:BoxDecoration(color:const Color(0xFF553543),borderRadius:BorderRadius.circular(30)))),
-     Positioned.fill(top:6,bottom:6,left:8,right:8,child:DecoratedBox(decoration:BoxDecoration(color:const Color(0xFF3E2935),borderRadius:BorderRadius.circular(30)))),
-     Positioned.fill(bottom:14,child:ClipRRect(borderRadius:BorderRadius.circular(28),child:Stack(fit:StackFit.expand,children:[VitaMediaImage(url:_s(filtered[index],'cover_url'),errorBuilder:(_,__,___)=>const ColoredBox(color:_panel,child:Icon(Icons.person,size:80,color:_rose))),const DecoratedBox(decoration:BoxDecoration(gradient:LinearGradient(begin:Alignment.topCenter,end:Alignment.bottomCenter,colors:[Colors.transparent,Color(0x22000000),Color(0xEE171018)],stops:[0,.45,1]))),
-      Positioned(left:22,right:22,bottom:22,child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[Text(_s(filtered[index],'name'),maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:28,fontWeight:FontWeight.w700,color:Colors.white)),Text(_s(filtered[index],'personality'),maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:_rose)),const SizedBox(height:8),Text(_s(filtered[index],'description'),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white,height:1.5)),const SizedBox(height:18),Row(children:[IconButton(onPressed:()=>_open(filtered[index],gift:true),icon:const Icon(Icons.card_giftcard,color:_rose),tooltip:'encounter.gift'.tr),const SizedBox(width:12),Expanded(child:FilledButton(onPressed:()=>_open(filtered[index]),child:Text('encounter.chat'.tr)))])]))
+     Positioned.fill(top:0,bottom:0,left:16,right:16,child:_backCard(filtered[(index+2)%filtered.length],const Color(0x99553543))),
+     Positioned.fill(top:6,bottom:6,left:8,right:8,child:_backCard(filtered[(index+1)%filtered.length],const Color(0x993E2935))),
+     Positioned.fill(top:14,bottom:14,child:ClipRRect(borderRadius:BorderRadius.circular(28),child:Stack(fit:StackFit.expand,children:[VitaMediaImage(url:_s(filtered[index],'cover_url'),errorBuilder:(_,__,___)=>const ColoredBox(color:_panel,child:Icon(Icons.person,size:80,color:_rose))),const DecoratedBox(decoration:BoxDecoration(gradient:LinearGradient(begin:Alignment.topCenter,end:Alignment.bottomCenter,colors:[Colors.transparent,Color(0x22000000),Color(0xEE171018)],stops:[0,.45,1]))),
+      Positioned(left:22,right:22,bottom:22,child:ConstrainedBox(constraints:BoxConstraints(maxHeight:max(80.0,box.maxHeight-110)),child:SingleChildScrollView(child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[Text(_s(filtered[index],'name'),maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:28,fontWeight:FontWeight.w700,color:Colors.white)),Text(_s(filtered[index],'personality'),maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:_rose)),const SizedBox(height:8),Text(_s(filtered[index],'description'),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white,height:1.5)),const SizedBox(height:18),Row(children:[IconButton(onPressed:()=>_open(filtered[index],gift:true),icon:const Icon(Icons.card_giftcard,color:_rose),tooltip:'encounter.gift'.tr),const SizedBox(width:12),Expanded(child:FilledButton(onPressed:()=>_open(filtered[index]),child:Text('encounter.chat'.tr)))])]))))
      ])))
-    ]))))):RefreshIndicator(onRefresh:_load,child:ListView.builder(physics:const AlwaysScrollableScrollPhysics(),itemCount:_chats.length,itemBuilder:(context,index){final c=_chats[index];return SizedBox(height:80,child:ListTile(leading:ClipRRect(borderRadius:BorderRadius.circular(14),child:SizedBox(width:52,height:52,child:VitaMediaImage(url:_s(c,'avatar_url').isEmpty?_s(c,'cover_url'):_s(c,'avatar_url')))),title:Text(_s(c,'name'),maxLines:1,overflow:TextOverflow.ellipsis),onTap:()=>Get.to(()=>EncounterChatPage(id:_s(c,'id'),name:_s(c,'name'),cover:_s(c,'cover_url')),transition:Transition.cupertino)));})),
-   bottomNavigationBar:SafeArea(top:false,child:Padding(padding:const EdgeInsets.fromLTRB(24,10,24,14),child:Row(mainAxisAlignment:MainAxisAlignment.spaceAround,children:[TextButton.icon(onPressed:()=>setState(()=>_tab=0),icon:Icon(Icons.explore_outlined,color:_tab==0?_rose:Colors.white54),label:Text('encounter.explore'.tr)),Container(decoration:BoxDecoration(shape:BoxShape.circle,gradient:const LinearGradient(colors:[Color(0xFFF6B9C9),Color(0xFFB86E91)]),boxShadow:[BoxShadow(color:_rose.withValues(alpha:.2),blurRadius:20)]),child:IconButton(onPressed:()async{final created=await Get.to<Map<String,dynamic>>(()=>const _EncounterForm(),transition:Transition.cupertino);if(created!=null&&mounted){await _load();if(mounted)_open(created);}},icon:const Icon(Icons.add_rounded,color:_night,size:30),tooltip:'encounter.create'.tr)),TextButton.icon(onPressed:()=>setState(()=>_tab=1),icon:Icon(Icons.chat_bubble_outline,color:_tab==1?_rose:Colors.white54),label:Text('encounter.chat'.tr))]))),
+    ])))):RefreshIndicator(onRefresh:_load,child:ListView.builder(physics:const AlwaysScrollableScrollPhysics(),itemCount:_chats.length,itemBuilder:(context,index){final c=_chats[index];return SizedBox(height:80,child:ListTile(leading:ClipRRect(borderRadius:BorderRadius.circular(14),child:SizedBox(width:52,height:52,child:VitaMediaImage(url:_s(c,'avatar_url').isEmpty?_s(c,'cover_url'):_s(c,'avatar_url')))),title:Text(_s(c,'name'),maxLines:1,overflow:TextOverflow.ellipsis),onTap:()=>Get.to(()=>EncounterChatPage(id:_s(c,'id'),name:_s(c,'name'),cover:_s(c,'cover_url')),transition:Transition.cupertino)));})),
+   bottomNavigationBar:SafeArea(top:false,child:Padding(padding:const EdgeInsets.fromLTRB(24,10,24,14),child:Row(mainAxisAlignment:MainAxisAlignment.spaceAround,children:[Expanded(child:TextButton.icon(onPressed:()=>setState(()=>_tab=0),icon:Icon(Icons.explore_outlined,color:_tab==0?_rose:Colors.white54),label:Text('encounter.explore'.tr))),Container(decoration:BoxDecoration(shape:BoxShape.circle,gradient:const LinearGradient(colors:[Color(0xFFF6B9C9),Color(0xFFB86E91)]),boxShadow:[BoxShadow(color:_rose.withValues(alpha:.2),blurRadius:20)]),child:IconButton(onPressed:()async{if(!_configured){await _preferences();return;}final created=await Get.to<Map<String,dynamic>>(()=>const _EncounterForm(),transition:Transition.cupertino);if(created!=null&&mounted){await _load();if(mounted)_open(created);}},icon:const Icon(Icons.add_rounded,color:_night,size:30),tooltip:'encounter.create'.tr)),Expanded(child:TextButton.icon(onPressed:()=>setState(()=>_tab=1),icon:Icon(Icons.chat_bubble_outline,color:_tab==1?_rose:Colors.white54),label:Text('encounter.chat'.tr)))]))),
   ));
  }
 }
@@ -78,7 +82,7 @@ class _EncounterFormState extends State<_EncounterForm>{
   if(_busy||_name.text.trim().isEmpty||_cover.isEmpty)return;
   setState(()=>_busy=true);try{final result=await ApiClient.instance.post('/v1/encounters/characters',data:{'name':_name.text.trim(),'gender':_gender,'personality':_traits.text.trim(),'persona':_persona.text.trim(),'description':_persona.text.trim(),'cover_url':_cover,'avatar_url':_cover,'enabled':true});if(mounted)Get.back(result:Map<String,dynamic>.from(result as Map));}catch(_){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('encounter.error'.tr)));}finally{if(mounted)setState(()=>_busy=false);}
  }
- @override Widget build(BuildContext context)=>Theme(data:ThemeData.dark(),child:Scaffold(backgroundColor:_night,appBar:AppBar(backgroundColor:_night,title:Text((widget.preferences?'encounter.preferences':'encounter.create').tr)),body:ListView(padding:const EdgeInsets.all(24),children:[
+ @override Widget build(BuildContext context)=>Theme(data:_encounterTheme,child:Scaffold(backgroundColor:_night,appBar:AppBar(backgroundColor:_night,title:Text((widget.preferences?'encounter.preferences':'encounter.create').tr)),body:ListView(padding:const EdgeInsets.all(24),children:[
   Text('encounter.gender'.tr),Wrap(spacing:8,children:[if(widget.preferences)'','male','female','other'].map((g)=>ChoiceChip(label:Text('encounter.${g.isEmpty?'any':g}'.tr),selected:_gender==g,onSelected:_busy?null:(_)=>setState(()=>_gender=g))).toList()),const SizedBox(height:24),
   if(widget.preferences)Wrap(spacing:8,runSpacing:8,children:['',...widget.personalities].map((p)=>ChoiceChip(label:Text(p.isEmpty?'encounter.any'.tr:p),selected:_traits.text==p,onSelected:(_)=>setState(()=>_traits.text=p))).toList()) else ...[
    TextField(controller:_name,maxLength:80,decoration:InputDecoration(labelText:'encounter.name'.tr)),TextField(controller:_traits,maxLength:200,decoration:InputDecoration(labelText:'encounter.personality'.tr)),TextField(controller:_persona,maxLength:500,maxLines:4,decoration:InputDecoration(labelText:'encounter.persona'.tr)),const SizedBox(height:16),OutlinedButton.icon(onPressed:_busy?null:_pick,icon:const Icon(Icons.add_photo_alternate_outlined),label:Text('encounter.cover'.tr)),if(_cover.isNotEmpty)SizedBox(height:220,child:VitaMediaImage(url:_cover)),
@@ -94,19 +98,34 @@ class EncounterChatPage extends StatefulWidget {
 class _EncounterChatPageState extends State<EncounterChatPage> with WidgetsBindingObserver {
  final _input=TextEditingController(),_scroll=ScrollController(); List<Map<String,dynamic>> _messages=[];
  bool _busy=false,_bottom=true; Map<String,dynamic>? _pending;
+ Timer? _poll; int _pollCount=0; bool _loadingMessages=false,_foreground=true;
  @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);_scroll.addListener(()=>_bottom=_scroll.hasClients&&_scroll.position.extentAfter<=24);_load();if(widget.gift)WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)_purchase('gift');});}
- @override void dispose(){WidgetsBinding.instance.removeObserver(this);_input.dispose();_scroll.dispose();super.dispose();}
+ @override void dispose(){_poll?.cancel();WidgetsBinding.instance.removeObserver(this);_input.dispose();_scroll.dispose();super.dispose();}
+ @override void didChangeAppLifecycleState(AppLifecycleState state){_foreground=state==AppLifecycleState.resumed;}
  @override void didChangeMetrics(){if(_bottom)_follow();}
  void _follow(){WidgetsBinding.instance.addPostFrameCallback((_){if(mounted&&_scroll.hasClients)_scroll.jumpTo(_scroll.position.maxScrollExtent);});}
  void _error(){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('encounter.error'.tr)));}
- Future<void> _load()async{try{final result=await ApiClient.instance.get('/v1/encounters/conversations/${widget.id}/messages');if(!mounted)return;final follow=_bottom;setState(()=>_messages=List<Map<String,dynamic>>.from((result['items'] as List).map((e)=>Map<String,dynamic>.from(e as Map))));if(follow)_follow();}catch(_){_error();}}
+ Future<void> _load()async{
+  if(_loadingMessages)return;_loadingMessages=true;
+  try{final result=await ApiClient.instance.get('/v1/encounters/conversations/${widget.id}/messages');if(!mounted)return;final follow=_bottom;
+   setState((){_messages=List<Map<String,dynamic>>.from((result['items'] as List).map((e)=>Map<String,dynamic>.from(e as Map)));if(result['processing_request'] is Map){_pending=Map<String,dynamic>.from(result['processing_request'] as Map);}else if(!_busy){_pending=null;}});
+   if(result['processing_request'] is Map){_startPolling();}else{_poll?.cancel();_poll=null;}
+   if(follow)_follow();
+  }catch(_){if(_poll==null)_error();}finally{_loadingMessages=false;}
+ }
+ void _startPolling(){
+  if(_poll!=null)return;_pollCount=0;
+  _poll=Timer.periodic(const Duration(seconds:5),(timer){if(!mounted||_pollCount>=60){timer.cancel();_poll=null;return;}if(_foreground&&!_loadingMessages){_pollCount++;_load();}});
+ }
  Future<void> _send([Map<String,dynamic>? paid])async{
   if(_busy)return;
   final data=_pending??paid??{'content':_input.text.trim(),'idempotency_key':_requestKey()};if(_s(data,'content').isEmpty)return;
-  setState((){_busy=true;_pending=data;});
-  try{await ApiClient.instance.post('/v1/encounters/conversations/${widget.id}/messages',data:data);if(!mounted)return;setState(()=>_pending=null);_input.clear();_bottom=true;await _load();}
-  on ApiException catch(e){if(e.code=='insufficient_credits'){await Get.toNamed('/credits');}else if(e.code!='request_processing'&&e.code!='settlement_pending'&&e.statusCode!=null){_pending=null;}_error();}
-  catch(_){_error();}finally{if(mounted)setState(()=>_busy=false);}
+  setState((){_busy=true;_pending=data;});_bottom=true;_follow();
+  String suggested='';
+  try{final result=await ApiClient.instance.post('/v1/encounters/conversations/${widget.id}/messages',data:data);if(!mounted)return;suggested=_s(result,'media_request');setState(()=>_pending=null);if(_s(data,'product_key').isEmpty)_input.clear();if(data['product_key']!=null){final sync=ApiClient.onPaidActionSuccess;if(sync!=null){try{await sync();}catch(_){}}}await _load();}
+  on ApiException catch(e){if(e.code=='insufficient_credits'){_pending=null;await Get.toNamed('/credits');}else if(e.code=='experience_requires_subscription'){_pending=null;await Get.toNamed('/subscription');}else if(e.code!='request_processing'&&e.code!='settlement_pending'&&e.statusCode!=null&&e.statusCode! < 500){_pending=null;}_error();}
+  catch(_){_error();}finally{if(mounted){setState(()=>_busy=false);if(_pending!=null)_startPolling();}}
+  if(mounted&&(suggested=='photo'||suggested=='video'))await _purchase(suggested);
  }
  Future<void> _purchase(String category)async{
   if(_busy||_pending!=null)return;
@@ -116,16 +135,20 @@ class _EncounterChatPageState extends State<EncounterChatPage> with WidgetsBindi
    if(products.isEmpty){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('encounter.unavailable'.tr)));return;}
    final product=await showModalBottomSheet<Map<String,dynamic>>(context:context,backgroundColor:_panel,builder:(sheet)=>SafeArea(child:ListView(shrinkWrap:true,children:products.map((p)=>ListTile(title:Text('${p['emoji']} ${_s(p,'name_key').tr}',style:const TextStyle(color:Colors.white)),trailing:Text('${p['coins']} ◈',style:const TextStyle(color:_rose)),onTap:()=>Navigator.of(sheet).pop(Map<String,dynamic>.from(p as Map)))).toList())));
    if(product==null||!mounted)return;
+   if(catalog['is_subscribed']!=true){
+    final subscribe=await showDialog<bool>(context:context,builder:(dialog)=>AlertDialog(backgroundColor:_panel,title:Text('subscription.required.title'.tr,style:const TextStyle(color:Colors.white)),actions:[TextButton(onPressed:()=>Navigator.of(dialog).pop(false),child:Text('encounter.cancel'.tr,style:const TextStyle(color:_rose))),FilledButton(style:FilledButton.styleFrom(backgroundColor:_rose,foregroundColor:_night),onPressed:()=>Navigator.of(dialog).pop(true),child:Text('encounter.continue'.tr))]));
+    if(subscribe==true&&mounted)await Get.toNamed('/subscription');return;
+   }
    if((catalog['balance'] as num)<(product['coins'] as num)){await Get.toNamed('/credits');return;}
    String demand;
    if(category=='gift'){demand='encounter.giftMessage'.trParams({'gift':_s(product,'name_key').tr});}else{
     final request=await Get.to<String>(()=>const _MediaDemandPage(),transition:Transition.cupertino);if(request==null||!mounted)return;demand=request;
    }
-   final confirmed=await showDialog<bool>(context:context,builder:(dialog)=>AlertDialog(backgroundColor:_panel,title:Text('encounter.confirm'.tr,style:const TextStyle(color:Colors.white)),content:Text('$demand\n\n${product['coins']} ◈\n${'encounter.refund'.tr}',style:const TextStyle(color:Colors.white70)),actions:[TextButton(onPressed:()=>Navigator.of(dialog).pop(false),child:Text('encounter.cancel'.tr)),FilledButton(onPressed:()=>Navigator.of(dialog).pop(true),child:Text('encounter.confirm'.tr))]));
+   final confirmed=await showDialog<bool>(context:context,builder:(dialog)=>AlertDialog(backgroundColor:_panel,title:Text('encounter.confirm'.tr,style:const TextStyle(color:Colors.white)),content:SingleChildScrollView(child:Text('${_s(product,'name_key').tr}\n$demand\n\n${product['coins']} ◈\n${'credits.balance'.tr}: ${catalog['balance']} ◈\n${'encounter.refund'.tr}',style:const TextStyle(color:Colors.white70))),actions:[TextButton(onPressed:()=>Navigator.of(dialog).pop(false),child:Text('encounter.cancel'.tr,style:const TextStyle(color:_rose))),FilledButton(style:FilledButton.styleFrom(backgroundColor:_rose,foregroundColor:_night),onPressed:()=>Navigator.of(dialog).pop(true),child:Text('encounter.confirm'.tr))]));
    if(confirmed==true&&mounted)_send({'content':demand,'idempotency_key':_requestKey(),'product_key':product['key'],'quoted_coins':product['coins']});
   }catch(_){_error();}
  }
- @override Widget build(BuildContext context)=>Theme(data:ThemeData.dark(),child:Scaffold(backgroundColor:_night,appBar:AppBar(backgroundColor:_night,title:Row(children:[ClipRRect(borderRadius:BorderRadius.circular(10),child:SizedBox(width:36,height:36,child:VitaMediaImage(url:widget.cover))),const SizedBox(width:12),Expanded(child:Text(widget.name,maxLines:1,overflow:TextOverflow.ellipsis)),if(_busy)Text('encounter.replying'.tr,style:const TextStyle(fontSize:12,color:_rose))])),body:SafeArea(top:false,child:Column(children:[Expanded(child:RefreshIndicator(onRefresh:_load,child:ListView.builder(controller:_scroll,physics:const AlwaysScrollableScrollPhysics(),padding:const EdgeInsets.all(18),itemCount:_messages.length,itemBuilder:(context,index){final m=_messages[index],own=m['sender_type']=='user';return Align(alignment:own?AlignmentDirectional.centerEnd:AlignmentDirectional.centerStart,child:Container(constraints:BoxConstraints(maxWidth:MediaQuery.sizeOf(context).width*.8),padding:const EdgeInsets.all(14),margin:const EdgeInsets.only(bottom:12),decoration:BoxDecoration(color:own?const Color(0xFF533346):_panel,borderRadius:BorderRadius.circular(18)),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[if(_s(m,'content').isNotEmpty)Text(_s(m,'content'),style:const TextStyle(color:Colors.white,height:1.5)),if(_s(m,'media_url').isNotEmpty)SizedBox(width:240,height:240,child:EncounterMedia(url:_s(m,'media_url'),video:m['media_type']=='video'))])));}))),
+ @override Widget build(BuildContext context)=>Theme(data:_encounterTheme,child:Scaffold(backgroundColor:_night,appBar:AppBar(backgroundColor:_night,title:Row(children:[ClipRRect(borderRadius:BorderRadius.circular(10),child:SizedBox(width:36,height:36,child:VitaMediaImage(url:widget.cover))),const SizedBox(width:12),Expanded(child:Text(widget.name,maxLines:1,overflow:TextOverflow.ellipsis)),if(_busy||_pending!=null)Text('encounter.replying'.tr,style:const TextStyle(fontSize:12,color:_rose))])),body:SafeArea(top:false,child:Column(children:[Expanded(child:RefreshIndicator(onRefresh:_load,child:ListView.builder(controller:_scroll,physics:const AlwaysScrollableScrollPhysics(),padding:const EdgeInsets.all(18),itemCount:_messages.length+(_pending==null?0:1),itemBuilder:(context,index){final m=index<_messages.length?_messages[index]:<String,dynamic>{'sender_type':'user','content':_pending!['content']},own=m['sender_type']=='user';return Align(alignment:own?AlignmentDirectional.centerEnd:AlignmentDirectional.centerStart,child:Container(constraints:BoxConstraints(maxWidth:MediaQuery.sizeOf(context).width*.8),padding:const EdgeInsets.all(14),margin:const EdgeInsets.only(bottom:12),decoration:BoxDecoration(color:own?const Color(0xFF533346):_panel,borderRadius:BorderRadius.circular(18)),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[if(_s(m,'content').isNotEmpty)Text(_s(m,'content'),style:const TextStyle(color:Colors.white,height:1.5)),if(_s(m,'media_url').isNotEmpty)SizedBox(width:240,height:240,child:EncounterMedia(url:_s(m,'media_url'),video:m['media_type']=='video'))])));}))),
   Padding(padding:const EdgeInsets.symmetric(horizontal:12),child:Row(children:[IconButton(onPressed:_busy?null:()=>_purchase('gift'),icon:const Icon(Icons.card_giftcard,color:_rose),tooltip:'encounter.gift'.tr),IconButton(onPressed:_busy?null:()=>_purchase('photo'),icon:const Icon(Icons.image_outlined,color:_rose),tooltip:'encounter.photo'.tr),IconButton(onPressed:_busy?null:()=>_purchase('video'),icon:const Icon(Icons.movie_outlined,color:_rose),tooltip:'encounter.video'.tr),if(_pending!=null&&!_busy)TextButton(onPressed:_send,child:Text('encounter.retry'.tr))])),
   Padding(padding:const EdgeInsets.fromLTRB(16,0,16,12),child:Row(children:[Expanded(child:TextField(controller:_input,enabled:!_busy&&_pending==null,maxLength:2000,decoration:InputDecoration(hintText:'encounter.message'.tr,counterText:'',filled:true,fillColor:_panel,border:OutlineInputBorder(borderRadius:BorderRadius.circular(24),borderSide:BorderSide.none)))),IconButton(onPressed:_busy?null:_send,icon:const Icon(Icons.arrow_upward_rounded,color:_rose))]))
  ]))));
@@ -136,5 +159,5 @@ class _MediaDemandPage extends StatefulWidget{
 }
 class _MediaDemandPageState extends State<_MediaDemandPage>{
  final _text=TextEditingController();@override void dispose(){_text.dispose();super.dispose();}
- @override Widget build(BuildContext context)=>Theme(data:ThemeData.dark(),child:Scaffold(backgroundColor:_night,appBar:AppBar(backgroundColor:_night,title:Text('encounter.demand'.tr)),body:Padding(padding:const EdgeInsets.all(24),child:Column(children:[TextField(controller:_text,maxLength:500,maxLines:5,decoration:InputDecoration(hintText:'encounter.demandHint'.tr)),FilledButton(onPressed:(){if(_text.text.trim().isNotEmpty)Get.back(result:_text.text.trim());},child:Text('encounter.continue'.tr))]))));
+ @override Widget build(BuildContext context)=>Theme(data:_encounterTheme,child:Scaffold(backgroundColor:_night,appBar:AppBar(backgroundColor:_night,title:Text('encounter.demand'.tr)),body:Padding(padding:const EdgeInsets.all(24),child:ListView(children:[TextField(controller:_text,maxLength:500,maxLines:5,decoration:InputDecoration(hintText:'encounter.demandHint'.tr)),FilledButton(onPressed:(){if(_text.text.trim().isNotEmpty)Get.back(result:_text.text.trim());},child:Text('encounter.continue'.tr))]))));
 }
