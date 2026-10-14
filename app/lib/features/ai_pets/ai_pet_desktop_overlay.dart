@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -7,7 +8,6 @@ import 'animation/pet/companion_pet_art.dart';
 import 'animation/pet/pet_motion_spec.dart';
 import 'animation/world_clock.dart';
 import 'ai_pet_desktop_controller.dart';
-import 'ai_pet_home_page.dart';
 import '../shell/shell_page.dart';
 
 class AIPetDesktopOverlay extends StatelessWidget {
@@ -58,6 +58,9 @@ class _DraggablePetState extends State<_DraggablePet>
   bool _foreground = true;
   bool _dragging = false;
   bool _facingLeft = true;
+  Timer? _pettingTimer;
+  bool _petting = false;
+  double _pettingStarted = 0;
 
   @override
   void initState() {
@@ -69,6 +72,7 @@ class _DraggablePetState extends State<_DraggablePet>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _pettingTimer?.cancel();
     _clock.dispose();
     super.dispose();
   }
@@ -88,16 +92,23 @@ class _DraggablePetState extends State<_DraggablePet>
     else { _clock.pause(); }
   }
 
-  void _openHome() {
-    final companionID = '${widget.pet['adopted_companion_id'] ?? ''}';
-    if (companionID.isEmpty) return;
-    Get.to(() => AIPetHomePage(
-          companionId: companionID,
-          name:
-              '${widget.pet['adopted_companion_name'] ?? widget.pet['name'] ?? ''}',
-          avatarUrl: '${widget.pet['avatar_url'] ?? ''}',
-          species: '${widget.pet['species'] ?? ''}',
-        ));
+  void _pet() {
+    _pettingTimer?.cancel();
+    setState(() {
+      _petting = true;
+      _pettingStarted = _clock.elapsedSeconds;
+    });
+    _pettingTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _petting = false);
+    });
+  }
+
+  void _startDrag() {
+    _pettingTimer?.cancel();
+    setState(() {
+      _petting = false;
+      _dragging = true;
+    });
   }
 
   @override
@@ -122,8 +133,8 @@ class _DraggablePetState extends State<_DraggablePet>
       height: _size,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: _openHome,
-        onPanStart: (_) => setState(() => _dragging = true),
+        onTap: _pet,
+        onPanStart: (_) => _startDrag(),
         onPanEnd: (_) => setState(() => _dragging = false),
         onPanCancel: () => setState(() => _dragging = false),
         onPanUpdate: (details) => setState(() {
@@ -140,6 +151,8 @@ class _DraggablePetState extends State<_DraggablePet>
           child: AnimatedBuilder(
             animation: _clock,
             builder: (context, _) {
+              final progress = ((_clock.elapsedSeconds - _pettingStarted) / 2)
+                  .clamp(0.0, 1.0);
               return Stack(fit: StackFit.expand, children: [
                 Positioned(left: 18, right: 18, bottom: 0, height: 7,
                   child: DecoratedBox(decoration: BoxDecoration(
@@ -149,10 +162,26 @@ class _DraggablePetState extends State<_DraggablePet>
                   name: '${widget.pet['adopted_companion_name'] ?? widget.pet['name'] ?? ''}',
                   imageUrl: '${widget.pet['avatar_url'] ?? ''}',
                   seconds: _clock.elapsedSeconds,
-                  state: _dragging ? PetState.walking : PetState.standing,
+                  state: _dragging
+                      ? PetState.walking
+                      : _petting ? PetState.happy : PetState.standing,
                   facingLeft: _facingLeft,
                   reducedMotion: _reduced,
                 ),
+                if (_petting)
+                  Positioned(
+                    right: 7,
+                    top: _reduced ? 5 : 17 - progress * 14,
+                    child: IgnorePointer(
+                      child: ExcludeSemantics(
+                        child: Opacity(
+                          opacity: _reduced ? 1 : math.sin(progress * math.pi),
+                          child: const Icon(Icons.favorite_rounded,
+                              size: 17, color: Color(0xFFEBA1AE)),
+                        ),
+                      ),
+                    ),
+                  ),
               ]);
             },
           ),

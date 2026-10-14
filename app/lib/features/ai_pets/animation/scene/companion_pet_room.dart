@@ -9,7 +9,7 @@ import '../pet/pet_state_machine.dart';
 import '../world_clock.dart';
 
 /// A fixed room canvas keeps every prop, contact shadow and pet on the same
-/// coordinate system even when the full-screen viewport crops the room edges.
+/// coordinate system while the full-screen camera follows the pet's route.
 class CompanionPetRoom extends StatefulWidget {
   const CompanionPetRoom({super.key, required this.name, required this.imageUrl,
     required this.machine, required this.clock, required this.onTap,
@@ -44,6 +44,9 @@ class _CompanionPetRoomState extends State<CompanionPetRoom> {
   PetState _display = PetState.standing;
   List<Offset> _route = const [];
   Offset _mouthDelta = const Offset(.24, .08);
+  Offset _cameraFocus = const Offset(.5, .73);
+  double _cameraLast = 0;
+  bool _cameraInitialized = false;
   static const _walkRoute = [Offset(.40, .79), Offset(.25, .74),
     Offset(.47, .86), Offset(.70, .81)];
 
@@ -83,6 +86,34 @@ class _CompanionPetRoomState extends State<CompanionPetRoom> {
       PetState.tired || PetState.sick => _position,
     _ => _rug,
   };
+
+  void _advanceCamera(bool reduced) {
+    final now = widget.clock.elapsedSeconds;
+    final dt = (now - _cameraLast).clamp(0.0, .05).toDouble();
+    _cameraLast = now;
+    final destination = _destination(_requested);
+    final focus = Offset(_position.dx * .75 + destination.dx * .25,
+      _position.dy * .75 + destination.dy * .25 - .08);
+    if (!_cameraInitialized || reduced) {
+      _cameraFocus = focus;
+      _cameraInitialized = true;
+    } else {
+      _cameraFocus = Offset.lerp(_cameraFocus, focus, 1 - math.exp(-dt * 3.5))!;
+    }
+  }
+
+  Alignment _cameraAlignment(Size viewport) {
+    if (viewport.width <= 0 || viewport.height <= 0) return Alignment.center;
+    final scale = math.max(viewport.width / 1024, viewport.height / 1536);
+    final visibleW = viewport.width / scale;
+    final visibleH = viewport.height / scale;
+    final cropW = math.max(0.0, 1024.0 - visibleW);
+    final cropH = math.max(0.0, 1536.0 - visibleH);
+    final originX = (_cameraFocus.dx * 1024 - visibleW / 2).clamp(0.0, cropW).toDouble();
+    final originY = (_cameraFocus.dy * 1536 - visibleH / 2).clamp(0.0, cropH).toDouble();
+    return Alignment(cropW == 0 ? 0 : originX / cropW * 2 - 1,
+      cropH == 0 ? 0 : originY / cropH * 2 - 1);
+  }
 
   void _advance(bool reduced) {
     final now = widget.clock.elapsedSeconds;
@@ -179,6 +210,7 @@ class _CompanionPetRoomState extends State<CompanionPetRoom> {
     builder: (context, _) {
       final reduced = MediaQuery.disableAnimationsOf(context);
       _advance(reduced);
+      _advanceCamera(reduced);
       final hour = widget.clock.dayProgress * 24;
       final night = hour < 6 ? 1.0 : hour < 8 ? (8 - hour) / 2
         : hour < 18 ? 0.0 : hour < 20 ? (hour - 18) / 2 : 1.0;
@@ -195,8 +227,10 @@ class _CompanionPetRoomState extends State<CompanionPetRoom> {
         0, 0, .88 + night * .02, 0, 0,
         0, 0, 0, 1, 0,
       ];
-      return ColoredBox(color: const Color(0xFF483629), child: Stack(children: [
-        Positioned.fill(child: Center(child: FittedBox(fit: BoxFit.cover,
+      return LayoutBuilder(builder: (context, constraints) =>
+        ColoredBox(color: const Color(0xFF483629), child: Stack(fit: StackFit.expand, children: [
+        Positioned.fill(child: FittedBox(fit: BoxFit.cover,
+          alignment: _cameraAlignment(constraints.biggest),
           clipBehavior: Clip.hardEdge,
           child: SizedBox(width: 1024, height: 1536, child: Stack(children: [
             Positioned.fill(child: AnimatedSwitcher(
@@ -243,7 +277,7 @@ class _CompanionPetRoomState extends State<CompanionPetRoom> {
                     'assets/ai_pets/cottage_v2/${_season}_night.png',
                     filterQuality: FilterQuality.none, fit: BoxFit.fill)),
                 ])))),
-          ]))))),
+          ])))),
         SafeArea(child: Padding(padding: const EdgeInsets.all(16), child: Row(children: [
           IconButton(onPressed: widget.onBack, icon: const Icon(Icons.arrow_back),
             color: const Color(0xFFFFEBCD), style: IconButton.styleFrom(
@@ -253,7 +287,7 @@ class _CompanionPetRoomState extends State<CompanionPetRoom> {
             style: const TextStyle(color: Color(0xFFFFEBCD), fontSize: 24,
               fontWeight: FontWeight.w700, shadows: [Shadow(blurRadius: 5, color: Colors.black54)]))),
         ]))),
-      ]));
+      ])));
     });
 }
 

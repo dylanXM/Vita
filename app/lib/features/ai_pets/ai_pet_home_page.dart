@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../core/notice.dart';
 import '../../core/analytics_service.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
@@ -12,6 +11,7 @@ import 'animation/pet/pet_motion_spec.dart';
 import 'animation/pet/pet_state_machine.dart';
 import 'animation/scene/companion_pet_room.dart';
 import 'animation/ui/pet_action_menu.dart';
+import 'animation/ui/pet_danmaku.dart';
 import 'animation/world_clock.dart';
 import 'ai_pet_desktop_controller.dart';
 
@@ -52,6 +52,7 @@ class _AIPetHomePageState extends State<AIPetHomePage>
   DateTime _lastInteractionAt = DateTime.now();
   bool _isForeground = true;
   bool _reduceMotion = false;
+  final PetDanmakuController _notices = PetDanmakuController();
 
   String get _currentAvatarUrl {
     final saved = _state?['avatar_url'];
@@ -137,6 +138,7 @@ class _AIPetHomePageState extends State<AIPetHomePage>
     _ambientTimer?.cancel();
     _worldClock.dispose();
     _machine.dispose();
+    _notices.dispose();
     super.dispose();
   }
 
@@ -166,7 +168,7 @@ class _AIPetHomePageState extends State<AIPetHomePage>
         _applyIntent(nextState);
       }
     } on ApiException catch (error) {
-      if (mounted) VitaNotice.error('aiPets.error'.tr, error.message);
+      if (mounted) _notices.show(PetNoticeKind.error, 'aiPets.error'.tr, error.message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -229,22 +231,22 @@ class _AIPetHomePageState extends State<AIPetHomePage>
             nextLevel > previousLevel ? PetState.levelUp : PetState.happy,
             duration: const Duration(milliseconds: 1800));
       }
-      VitaNotice.success('aiPets.fed'.tr, 'aiPets.fedSub'.tr);
+      _notices.show(PetNoticeKind.success, 'aiPets.fed'.tr, 'aiPets.fedSub'.tr);
     } on ApiException catch (error) {
       if (!mounted) return;
       _machine.transition(
           _machine.needsSleep ? PetState.sleeping : PetState.standing);
       if (error.code == 'insufficient_credits') {
-        VitaNotice.warning(
-            'aiPets.notEnoughCoins'.tr, 'aiPets.notEnoughCoinsSub'.tr);
-        Get.toNamed('/credits');
+        _notices.show(PetNoticeKind.warning,
+            'aiPets.notEnoughCoins'.tr, 'aiPets.notEnoughCoinsSub'.tr,
+            onTap: () => Get.toNamed('/credits'));
       } else {
-        VitaNotice.error('aiPets.error'.tr, error.message);
+        _notices.show(PetNoticeKind.error, 'aiPets.error'.tr, error.message);
       }
     } catch (_) {
       if (!mounted) return;
       _machine.transition(_machine.suggestFromState(_state ?? const {}));
-      VitaNotice.error('aiPets.error'.tr, 'common.loadFailed'.tr);
+      _notices.show(PetNoticeKind.error, 'aiPets.error'.tr, 'common.loadFailed'.tr);
     } finally {
       if (mounted) {
         setState(() => _feeding = false);
@@ -303,11 +305,11 @@ class _AIPetHomePageState extends State<AIPetHomePage>
           'pet_needs_rest' => 'aiPets.needsRest'.tr,
           _ => error.message,
         };
-        VitaNotice.error('aiPets.error'.tr, message);
+        _notices.show(PetNoticeKind.error, 'aiPets.error'.tr, message);
       }
       if (mounted) _machine.transition(_machine.suggestFromState(_state ?? const {}));
     } catch (_) {
-      if (mounted) VitaNotice.error('aiPets.error'.tr, 'common.loadFailed'.tr);
+      if (mounted) _notices.show(PetNoticeKind.error, 'aiPets.error'.tr, 'common.loadFailed'.tr);
       if (mounted) _machine.transition(_machine.suggestFromState(_state ?? const {}));
     } finally {
       if (mounted) setState(() => _caring = false);
@@ -374,9 +376,11 @@ class _AIPetHomePageState extends State<AIPetHomePage>
                 onSit: _sit,
                 onRest: _rest,
                 onRefresh: _refreshState,
+                onHint: (hint) => _notices.show(PetNoticeKind.info, '', hint),
               ),
             ),
           ),
+          PetDanmaku(controller: _notices),
           if (_loading)
             Center(
               child: Container(

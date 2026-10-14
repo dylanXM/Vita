@@ -24,6 +24,7 @@ class PetActionMenu extends StatefulWidget {
     required this.onSit,
     required this.onRest,
     required this.onRefresh,
+    this.onHint,
   });
 
   final int level;
@@ -39,6 +40,7 @@ class PetActionMenu extends StatefulWidget {
   final VoidCallback onSit;
   final VoidCallback onRest;
   final VoidCallback onRefresh;
+  final ValueChanged<String>? onHint;
 
   @override
   State<PetActionMenu> createState() => _PetActionMenuState();
@@ -167,12 +169,14 @@ class _PetActionMenuState extends State<PetActionMenu>
               _IconButton(
                 icon: Icons.refresh,
                 tooltip: 'aiPets.refresh',
+                onHint: widget.onHint,
                 onTap: () => _run(widget.onRefresh),
               ),
               const SizedBox(width: 2),
               _IconButton(
                 icon: Icons.close,
                 tooltip: 'common.cancel',
+                onHint: widget.onHint,
                 onTap: _toggle,
               ),
             ]),
@@ -335,26 +339,29 @@ class _IconButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onTap,
+    this.onHint,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
+  final ValueChanged<String>? onHint;
 
   @override
   Widget build(BuildContext context) {
     final vita = context.vita;
-    return Tooltip(
-      message: tooltip.tr,
+    final button = Semantics(button: true, label: tooltip.tr,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onHint == null ? null : () => onHint!(tooltip.tr),
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(4),
+        child: SizedBox(
+          width: 44, height: 44,
           child: Icon(icon, size: 18, color: vita.subText),
         ),
       ),
     );
+    return onHint == null ? Tooltip(message: tooltip.tr, child: button) : button;
   }
 }
 

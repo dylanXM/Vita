@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vita/core/settings_controller.dart';
 import 'package:vita/features/ai_pets/ai_pet_desktop_controller.dart';
 import 'package:vita/features/ai_pets/ai_pet_desktop_overlay.dart';
+import 'package:vita/features/ai_pets/animation/pet/companion_pet_art.dart';
+import 'package:vita/features/ai_pets/animation/pet/pet_motion_spec.dart';
 import 'package:vita/features/auth/auth_controller.dart';
 
 void main() {
@@ -32,6 +34,20 @@ void main() {
 
     expect(find.text('Any page'), findsOneWidget);
     expect(find.bySemanticsLabel('Mochi'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Mochi'));
+    await tester.pump();
+    expect(tester.widget<CompanionPetArt>(find.byType(CompanionPetArt)).state,
+        PetState.happy);
+    expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
+    expect(find.text('Any page'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.bySemanticsLabel('Mochi'));
+    await tester.pump(const Duration(milliseconds: 1500));
+    expect(tester.widget<CompanionPetArt>(find.byType(CompanionPetArt)).state,
+        PetState.happy);
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(tester.widget<CompanionPetArt>(find.byType(CompanionPetArt)).state,
+        PetState.standing);
     await tester.drag(find.bySemanticsLabel('Mochi'), const Offset(-40, -60));
     await tester.pump();
     expect(tester.takeException(), isNull);
