@@ -178,6 +178,11 @@ function CompanionSection({ companions, models, portraits, loading, onSaved }: {
   const [details, setDetails] = useState<{ companion: AdminCompanion; summary: string[] } | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
   const chatModels = models.filter((model) => (model.configured_scenarios ?? []).includes("text_chat"));
+  const toggle = useMutation({
+    mutationFn: ({ item, proactive_enabled }: { item: AdminCompanion; proactive_enabled: boolean }) => agentApi.updateCompanion(item.id, { ...item, proactive_enabled }),
+    onSuccess: () => { toast.success(t("agent.saved")); onSaved(); },
+    onError: (error) => toast.error(errorMessage(error, t("common.failedToLoad"))),
+  });
   const save = useMutation({
     mutationFn: () => {
       if (!form) throw new Error("No companion selected");
@@ -222,7 +227,7 @@ function CompanionSection({ companions, models, portraits, loading, onSaved }: {
             </div></TableCell>
             <TableCell>{item.user_email}</TableCell><TableCell>{item.city || "—"}</TableCell>
             <TableCell>{model?.display_name ?? t("agent.useDefault")}</TableCell>
-            <TableCell><Switch checked={item.proactive_enabled} disabled aria-label={t("agent.proactiveEnabled")} /></TableCell>
+            <TableCell><Switch checked={item.proactive_enabled} disabled={toggle.isPending} aria-label={t("agent.proactiveEnabled")} onCheckedChange={(proactive_enabled) => toggle.mutate({ item, proactive_enabled })} /></TableCell>
             <TableCell className="text-end"><ListActions actions={[{ label: t("listActions.details"), onSelect: () => setDetails({ companion: item, summary }) }, { label: t("users.edit"), icon: <Bot />, onSelect: () => setForm({ ...item, personality_tags: [...item.personality_tags] }) }]} /></TableCell>
           </TableRow>;
         })}</TableBody></Table>}

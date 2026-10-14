@@ -53,6 +53,11 @@ export function AIPetsPage() {
     enabled: Boolean(activeEnv),
   });
   const close = () => { setOpen(false); setEditing(null); };
+  const toggle = useMutation({
+    mutationFn: ({ breed, enabled }: { breed: AIPetBreed; enabled: boolean }) => aiPetBreedsApi.update(breed.id, { ...breed, enabled }),
+    onSuccess: async () => { toast.success(t("aiPets.saved")); await queryClient.invalidateQueries({ queryKey: ["ai-pet-breeds", activeEnv] }); },
+    onError: (error) => toast.error(errorMessage(error, t("common.failedToLoad"))),
+  });
   const remove = useMutation({
     mutationFn: (id: string) => aiPetBreedsApi.remove(id),
     onSuccess: () => {
@@ -109,7 +114,7 @@ export function AIPetsPage() {
           </div></TableCell>
           <TableCell>{breed.species}</TableCell>
           <TableCell>{breed.subscription_plan_ids.length ? t("aiPets.selectedPlans", { count: breed.subscription_plan_ids.length }) : t("aiPets.allPlans")}</TableCell>
-          <TableCell><Switch checked={breed.enabled} disabled aria-label={t("content.enabled")} /></TableCell>
+          <TableCell><Switch checked={breed.enabled} disabled={toggle.isPending} aria-label={t("content.enabled")} onCheckedChange={(enabled) => toggle.mutate({ breed, enabled })} /></TableCell>
           <TableCell className="text-end"><ListActions actions={[{ label: t("listActions.details"), onSelect: () => setDetails(breed) }, { label: t("users.edit"), icon: <Pencil />, onSelect: () => edit(breed) }]} /></TableCell>
         </TableRow>)}</TableBody></Table>}
     </CardContent></Card>

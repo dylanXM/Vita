@@ -24,11 +24,11 @@ export function CreditProductsPage() {
   const products = useQuery({ queryKey: ["credit-products", environment], queryFn: ({ signal }) => creditProductsApi.list(environment, signal) });
   const save = useMutation({
     mutationFn: (product: CreditProduct) => creditProductsApi.update(environment, product.key, product),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success(t("creditProducts.saved"));
       setDialog(null);
       setDraft(null);
-      void queryClient.invalidateQueries({ queryKey: ["credit-products", environment] });
+      await queryClient.invalidateQueries({ queryKey: ["credit-products", environment] });
     },
     onError: (error) => toast.error(errorMessage(error, t("common.failedToLoad"))),
   });
@@ -53,7 +53,7 @@ export function CreditProductsPage() {
       <TableBody>{products.isLoading || products.isError || !products.data?.items.length ? <TableRow><TableCell colSpan={7} className="h-20 text-center text-muted-foreground">{t(products.isLoading ? "common.loading" : products.isError ? "common.failedToLoad" : "creditProductDialog.empty")}</TableCell></TableRow> : products.data.items.map((product) => <TableRow key={product.key} className="h-20">
         <TableCell><div className="max-w-64 truncate" title={name(product)}><ListName onClick={() => open(product, false)}>{product.emoji} {name(product)}</ListName></div><div className="max-w-64 truncate text-xs text-muted-foreground" title={product.key}>{product.key}</div></TableCell>
         <TableCell>{t(`creditProducts.categories.${product.category}`, { defaultValue: product.category })}</TableCell><TableCell className="tabular-nums">{product.coins.toLocaleString()}</TableCell>
-        <TableCell><Switch checked={product.enabled} disabled aria-label={t("creditProducts.enabled")} /></TableCell><TableCell><Switch checked={product.subscription_only} disabled aria-label={t("creditProducts.subscriptionOnly")} /></TableCell><TableCell><Switch checked={product.is_launched} disabled aria-label={t("creditProducts.isLaunched")} /></TableCell>
+        <TableCell><Switch checked={product.enabled} disabled={save.isPending} aria-label={t("creditProducts.enabled")} onCheckedChange={(enabled) => save.mutate({ ...product, enabled })} /></TableCell><TableCell><Switch checked={product.subscription_only} disabled={save.isPending} aria-label={t("creditProducts.subscriptionOnly")} onCheckedChange={(subscription_only) => save.mutate({ ...product, subscription_only })} /></TableCell><TableCell><Switch checked={product.is_launched} disabled={save.isPending} aria-label={t("creditProducts.isLaunched")} onCheckedChange={(is_launched) => save.mutate({ ...product, is_launched })} /></TableCell>
         <TableCell className="text-end"><ListActions actions={[{ label: t("listActions.details"), disabled: save.isPending, onSelect: () => open(product, false) }, { label: t("common.edit"), disabled: save.isPending, onSelect: () => open(product, true) }]} /></TableCell>
       </TableRow>)}</TableBody>
     </Table></div>

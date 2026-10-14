@@ -299,22 +299,52 @@ class RomanticDateStageState extends State<RomanticDateStage>
     }
     showModalBottomSheet<void>(
         context: context,
+        isScrollControlled: true,
         showDragHandle: true,
-        backgroundColor: const Color(0xFF29221D),
+        backgroundColor: context.vita.surface,
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+        clipBehavior: Clip.antiAlias,
         builder: (ctx) => SafeArea(
             top: false,
-            child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
+            child: SizedBox(
+              width: MediaQuery.sizeOf(ctx).width,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(ctx).height * .75),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                          color: ctx.vita.greenTint,
+                          borderRadius: BorderRadius.circular(14)),
+                      child: Icon(Icons.bookmark_border_rounded,
+                          color: ctx.vita.green, size: 24)),
+                    const SizedBox(width: 14),
+                    Expanded(child: Text('experience.journey.keepsake'.tr,
+                        style: TextStyle(color: ctx.vita.text, fontSize: 20,
+                            fontWeight: FontWeight.w700))),
+                  ]),
+                  const SizedBox(height: 8),
                   widget.journey!,
-                  TextButton(
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
                       onPressed: () {
+                        final openKeepsake = widget.onKeepsake;
                         Navigator.pop(ctx);
-                        widget.onKeepsake?.call();
+                        openKeepsake?.call();
                       },
-                      child: Text('moment.create'.tr,
-                          style: const TextStyle(color: Colors.white)))
-                ]))));
+                      style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48)),
+                      icon: const Icon(Icons.edit_outlined, size: 19),
+                      label: Text('moment.create'.tr)),
+                ]))))));
   }
 
   @override

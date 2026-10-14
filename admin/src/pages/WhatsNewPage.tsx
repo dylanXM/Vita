@@ -30,6 +30,11 @@ export function WhatsNewPage() {
   const query = useQuery({ queryKey: ["whats-new", activeEnv, platform], queryFn: ({ signal }) => whatsNewApi.list(activeEnv!, platform, signal), enabled: Boolean(activeEnv) });
   const [editing, setEditing] = useState<WhatsNewCampaign | null | undefined>(undefined);
   const [details, setDetails] = useState<WhatsNewCampaign | null>(null);
+  const toggle = useMutation({
+    mutationFn: ({ item, enabled }: { item: WhatsNewCampaign; enabled: boolean }) => whatsNewApi.update(item.id, { ...item, enabled }),
+    onSuccess: async () => { toast.success(t("content.saved")); await qc.invalidateQueries({ queryKey: ["whats-new"] }); },
+    onError: (error) => toast.error(errorMessage(error, t("common.failedToLoad"))),
+  });
 
   const remove = useMutation({ mutationFn: whatsNewApi.remove, onSuccess: () => { void qc.invalidateQueries({ queryKey: ["whats-new"] }); toast.success(t("content.deleted")); }, onError: (e) => toast.error(errorMessage(e)) });
 
@@ -39,7 +44,7 @@ export function WhatsNewPage() {
       <Button disabled={!activeEnv} onClick={() => setEditing(null)}><Plus />{t("whatsNew.create")}</Button>
     </div>} />
     <Card><CardContent className="p-0"><Table><TableHeader><TableRow><TableHead>{t("content.name")}</TableHead><TableHead>{t("content.status")}</TableHead><TableHead>{t("whatsNew.version")}</TableHead><TableHead>{t("content.schedule")}</TableHead><TableHead>{t("content.operator")}</TableHead><TableHead className="text-right">{t("content.actions")}</TableHead></TableRow></TableHeader><TableBody>
-      {(query.data?.items ?? []).map((item) => <TableRow key={item.id}><TableCell><ListName onClick={() => setDetails(item)}>{item.name}</ListName></TableCell><TableCell><Switch checked={item.enabled} disabled aria-label={t("content.enabled")} /></TableCell><TableCell>{item.min_app_version || "—"}</TableCell><TableCell className="text-xs">{item.starts_at ? new Date(item.starts_at).toLocaleString() : "—"}<br />{item.ends_at ? new Date(item.ends_at).toLocaleString() : "—"}</TableCell><TableCell>{item.updated_by || "—"}</TableCell><TableCell className="text-end"><ListActions actions={[{ label: t("listActions.details"), onSelect: () => setDetails(item) }, { label: t("common.edit"), icon: <Pencil />, onSelect: () => setEditing(item) }]} /></TableCell></TableRow>)}
+      {(query.data?.items ?? []).map((item) => <TableRow key={item.id}><TableCell><ListName onClick={() => setDetails(item)}>{item.name}</ListName></TableCell><TableCell><Switch checked={item.enabled} disabled={toggle.isPending} aria-label={t("content.enabled")} onCheckedChange={(enabled) => toggle.mutate({ item, enabled })} /></TableCell><TableCell>{item.min_app_version || "—"}</TableCell><TableCell className="text-xs">{item.starts_at ? new Date(item.starts_at).toLocaleString() : "—"}<br />{item.ends_at ? new Date(item.ends_at).toLocaleString() : "—"}</TableCell><TableCell>{item.updated_by || "—"}</TableCell><TableCell className="text-end"><ListActions actions={[{ label: t("listActions.details"), onSelect: () => setDetails(item) }, { label: t("common.edit"), icon: <Pencil />, onSelect: () => setEditing(item) }]} /></TableCell></TableRow>)}
       {!query.isLoading && !query.data?.items.length && <TableRow><TableCell colSpan={6} className="h-28 text-center text-muted-foreground">{t("whatsNew.empty")}</TableCell></TableRow>}
     </TableBody></Table></CardContent></Card>
     {activeEnv && editing !== undefined && <CampaignDialog campaign={editing} environment={activeEnv} platform={platform} onClose={() => setEditing(undefined)} onSaved={() => { setEditing(undefined); void qc.invalidateQueries({ queryKey: ["whats-new"] }); }} />}

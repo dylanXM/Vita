@@ -50,6 +50,11 @@ export function StoryHubPage() {
 
   useEffect(() => { if (!rulesOpen && config.data) setRules(config.data); }, [config.data, rulesOpen]);
   const refresh = () => { void queryClient.invalidateQueries({ queryKey: ["story-backgrounds", active] }); };
+  const toggle = useMutation({
+    mutationFn: ({ item, enabled }: { item: StoryBackground; enabled: boolean }) => storiesApi.updateBackground(item.id, { ...item, enabled }),
+    onSuccess: async () => { toast.success(t("storyHub.saved")); await queryClient.invalidateQueries({ queryKey: ["story-backgrounds", active] }); },
+    onError: (error) => toast.error(errorMessage(error, t("common.failedToLoad"))),
+  });
   const closeBackground = () => { if (coverUploading) return; setBackgroundOpen(false); setEditing(null); };
   const saveRules = useMutation({
     mutationFn: () => storiesApi.saveConfig(rules!),
@@ -94,7 +99,7 @@ export function StoryHubPage() {
             <div><ListName onClick={() => setDetails(item)}>{item.title}</ListName><div className="line-clamp-1 max-w-72 text-xs text-muted-foreground">{item.synopsis || item.world_setting}</div></div>
           </div></TableCell>
           <TableCell>{item.genre || "—"}</TableCell><TableCell>{item.sort_order}</TableCell>
-          <TableCell><Switch checked={item.enabled} disabled aria-label={t("storyHub.enabled")} /></TableCell>
+          <TableCell><Switch checked={item.enabled} disabled={toggle.isPending} aria-label={t("storyHub.enabled")} onCheckedChange={(enabled) => toggle.mutate({ item, enabled })} /></TableCell>
           <TableCell className="text-end"><ListActions actions={[{ label: t("listActions.details"), onSelect: () => setDetails(item) }, { label: t("users.edit"), icon: <Pencil />, onSelect: () => edit(item) }]} /></TableCell>
         </TableRow>)}</TableBody></Table>}
     </CardContent></Card>

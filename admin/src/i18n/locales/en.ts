@@ -1,6 +1,9 @@
 // English — the master key set. Every other locale mirrors this structure.
 const en = {
   brand: "Vita Admin",
+  modelCallTokens: "Token usage",
+  modelCallTokenUnknown: "Unknown",
+  modelCallTokenBreakdown: "Input {{input}} · Output {{output}} · Cache read {{read}} · Cache write {{write}}",
   listActions: { more: "More", details: "Details", close: "Close" },
   creditProductClose: "Close",
   creditProductDialog: { details: "Experience details", edit: "Edit experience", sortOrder: "Sort order", metadata: "Experience configuration", empty: "No credit experiences.", invalidCoins: "Enter an integer from 1 to 100,000." },

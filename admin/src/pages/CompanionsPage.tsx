@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bot, Eye, RefreshCw, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { companionsApi } from "@/api/admin";
 import { PageHeader } from "@/components/page-header";
 import { ListActions } from "@/components/list-actions";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "@/components/ui/sonner";
+import { errorMessage } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,6 +23,15 @@ const PAGE_SIZE = 20;
 
 export function CompanionsPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const toggle = useMutation({
+    mutationFn: async ({ id, field, checked }: { id: string; field: "active" | "proactive_enabled"; checked: boolean }) => {
+      const detail = await companionsApi.get(id);
+      return companionsApi.update(id, { ...detail, [field]: checked });
+    },
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["managed-companions"] }); void queryClient.invalidateQueries({ queryKey: ["agent-companions"] }); },
+    onError: (error) => toast.error(errorMessage(error)),
+  });
   const { t } = useTranslation();
   const [params] = useSearchParams();
   const userID = params.get("user_id") ?? "";
@@ -104,7 +116,7 @@ export function CompanionsPage() {
                     </div>
                   </TableCell>
                   <TableCell><Link to={`/users/${item.user_id}`} className="hover:text-primary hover:underline">{item.user_email}</Link></TableCell>
-                  <TableCell><div className="flex flex-wrap gap-1"><Badge variant={item.active ? "success" : "muted"}>{t(item.active ? "companions.active" : "companions.inactive")}</Badge>{item.proactive_enabled && <Badge variant="outline">{t("companions.proactive")}</Badge>}</div></TableCell>
+                  <TableCell><div className="space-y-2"><div className="flex items-center gap-2"><Switch checked={item.active} disabled={toggle.isPending} aria-label={t("companions.roleEnabled")} onCheckedChange={(checked) => toggle.mutate({ id: item.id, field: "active", checked })} /><Badge variant={item.active ? "success" : "muted"}>{t(item.active ? "companions.active" : "companions.inactive")}</Badge></div><label className="flex items-center gap-2 text-xs"><Switch checked={item.proactive_enabled} disabled={toggle.isPending} onCheckedChange={(checked) => toggle.mutate({ id: item.id, field: "proactive_enabled", checked })} />{t("companions.proactive")}</label></div></TableCell>
                   <TableCell>{item.conversations} / {item.messages}</TableCell>
                   <TableCell className="hidden text-muted-foreground xl:table-cell">{formatDate(item.created_at)}</TableCell>
                   <TableCell className="text-end"><ListActions actions={[{ label: t("listActions.details"), icon: <Eye />, onSelect: () => navigate(`/companions/${item.id}`) }]} /></TableCell>

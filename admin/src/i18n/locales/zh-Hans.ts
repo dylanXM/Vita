@@ -1,6 +1,9 @@
 // 简体中文 — mirrors the key set in en.ts.
 const zhHans = {
   brand: "Vita Admin",
+  modelCallTokens: "Token 用量",
+  modelCallTokenUnknown: "未知",
+  modelCallTokenBreakdown: "输入 {{input}} · 输出 {{output}} · 缓存读取 {{read}} · 缓存写入 {{write}}",
   listActions: { more: "更多", details: "详情", close: "关闭" },
   creditProductClose: "关闭",
   creditProductDialog: { details: "体验详情", edit: "编辑体验", sortOrder: "排序", metadata: "体验配置", empty: "暂无金币体验。", invalidCoins: "请输入 1 至 100,000 的整数。" },

@@ -63,6 +63,12 @@ function BillingProductsPage({ plan }: { plan: boolean }) {
     onError: (err) => toast.error(errorMessage(err, t("common.failedToLoad"))),
   });
 
+  const toggle = useMutation({
+    mutationFn: ({ item, enabled }: { item: BillingProduct; enabled: boolean }) => api.update(item.id, { ...item, enabled }),
+    onSuccess: async () => { toast.success(t("billing.saved")); await queryClient.invalidateQueries({ queryKey: [plan ? "subscription-plans" : "coin-packs"] }); },
+    onError: (error) => toast.error(errorMessage(error, t("common.failedToLoad"))),
+  });
+
   const titleKey = plan ? "billing.plansTitle" : "billing.packsTitle";
   const descKey = plan ? "billing.plansDesc" : "billing.packsDesc";
   return (
@@ -100,7 +106,7 @@ function BillingProductsPage({ plan }: { plan: boolean }) {
               <TableCell>{item.coins.toLocaleString()}</TableCell><TableCell>${Number(item.price_usd).toFixed(2)}</TableCell>
               {plan && <TableCell>{t(`billing.periods.${item.period}`)}</TableCell>}
               <TableCell className="max-w-48 truncate font-mono text-xs">{item.product_id || "—"}</TableCell>
-              <TableCell><Switch checked={item.enabled} disabled aria-label={t("billing.enabled")} /></TableCell>
+              <TableCell><Switch checked={item.enabled} disabled={toggle.isPending} aria-label={t("billing.enabled")} onCheckedChange={(enabled) => toggle.mutate({ item, enabled })} /></TableCell>
               {plan && <TableCell className="max-w-64 text-xs text-muted-foreground">{(item.benefits_i18n?.[i18n.resolvedLanguage ?? "en"]?.join(" · ") || item.benefits_i18n?.en?.join(" · ") || item.benefits?.join(" · ") || "—")}</TableCell>}
               <TableCell className="text-end"><ListActions actions={[{ label: t("listActions.details"), onSelect: () => setDetails(item) }, { label: t("billing.edit"), icon: <Pencil />, onSelect: () => { setEditing(item); setDialogOpen(true); } }]} /></TableCell>
             </TableRow>)}</TableBody></Table>}

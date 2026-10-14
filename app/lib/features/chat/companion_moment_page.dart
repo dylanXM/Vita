@@ -557,6 +557,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
             },
             onKeepsake: _openKeepsake,
             journey: ExperienceDecisionPanel(
+                compact: false,
                 companionId: widget.companionId,
                 eventId: widget.eventId,
                 proposalMessage: reply,

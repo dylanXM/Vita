@@ -71,7 +71,7 @@ export function WorldEngineConfigDialog({ open, onOpenChange }: { open: boolean;
           <div>
             <ListName onClick={() => showPlace(item)}>{t(`worldEngine.kind.${item.scene_kind}`)} · {item.title}</ListName>
             <div className="text-sm text-muted-foreground">{item.description}</div>
-            <div className="text-xs text-muted-foreground">{item.enabled ? t("worldEngine.enabled") : t("worldEngine.disabled")}</div>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground"><Switch checked={item.enabled} disabled={savePlace.isPending} onCheckedChange={(enabled) => savePlace.mutate({ ...item, enabled })} />{item.enabled ? t("worldEngine.enabled") : t("worldEngine.disabled")}</label>
           </div>
           <ListActions actions={[{ label: t("listActions.details"), onSelect: () => showPlace(item) }, { label: t("common.edit"), onSelect: () => setPlace({ ...item }) }]} />
         </div>)}
@@ -88,7 +88,7 @@ export function WorldEngineConfigDialog({ open, onOpenChange }: { open: boolean;
           <div>
             <ListName onClick={() => showCampaign(item)}>{item.title} · {item.region_code}</ListName>
             <div className="text-sm text-muted-foreground">{item.starts_on} — {item.ends_on} · {t(`worldEngine.kind.${item.scene_kind}`)} · {t(`worldEngine.weather.${item.ambience}`)}</div>
-            <div className="text-xs text-muted-foreground">{item.enabled ? t("worldEngine.enabled") : t("worldEngine.disabled")}</div>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground"><Switch checked={item.enabled} disabled={saveCampaign.isPending} onCheckedChange={(enabled) => saveCampaign.mutate({ id: item.id, body: { ...item, enabled } })} />{item.enabled ? t("worldEngine.enabled") : t("worldEngine.disabled")}</label>
           </div>
           <ListActions actions={[{ label: t("listActions.details"), onSelect: () => showCampaign(item) }, { label: t("common.edit"), onSelect: () => editCampaign(item) }]} />
         </div>)}

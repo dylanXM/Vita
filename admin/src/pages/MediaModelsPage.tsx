@@ -8,15 +8,13 @@ import { agentApi } from "@/api/admin";
 import type { AIModel, MediaModelRoute, MediaModelType } from "@/api/types";
 import { errorMessage } from "@/api/client";
 import { PageHeader } from "@/components/page-header";
-import { ListActions, ListDetails, ListName } from "@/components/list-actions";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/sonner";
-import { compatibleMediaModels, selectedMediaModelIDs } from "./media-model-routes";
+import { compatibleMediaModels, changedMediaRoutesForSave, selectedMediaModelIDs } from "./media-model-routes";
 
 const groups: Array<{ type: MediaModelType; icon: typeof Image }> = [
   { type: "text", icon: MessageCircle },
@@ -32,8 +30,9 @@ export function MediaModelsPage() {
   const [routes, setRoutes] = useState<MediaModelRoute[]>([]);
   const [activeType, setActiveType] = useState<MediaModelType>("text");
   useEffect(() => { if (query.data) setRoutes(query.data.routes); }, [query.data]);
+  const changedRoutes = changedMediaRoutesForSave(routes, query.data?.routes ?? []);
   const save = useMutation({
-    mutationFn: (next: MediaModelRoute) => agentApi.saveMediaRoutes([next]),
+    mutationFn: () => agentApi.saveMediaRoutes(changedRoutes),
     onSuccess: (data) => {
       queryClient.setQueryData(["media-model-routes"], data);
       setRoutes(data.routes);
@@ -44,33 +43,21 @@ export function MediaModelsPage() {
   });
   if (query.isLoading) return <Skeleton className="h-96" />;
   if (!query.data || query.isError) return <p className="text-sm text-destructive">{t("common.failedToLoad")}</p>;
+  const update = (next: MediaModelRoute) => setRoutes((items) => items.map((item) => item.route_key === next.route_key ? next : item));
   return (
     <div className="space-y-6">
-      <PageHeader title={t("mediaModels.title")} description={t("mediaModels.description")} />
+      <PageHeader title={t("mediaModels.title")} description={t("mediaModels.description")} actions={<Button disabled={save.isPending || !changedRoutes.length} onClick={() => save.mutate()}><Save />{t("mediaModels.save")}</Button>} />
       <div className="flex gap-1 overflow-x-auto rounded-lg border bg-muted/40 p-1" role="tablist" aria-label={t("mediaModels.title")}>
         {groups.map(({ type, icon: Icon }) => <button key={type} type="button" role="tab" aria-selected={activeType === type} onClick={() => setActiveType(type)} className={`flex min-w-24 flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${activeType === type ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><Icon className="size-4" />{t(`mediaModels.type.${type}`)}</button>)}
       </div>
       {groups.filter(({ type }) => type === activeType).map(({ type, icon: Icon }) => <Card key={type} role="tabpanel">
         <CardHeader><CardTitle className="flex items-center gap-2"><Icon className="size-5" />{t(`mediaModels.type.${type}`)}</CardTitle><CardDescription>{t(`mediaModels.type.${type}.desc`)}</CardDescription></CardHeader>
         <CardContent className="space-y-4">
-          {routes.filter((route) => route.media_type === type).map((route) => <RouteRow key={route.route_key} route={route} models={query.data.models} saving={save.isPending} onSave={(next) => save.mutateAsync(next)} />)}
+          {routes.filter((route) => route.media_type === type).map((route) => <RouteEditor key={route.route_key} route={route} models={query.data.models} onChange={update} />)}
         </CardContent>
       </Card>)}
     </div>
   );
-}
-
-function RouteRow({ route, models, saving, onSave }: { route: MediaModelRoute; models: AIModel[]; saving: boolean; onSave: (route: MediaModelRoute) => Promise<unknown> }) {
-  const { t } = useTranslation();
-  const [details, setDetails] = useState(false);
-  const [draft, setDraft] = useState<MediaModelRoute | null>(null);
-  const modelName = (id: string | null) => models.find((model) => model.id === id)?.display_name ?? id ?? t("mediaModels.notSelected");
-  return <div className="flex min-h-20 items-center justify-between gap-4 rounded-lg border p-4">
-    <div className="min-w-0"><ListName onClick={() => setDetails(true)}>{t(`mediaModels.route.${route.route_key}`)}</ListName><p className="truncate text-xs text-muted-foreground">{modelName(route.primary_model_id)}</p></div>
-    <div className="flex shrink-0 items-center gap-3"><Switch checked={route.enabled} disabled={saving} aria-label={t("mediaModels.enabled")} onCheckedChange={(enabled) => { void onSave({ ...route, enabled }).catch(() => {}); }} /><ListActions actions={[{ label: t("listActions.details"), onSelect: () => setDetails(true) }, { label: t("common.edit"), disabled: saving, onSelect: () => setDraft({ ...route, fallback_model_ids: [...route.fallback_model_ids] }) }]} /></div>
-    {details && <ListDetails title={t(`mediaModels.route.${route.route_key}`)} onClose={() => setDetails(false)} fields={[{ label: t("mediaModels.description"), value: t(`mediaModels.route.${route.route_key}.desc`) }, { label: t("mediaModels.defaultModel"), value: modelName(route.primary_model_id) }, { label: t("mediaModels.fallbackModels"), value: route.fallback_model_ids.map(modelName).join("\n") || t("mediaModels.noFallback") }]} actions={[{ label: t("common.edit"), disabled: saving, onSelect: () => { setDetails(false); setDraft({ ...route, fallback_model_ids: [...route.fallback_model_ids] }); } }]} />}
-    <Dialog open={draft !== null} onOpenChange={(open) => { if (!open && !saving) setDraft(null); }}><DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>{t("common.edit")}</DialogTitle></DialogHeader>{draft && <RouteEditor route={draft} models={models} onChange={setDraft} />}<DialogFooter><Button variant="outline" disabled={saving} onClick={() => setDraft(null)}>{t("common.cancel")}</Button><Button disabled={saving || !draft} onClick={() => { if (draft) void onSave(draft).then(() => setDraft(null)).catch(() => {}); }}><Save />{t("common.save")}</Button></DialogFooter></DialogContent></Dialog>
-  </div>;
 }
 
 function RouteEditor({ route, models, onChange }: { route: MediaModelRoute; models: AIModel[]; onChange: (route: MediaModelRoute) => void }) {
