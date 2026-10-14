@@ -39,6 +39,7 @@ const zhHans = {
   },
 
   nav: {
+    encounters: "萍水相逢角色",
     feedback: "意见反馈",
     overview: "概览",
     dashboard: "仪表盘",

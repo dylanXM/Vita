@@ -41,6 +41,7 @@ export const NAV: NavGroup[] = [
       { to: "/users", labelKey: "nav.users", icon: Users },
       { to: "/feedback", labelKey: "nav.feedback", icon: ScrollText },
       { to: "/companions", labelKey: "nav.companions", icon: HeartHandshake },
+      { to: "/encounter-characters", labelKey: "nav.encounters", icon: HeartHandshake },
       { to: "/agent", labelKey: "nav.agent", icon: Bot },
       { to: "/life-engine", labelKey: "nav.lifeEngine", icon: Activity },
       { to: "/model-services", labelKey: "nav.modelServices", icon: Plug },

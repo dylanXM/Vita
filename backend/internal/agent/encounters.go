@@ -3,7 +3,11 @@ package agent
 import (
  "context"
  "fmt"
+ "io"
+ "net/http"
+ "strconv"
  "strings"
+ "github.com/google/uuid"
 )
 
 // Encounter replies intentionally have no companion world, events or contact jobs.
@@ -21,6 +25,33 @@ func (s *Service) ReplyEncounter(ctx context.Context, userID, name, persona, lan
  }
  if last == nil { last = fmt.Errorf("no usable encounter reply") }
  return "", last
+}
+
+func (s *Service) CheckEncounterVideo(ctx context.Context, modelID string, duration int) error {
+ model,err:=s.loadModel(ctx,modelID)
+ if err!=nil { return err }
+ if model.Kind!="kie" || model.ModelName!="kling/v2-1-master-image-to-video" || (duration!=5 && duration!=10) { return fmt.Errorf("supported video adapter: KIE kling/v2-1-master-image-to-video, 5 or 10 seconds") }
+ if s.media==nil { return fmt.Errorf("media storage unavailable") }; return nil
+}
+
+// Use the existing authenticated KIE task protocol. Never resubmit a timed-out task.
+func (s *Service) VideoEncounter(ctx context.Context, userID, modelID string, duration int, cover,demand string) (string,error) {
+ if err:=s.CheckEncounterVideo(ctx,modelID,duration); err!=nil { return "",err }
+ model,err:=s.loadModel(ctx,modelID); if err!=nil { return "",err }
+ ref,err:=s.loadPortraitReference(ctx,userID,cover); if err!=nil { return "",err }
+ imageURL,err:=s.client.uploadKieReference(ctx,model,ref); if err!=nil { return "",err }
+ task,err:=s.client.kieCreateTask(ctx,model,map[string]any{"prompt":demand,"image_url":imageURL,"duration":strconv.Itoa(duration),"negative_prompt":"blur, distort, low quality","cfg_scale":.5})
+ if err!=nil { return "",err }
+ result,err:=s.client.kiePollResult(ctx,model,task); if err!=nil { return "",err }
+ source,err:=kieResultURL(result); if err!=nil { return "",err }
+ request,err:=http.NewRequestWithContext(ctx,http.MethodGet,source,nil); if err!=nil { return "",err }
+ if request.URL.Scheme!="https" && request.URL.Scheme!="http" { return "",fmt.Errorf("invalid video URL") }
+ response,err:=s.client.httpClient.Do(request); if err!=nil { return "",err }; defer response.Body.Close()
+ if response.StatusCode!=200 { return "",fmt.Errorf("video download failed") }
+ data,err:=io.ReadAll(io.LimitReader(response.Body,(64<<20)+1))
+ if err!=nil { return "",err }
+ if len(data)<12 || len(data)>64<<20 || string(data[4:8])!="ftyp" { return "",fmt.Errorf("invalid or oversized MP4 video") }
+ id:=uuid.NewString(); if err=s.media.Store(ctx,userID,id,"video","video/mp4",data); err!=nil { return "",err }; return "/v1/media/"+id,nil
 }
 
 func (s *Service) PhotoEncounter(ctx context.Context, userID, name, persona, cover, demand string) (string, error) {

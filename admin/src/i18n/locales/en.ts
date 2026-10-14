@@ -39,6 +39,7 @@ const en = {
   },
 
   nav: {
+    encounters: "Chance encounters",
     feedback: "Feedback",
     overview: "Overview",
     dashboard: "Dashboard",

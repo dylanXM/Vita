@@ -151,6 +151,16 @@ func main() {
 	engine.Use(middleware.AuthMiddleware(tokenManager, redisClient))
 
 	api := engine.Group("/v1")
+	encounters := api.Group("/encounters", middleware.RequireAuth())
+	encounters.GET("/characters", handler.ListEncounterCharacters)
+	encounters.GET("/catalog", handler.EncounterCatalog)
+	encounters.POST("/characters", middleware.RateLimit(10, time.Minute), handler.CreateCustomEncounterCharacter)
+	encounters.GET("/preferences", handler.EncounterPreferences)
+	encounters.PUT("/preferences", handler.EncounterPreferences)
+	encounters.GET("/conversations", handler.ListEncounterConversations)
+	encounters.POST("/conversations", handler.StartEncounterConversation)
+	encounters.GET("/conversations/:id/messages", handler.GetEncounterMessages)
+	encounters.POST("/conversations/:id/messages", middleware.RateLimit(20, time.Minute), handler.SendEncounterMessage)
 	api.POST("/feedback", middleware.RequireAuth(), middleware.RateLimit(5, time.Minute), handler.SubmitFeedback)
 	{
 		auth := api.Group("/auth")
@@ -295,6 +305,11 @@ func main() {
 		api.DELETE("/me", middleware.RequireAuth(), handler.DeleteMe)
 
 		admin := api.Group("/admin", middleware.RequireAdmin())
+		admin.GET("/encounter-characters", handler.AdminListEncounterCharacters)
+		admin.GET("/encounter-video", handler.AdminEncounterVideo)
+		admin.PUT("/encounter-video", handler.AdminEncounterVideo)
+		admin.POST("/encounter-characters", handler.AdminSaveEncounterCharacter)
+		admin.PUT("/encounter-characters/:id", handler.AdminSaveEncounterCharacter)
 		admin.GET("/feedback", handler.AdminListFeedback)
 		{
 			admin.POST("/images", handler.AdminUploadImage)
