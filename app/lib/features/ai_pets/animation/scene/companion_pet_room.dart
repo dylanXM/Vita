@@ -278,7 +278,9 @@ class _CompanionPetRoomState extends State<CompanionPetRoom> {
                     filterQuality: FilterQuality.none, fit: BoxFit.fill)),
                 ])))),
           ])))),
-        SafeArea(child: Padding(padding: const EdgeInsets.all(16), child: Row(children: [
+        Positioned(top: 0, left: 0, right: 0,
+          child: SafeArea(bottom: false, child: Padding(
+            padding: const EdgeInsets.all(16), child: Row(children: [
           IconButton(onPressed: widget.onBack, icon: const Icon(Icons.arrow_back),
             color: const Color(0xFFFFEBCD), style: IconButton.styleFrom(
               backgroundColor: const Color(0xCC483629))),
@@ -286,7 +288,7 @@ class _CompanionPetRoomState extends State<CompanionPetRoom> {
           Expanded(child: Text(widget.name, maxLines: 1, overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: Color(0xFFFFEBCD), fontSize: 24,
               fontWeight: FontWeight.w700, shadows: [Shadow(blurRadius: 5, color: Colors.black54)]))),
-        ]))),
+        ])))),
       ])));
     });
 }

@@ -168,7 +168,7 @@ class _AIPetHomePageState extends State<AIPetHomePage>
         _applyIntent(nextState);
       }
     } on ApiException catch (error) {
-      if (mounted) _notices.show(PetNoticeKind.error, 'aiPets.error'.tr, error.message);
+      if (mounted) _notices.show(PetNoticeKind.error, widget.name, error.message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -241,12 +241,12 @@ class _AIPetHomePageState extends State<AIPetHomePage>
             'aiPets.notEnoughCoins'.tr, 'aiPets.notEnoughCoinsSub'.tr,
             onTap: () => Get.toNamed('/credits'));
       } else {
-        _notices.show(PetNoticeKind.error, 'aiPets.error'.tr, error.message);
+        _notices.show(PetNoticeKind.error, widget.name, error.message);
       }
     } catch (_) {
       if (!mounted) return;
       _machine.transition(_machine.suggestFromState(_state ?? const {}));
-      _notices.show(PetNoticeKind.error, 'aiPets.error'.tr, 'common.loadFailed'.tr);
+      _notices.show(PetNoticeKind.error, widget.name, 'common.loadFailed'.tr);
     } finally {
       if (mounted) {
         setState(() => _feeding = false);
@@ -305,11 +305,11 @@ class _AIPetHomePageState extends State<AIPetHomePage>
           'pet_needs_rest' => 'aiPets.needsRest'.tr,
           _ => error.message,
         };
-        _notices.show(PetNoticeKind.error, 'aiPets.error'.tr, message);
+        _notices.show(PetNoticeKind.error, widget.name, message);
       }
       if (mounted) _machine.transition(_machine.suggestFromState(_state ?? const {}));
     } catch (_) {
-      if (mounted) _notices.show(PetNoticeKind.error, 'aiPets.error'.tr, 'common.loadFailed'.tr);
+      if (mounted) _notices.show(PetNoticeKind.error, widget.name, 'common.loadFailed'.tr);
       if (mounted) _machine.transition(_machine.suggestFromState(_state ?? const {}));
     } finally {
       if (mounted) setState(() => _caring = false);
