@@ -151,6 +151,7 @@ func main() {
 	engine.Use(middleware.AuthMiddleware(tokenManager, redisClient))
 
 	api := engine.Group("/v1")
+	api.GET("/encounter-art/:name",handler.EncounterArtwork)
 	encounters := api.Group("/encounters", middleware.RequireAuth())
 	encounters.GET("/characters", handler.ListEncounterCharacters)
 	encounters.GET("/catalog", handler.EncounterCatalog)

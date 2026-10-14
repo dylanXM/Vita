@@ -17,6 +17,7 @@ import (
  "vita/internal/agent"
  "vita/internal/credits"
  "vita/internal/db"
+ "vita/internal/encounterart"
 )
 
 type encounterCharacter struct {
@@ -30,13 +31,18 @@ type encounterCharacter struct {
  AvatarURL string `json:"avatar_url"`
  Enabled bool `json:"enabled"`
  SortOrder int `json:"sort_order"`
+ ImageURLs []string `json:"image_urls"`
 }
 
-const encounterColumns = "id,name,gender,personality,persona,description,cover_url,avatar_url,enabled,sort_order"
+const encounterColumns = "id,name,gender,personality,persona,description,cover_url,avatar_url,enabled,sort_order,image_urls"
 func scanEncounter(row interface{ Scan(...any) error }, item *encounterCharacter) error {
- return row.Scan(&item.ID,&item.Name,&item.Gender,&item.Personality,&item.Persona,&item.Description,&item.CoverURL,&item.AvatarURL,&item.Enabled,&item.SortOrder)
+ var images string
+ if err:=row.Scan(&item.ID,&item.Name,&item.Gender,&item.Personality,&item.Persona,&item.Description,&item.CoverURL,&item.AvatarURL,&item.Enabled,&item.SortOrder,&images); err!=nil { return err }
+ return json.Unmarshal([]byte(images),&item.ImageURLs)
 }
 func validEncounterURL(raw string) bool {
+ if len(raw)>2048 { return false }
+ if strings.HasPrefix(raw,"/v1/encounter-art/") { _,err:=encounterart.Read(strings.TrimPrefix(raw,"/v1/encounter-art/"));return err==nil }
  if strings.HasPrefix(raw,"/v1/admin-images/") && !strings.Contains(raw,"..") && !strings.ContainsAny(raw,"?#") { _,err:=uuid.Parse(strings.TrimPrefix(raw,"/v1/admin-images/")); return err==nil }
  parsed, err := url.Parse(raw)
  return err == nil && (parsed.Scheme == "https" || parsed.Scheme == "http") && parsed.Host != "" && parsed.User == nil
@@ -69,6 +75,18 @@ func saveEncounterCharacter(c *gin.Context, admin bool) {
  var item encounterCharacter
  if c.ShouldBindJSON(&item) != nil { c.JSON(400,gin.H{"error":"invalid character"}); return }
  item.Name = strings.TrimSpace(item.Name)
+ if item.ImageURLs==nil {
+  item.ImageURLs=[]string{item.CoverURL}
+  if admin && c.Param("id")!="" {
+   var raw string
+   if err:=db.Get().QueryRowContext(c.Request.Context(),`SELECT image_urls FROM encounter_characters WHERE id=$1 AND owner_id IS NULL`,c.Param("id")).Scan(&raw); err==nil {
+    var saved []string
+    if json.Unmarshal([]byte(raw),&saved)==nil && len(saved)>1 { item.ImageURLs=append(item.ImageURLs,saved[1:]...) }
+   }
+  }
+ }
+ if len(item.ImageURLs)<1 || len(item.ImageURLs)>3 { c.JSON(400,gin.H{"error":"one to three character images required"});return }
+ item.CoverURL=item.ImageURLs[0]
  validImage:=func(raw string)bool{
   if !admin && strings.HasPrefix(raw,"/v1/media/") {
    var ok bool
@@ -76,19 +94,21 @@ func saveEncounterCharacter(c *gin.Context, admin bool) {
    return err==nil&&ok
   };return admin && validEncounterURL(raw)
  }
+ for _,image:=range item.ImageURLs { if !validImage(image) { c.JSON(400,gin.H{"error":"invalid character image"});return } }
  if item.Name == "" || utf8.RuneCountInString(item.Name)>80 || utf8.RuneCountInString(item.Persona)>4000 || utf8.RuneCountInString(item.Description)>500 || utf8.RuneCountInString(item.Personality)>200 || !validImage(item.CoverURL) || (item.AvatarURL!="" && !validImage(item.AvatarURL)) || (item.Gender!="male" && item.Gender!="female" && item.Gender!="other") {
   c.JSON(400,gin.H{"error":"invalid character fields"}); return
  }
  id := c.Param("id")
+ images,_:=json.Marshal(item.ImageURLs)
  if id != "" {
   if _,err:=uuid.Parse(id); err!=nil { c.JSON(400,gin.H{"error":"invalid character id"}); return }
-  result,err:=db.Get().ExecContext(c.Request.Context(),`UPDATE encounter_characters SET name=$2,gender=$3,personality=$4,persona=$5,description=$6,cover_url=$7,avatar_url=$8,enabled=$9,sort_order=$10 WHERE id=$1 AND owner_id IS NULL`,id,item.Name,item.Gender,item.Personality,item.Persona,item.Description,item.CoverURL,item.AvatarURL,item.Enabled,item.SortOrder)
+  result,err:=db.Get().ExecContext(c.Request.Context(),`UPDATE encounter_characters SET name=$2,gender=$3,personality=$4,persona=$5,description=$6,cover_url=$7,avatar_url=$8,enabled=$9,sort_order=$10,image_urls=$11 WHERE id=$1 AND owner_id IS NULL`,id,item.Name,item.Gender,item.Personality,item.Persona,item.Description,item.CoverURL,item.AvatarURL,item.Enabled,item.SortOrder,string(images))
   if err!=nil { c.JSON(500,gin.H{"error":"cannot save character"}); return }
   n,_:=result.RowsAffected(); if n!=1 { c.JSON(404,gin.H{"error":"character not found"}); return }
  } else {
   id=uuid.NewString(); var owner any
   if !admin { owner=c.GetString("user_id"); item.Enabled=true; item.SortOrder=0 }
-  _,err:=db.Get().ExecContext(c.Request.Context(),`INSERT INTO encounter_characters(id,owner_id,name,gender,personality,persona,description,cover_url,avatar_url,enabled,sort_order) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,id,owner,item.Name,item.Gender,item.Personality,item.Persona,item.Description,item.CoverURL,item.AvatarURL,item.Enabled,item.SortOrder)
+  _,err:=db.Get().ExecContext(c.Request.Context(),`INSERT INTO encounter_characters(id,owner_id,name,gender,personality,persona,description,cover_url,avatar_url,enabled,sort_order,image_urls) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,id,owner,item.Name,item.Gender,item.Personality,item.Persona,item.Description,item.CoverURL,item.AvatarURL,item.Enabled,item.SortOrder,string(images))
   if err!=nil { c.JSON(500,gin.H{"error":"cannot create character"}); return }
  }
  item.ID=id; c.JSON(200,item)
@@ -152,7 +172,7 @@ func SendEncounterMessage(c *gin.Context) {
  if existingEncounterRequest(c,ctx,input.Key,input.Content,input.Product,input.Coins) { return }
  if companionAgent==nil { c.JSON(503,gin.H{"error":"model service unavailable"}); return }
  var character encounterCharacter
- err:=scanEncounter(db.Get().QueryRowContext(ctx,"SELECT "+"r.id,r.name,r.gender,r.personality,r.persona,r.description,r.cover_url,r.avatar_url,r.enabled,r.sort_order"+` FROM encounter_characters r JOIN encounter_conversations v ON v.character_id=r.id WHERE v.id=$1 AND v.user_id=$2 AND r.enabled`,c.Param("id"),c.GetString("user_id")),&character)
+ err:=scanEncounter(db.Get().QueryRowContext(ctx,"SELECT "+"r.id,r.name,r.gender,r.personality,r.persona,r.description,r.cover_url,r.avatar_url,r.enabled,r.sort_order,r.image_urls"+` FROM encounter_characters r JOIN encounter_conversations v ON v.character_id=r.id WHERE v.id=$1 AND v.user_id=$2 AND r.enabled`,c.Param("id"),c.GetString("user_id")),&character)
  if err!=nil { c.JSON(404,gin.H{"error":"character unavailable"}); return }
  var product *credits.Product
  if input.Product!="" {

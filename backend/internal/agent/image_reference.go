@@ -1,6 +1,7 @@
 package agent
 
 import (
+ "vita/internal/encounterart"
 	"bytes"
 	"context"
 	"embed"
@@ -34,6 +35,9 @@ func (s *Service) loadPortraitReference(ctx context.Context, userID, source stri
 	ref := &ImageReference{Source: source}
 	var err error
 	switch {
+	case strings.HasPrefix(source,"/v1/encounter-art/"):
+		ref.Data,err=encounterart.Read(strings.TrimPrefix(source,"/v1/encounter-art/"))
+		ref.MIME="image/png"
 	case strings.HasPrefix(source, "asset://assets/companions/"):
 		name := strings.TrimPrefix(source, "asset://assets/companions/")
 		switch name {

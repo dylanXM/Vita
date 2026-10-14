@@ -1,5 +1,8 @@
 const encounterTranslations = <String, Map<String, String>>{
   "en": {
+    "encounter.imagesHint": "Up to three images. The first is the cover.",
+    "encounter.removeImage": "Remove image",
+    "encounter.imageNumber": "Image @number",
     "encounter.title": "Chance encounters",
     "encounter.error": "Could not complete this action. Please retry.",
     "encounter.preferences": "Your preferences",
@@ -33,6 +36,9 @@ const encounterTranslations = <String, Map<String, String>>{
     "encounter.cancel": "Cancel"
   },
   "zh_CN": {
+    "encounter.imagesHint": "最多三张图片，第一张为封面。",
+    "encounter.removeImage": "删除图片",
+    "encounter.imageNumber": "第@number张图片",
     "encounter.title": "萍水相逢",
     "encounter.error": "操作未完成，请重试。",
     "encounter.preferences": "选择喜好",
@@ -66,6 +72,9 @@ const encounterTranslations = <String, Map<String, String>>{
     "encounter.cancel": "取消"
   },
   "zh_TW": {
+    "encounter.imagesHint": "最多三張圖片，第一張為封面。",
+    "encounter.removeImage": "刪除圖片",
+    "encounter.imageNumber": "第@number張圖片",
     "encounter.title": "萍水相逢",
     "encounter.error": "操作未完成，請重試。",
     "encounter.preferences": "選擇喜好",
@@ -99,6 +108,9 @@ const encounterTranslations = <String, Map<String, String>>{
     "encounter.cancel": "取消"
   },
   "es": {
+    "encounter.imagesHint": "Hasta tres imágenes. La primera es la portada.",
+    "encounter.removeImage": "Eliminar imagen",
+    "encounter.imageNumber": "Imagen @number",
     "encounter.title": "Encuentros casuales",
     "encounter.error": "No se pudo completar. Inténtalo de nuevo.",
     "encounter.preferences": "Tus preferencias",
@@ -132,6 +144,9 @@ const encounterTranslations = <String, Map<String, String>>{
     "encounter.cancel": "Cancelar"
   },
   "pt": {
+    "encounter.imagesHint": "Até três imagens. A primeira é a capa.",
+    "encounter.removeImage": "Remover imagem",
+    "encounter.imageNumber": "Imagem @number",
     "encounter.title": "Encontros casuais",
     "encounter.error": "Não foi possível concluir. Tente novamente.",
     "encounter.preferences": "Suas preferências",
@@ -165,6 +180,9 @@ const encounterTranslations = <String, Map<String, String>>{
     "encounter.cancel": "Cancelar"
   },
   "ja": {
+    "encounter.imagesHint": "画像は3枚まで。1枚目がカバーです。",
+    "encounter.removeImage": "画像を削除",
+    "encounter.imageNumber": "画像@number",
     "encounter.title": "偶然の出会い",
     "encounter.error": "操作を完了できませんでした。再試行してください。",
     "encounter.preferences": "好みを選ぶ",
@@ -198,6 +216,9 @@ const encounterTranslations = <String, Map<String, String>>{
     "encounter.cancel": "キャンセル"
   },
   "ko": {
+    "encounter.imagesHint": "이미지는 최대 3장입니다. 첫 번째가 커버입니다.",
+    "encounter.removeImage": "이미지 삭제",
+    "encounter.imageNumber": "이미지 @number",
     "encounter.title": "우연한 만남",
     "encounter.error": "작업을 완료하지 못했습니다. 다시 시도하세요.",
     "encounter.preferences": "취향 선택",
@@ -231,6 +252,9 @@ const encounterTranslations = <String, Map<String, String>>{
     "encounter.cancel": "취소"
   },
   "ar": {
+    "encounter.imagesHint": "حتى ثلاث صور. الصورة الأولى هي الغلاف.",
+    "encounter.removeImage": "حذف الصورة",
+    "encounter.imageNumber": "الصورة @number",
     "encounter.title": "لقاءات عابرة",
     "encounter.error": "تعذر إكمال العملية. حاول مجدداً.",
     "encounter.preferences": "اختر تفضيلاتك",
