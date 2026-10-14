@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../../ai_pet_avatar.dart';
 import 'pet_motion_spec.dart';
+import 'pet_atlas_frames.dart';
 
 /// The authored art contains pets only. Room furniture, lighting and shadows
 /// are supplied by the scene, so moving a pet never moves a second bowl/bed.
@@ -43,6 +44,8 @@ class _CompanionPetArtState extends State<CompanionPetArt> {
   List<double> _baselines = const [];
   List<double> _turnBaselines = const [];
   List<Offset?> _mouths = const [];
+  double _mainFit = 1, _turnFit = 1, _mainFrameScale = 1, _turnFrameScale = 1;
+  double get _fit => math.min(_mainFit, _turnFit);
   final List<MapEntry<ImageStream, ImageStreamListener>> _streams = [];
   final List<Completer<ui.Image?>> _pending = [];
   int _generation = 0;
@@ -89,6 +92,7 @@ class _CompanionPetArtState extends State<CompanionPetArt> {
     _baselines = const [];
     _turnBaselines = const [];
     _mouths = const [];
+    _mainFit = _turnFit = _mainFrameScale = _turnFrameScale = 1;
     _facingLeft = null;
     _turning = false;
     final path = aiPetRoomMotionAsset(widget.imageUrl);
@@ -154,41 +158,22 @@ class _CompanionPetArtState extends State<CompanionPetArt> {
       final pixels = bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes);
       final rgba = colorBytes.buffer.asUint8List(colorBytes.offsetInBytes, colorBytes.lengthInBytes);
       if (pixels[0] > 8) { image.dispose(); mask.dispose(); return; }
-      final baselines = <double>[];
       final columns = turn ? 3 : 4;
       final rows = turn ? 2 : 6;
+      final frames = buildPetAtlasFrames(rgba, pixels, image.width, image.height,
+          columns: columns, rows: rows);
       final mouths = List<Offset?>.filled(columns * rows, null);
-      for (var frame = 0; frame < columns * rows; frame++) {
-        final left = (frame % columns * image.width / columns).round();
-        final right = ((frame % columns + 1) * image.width / columns).round();
-        final top = (frame ~/ columns * image.height / rows).round();
-        final bottom = ((frame ~/ columns + 1) * image.height / rows).round();
-        var ground = bottom - 1;
-        var found = false;
-        for (var y = bottom - 1; y >= top && !found; y--) {
-          var solid = 0;
-          for (var x = left; x < right; x++) {
-            if (pixels[(y * image.width + x) * 4] > 48) solid++;
-          }
-          if (solid >= 4) { ground = y; found = true; }
+      if (!turn) {
+        for (final frame in [10, 11]) {
+          final left = frame % columns * frames.cellWidth;
+          final top = frame ~/ columns * frames.cellHeight;
+          final mouth = _detectMouth(rgba, pixels, image.width,
+              left, left + frames.cellWidth, top, top + frames.cellHeight);
+          if (mouth != null) mouths[frame] = frames.remapPoint(mouth);
         }
-        baselines.add((ground - top + 1) / (bottom - top));
-        if (!turn && (frame == 10 || frame == 11)) {
-          mouths[frame] = _detectMouth(rgba, pixels, image.width, left, right, top, bottom);
-        }
-      }
-      // Build a real premultiplied RGBA image once. The matte is never painted
-      // over the character, and no per-frame color-filter/blend composition is
-      // needed on the device renderer.
-      for (var i = 0; i < rgba.length; i += 4) {
-        final coverage = pixels[i] / 255.0;
-        rgba[i] = (rgba[i] * coverage).round();
-        rgba[i + 1] = (rgba[i + 1] * coverage).round();
-        rgba[i + 2] = (rgba[i + 2] * coverage).round();
-        rgba[i + 3] = (rgba[i + 3] * coverage).round();
       }
       final decoded = Completer<ui.Image>();
-      ui.decodeImageFromPixels(rgba, image.width, image.height,
+      ui.decodeImageFromPixels(frames.rgba, frames.width, frames.height,
         ui.PixelFormat.rgba8888, decoded.complete);
       final transparent = await decoded.future;
       if (!mounted || generation != _generation) {
@@ -201,18 +186,23 @@ class _CompanionPetArtState extends State<CompanionPetArt> {
         if (turn) {
           _turnAtlas?.dispose();
           _turnAtlas = transparent;
-          _turnBaselines = baselines;
+          _turnBaselines = frames.baselines;
+          _turnFit = frames.fitScale;
+          _turnFrameScale = frames.frameScale;
         } else {
           _atlas?.dispose();
           _atlas = transparent;
-          _baselines = baselines;
+          _baselines = frames.baselines;
+          _mainFit = frames.fitScale;
+          _mainFrameScale = frames.frameScale;
           _mouths = mouths;
         }
       });
-      if (!turn && mouths[10] != null && mouths[11] != null) {
-        final mouth = (mouths[10]! + mouths[11]!) / 2;
-        final baseline = (baselines[10] + baselines[11]) / 2;
-        widget.onMouthOffsetReady?.call(Offset(.5 - mouth.dx, baseline - mouth.dy));
+      if (_mouths.length > 11 && _mouths[10] != null && _mouths[11] != null) {
+        final mouth = (_mouths[10]! + _mouths[11]!) / 2;
+        final baseline = (_baselines[10] + _baselines[11]) / 2;
+        widget.onMouthOffsetReady?.call(
+            Offset(.5 - mouth.dx, baseline - mouth.dy) * (_fit * _mainFrameScale));
       }
       image.dispose();
       mask.dispose();
@@ -308,6 +298,7 @@ class _CompanionPetArtState extends State<CompanionPetArt> {
     return RepaintBoundary(child: CustomPaint(painter: _CompanionPetPainter(
       image: turning ? _turnAtlas! : atlas, frame: frame, seconds: widget.seconds,
       columns: turning ? 3 : 4, rows: turning ? 2 : 6,
+      frameScale: (turning ? _turnFrameScale : _mainFrameScale) * _fit,
       baseline: turning ? _turnBaselines[frame] : _baselines[frame],
       mouth: turning ? null : _mouths[frame], mouthTarget: widget.mouthTarget,
       sleep: _row == 4, facing: (turning || _facingLeft!) ? 1.0 : -1.0, look: widget.look,
@@ -328,11 +319,11 @@ class _CompanionPetPainter extends CustomPainter {
   const _CompanionPetPainter({required this.image, required this.frame,
     required this.seconds, required this.sleep, required this.facing,
     required this.look, required this.reduced, required this.baseline,
-    required this.columns, required this.rows, required this.mouth, required this.mouthTarget});
+    required this.columns, required this.rows, required this.mouth, required this.mouthTarget, required this.frameScale});
   final ui.Image image;
   final int frame;
   final int columns, rows;
-  final double seconds, facing, baseline;
+  final double seconds, facing, baseline, frameScale;
   final bool sleep, reduced;
   final Offset look;
   final Offset? mouth, mouthTarget;
@@ -342,8 +333,9 @@ class _CompanionPetPainter extends CustomPainter {
     final cellW = image.width / columns;
     final cellH = image.height / rows;
     final source = Rect.fromLTWH(frame % columns * cellW, frame ~/ columns * cellH, cellW, cellH);
-    final extent = math.min(size.width, size.height);
-    final ground = Offset(size.width / 2, (size.height - extent) / 2 + extent);
+    final originalExtent = math.min(size.width, size.height);
+    final extent = originalExtent * frameScale;
+    final ground = Offset(size.width / 2, (size.height - originalExtent) / 2 + originalExtent);
     final target = Rect.fromLTWH((size.width - extent) / 2, ground.dy - extent * baseline, extent, extent);
     final breath = reduced ? 0.0 : math.sin(seconds * math.pi * 2 / (sleep ? 3.6 : 2.8)) * .004;
     canvas.save();
@@ -366,7 +358,7 @@ class _CompanionPetPainter extends CustomPainter {
   bool shouldRepaint(covariant _CompanionPetPainter old) => image != old.image ||
     frame != old.frame || seconds != old.seconds || facing != old.facing ||
     look != old.look || reduced != old.reduced || sleep != old.sleep || baseline != old.baseline ||
-    columns != old.columns || rows != old.rows || mouth != old.mouth || mouthTarget != old.mouthTarget;
+    frameScale != old.frameScale || columns != old.columns || rows != old.rows || mouth != old.mouth || mouthTarget != old.mouthTarget;
 }
 
 /// Locate the pink nose/tongue only in the lowered muzzle region, inside the

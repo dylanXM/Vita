@@ -111,7 +111,6 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
               previous.isBefore(startsAt) &&
               !now.isBefore(startsAt)) ||
           (endsAt != null &&
-              _started &&
               previous.isBefore(endsAt) &&
               !now.isBefore(endsAt))) {
         setState(() {});
@@ -162,11 +161,12 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
       DateTime.tryParse('${_moment?[key] ?? ''}')?.toLocal();
   bool get _scheduled => _time('starts_at')?.isAfter(DateTime.now()) ?? false;
   bool get _ended =>
-      _started && (_time('ends_at')?.isBefore(DateTime.now()) ?? false);
+      (_time('ends_at') != null && !DateTime.now().isBefore(_time('ends_at')!));
   bool get _active => !_scheduled && !_ended && _moment != null;
   bool get _started => '${_moment?['opening'] ?? ''}'.isNotEmpty;
   _MomentPhase get _phase {
-    if (_started) return _ended ? _MomentPhase.keepsake : _MomentPhase.together;
+    if (_ended) return _MomentPhase.keepsake;
+    if (_started) return _MomentPhase.together;
     return _scheduled ? _MomentPhase.booked : _MomentPhase.ready;
   }
 
@@ -240,7 +240,9 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
               _MomentPhase.together => 'moment.timeLeft'.trParams({
                   'time': _remaining(_time('ends_at'), now),
                 }),
-              _MomentPhase.keepsake => '${_moment?['artifact'] ?? ''}'.isEmpty
+              _MomentPhase.keepsake => !_started
+                  ? 'moment.ended'.tr
+                  : '${_moment?['artifact'] ?? ''}'.isEmpty
                   ? 'moment.endCreateHint'.tr
                   : 'moment.endedHint'.tr,
             };
@@ -303,7 +305,7 @@ class _CompanionMomentPageState extends State<CompanionMomentPage>
   }
 
   Future<void> _finish() async {
-    if (_finishing || !_ended || '${_moment?['closing'] ?? ''}'.isNotEmpty) {
+    if (_finishing || !_started || !_ended || '${_moment?['closing'] ?? ''}'.isNotEmpty) {
       return;
     }
     setState(() {

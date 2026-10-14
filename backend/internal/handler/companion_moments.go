@@ -41,12 +41,8 @@ type companionMoment struct {
 	SceneFocus         string    `json:"scene_focus"`
 }
 
-func (moment companionMoment) duration() time.Duration {
-	duration := moment.EndsAt.Sub(moment.StartsAt)
-	if duration <= 0 {
-		return time.Hour
-	}
-	return duration
+func (moment companionMoment) ended(now time.Time) bool {
+	return !now.Before(moment.EndsAt)
 }
 
 func loadCompanionMoment(ctx context.Context, userID, companionID, eventID string) (companionMoment, error) {
@@ -86,11 +82,6 @@ func GetCompanionMoment(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load moment"})
 		return
-	}
-	// Older App builds use ends_at to decide whether the Enter button is shown.
-	// Keep unopened purchases enterable until the App status logic is updated.
-	if moment.Opening == "" && !time.Now().Before(moment.EndsAt) {
-		moment.EndsAt = time.Now().Add(moment.duration())
 	}
 	c.JSON(http.StatusOK, moment)
 }
@@ -311,7 +302,7 @@ func StartCompanionMoment(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "moment has not started", "code": "moment_scheduled", "starts_at": moment.StartsAt})
 		return
 	}
-	if moment.Opening != "" && !time.Now().Before(moment.EndsAt) {
+	if moment.ended(time.Now()) {
 		c.JSON(http.StatusConflict, gin.H{"error": "moment has ended", "code": "moment_ended"})
 		return
 	}
@@ -390,23 +381,20 @@ func StartCompanionMoment(c *gin.Context) {
 	}
 	messageID := uuid.New().String()
 	messagePayload, _ := json.Marshal(map[string]any{"event_id": eventID, "conversation_channel": "date"})
-	startedAt := time.Now().UTC()
-	endsAt := startedAt.Add(moment.duration())
-	var timezone string
-	_ = db.Get().QueryRowContext(ctx, `SELECT timezone FROM users WHERE id=$1`, userID).Scan(&timezone)
-	location, zoneErr := time.LoadLocation(timezone)
-	if zoneErr != nil {
-		location = time.UTC
-	}
 	tx, err := db.Get().BeginTx(ctx, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save opening"})
 		return
 	}
 	defer tx.Rollback()
-	var lockedEventID string
-	if err = tx.QueryRowContext(ctx, `SELECT id FROM life_events WHERE id=$1 FOR UPDATE`, eventID).Scan(&lockedEventID); err != nil {
+	var lockedEnd time.Time
+	if err = tx.QueryRowContext(ctx, `SELECT end_time FROM life_events WHERE id=$1 FOR UPDATE`, eventID).Scan(&lockedEnd); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to lock appointment"})
+		return
+	}
+
+	if !time.Now().Before(lockedEnd) {
+		c.JSON(http.StatusConflict, gin.H{"error": "moment has ended", "code": "moment_ended"})
 		return
 	}
 
@@ -415,24 +403,17 @@ func StartCompanionMoment(c *gin.Context) {
 		_, err = tx.ExecContext(ctx, `UPDATE companion_moment_sessions SET opening_message_id=$2 WHERE event_id=$1 AND user_id=$3`, eventID, messageID, userID)
 	}
 	if err == nil {
-		_, err = tx.ExecContext(ctx, `UPDATE life_events SET start_time=$2,end_time=$3,local_date=$4::date,
-			sequence=(SELECT COALESCE(MAX(sequence),-1)+1 FROM life_events WHERE companion_id=$5 AND local_date=$4::date AND id<>$1),
-			status='active' WHERE id=$1`,
-			eventID, startedAt, endsAt, startedAt.In(location).Format("2006-01-02"), companionID)
+		_, err = tx.ExecContext(ctx, `UPDATE life_events SET status='active' WHERE id=$1`, eventID)
 	}
 	if err == nil && moment.MemoryID != "" {
 		metadata, _ := json.Marshal(map[string]any{"paid_experience": true, "product_key": moment.ProductKey, "with_user": true, "event_id": eventID})
 		_, err = tx.ExecContext(ctx, `INSERT INTO memories(id,companion_id,type,content,importance,event_time,metadata)
 			VALUES($1,$2,'shared_experience',$3,80,$4,$5) ON CONFLICT(id) DO NOTHING`,
-			moment.MemoryID, companionID, moment.Description, startedAt, string(metadata))
+			moment.MemoryID, companionID, moment.Description, moment.StartsAt, string(metadata))
 		if err == nil {
 			_, err = tx.ExecContext(ctx, `UPDATE memories SET event_time=$2,metadata=$3
-				WHERE id=$1 AND companion_id=$4`, moment.MemoryID, startedAt, string(metadata), companionID)
+				WHERE id=$1 AND companion_id=$4`, moment.MemoryID, moment.StartsAt, string(metadata), companionID)
 		}
-	}
-	if err == nil {
-		_, err = tx.ExecContext(ctx, `UPDATE messages SET payload=jsonb_set(jsonb_set(payload,'{scheduled_at}',to_jsonb($2::timestamptz)),'{ends_at}',to_jsonb($3::timestamptz))
-			WHERE life_event_id=$1 AND message_type='scene_card' AND source='paid_date'`, eventID, startedAt, endsAt)
 	}
 	if err != nil || tx.Commit() != nil {
 		_ = tx.Rollback()
@@ -441,8 +422,6 @@ func StartCompanionMoment(c *gin.Context) {
 	}
 	completed = true
 	moment.Opening = text
-	moment.StartsAt = startedAt
-	moment.EndsAt = endsAt
 	// Fulfilled text and attendance remain valid if the image provider is down.
 	// A retry never charges again and uses the stored milestone image.
 	_ = companionAgent.QueueDateSceneImage(ctx, userID, companionID, eventID, "arrival")

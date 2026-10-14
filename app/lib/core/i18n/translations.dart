@@ -451,7 +451,7 @@ class VitaTranslations extends Translations {
       'moment.phase.together': 'Together',
       'moment.phase.keepsake': 'Keepsake',
       'moment.waitingFor': 'Begins in @time',
-      'moment.readyHint': 'Your time begins when you enter.',
+      'moment.readyHint': 'The date ends at its scheduled time, even if you enter late.',
       'moment.timeLeft': '@time left together',
       'moment.endCreateHint':
           'Look back on your conversation and create a keepsake together.',
@@ -1351,7 +1351,7 @@ class VitaTranslations extends Translations {
       'moment.phase.together': '正在一起',
       'moment.phase.keepsake': '共同回忆',
       'moment.waitingFor': '距离预约还有 @time',
-      'moment.readyHint': '进入后才开始计算体验时间。',
+      'moment.readyHint': '约会按预约时间结束，迟到不会延长。',
       'moment.timeLeft': '还能一起度过 @time',
       'moment.endCreateHint': '回顾这段对话，和 TA 一起留下共同纪念。',
       'moment.endedHint': '对话与共同纪念会一直留在这里。',

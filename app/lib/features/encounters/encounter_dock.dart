@@ -1,9 +1,9 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 class EncounterDock extends StatefulWidget {
   const EncounterDock({super.key, required this.index, required this.onTab,
@@ -52,36 +52,31 @@ class _EncounterDockState extends State<EncounterDock>
     selected:widget.index==index,button:true,
     child:InkWell(onTap:()=>widget.onTab(index),borderRadius:BorderRadius.circular(26),
       child:AnimatedContainer(duration:_reduced?Duration.zero:const Duration(milliseconds:220),
-        height:56,decoration:BoxDecoration(borderRadius:BorderRadius.circular(26),
+        height:44,decoration:BoxDecoration(borderRadius:BorderRadius.circular(26),
           color:widget.index==index?const Color(0x20FFE0EF):Colors.transparent),
-        child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[
+        child:Row(mainAxisAlignment:MainAxisAlignment.center,children:[
           Icon(icon,size:23,color:widget.index==index?const Color(0xFFFFD5E6):Colors.white60),
-          const SizedBox(height:3),Flexible(child:Text(label,maxLines:1,overflow:TextOverflow.ellipsis,
+          const SizedBox(width:8),Flexible(child:Text(label,maxLines:1,overflow:TextOverflow.ellipsis,
             style:TextStyle(fontSize:11,color:widget.index==index?Colors.white:Colors.white60))),
         ])))));
 
   @override Widget build(BuildContext context)=>SafeArea(top:false,child:Padding(
-    padding:const EdgeInsets.fromLTRB(18,10,18,12),child:SizedBox(height:72,
+    padding:const EdgeInsets.fromLTRB(18,10,18,12),child:SizedBox(height:84,
       child:Stack(clipBehavior:Clip.none,children:[
-        Positioned.fill(child:AdaptiveGlass(shape:const LiquidRoundedRectangle(borderRadius:36),
-          settings:LiquidGlassSettings(glassColor:const Color(0xFF33202C).withValues(alpha:.42),blur:8),
-          child:const SizedBox.expand())),
-        Positioned.fill(
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(36),
-                border: Border.all(color: const Color(0x36FFE6F0)),
-              ),
-            ),
-          ),
-        ),
-        Padding(padding:const EdgeInsets.symmetric(horizontal:10,vertical:8),child:Row(children:[
+        Positioned.fill(child:IgnorePointer(child:ClipPath(
+          clipper:const _EncounterDockClipper(),
+          child:BackdropFilter(filter:ui.ImageFilter.blur(sigmaX:8,sigmaY:8),
+            child:const ColoredBox(color:Color(0x6B33202C))),
+        ))),
+        const Positioned.fill(child:IgnorePointer(
+          child:CustomPaint(painter:_EncounterDockBorder()),
+        )),
+        Positioned(top:24,left:10,right:10,height:44,child:Row(children:[
           _tab(0,Icons.explore_outlined,'encounter.explore'.tr),
           const SizedBox(width:84),
           _tab(1,Icons.chat_bubble_outline_rounded,'encounter.chat'.tr),
         ])),
-        Align(alignment:Alignment.center,child:AnimatedBuilder(animation:Listenable.merge([_glow,_press]),
+        Positioned(top:4,left:0,right:0,child:Center(child:AnimatedBuilder(animation:Listenable.merge([_glow,_press]),
           builder:(context,_) {
             final wave=_reduced?0.5:Curves.easeInOut.transform(_glow.value);
             final press=Curves.easeOutCubic.transform(_press.value);
@@ -99,6 +94,36 @@ class _EncounterDockState extends State<EncounterDock>
                     Positioned(top:1,right:3,child:IgnorePointer(child:Opacity(opacity:.45+wave*.45,
                       child:const Icon(Icons.auto_awesome_rounded,color:Color(0xFFFFE9F2),size:14)))),
                   ]))))));
-          })),
+          }))),
       ]))));
+}
+
+/// One outline for the glass and its border. The center circle has a constant
+/// seven-pixel clearance from the 33-pixel action radius, above and below.
+Path encounterDockOutline(Size size) => Path.combine(
+  PathOperation.union,
+  Path()..addRRect(RRect.fromRectAndRadius(
+    Rect.fromLTRB(1, 24, size.width - 1, 68), const Radius.circular(22))),
+  Path()..addOval(Rect.fromCircle(center: Offset(size.width / 2, 42), radius: 40)),
+);
+
+class _EncounterDockClipper extends CustomClipper<Path> {
+  const _EncounterDockClipper();
+  @override
+  Path getClip(Size size) => encounterDockOutline(size);
+  @override
+  bool shouldReclip(covariant _EncounterDockClipper oldClipper) => false;
+}
+
+class _EncounterDockBorder extends CustomPainter {
+  const _EncounterDockBorder();
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawPath(encounterDockOutline(size), Paint()
+      ..color = const Color(0x36FFE6F0)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2);
+  }
+  @override
+  bool shouldRepaint(covariant _EncounterDockBorder oldDelegate) => false;
 }
