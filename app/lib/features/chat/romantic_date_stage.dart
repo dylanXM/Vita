@@ -504,7 +504,14 @@ class RomanticDateStageState extends State<RomanticDateStage>
                                       child: Padding(
                                           padding:
                                               const EdgeInsets.only(bottom: 4),
-                                          child: Text(widget.companionName,
+                                          child: Text.rich(
+                                              TextSpan(text: widget.companionName, children: [
+                                                if (widget.busy || _sending)
+                                                  TextSpan(
+                                                    text: '  ${'moment.scene.responding'.tr}',
+                                                    style: const TextStyle(color: Colors.white70,
+                                                        fontSize: 12, fontWeight: FontWeight.normal)),
+                                              ]),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: const TextStyle(
@@ -552,11 +559,6 @@ class RomanticDateStageState extends State<RomanticDateStage>
                 ),
               ),
             ),
-            if (widget.busy || _sending)
-              Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Text('moment.scene.responding'.tr,
-                      style: const TextStyle(color: Colors.white70))),
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(children: [
@@ -568,13 +570,15 @@ class RomanticDateStageState extends State<RomanticDateStage>
                           TextButton.styleFrom(foregroundColor: Colors.white)),
                   if (widget.onKeepsake != null)
                     Expanded(
-                        child: TextButton(
+                        child: Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: TextButton(
                             onPressed: _openKeepsakePanel,
                             child: Text('moment.create'.tr,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style:
-                                    const TextStyle(color: Colors.white70)))),
+                                    const TextStyle(color: Colors.white70))))),
                 ])),
             if (_chat)
               Padding(
