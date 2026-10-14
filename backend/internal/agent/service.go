@@ -2204,6 +2204,7 @@ func (s *Service) DispatchDueProactive(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	spontaneousErr := s.dispatchSpontaneousContact(ctx, settings)
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT e.id, e.companion_id, c.user_id, c.name, COALESCE(c.city, ''),
 		       COALESCE(e.title, ''), COALESCE(e.description, ''), COALESCE(e.location, ''),
@@ -2241,6 +2242,9 @@ func (s *Service) DispatchDueProactive(ctx context.Context) error {
 		return err
 	}
 	var failures []error
+	if spontaneousErr != nil {
+		failures = append(failures, spontaneousErr)
+	}
 	for _, event := range due {
 		if err := ctx.Err(); err != nil {
 			return errors.Join(append(failures, err)...)

@@ -3,7 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import 'animation/pet/pixel_pet.dart';
+import 'animation/pet/companion_pet_art.dart';
+import 'animation/pet/pet_motion_spec.dart';
+import 'animation/world_clock.dart';
 import 'ai_pet_desktop_controller.dart';
 import 'ai_pet_home_page.dart';
 import '../shell/shell_page.dart';
@@ -27,6 +29,7 @@ class AIPetDesktopOverlay extends StatelessWidget {
               child,
               if (pet != null && !petHomeVisible && !worldHomeVisible)
                 _DraggablePet(
+                  key: ValueKey('${pet['adopted_companion_id'] ?? pet['id'] ?? ''}'),
                   pet: pet,
                   availableSize: constraints.biggest,
                 ),
@@ -37,7 +40,7 @@ class AIPetDesktopOverlay extends StatelessWidget {
 }
 
 class _DraggablePet extends StatefulWidget {
-  const _DraggablePet({required this.pet, required this.availableSize});
+  const _DraggablePet({super.key, required this.pet, required this.availableSize});
 
   final Map<String, dynamic> pet;
   final Size availableSize;
@@ -50,23 +53,23 @@ class _DraggablePetState extends State<_DraggablePet>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   static const _size = 84.0;
   Offset? _position;
-  late final AnimationController _controller;
+  late final WorldClock _clock;
   bool _reduced = false;
+  bool _foreground = true;
+  bool _dragging = false;
+  bool _facingLeft = true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 6),
-    )..repeat();
+    _clock = WorldClock(vsync: this);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _controller.dispose();
+    _clock.dispose();
     super.dispose();
   }
 
@@ -74,15 +77,15 @@ class _DraggablePetState extends State<_DraggablePet>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _reduced = MediaQuery.disableAnimationsOf(context);
-    if (_reduced) { _controller.stop(); }
-    else if (!_controller.isAnimating) { _controller.repeat(); }
+    if (_reduced || !_foreground) { _clock.pause(); }
+    else { _clock.resume(); }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && !_reduced) {
-      _controller.repeat();
-    } else { _controller.stop(); }
+    _foreground = state == AppLifecycleState.resumed;
+    if (_foreground && !_reduced) { _clock.resume(); }
+    else { _clock.pause(); }
   }
 
   void _openHome() {
@@ -120,7 +123,11 @@ class _DraggablePetState extends State<_DraggablePet>
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: _openHome,
+        onPanStart: (_) => setState(() => _dragging = true),
+        onPanEnd: (_) => setState(() => _dragging = false),
+        onPanCancel: () => setState(() => _dragging = false),
         onPanUpdate: (details) => setState(() {
+          if (details.delta.dx.abs() > 1) _facingLeft = details.delta.dx < 0;
           _position = Offset(
             (position.dx + details.delta.dx).clamp(8.0, maxX),
             (position.dy + details.delta.dy).clamp(padding.top + 8, maxY),
@@ -131,13 +138,22 @@ class _DraggablePetState extends State<_DraggablePet>
           label:
               '${widget.pet['adopted_companion_name'] ?? widget.pet['name'] ?? ''}',
           child: AnimatedBuilder(
-            animation: _controller,
+            animation: _clock,
             builder: (context, _) {
-              return PixelPet(
-                identity: '${widget.pet['avatar_url'] ?? ''} ${widget.pet['name'] ?? ''}',
-                species: '${widget.pet['species'] ?? ''}',
-                seconds: _controller.value * 6,
-              );
+              return Stack(fit: StackFit.expand, children: [
+                Positioned(left: 18, right: 18, bottom: 0, height: 7,
+                  child: DecoratedBox(decoration: BoxDecoration(
+                    color: const Color(0x19000000),
+                    borderRadius: BorderRadius.circular(24)))),
+                CompanionPetArt(
+                  name: '${widget.pet['adopted_companion_name'] ?? widget.pet['name'] ?? ''}',
+                  imageUrl: '${widget.pet['avatar_url'] ?? ''}',
+                  seconds: _clock.elapsedSeconds,
+                  state: _dragging ? PetState.walking : PetState.standing,
+                  facingLeft: _facingLeft,
+                  reducedMotion: _reduced,
+                ),
+              ]);
             },
           ),
         ),

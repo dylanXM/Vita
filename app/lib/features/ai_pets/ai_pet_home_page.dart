@@ -10,7 +10,7 @@ import '../../core/theme.dart';
 import 'animation/brain/pet_brain.dart';
 import 'animation/pet/pet_motion_spec.dart';
 import 'animation/pet/pet_state_machine.dart';
-import 'animation/scene/pixel_pet_room.dart';
+import 'animation/scene/companion_pet_room.dart';
 import 'animation/ui/pet_action_menu.dart';
 import 'animation/world_clock.dart';
 import 'ai_pet_desktop_controller.dart';
@@ -206,12 +206,14 @@ class _AIPetHomePageState extends State<AIPetHomePage>
             'pet-feed-${widget.companionId}-${DateTime.now().microsecondsSinceEpoch}'
       });
       final animationElapsed = DateTime.now().difference(animationStartedAt);
-      const minimumFeedingDuration = Duration(milliseconds: 2600);
+      const minimumFeedingDuration = Duration(seconds: 6);
       if (animationElapsed < minimumFeedingDuration) {
         await Future<void>.delayed(minimumFeedingDuration - animationElapsed);
       }
+      if (!mounted) return;
       final state = data is Map ? data['state'] : null;
-      if (mounted && state is Map) {
+      if (state is! Map) throw const FormatException('Invalid pet feed state');
+      if (mounted) {
         ++_stateRequestId;
         final nextState = Map<String, dynamic>.from(state);
         final nextLevel =
@@ -229,6 +231,7 @@ class _AIPetHomePageState extends State<AIPetHomePage>
       }
       VitaNotice.success('aiPets.fed'.tr, 'aiPets.fedSub'.tr);
     } on ApiException catch (error) {
+      if (!mounted) return;
       _machine.transition(
           _machine.needsSleep ? PetState.sleeping : PetState.standing);
       if (error.code == 'insufficient_credits') {
@@ -238,6 +241,10 @@ class _AIPetHomePageState extends State<AIPetHomePage>
       } else {
         VitaNotice.error('aiPets.error'.tr, error.message);
       }
+    } catch (_) {
+      if (!mounted) return;
+      _machine.transition(_machine.suggestFromState(_state ?? const {}));
+      VitaNotice.error('aiPets.error'.tr, 'common.loadFailed'.tr);
     } finally {
       if (mounted) {
         setState(() => _feeding = false);
@@ -298,32 +305,32 @@ class _AIPetHomePageState extends State<AIPetHomePage>
         };
         VitaNotice.error('aiPets.error'.tr, message);
       }
-      _machine.transition(_machine.suggestFromState(_state ?? const {}));
+      if (mounted) _machine.transition(_machine.suggestFromState(_state ?? const {}));
     } catch (_) {
       if (mounted) VitaNotice.error('aiPets.error'.tr, 'common.loadFailed'.tr);
-      _machine.transition(_machine.suggestFromState(_state ?? const {}));
+      if (mounted) _machine.transition(_machine.suggestFromState(_state ?? const {}));
     } finally {
       if (mounted) setState(() => _caring = false);
     }
   }
 
   void _drink() {
-    _care('drink', PetState.drinking, const Duration(milliseconds: 2800));
+    _care('drink', PetState.drinking, const Duration(seconds: 6));
   }
 
   void _walk() {
-    _care('walk', PetState.walking, const Duration(milliseconds: 6000));
+    _care('walk', PetState.walking, const Duration(seconds: 10));
   }
 
   void _sit() {
     if (_feeding || _caring) return;
     _lastInteractionAt = DateTime.now();
     _machine.showAction(PetState.sitting,
-        duration: const Duration(milliseconds: 4000));
+        duration: const Duration(seconds: 7));
   }
 
   void _rest() {
-    _care('rest', PetState.sleeping, const Duration(milliseconds: 6000));
+    _care('rest', PetState.sleeping, const Duration(seconds: 11));
   }
 
   @override
@@ -335,10 +342,9 @@ class _AIPetHomePageState extends State<AIPetHomePage>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          PixelPetRoom(
+          CompanionPetRoom(
             name: widget.name,
-            identity: _currentAvatarUrl,
-            species: widget.species,
+            imageUrl: _currentAvatarUrl,
             machine: _machine,
             clock: _worldClock,
             onTap: _petTap,
@@ -346,6 +352,7 @@ class _AIPetHomePageState extends State<AIPetHomePage>
             onDrink: _drink,
             onRest: _rest,
             onSit: _sit,
+            onWalk: _walk,
             busy: _feeding || _caring,
             onBack: () => Get.back(),
           ),

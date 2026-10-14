@@ -51,5 +51,6 @@ flutter:
     - assets/icons/
     - assets/ai_pets/
     - assets/ai_pets/cottage_v2/
+    - assets/ai_pets/motion_v3/
     - assets/branding/
     - assets/scenes/
