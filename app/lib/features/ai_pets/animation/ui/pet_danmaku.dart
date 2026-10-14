@@ -161,15 +161,16 @@ class _PetDanmakuLineState extends State<_PetDanmakuLine>
         child: LayoutBuilder(builder: (context, constraints) => ClipRect(
           child: AnimatedBuilder(animation: _animation, child: chip,
             builder: (context, child) {
+              final content = child ?? chip;
               final width = constraints.maxWidth;
               if (_reduced) {
-                return Center(child: SizedBox(width: math.min(math.max(0.0, width - 32), _chipWidth), child: child));
+                return Center(child: SizedBox(width: math.min(math.max(0.0, width - 32), _chipWidth), child: content));
               }
               final rtl = Directionality.of(context) == TextDirection.rtl;
               final left = rtl ? -_chipWidth + (width + _chipWidth) * _animation.value
                 : width - (width + _chipWidth) * _animation.value;
               return Stack(clipBehavior: Clip.none, children: [
-                Positioned(left: left, top: 4, width: _chipWidth, height: chipHeight, child: child),
+                Positioned(left: left, top: 4, width: _chipWidth, height: chipHeight, child: content),
               ]);
             }))))));
   }
