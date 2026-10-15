@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../core/api_client.dart';
 import '../auth/auth_controller.dart';
+import 'chat_list_presentation.dart';
 
 /// Loads the user's companions for the Chat tab.
 ///
@@ -198,13 +199,29 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
     }
   }
 
-  /// Filtered companions by name (case-insensitive).
+  /// Unread contacts first, then newest message; ties retain the server order.
   List<Map<String, dynamic>> get filtered {
     final q = searchQuery.value.trim().toLowerCase();
-    if (q.isEmpty) return List.of(companions);
-    return companions.where((c) {
-      final name = (c['name'] as String? ?? '').toLowerCase();
-      return name.contains(q);
+    final entries = companions.toList().asMap().entries.where((entry) {
+      final name = (entry.value['name'] as String? ?? '').toLowerCase();
+      return q.isEmpty || name.contains(q);
     }).toList();
+    entries.sort((a, b) {
+      final first = ChatListPresentation.from(a.value);
+      final second = ChatListPresentation.from(b.value);
+      final firstUnread = first.unreadCount > 0;
+      final secondUnread = second.unreadCount > 0;
+      if (firstUnread != secondUnread) return firstUnread ? -1 : 1;
+      final firstAt = first.messageAt;
+      final secondAt = second.messageAt;
+      if (firstAt == null && secondAt != null) return 1;
+      if (firstAt != null && secondAt == null) return -1;
+      if (firstAt != null && secondAt != null) {
+        final order = secondAt.compareTo(firstAt);
+        if (order != 0) return order;
+      }
+      return a.key.compareTo(b.key);
+    });
+    return entries.map((entry) => entry.value).toList();
   }
 }
