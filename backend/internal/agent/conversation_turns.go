@@ -19,6 +19,7 @@ This schedules a decision later, NOT a promise or a prewritten message. Choose n
 type conversationalTurn struct {
 	Messages []string              `json:"messages"`
 	FollowUp *conversationFollowUp `json:"follow_up"`
+	Affect   *affectChange         `json:"affect"`
 }
 type conversationFollowUp struct {
 	AfterSeconds int    `json:"after_seconds"`
@@ -28,18 +29,28 @@ type conversationFollowUp struct {
 
 func decodeConversationalTurn(raw string) (conversationalTurn, error) {
 	var turn conversationalTurn
-	trimmed := strings.TrimSpace(raw)
+	trimmed := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(raw), "```json"), "```"), "```"))
 	if !strings.HasPrefix(trimmed, "{") {
+		if strings.Contains(trimmed, `"affect"`) || strings.Contains(trimmed, `"messages"`) {
+			return turn, fmt.Errorf("invalid conversational JSON envelope")
+		}
 		return conversationalTurn{Messages: []string{raw}}, nil
 	}
 	var decoded struct {
 		Messages []string        `json:"messages"`
 		FollowUp json.RawMessage `json:"follow_up"`
+		Affect   json.RawMessage `json:"affect"`
 	}
 	if err := json.Unmarshal([]byte(trimmed), &decoded); err != nil {
 		return turn, fmt.Errorf("invalid conversation turn: %w", err)
 	}
 	turn.Messages = decoded.Messages
+	if len(decoded.Affect) > 0 {
+		var a affectChange
+		if json.Unmarshal(decoded.Affect, &a) == nil && validAffect(&a) {
+			turn.Affect = &a
+		}
+	}
 	if len(decoded.FollowUp) > 0 && string(decoded.FollowUp) != "null" {
 		var follow conversationFollowUp
 		if json.Unmarshal(decoded.FollowUp, &follow) == nil {
@@ -91,6 +102,11 @@ func (s *Service) saveConversationalTurn(ctx context.Context, conversationID, us
 	}
 	if err != sql.ErrNoRows {
 		return nil, err
+	}
+	if turn.Affect != nil {
+		if err := applyAffect(ctx, tx, companionID, "reply:"+trigger, *turn.Affect, true); err != nil {
+			return nil, err
+		}
 	}
 	now := time.Now().UTC()
 	payload["trigger_message_id"] = trigger
@@ -352,5 +368,5 @@ func (s *Service) conversationFollowupEligible(ctx context.Context, q contactQue
 			return false, e
 		}
 	}
-	return s.contactAllowedWithChatPresence(ctx, q, item.UserID, timezone, settings, chatPresent)
+	return s.contactAllowedWithChatPresence(ctx, q, item.UserID, timezone, settings, chatPresent, item.CompanionID)
 }

@@ -29,6 +29,7 @@ type momentScene struct {
 	Goal      string                    `json:"goal"`
 	Challenge string                    `json:"challenge"`
 	Proposal  *momentExperienceProposal `json:"proposal"`
+	Affect    json.RawMessage           `json:"affect,omitempty"`
 }
 
 func decodeMomentScene(raw string) (string, []momentSceneAction, error) {

@@ -34,6 +34,7 @@ func (s *Service) dispatchSpontaneousContact(ctx context.Context, settings lifeS
  FROM companions c JOIN users u ON u.id=c.user_id
  JOIN LATERAL (SELECT id FROM conversations WHERE companion_id=c.id AND user_id=c.user_id ORDER BY created_at DESC,id DESC LIMIT 1) cv ON true
  WHERE c.active=true AND c.deleted_at IS NULL AND c.proactive_enabled=true AND c.friendship_active=true
+ AND `+companionInitiativeSQL("c.id")+`
  AND c.life_enabled=true AND c.is_default=false AND c.pet_breed_id IS NULL AND COALESCE(c.admin_takeover,false)=false
  AND c.created_at<CURRENT_TIMESTAMP-INTERVAL '1 hour' AND vita_companion_access(c.user_id,c.id)
  AND EXISTS(SELECT 1 FROM messages WHERE conversation_id=cv.id AND sender_type='user')
@@ -89,7 +90,7 @@ func spontaneousContactEligible(ctx context.Context, q contactQuerier, item spon
 }
 
 func (s *Service) sendSpontaneousContact(ctx context.Context, item spontaneousContactCandidate, settings lifeSettings) (runErr error) {
-	allowed, err := s.contactAllowed(ctx, s.db, item.userID, item.timezone, settings)
+	allowed, err := s.contactAllowed(ctx, s.db, item.userID, item.timezone, settings, item.companionID)
 	if err != nil || !allowed {
 		return err
 	}
@@ -102,7 +103,7 @@ func (s *Service) sendSpontaneousContact(ctx context.Context, item spontaneousCo
 		return err
 	}
 	defer tx.Rollback()
-	allowed, err = s.lockContact(ctx, tx, item.userID, item.timezone, settings)
+	allowed, err = s.lockContact(ctx, tx, item.userID, item.timezone, settings, item.companionID)
 	if err != nil || !allowed {
 		return err
 	}
@@ -150,7 +151,7 @@ func (s *Service) sendSpontaneousContact(ctx context.Context, item spontaneousCo
 	}
 	recent = append(recent, ChatMessage{Role: "user", Content: "Privately decide whether you feel like sending one spontaneous message now. Recent messages and life history are context, not a requirement to report another event. A good reason can simply be a thought, feeling or joke. Choose silence if there is no genuine motive."})
 	raw, model, err := s.generateTextWithFallback(ctx, item.companionID, "spontaneous_contact_decision", models, GenerateRequest{
-		System: s.companionPrompt(ctx, profile, "spontaneous contact, humor, feelings, care, unfinished conversation and user boundaries") + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy + "\n\n" + spontaneousContactPolicy,
+		System:   s.companionPrompt(ctx, profile, "spontaneous contact, humor, feelings, care, unfinished conversation and user boundaries") + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy + "\n\n" + spontaneousContactPolicy + "\n" + affectReplyPolicy,
 		Messages: recent, Temperature: .85, MaxTokens: 768,
 	})
 	modelID = model.ID
@@ -158,10 +159,11 @@ func (s *Service) sendSpontaneousContact(ctx context.Context, item spontaneousCo
 		return err
 	}
 	var decision struct {
-		Send       bool   `json:"send"`
-		Motivation string `json:"motivation"`
-		Reason     string `json:"reason"`
-		Message    string `json:"message"`
+		Send       bool            `json:"send"`
+		Motivation string          `json:"motivation"`
+		Reason     string          `json:"reason"`
+		Message    string          `json:"message"`
+		Affect     json.RawMessage `json:"affect"`
 	}
 	clean := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(raw), "```json"), "```"), "```"))
 	if err := json.Unmarshal([]byte(clean), &decision); err != nil {
@@ -169,24 +171,23 @@ func (s *Service) sendSpontaneousContact(ctx context.Context, item spontaneousCo
 	}
 	summary = decision.Motivation + ": " + decision.Reason
 	text := strings.TrimSpace(decision.Message)
-	if !decision.Send {
-		return nil
-	}
-	switch decision.Motivation {
-	case "humor", "feeling", "affection", "care", "curiosity", "reconnect":
-	default:
-		return fmt.Errorf("invalid spontaneous motivation")
-	}
-	if text == "" || len([]rune(text)) > 240 {
-		return fmt.Errorf("invalid spontaneous message")
-	}
-	if !responseUsesRequiredScript(text, locale) {
-		text, err = s.repairMessageLanguage(ctx, item.companionID, "spontaneous_contact_language", models, text, locale)
-		if err != nil {
-			return err
+	if decision.Send {
+		switch decision.Motivation {
+		case "humor", "feeling", "affection", "care", "curiosity", "reconnect":
+		default:
+			return fmt.Errorf("invalid spontaneous motivation")
 		}
-		if text == "" || len([]rune(text)) > 240 || !responseUsesRequiredScript(text, locale) {
-			return fmt.Errorf("invalid spontaneous message language")
+		if text == "" || len([]rune(text)) > 240 {
+			return fmt.Errorf("invalid spontaneous message")
+		}
+		if !responseUsesRequiredScript(text, locale) {
+			text, err = s.repairMessageLanguage(ctx, item.companionID, "spontaneous_contact_language", models, text, locale)
+			if err != nil {
+				return err
+			}
+			if text == "" || len([]rune(text)) > 240 || !responseUsesRequiredScript(text, locale) {
+				return fmt.Errorf("invalid spontaneous message language")
+			}
 		}
 	}
 	tx, err = s.db.BeginTx(ctx, nil)
@@ -194,7 +195,7 @@ func (s *Service) sendSpontaneousContact(ctx context.Context, item spontaneousCo
 		return err
 	}
 	defer tx.Rollback()
-	allowed, err = s.lockContact(ctx, tx, item.userID, item.timezone, settings)
+	allowed, err = s.lockContact(ctx, tx, item.userID, item.timezone, settings, item.companionID)
 	if err != nil || !allowed {
 		return err
 	}
@@ -208,6 +209,15 @@ func (s *Service) sendSpontaneousContact(ctx context.Context, item spontaneousCo
 	}
 	if latestID != currentID {
 		return nil
+	}
+	var emotional affectChange
+	if json.Unmarshal(decision.Affect, &emotional) == nil && validAffect(&emotional) {
+		if err := applyAffect(ctx, tx, item.companionID, "spontaneous:"+runID, emotional, true); err != nil {
+			return err
+		}
+	}
+	if !decision.Send {
+		return tx.Commit()
 	}
 	messageID := uuid.New().String()
 	payload, _ := json.Marshal(map[string]any{"model_id": modelID, "proactive_motivation": decision.Motivation, "conversation_channel": "chat", "interaction_stage": "chat"})
@@ -226,4 +236,3 @@ func (s *Service) sendSpontaneousContact(ctx context.Context, item spontaneousCo
 	status = "succeeded"
 	return nil
 }
-

@@ -45,7 +45,8 @@ func (s *Service) ProcessDateAttendance(ctx context.Context, eventID string) err
 	}
 	// Bound provider work and always retain a localized, factual fallback.
 	reactionCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
-	text := s.ComposeInteractionReaction(reactionCtx, userID, companionID, "date_attendance", fmt.Sprintf("%s at %s, scheduled %s to %s; user has not entered", title, location, start.Format(time.RFC3339), end.Format(time.RFC3339)), stage)
+	var reaction affectChange
+	text := s.ComposeInteractionReaction(reactionCtx, userID, companionID, "date_attendance", fmt.Sprintf("%s at %s, scheduled %s to %s; user has not entered", title, location, start.Format(time.RFC3339), end.Format(time.RFC3339)), stage, &reaction)
 	cancel()
 	if text == "" {
 		return fmt.Errorf("date attendance: empty reaction for %s", eventID)
@@ -77,19 +78,28 @@ func (s *Service) ProcessDateAttendance(ctx context.Context, eventID string) err
 	if dateAttendanceStage(time.Now(), start, end, late, missed) != stage {
 		return nil
 	}
-	penalty := 3
-	if stage == "missed" {
-		penalty = 8
-		if late {
-			penalty = 5
+	modelAffect := validAffect(&reaction)
+	if !modelAffect {
+		// Deterministic fallback, only when the existing reaction call is unavailable.
+		var relationship string
+		var stress int
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(c.relationship_stage,'stranger'),COALESCE(st.stress,50) FROM companions c LEFT JOIN companion_states st ON st.companion_id=c.id WHERE c.id=$1`, companionID).Scan(&relationship, &stress); err != nil {
+			return err
 		}
+		penalty := 1
+		if relationship == "close" || relationship == "partner" {
+			penalty++
+		}
+		if stage == "missed" || stress > 70 {
+			penalty++
+		}
+		reaction = affectChange{Feeling: "sad", Reason: "Recorded date attendance: " + stage, Mood: -penalty, Stress: 1, Social: -1, Action: "slow"}
 	}
 	marker := "attendance_" + stage
 	if _, err = tx.ExecContext(ctx, `UPDATE life_events SET payload=jsonb_set(COALESCE(payload,'{}'::jsonb),ARRAY[$2::text],'true'::jsonb) WHERE id=$1`, eventID, marker); err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO companion_states(companion_id,mood,updated_at) VALUES($1,50-$2,CURRENT_TIMESTAMP)
- ON CONFLICT(companion_id) DO UPDATE SET mood=GREATEST(0,companion_states.mood-$2),updated_at=CURRENT_TIMESTAMP`, companionID, penalty); err != nil {
+	if err = applyAffect(ctx, tx, companionID, "attendance:"+eventID+":"+stage, reaction, modelAffect); err != nil {
 		return err
 	}
 	id := "date-attendance:" + eventID + ":" + stage
@@ -98,7 +108,7 @@ func (s *Service) ProcessDateAttendance(ctx context.Context, eventID string) err
  VALUES($1,$2,'assistant','text',$3,$4::jsonb,'date_attendance','delivered')`, id, conversationID, text, string(payload)); err != nil {
 		return err
 	}
-	fact := fmt.Sprintf("The user was %s for our booked virtual date (%s, %s, scheduled %s to %s). I felt disappointed and said: %s. This is one incident, not a permanent user trait; listen to their explanation and let apology or making amends gradually restore mood.", stage, title, location, start.Format(time.RFC3339), end.Format(time.RFC3339), text)
+	fact := fmt.Sprintf("The user was %s for our booked virtual date (%s, %s, scheduled %s to %s). My recorded reaction was: %s. This is one incident, not a permanent user trait. Later feelings and actions depend on actual context; neither a return nor an apology automatically resolves it.", stage, title, location, start.Format(time.RFC3339), end.Format(time.RFC3339), text)
 	if _, err = tx.ExecContext(ctx, `INSERT INTO memories(id,companion_id,type,content,importance,event_time,metadata) VALUES($1,$2,'emotional_context',$3,80,$4,$5)`, id, companionID, fact, start, string(payload)); err != nil {
 		return err
 	}

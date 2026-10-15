@@ -393,11 +393,7 @@ func VisitWorld(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update world relationship"})
 			return
 		}
-		if _, err := tx.ExecContext(c.Request.Context(), `INSERT INTO companion_states(companion_id,mood,updated_at) VALUES($1,52,CURRENT_TIMESTAMP)
-			ON CONFLICT(companion_id) DO UPDATE SET mood=LEAST(100,companion_states.mood+2),updated_at=CURRENT_TIMESTAMP`, companionID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update world mood"})
-			return
-		}
+		// A visit is a recorded interaction, not automatic emotional reconciliation.
 		memoryID = uuid.New().String()
 		memoryContent := "The user stayed with me during a visit."
 		if input.Choice == "ask" {
@@ -457,7 +453,7 @@ func VisitWorld(c *gin.Context) {
 	}
 	effects := gin.H{"familiarity": 0, "trust": 0, "enthusiasm": 0, "mood": 0}
 	if changed > 0 {
-		effects = gin.H{"familiarity": 1, "trust": trustDelta, "enthusiasm": enthusiasmDelta, "mood": 2}
+		effects = gin.H{"familiarity": 1, "trust": trustDelta, "enthusiasm": enthusiasmDelta, "mood": 0}
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"visited_today": true, "new_visit": changed > 0, "memory_id": memoryID,

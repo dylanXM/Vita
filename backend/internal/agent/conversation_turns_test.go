@@ -290,4 +290,51 @@ func TestConversationTurnsPostgres(t *testing.T) {
 		t.Fatal("full reply lost continuation or initiative")
 	}
 
+	t.Run("affect transactions and initiative", func(t *testing.T) {
+		exec(`INSERT INTO companions(id,user_id,name,is_default) VALUES('affect-c','u','Affect',true)`)
+		apply := func(cause string, a affectChange, check, commit bool) {
+			t.Helper()
+			tx, err := database.BeginTx(ctx, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tx.Rollback()
+			if err := applyAffect(ctx, tx, "affect-c", cause, a, check); err != nil {
+				t.Fatal(err)
+			}
+			if commit {
+				if err := tx.Commit(); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		a := affectChange{Feeling: "sad", Reason: "A real interaction", Mood: -3, Action: "space"}
+		apply("one", a, false, true)
+		apply("one", a, false, true)
+		if count(`SELECT mood FROM companion_states WHERE companion_id='affect-c'`) != 47 {
+			t.Fatal("duplicate emotional effect")
+		}
+		apply("stale", a, true, true)
+		if count(`SELECT version FROM companion_affect WHERE companion_id='affect-c'`) != 1 {
+			t.Fatal("stale generated state applied")
+		}
+		life := affectChange{Feeling: "content", Reason: "A good life event", Mood: 2, Action: "open"}
+		apply("life:good", life, false, true)
+		allowed, err := companionInitiativeAllowed(ctx, database, "affect-c")
+		if err != nil || allowed {
+			t.Fatalf("positive event erased paused initiative: %v", err)
+		}
+		a.Version = 2
+		a.Mood = 1
+		a.Action = "open"
+		apply("reply:actual", a, true, false)
+		if count(`SELECT version FROM companion_affect WHERE companion_id='affect-c'`) != 2 {
+			t.Fatal("rolled back emotion persisted")
+		}
+		apply("reply:actual", a, true, true)
+		if count(`SELECT mood FROM companion_states WHERE companion_id='affect-c'`) != 50 {
+			t.Fatal("real subsequent interaction not applied")
+		}
+	})
+
 }

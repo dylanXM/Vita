@@ -40,11 +40,17 @@ func LoadContactPreferences(ctx context.Context, q contactQuerier, userID string
 
 // All autonomous contact shares one account-wide budget, including follow-ups.
 // The transaction caller locks the user row before this final eligibility check.
-func (s *Service) contactAllowed(ctx context.Context, q contactQuerier, userID, timezone string, settings lifeSettings) (bool, error) {
-	return s.contactAllowedWithChatPresence(ctx, q, userID, timezone, settings, false)
+func (s *Service) contactAllowed(ctx context.Context, q contactQuerier, userID, timezone string, settings lifeSettings, companionIDs ...string) (bool, error) {
+	return s.contactAllowedWithChatPresence(ctx, q, userID, timezone, settings, false, companionIDs...)
 }
 
-func (s *Service) contactAllowedWithChatPresence(ctx context.Context, q contactQuerier, userID, timezone string, settings lifeSettings, chatPresent bool) (bool, error) {
+func (s *Service) contactAllowedWithChatPresence(ctx context.Context, q contactQuerier, userID, timezone string, settings lifeSettings, chatPresent bool, companionIDs ...string) (bool, error) {
+	if len(companionIDs) > 0 {
+		allowed, err := companionInitiativeAllowed(ctx, q, companionIDs[0])
+		if err != nil || !allowed {
+			return false, err
+		}
+	}
 	p, err := LoadContactPreferences(ctx, q, userID)
 	if err != nil {
 		return false, err
@@ -80,10 +86,10 @@ func (s *Service) contactAllowedWithChatPresence(ctx context.Context, q contactQ
 	return !present, err
 }
 
-func (s *Service) lockContact(ctx context.Context, tx *sql.Tx, userID, timezone string, settings lifeSettings) (bool, error) {
+func (s *Service) lockContact(ctx context.Context, tx *sql.Tx, userID, timezone string, settings lifeSettings, companionIDs ...string) (bool, error) {
 	var id string
 	if err := tx.QueryRowContext(ctx, `SELECT id FROM users WHERE id=$1 FOR UPDATE`, userID).Scan(&id); err != nil {
 		return false, err
 	}
-	return s.contactAllowed(ctx, tx, userID, timezone, settings)
+	return s.contactAllowed(ctx, tx, userID, timezone, settings, companionIDs...)
 }

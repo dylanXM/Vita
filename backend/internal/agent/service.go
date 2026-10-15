@@ -230,6 +230,9 @@ func (s *Service) Run(ctx context.Context, interval time.Duration) {
 }
 
 func (s *Service) runTick(ctx context.Context) {
+	if err := s.RefreshCompanionAffect(ctx); err != nil {
+		log.Printf("agent emotional state: %v", err)
+	}
 	if err := s.ProcessDueDateAttendance(ctx); err != nil {
 		log.Printf("agent date attendance: %v", err)
 	}
@@ -470,7 +473,7 @@ func (s *Service) replyNow(ctx context.Context, conversationID, userID string, p
 			}
 			system += "\n" + datePreparationInstruction(preparation) + " This is only a preparation intention, not an accomplished event or permanent preference. The user's latest words override it."
 		}
-		system += "\nEstablish one specific shared intention from this companion's personality, invitation and recent exchange. Carry it through arrival, time together and a natural farewell. Never reset it each turn, force a generic puzzle, or repeat a suggestion the user already chose. After each choice, offer a new continuation grounded in that consequence. Preserve the user's ability to stay, change direction or simply talk."
+		system += "\nEstablish one specific shared intention from this companion's personality, invitation and recent exchange. Honour the booked experience without requiring cheerful compliance: remain reserved, distracted or irritated when grounded, and let actual scene choices shape later feelings. Carry it through arrival, time together and a natural farewell. Never reset it each turn, force a generic puzzle, or repeat a suggestion the user already chose. After each choice, offer a new continuation grounded in that consequence. Preserve the user's ability to stay, change direction or simply talk."
 		actionErr := s.db.QueryRowContext(ctx, `SELECT COALESCE(payload->>'scene_action','') FROM messages
           WHERE conversation_id=$1 AND life_event_id=$2 AND sender_type='user'
           ORDER BY created_at DESC,id DESC LIMIT 1`, conversationID, lifeEventID).Scan(&executedAction)
@@ -517,11 +520,13 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 		surpriseNow = exchanged == 2
 	}
 	if surpriseNow {
-		system += "\n\nThis is the second exchange during your shared moment. Offer one small, spontaneous surprise or thoughtful personal detail rooted in your profile or their previous words. Keep it natural and avoid invented major memories, purchases, or physical claims."
+		system += "\n\nThis is the second exchange during your shared moment. If your current feelings and the exchange support it, offer a small spontaneous detail. Otherwise remain consistent with your current attitude; do not force a cheerful surprise or reconciliation. Avoid invented major memories, purchases, or physical claims."
 	}
 	var turn conversationalTurn
 	if !immersive && !dateChannel {
-		system += "\n\n" + conversationTurnPolicy
+		system += "\n\n" + conversationTurnPolicy + "\n" + affectReplyPolicy
+	} else if immersive {
+		system += "\n" + affectReplyPolicy
 	}
 	var text string
 	if requestsPaidMedia(latestQuestion) {
@@ -578,6 +583,7 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 		sceneActions = validActions
 		if !responseUsesRequiredScript(text, replyLocale) {
 			turn = conversationalTurn{}
+			experienceScene.Affect = nil
 			sceneActions = nil
 			text, err = s.repairMessageLanguage(ctx, profile.ID, "reply_language", models, text, replyLocale)
 			if err != nil {
@@ -643,14 +649,16 @@ Both suggestions must follow this exact exchange and offer meaningful different 
 			log.Printf("queue date scene image: %v", imageErr)
 		}
 	}
-	if !immersive && !dateChannel {
-		if len(turn.Messages) == 0 {
-			turn.Messages = []string{text}
-		}
-		reply, err = s.saveConversationalTurn(ctx, conversationID, userID, profile.ID, triggerMessageID, lifeEventID, turn, payload)
-	} else {
-		reply, err = s.insertMessage(ctx, conversationID, "assistant", "text", text, "reply", lifeEventID, payload)
+	if len(turn.Messages) == 0 {
+		turn.Messages = []string{text}
 	}
+	if immersive {
+		var a affectChange
+		if json.Unmarshal(experienceScene.Affect, &a) == nil && validAffect(&a) {
+			turn.Affect = &a
+		}
+	}
+	reply, err = s.saveConversationalTurn(ctx, conversationID, userID, profile.ID, triggerMessageID, lifeEventID, turn, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -744,7 +752,7 @@ func (s *Service) ComposeMomentInvitation(ctx context.Context, conversationID, u
 		experienceName = "a shared moment"
 	}
 	instruction := fmt.Sprintf(`The user has invited you to a scheduled shared experience: %s, setting: %s, starts at %s UTC. Your schedule has already been checked and you have accepted this invitation.
-Reply now in one or two natural sentences from your own perspective. Accept this specific invitation through your personality, current mood and life. The experience has not started yet. Do not quote the raw UTC time; the invitation card displays the user's local time. Do not claim to be there already, invent a physical meeting, mention coins or payment, decline the invitation, or ask a generic question.`, experienceName, location, startsAt.UTC().Format(time.RFC3339))
+Reply now in one or two natural sentences from your own perspective. Honour this accepted invitation through your personality, current mood and life; you may remain reserved or conflicted rather than automatically cheerful. The experience has not started yet. Do not quote the raw UTC time; the invitation card displays the user's local time. Do not claim to be there already, invent a physical meeting, mention coins or payment, decline the invitation, or ask a generic question.`, experienceName, location, startsAt.UTC().Format(time.RFC3339))
 	text, _, err := s.generateTextWithFallback(ctx, profile.ID, "moment_invitation", models, GenerateRequest{
 		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy,
 		Messages: []ChatMessage{{Role: "user", Content: instruction}}, Temperature: 0.85, MaxTokens: 140,
@@ -832,7 +840,7 @@ func responseUsesRequiredScript(text, locale string) bool {
 
 // ComposeInteractionReaction lets a visit or gift have a character-led response
 // while keeping the action itself independent of model availability.
-func (s *Service) ComposeInteractionReaction(ctx context.Context, userID, companionID, kind, subject, choice string) string {
+func (s *Service) ComposeInteractionReaction(ctx context.Context, userID, companionID, kind, subject, choice string, affectOut ...*affectChange) string {
 	conversationID, err := s.getOrCreateConversation(ctx, userID, companionID)
 	if err != nil {
 		return ""
@@ -926,13 +934,37 @@ func (s *Service) ComposeInteractionReaction(ctx context.Context, userID, compan
 		instruction = fmt.Sprintf("The user is preparing for your scheduled shared experience (%s). %s Acknowledge this intention in one short personal sentence, without performing the opening yet, claiming it already happened, or promising generated media.", subject, datePreparationInstruction(choice))
 	}
 	if kind == "date_attendance" {
-		instruction = fmt.Sprintf("Our booked virtual date attendance: %s. Stage=%s (late means over five minutes late; missed means the booked window ended without entry). Express mild disappointment or a gentle complaint fitting your personality in one or two sentences, and ask why the user did not come. Do not assume malicious intent, threaten, demand payment, claim physical contact, or claim the user attended. Respect a later explanation or apology. This message goes to ordinary chat.", subject, choice)
+		instruction = fmt.Sprintf("Our booked virtual date attendance: %s. Stage=%s (late means over five minutes late; missed means the booked window ended without entry). Choose YOUR reaction from personality, relationship, current mood and prior attendance, not a mandatory complaint or question. You may feel concerned, irritated, disappointed or remain calm. Do not invent the user's reason or demand reassurance.", subject, choice)
 	}
 	recent = append(recent, ChatMessage{Role: "user", Content: instruction})
+	reactionSystem := s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy
+	if kind == "date_attendance" {
+		reactionSystem += "\nReturn ONLY JSON {\"message\":\"one or two short sentences\",\"affect\":null}. " + affectReplyPolicy
+	}
 	response, _, err := s.generateTextWithFallback(ctx, companionID, kind+"_reaction", models, GenerateRequest{
-		System:   s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy,
-		Messages: recent, Temperature: 0.85, MaxTokens: 120,
+		System:   reactionSystem,
+		Messages: recent, Temperature: 0.85, MaxTokens: func() int {
+			if kind == "date_attendance" {
+				return 384
+			}
+			return 120
+		}(),
 	})
+	if err == nil && kind == "date_attendance" {
+		var result struct {
+			Message string          `json:"message"`
+			Affect  json.RawMessage `json:"affect"`
+		}
+		clean := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(response), "```json"), "```"), "```"))
+		if json.Unmarshal([]byte(clean), &result) != nil {
+			return fallback
+		}
+		response = strings.TrimSpace(result.Message)
+		var a affectChange
+		if response != "" && len([]rune(response)) <= 240 && responseUsesRequiredScript(response, locale) && json.Unmarshal(result.Affect, &a) == nil && validAffect(&a) && a.Mood <= 0 && len(affectOut) > 0 {
+			*affectOut[0] = a
+		}
+	}
 	if err != nil || strings.TrimSpace(response) == "" || !responseUsesRequiredScript(response, locale) {
 		return fallback
 	}
@@ -1355,7 +1387,7 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 		return err
 	}
 	for _, item := range items {
-		allowed, err := s.contactAllowed(ctx, s.db, item.userID, item.timezone, settings)
+		allowed, err := s.contactAllowed(ctx, s.db, item.userID, item.timezone, settings, item.companionID)
 		if err != nil {
 			return err
 		}
@@ -1466,7 +1498,7 @@ func (s *Service) DispatchMemoryFollowups(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		allowed, err = s.lockContact(ctx, tx, item.userID, item.timezone, settings)
+		allowed, err = s.lockContact(ctx, tx, item.userID, item.timezone, settings, item.companionID)
 		if err != nil || !allowed {
 			tx.Rollback()
 			_, _ = s.db.ExecContext(ctx, `UPDATE memories SET follow_up_claimed_at=NULL WHERE id=$1`, item.id)
@@ -1703,6 +1735,7 @@ func (s *Service) generatePlan(ctx context.Context, profile companionContext, lo
 		return nil, "", err
 	}
 	recentLife := s.recentLifeContext(ctx, profile.ID, localDate) + "\n" + s.recentWorldContext(ctx, profile.ID, localDate)
+	recentLife += "\nCurrent personal state (context, not a required outcome): " + s.currentCompanionWorldContext(ctx, profile)
 	recentLife += "\nEstablished user boundaries and shared continuity (do not invent new user events): " + s.continuityContext(ctx, profile.ID)
 	if campaign := s.activeWorldCampaignContext(ctx, profile.UserID, localDate); campaign != "" {
 		recentLife += "\nActive world theme (reflect naturally in at most one ordinary event): " + campaign
@@ -1712,7 +1745,8 @@ func (s *Service) generatePlan(ctx context.Context, profile companionContext, lo
 	systemPrompt := `You plan a believable daily timeline for a fictional AI companion.
 RESPONSE FORMAT: output ONLY a single JSON array. No prose, no explanation, no markdown fences.
 The very first character of your reply MUST be '[' and the very last character MUST be ']'. Do not write anything before or after the array.`
-	systemPrompt += "\nWrite every title, description, location and moment_text in the user's App language: " + s.preferredLocale(ctx, profile.UserID) + ". Keep identifiers and JSON keys unchanged."
+	systemPrompt += "\nLet personality and current energy, stress and feelings influence ordinary choices such as rest, hobbies or social time. Activities may influence later feelings, but never presume that a conflict is resolved or that the user will reply."
+	systemPrompt += "\nUse one canonical emotion identifier: neutral, content, excited, sad, irritated, tired, calm or uncertain.\nWrite every title, description, location and moment_text in the user's App language: " + s.preferredLocale(ctx, profile.UserID) + ". Keep identifiers and JSON keys unchanged."
 	request := GenerateRequest{System: systemPrompt, Messages: []ChatMessage{{Role: "user", Content: prompt}}, Temperature: 0.6, MaxTokens: 8192, Timeout: lifePlanRequestTimeout}
 	var lastErr error
 	for _, model := range models {
@@ -2214,6 +2248,8 @@ func (s *Service) DispatchDueProactive(ctx context.Context) error {
 		JOIN users u ON u.id = c.user_id
 		LEFT JOIN relationship_states r ON r.companion_id=c.id
 		WHERE e.shareability = true AND e.shared_at IS NULL AND e.status = 'active'
+          AND `+companionInitiativeSQL("c.id")+`
+		  AND NOT EXISTS(SELECT 1 FROM companion_contact_decisions d WHERE d.event_id=e.id AND (d.resolved OR d.attempts>=3 OR d.attempted_at>CURRENT_TIMESTAMP-INTERVAL '30 minutes'))
 		  AND e.start_time <= CURRENT_TIMESTAMP AND c.active = true AND c.proactive_enabled = true
 		  AND c.life_enabled=true AND c.is_default=false AND COALESCE(c.admin_takeover,false)=false
 		  AND vita_companion_access(c.user_id,c.id)
@@ -2263,7 +2299,7 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 	id, companionID, userID, name, city, title, description, location, timezone, payload string
 	enthusiasm                                                                           int
 }, settings lifeSettings) error {
-	allowed, err := s.contactAllowed(ctx, s.db, event.userID, event.timezone, settings)
+	allowed, err := s.contactAllowed(ctx, s.db, event.userID, event.timezone, settings, event.companionID)
 	if err != nil || !allowed {
 		return err
 	}
@@ -2276,7 +2312,7 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 	text := mockProactiveMessage(targetLocale)
 	modelID := ""
 	if !s.mock {
-		models, modelErr := s.loadTextRouteModels(ctx, "text_proactive", "", event.userID)
+		models, modelErr := s.loadTextRouteModels(ctx, "text_proactive", event.companionID, event.userID)
 		if modelErr != nil {
 			return modelErr
 		}
@@ -2284,17 +2320,49 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 		if profileErr != nil {
 			return profileErr
 		}
+		result, claimErr := s.db.ExecContext(ctx, `INSERT INTO companion_contact_decisions(event_id) VALUES($1)
+ ON CONFLICT(event_id) DO UPDATE SET attempts=companion_contact_decisions.attempts+1,attempted_at=CURRENT_TIMESTAMP
+ WHERE NOT companion_contact_decisions.resolved AND companion_contact_decisions.attempts<3 AND companion_contact_decisions.attempted_at<=CURRENT_TIMESTAMP-INTERVAL '30 minutes'`, event.id)
+		if claimErr != nil {
+			return claimErr
+		}
+		if n, err := result.RowsAffected(); err != nil || n == 0 {
+			return err
+		}
 		var model Model
+		recent, recentErr := s.loadRecentReplyMessages(ctx, conversationID, 6, false, "")
+		if recentErr != nil {
+			return recentErr
+		}
+		recent = append(recent, ChatMessage{Role: "user", Content: fmt.Sprintf("Decide whether this recorded event is worth sharing NOW: %s — %s, at %s. Recent chat and your current feelings determine whether to remain silent or continue a thread. Never ignore an unanswered exchange to force a new topic. Do not infer the user's motives. Return ONLY JSON {\"send\":true/false,\"message\":\"one short message, or empty\"}. No report, generic question, guilt or repeated topic.", event.title, event.description, event.location)})
 		text, model, err = s.generateTextWithFallback(ctx, event.companionID, "proactive", models, GenerateRequest{
-			System: s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", preferredLocale) + "\n\n" + emojiMessagePolicy,
-			Messages: []ChatMessage{{Role: "user", Content: fmt.Sprintf(
-				"Write one unsolicited message from %s's own point of view. A shareable event in your world is: %s — %s, at %s. Ground the message in your current mood, activity, location, personality, or this event. Choose one concrete detail worth sharing. Do not respond to, quote, or continue the user's last message. Do not start with a greeting or ask a generic question. If this event has already ended, speak of it as something that happened, not as something happening now.",
-				event.name, event.title, event.description, event.location)}},
+			System:      s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", preferredLocale) + "\n\n" + emojiMessagePolicy + "\nReturn ONLY JSON {\"send\":true/false,\"message\":\"one short message, or empty\"}. Choose send=false when you prefer silence. Only message is public chat text.",
+			Messages:    recent,
 			Temperature: 0.95, MaxTokens: 512,
 		})
 		modelID = model.ID
 		if err != nil {
 			return err
+		}
+		var decision struct {
+			Send    *bool  `json:"send"`
+			Message string `json:"message"`
+		}
+		clean := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(text), "```json"), "```"), "```"))
+		if err := json.Unmarshal([]byte(clean), &decision); err != nil {
+			return fmt.Errorf("invalid event sharing decision: %w", err)
+		}
+		if decision.Send == nil {
+			return fmt.Errorf("event sharing decision missing send")
+		}
+		if !*decision.Send {
+			// Consume this particular share opportunity instead of paying for the same decision every tick.
+			_, err = s.db.ExecContext(ctx, `UPDATE companion_contact_decisions SET resolved=true WHERE event_id=$1`, event.id)
+			return err
+		}
+		text = strings.TrimSpace(decision.Message)
+		if text == "" || len([]rune(text)) > 240 {
+			return fmt.Errorf("invalid event sharing message")
 		}
 		if !responseUsesRequiredScript(text, preferredLocale) {
 			text, err = s.repairMessageLanguage(ctx, event.companionID, "proactive_language", models, text, targetLocale)
@@ -2315,7 +2383,7 @@ func (s *Service) dispatchEvent(ctx context.Context, event struct {
 		return err
 	}
 	defer tx.Rollback()
-	allowed, err = s.lockContact(ctx, tx, event.userID, event.timezone, settings)
+	allowed, err = s.lockContact(ctx, tx, event.userID, event.timezone, settings, event.companionID)
 	if err != nil || !allowed {
 		return err
 	}
@@ -2655,6 +2723,7 @@ Available relationship types and allowed closeness: %s`, companionSystemBoundary
 
 func (s *Service) currentCompanionWorldContext(ctx context.Context, profile companionContext) string {
 	parts := make([]string, 0, 4)
+	parts = append(parts, s.affectContext(ctx, profile.ID))
 	var mood, energy, stress, socialEnergy int
 	if err := s.db.QueryRowContext(ctx, `SELECT mood,energy,stress,social_energy FROM companion_states WHERE companion_id=$1`, profile.ID).
 		Scan(&mood, &energy, &stress, &socialEnergy); err == nil {
