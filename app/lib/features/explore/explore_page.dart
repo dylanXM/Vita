@@ -28,6 +28,8 @@ class ExploreController extends GetxController {
   final storyCoverUrl = RxnString();
   final petName = RxnString();
   final petAvatarUrl = RxnString();
+  final encounterName = RxnString();
+  final encounterCoverUrl = RxnString();
 
   Map<String, dynamic>? get featuredPost {
     final cutoff = DateTime.now().subtract(const Duration(hours: 48));
@@ -77,6 +79,19 @@ class ExploreController extends GetxController {
   }
 
   Future<void> loadHighlights() async {
+    try {
+      final data = await ApiClient.instance.get('/v1/encounters/characters');
+      final items = data is Map ? data['items'] : null;
+      if (items is List) {
+        final characters = items.whereType<Map>().toList();
+        encounterName.value = characters.isEmpty
+            ? null : '${characters.first['name'] ?? ''}'.trim();
+        encounterCoverUrl.value = characters.isEmpty
+            ? null : '${characters.first['cover_url'] ?? ''}'.trim();
+      }
+    } catch (_) {
+      // Keep the entry available when recommendations cannot be loaded.
+    }
     try {
       final data = await ApiClient.instance.get('/v1/stories/');
       final items = data is Map ? data['items'] : null;
@@ -151,27 +166,40 @@ class ExplorePage extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 126),
           children: [
             VitaTabHeader(title: 'tab.discover'.tr, showDivider: false),
-            _PlaceCard(
+            Obx(() => _PlaceCard(
               icon: Icons.auto_awesome_outlined,
               title: 'encounter.title'.tr,
-              subtitle: 'encounter.welcome'.tr,
-              onTap: () => Get.to(() => const EncountersPage(),
-                  transition: Transition.cupertino),
-            ),
-            _PlaceCard(
-              icon: Icons.camera_alt_outlined,
-              title: 'explore.moments'.tr,
-              subtitle: 'discover.moments'.tr,
-              onTap: () {
-                AnalyticsService.to
-                    .track('discover_moment_opened', category: 'life');
-                Get.to(() => const MomentsPage(),
-                    transition: Transition.cupertino);
+              subtitle: ExploreController.to.encounterName.value?.isNotEmpty == true
+                  ? ExploreController.to.encounterName.value! : 'encounter.welcome'.tr,
+              imageUrl: ExploreController.to.encounterCoverUrl.value ?? '',
+              onTap: () async {
+                await Get.to(() => const EncountersPage(), transition: Transition.cupertino);
+                ExploreController.to.loadHighlights();
               },
-            ),
+            )),
+            Obx(() {
+              final ctrl = ExploreController.to;
+              final post = ctrl.posts.isEmpty ? null : ctrl.posts.first;
+              final media = post == null ? <String>[] : _momentMediaUrls(post);
+              final author = post?['author'] is Map ? post!['author'] as Map : const {};
+              final content = '${post?['content'] ?? ''}'.trim();
+              return _PlaceCard(
+                icon: Icons.camera_alt_outlined,
+                title: 'explore.moments'.tr,
+                subtitle: content.isEmpty ? 'discover.moments'.tr : content,
+                imageUrl: media.isEmpty ? '${author['portrait_url'] ?? ''}' : media.first,
+                onTap: () async {
+                  AnalyticsService.to.track('discover_moment_opened', category: 'life');
+                  await Get.to(() => const MomentsPage(), transition: Transition.cupertino);
+                  ctrl.loadPosts();
+                },
+              );
+            }),
             Obx(() => _PlaceCard(
                     icon: Icons.pets_outlined,
                     title: 'aiPets.title'.tr,
+                    imageUrl: ExploreController.to.petAvatarUrl.value ?? '',
+                    imageFit: BoxFit.contain,
                     subtitle:
                         ExploreController.to.petName.value?.isNotEmpty == true
                             ? 'discover.myPet'.trParams(
@@ -188,6 +216,7 @@ class ExplorePage extends StatelessWidget {
             Obx(() => _PlaceCard(
                     icon: Icons.auto_stories_outlined,
                     title: 'storyHub.title'.tr,
+                    imageUrl: ExploreController.to.storyCoverUrl.value ?? '',
                     subtitle: ExploreController.to.storyChapter.value == null
                         ? 'discover.stories'.tr
                         : 'discover.continueStory'.trParams({
@@ -215,62 +244,75 @@ class _PlaceCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.imageUrl = '',
+    this.imageFit = BoxFit.cover,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final String imageUrl;
+  final BoxFit imageFit;
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-        child: Material(
-          borderRadius: BorderRadius.circular(18),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onTap,
-            child: Ink(
-              color: context.vita.surface,
-              child: SizedBox(
-                height: 104,
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Row(children: [
-                    Icon(icon, size: 30, color: context.vita.text),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                  color: context.vita.text,
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 5),
-                          Flexible(
-                              child: Text(subtitle,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      color: context.vita.subText,
-                                      fontSize: 13))),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(Icons.chevron_right, color: context.vita.subText),
-                  ]),
+  Widget build(BuildContext context) {
+    final vita = context.vita;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    Widget placeholder() => DecoratedBox(
+      decoration: BoxDecoration(gradient: LinearGradient(
+        begin: Alignment.topLeft, end: Alignment.bottomRight,
+        colors: [vita.greenTint, vita.surface])),
+      child: Center(child: Icon(icon, size: 56,
+        color: vita.green.withValues(alpha: .45))),
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+      child: Material(
+        color: vita.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22),
+          side: BorderSide(color: vita.divider.withValues(alpha: .55))),
+        clipBehavior: Clip.antiAlias,
+        child: SizedBox(height: 128, child: LayoutBuilder(builder: (context, box) {
+          return Stack(fit: StackFit.expand, children: [
+            PositionedDirectional(top: 0, bottom: 0, end: 0, width: box.maxWidth * .48,
+              child: imageUrl.trim().isEmpty ? placeholder() : VitaMediaImage(
+                url: imageUrl, fit: imageFit,
+                placeholderBuilder: (_) => placeholder(),
+                errorBuilder: (_, __, ___) => placeholder(),
+              )),
+            IgnorePointer(child: DecoratedBox(decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: rtl ? Alignment.centerRight : Alignment.centerLeft,
+                end: rtl ? Alignment.centerLeft : Alignment.centerRight,
+                colors: [vita.surface, vita.surface,
+                  vita.surface.withValues(alpha: .08)],
+                stops: const [0, .48, 1],
+              ),
+            ))),
+            Material(color: Colors.transparent, child: InkWell(onTap: onTap,
+              child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                child: Align(alignment: AlignmentDirectional.centerStart,
+                  child: SizedBox(width: box.maxWidth * .55,
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: vita.text, fontSize: 18,
+                            fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 8),
+                        Flexible(child: Text(subtitle, maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: vita.subText, fontSize: 12, height: 1.5))),
+                      ]),
+                  ),
                 ),
               ),
-            ),
-          ),
-        ),
-      );
+            )),
+          ]);
+        })),
+      ),
+    );
+  }
 }
 
 /// Moments second page — companions' public posts, pushed from the Explore
