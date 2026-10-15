@@ -7,6 +7,8 @@ import '../../core/api_client.dart';
 import '../../shared/media_image.dart';
 import 'encounter_media.dart';
 import 'encounter_dock.dart';
+import 'encounter_deck.dart';
+import 'encounter_purchase_sheet.dart';
 import 'encounter_portrait.dart';
 import 'encounter_profile.dart';
 
@@ -15,7 +17,6 @@ const _rose = Color(0xFFEBA2B8);
 const _panel = Color(0xFF2A202A);
 final _encounterTheme = ThemeData.dark().copyWith(scaffoldBackgroundColor:_night,colorScheme:const ColorScheme.dark(primary:_rose,surface:_panel));
 String _s(Map value, String key) => '${value[key] ?? ''}';
-Widget _backCard(Map character,Color tint)=>ExcludeSemantics(child:ClipRRect(borderRadius:BorderRadius.circular(30),child:Stack(fit:StackFit.expand,children:[VitaMediaImage(url:_s(character,'cover_url')),ColoredBox(color:tint)])));
 String _requestKey() => '${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 30)}';
 
 class EncountersPage extends StatefulWidget {
@@ -26,9 +27,8 @@ class _EncountersPageState extends State<EncountersPage> {
  List<Map<String,dynamic>> _characters=[],_chats=[];
  bool _loading=true,_configured=false;
  String _gender='',_personality=''; int _tab=0;
- final _pages=PageController();
+ int _deckRevision=0;
  @override void initState(){super.initState();_load();}
- @override void dispose(){_pages.dispose();super.dispose();}
  void _error(){if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('encounter.error'.tr)));}
  Future<void> _load() async {
   try {
@@ -42,7 +42,7 @@ class _EncountersPageState extends State<EncountersPage> {
  Future<void> _preferences() async {
   final choice=await Get.to<Map<String,dynamic>>(()=>_EncounterForm(preferences:true,initial:{'gender':_gender,'personality':_personality},personalities:_characters.expand((e)=>[_s(e,'personality'),...(e['tags'] as List? ?? []).whereType<String>()]).where((e)=>e.isNotEmpty).toSet().toList()),transition:Transition.cupertino);
   if(choice==null||!mounted)return;
-  try{await ApiClient.instance.put('/v1/encounters/preferences',data:choice);if(!mounted)return;setState((){_configured=true;_gender=_s(choice,'gender');_personality=_s(choice,'personality');});await _load();if(mounted&&_pages.hasClients)_pages.jumpToPage(0);}catch(_){_error();}
+  try{await ApiClient.instance.put('/v1/encounters/preferences',data:choice);if(!mounted)return;setState((){_configured=true;_gender=_s(choice,'gender');_personality=_s(choice,'personality');});await _load();if(mounted)setState(()=>_deckRevision++);}catch(_){_error();}
  }
  Future<void> _open(Map<String,dynamic> character,{bool gift=false}) async {
   try {
@@ -62,13 +62,9 @@ class _EncountersPageState extends State<EncountersPage> {
   return Theme(data:_encounterTheme,child:Scaffold(backgroundColor:_night,extendBody:true,
    appBar:AppBar(backgroundColor:_night,title:Text('encounter.title'.tr),actions:[IconButton(onPressed:_preferences,icon:const Icon(Icons.tune_rounded),tooltip:'encounter.preferences'.tr)]),
    body:_loading?const Center(child:CircularProgressIndicator()):!_configured?Center(child:Padding(padding:const EdgeInsets.all(28),child:Column(mainAxisSize:MainAxisSize.min,children:[const Icon(Icons.auto_awesome,color:_rose,size:40),const SizedBox(height:18),Text('encounter.welcome'.tr,textAlign:TextAlign.center,style:const TextStyle(fontSize:24,fontWeight:FontWeight.w600)),const SizedBox(height:24),FilledButton(onPressed:_preferences,child:Text('encounter.preferences'.tr))]))):_tab==0?
-    filtered.isEmpty?Center(child:TextButton(onPressed:_preferences,child:Text('encounter.empty'.tr))):LayoutBuilder(builder:(context,box)=>PageView.builder(controller:_pages,itemCount:filtered.length,itemBuilder:(context,index)=>Padding(padding:const EdgeInsets.fromLTRB(24,18,24,110),child:Stack(fit:StackFit.expand,children:[
-     Positioned.fill(top:0,bottom:0,left:16,right:16,child:_backCard(filtered[(index+2)%filtered.length],const Color(0x99553543))),
-     Positioned.fill(top:6,bottom:6,left:8,right:8,child:_backCard(filtered[(index+1)%filtered.length],const Color(0x993E2935))),
-     Positioned.fill(top:14,bottom:14,child:ClipRRect(borderRadius:BorderRadius.circular(28),child:Stack(fit:StackFit.expand,children:[EncounterPortrait(key:ValueKey(filtered[index]['id']),character:filtered[index]),const IgnorePointer(child:DecoratedBox(decoration:BoxDecoration(gradient:LinearGradient(begin:Alignment.topCenter,end:Alignment.bottomCenter,colors:[Colors.transparent,Color(0x22000000),Color(0xEE171018)],stops:[0,.45,1])))),
+    filtered.isEmpty?Center(child:TextButton(onPressed:_preferences,child:Text('encounter.empty'.tr))):LayoutBuilder(builder:(context,box)=>Padding(padding:const EdgeInsets.fromLTRB(24,18,24,110),child:EncounterDeck(key:ValueKey(_deckRevision),itemCount:filtered.length,itemBuilder:(context,index)=>ClipRRect(borderRadius:BorderRadius.circular(28),child:Stack(fit:StackFit.expand,children:[EncounterPortrait(key:ValueKey(filtered[index]['id']),character:filtered[index]),const IgnorePointer(child:DecoratedBox(decoration:BoxDecoration(gradient:LinearGradient(begin:Alignment.topCenter,end:Alignment.bottomCenter,colors:[Colors.transparent,Color(0x22000000),Color(0xEE171018)],stops:[0,.45,1])))),
       Positioned(left:22,right:22,bottom:22,child:ConstrainedBox(constraints:BoxConstraints(maxHeight:max(80.0,box.maxHeight-110)),child:SingleChildScrollView(child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[InkWell(onTap:()async{await Get.to(()=>EncounterProfilePage(character:filtered[index]),transition:Transition.cupertino);if(mounted)await _load();},child:Text('${filtered[index]['name']} · ${filtered[index]['age']??25}',maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:28,fontWeight:FontWeight.w700,color:Colors.white))),Text(_s(filtered[index],'personality'),maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:_rose)),const SizedBox(height:8),Text((filtered[index]['tags'] as List? ?? []).join(' · '),maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white70)),Text('encounter.followers'.trParams({'count':'${filtered[index]['follower_count']??0}'}),style:const TextStyle(color:Colors.white70)),Text(_s(filtered[index],'description'),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white,height:1.5)),const SizedBox(height:18),Row(children:[IconButton(onPressed:()=>_open(filtered[index],gift:true),icon:const Icon(Icons.card_giftcard,color:_rose),tooltip:'encounter.gift'.tr),const SizedBox(width:12),Expanded(child:FilledButton(onPressed:()=>_open(filtered[index]),child:Text('encounter.chat'.tr)))])]))))
-     ])))
-    ])))):RefreshIndicator(onRefresh:_load,child:ListView.builder(padding:const EdgeInsets.only(bottom:110),physics:const AlwaysScrollableScrollPhysics(),itemCount:_chats.length,itemBuilder:(context,index){final c=_chats[index];return SizedBox(height:80,child:ListTile(leading:ClipRRect(borderRadius:BorderRadius.circular(14),child:SizedBox(width:52,height:52,child:EncounterAvatar(url:_s(c,'avatar_url'),size:52))),title:Text(_s(c,'name'),maxLines:1,overflow:TextOverflow.ellipsis),onTap:()=>Get.to(()=>EncounterChatPage(id:_s(c,'id'),name:_s(c,'name'),cover:_s(c,'cover_url'),avatar:_s(c,'avatar_url'),characterId:_s(c,'character_id')),transition:Transition.cupertino)));})),
+     ]))))):RefreshIndicator(onRefresh:_load,child:ListView.builder(padding:const EdgeInsets.only(bottom:110),physics:const AlwaysScrollableScrollPhysics(),itemCount:_chats.length,itemBuilder:(context,index){final c=_chats[index];return SizedBox(height:80,child:ListTile(leading:ClipRRect(borderRadius:BorderRadius.circular(14),child:SizedBox(width:52,height:52,child:EncounterAvatar(url:_s(c,'avatar_url'),size:52))),title:Text(_s(c,'name'),maxLines:1,overflow:TextOverflow.ellipsis),onTap:()=>Get.to(()=>EncounterChatPage(id:_s(c,'id'),name:_s(c,'name'),cover:_s(c,'cover_url'),avatar:_s(c,'avatar_url'),characterId:_s(c,'character_id')),transition:Transition.cupertino)));})),
    bottomNavigationBar:EncounterDock(index:_tab,onTab:(index)=>setState(()=>_tab=index),onCreate:_createCharacter),
   ));
  }
@@ -144,19 +140,54 @@ class _EncounterChatPageState extends State<EncounterChatPage> with WidgetsBindi
   try{
    final catalog=await ApiClient.instance.get('/v1/encounters/catalog');if(!mounted)return;
    final products=(catalog['products'] as List).where((e)=>category=='video'?e['key']=='encounter_video':e['category']==category&&e['key']!='encounter_video').toList();
-   if(products.isEmpty){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('encounter.unavailable'.tr)));return;}
-   final product=await showModalBottomSheet<Map<String,dynamic>>(context:context,backgroundColor:_panel,builder:(sheet)=>SafeArea(child:ListView(shrinkWrap:true,children:products.map((p)=>ListTile(title:Text('${p['emoji']} ${_s(p,'name_key').tr}',style:const TextStyle(color:Colors.white)),trailing:Text('${p['coins']} ◈',style:const TextStyle(color:_rose)),onTap:()=>Navigator.of(sheet).pop(Map<String,dynamic>.from(p as Map)))).toList())));
+   final icon=category=='gift'?Icons.card_giftcard:category=='video'?Icons.movie_outlined:Icons.image_outlined;
+   final title='encounter.$category'.tr;
+   final product=await showEncounterSheet<Map<String,dynamic>>(context,Builder(builder:(sheet)=>EncounterSheetContent(
+    title:title,icon:icon,children:[
+     if(products.isEmpty) ...[
+      const SizedBox(height:12),
+      Text('encounter.unavailable'.tr,textAlign:TextAlign.center,style:const TextStyle(color:Colors.white60)),
+      const SizedBox(height:28),
+     ] else ...[
+      Text('${'credits.balance'.tr}: ${catalog['balance']} ◈',style:const TextStyle(color:_rose)),
+      const SizedBox(height:16),
+      ...products.map((p)=>EncounterProductTile(product:Map<String,dynamic>.from(p as Map),
+       onTap:()=>Navigator.of(sheet).pop(Map<String,dynamic>.from(p as Map)))),
+     ],
+    ],
+   )));
    if(product==null||!mounted)return;
    if(catalog['is_subscribed']!=true){
-    final subscribe=await showDialog<bool>(context:context,builder:(dialog)=>AlertDialog(backgroundColor:_panel,title:Text('subscription.required.title'.tr,style:const TextStyle(color:Colors.white)),actions:[TextButton(onPressed:()=>Navigator.of(dialog).pop(false),child:Text('encounter.cancel'.tr,style:const TextStyle(color:_rose))),FilledButton(style:FilledButton.styleFrom(backgroundColor:_rose,foregroundColor:_night),onPressed:()=>Navigator.of(dialog).pop(true),child:Text('encounter.continue'.tr))]));
+    final subscribe=await showEncounterSheet<bool>(context,Builder(builder:(sheet)=>EncounterSheetContent(
+     title:'subscription.required.title'.tr,icon:Icons.favorite_border_rounded,children:[
+      FilledButton(onPressed:()=>Navigator.of(sheet).pop(true),child:Text('encounter.continue'.tr)),
+      TextButton(onPressed:()=>Navigator.of(sheet).pop(false),child:Text('encounter.cancel'.tr)),
+     ],
+    )));
     if(subscribe==true&&mounted)await Get.toNamed('/subscription');return;
    }
    if((catalog['balance'] as num)<(product['coins'] as num)){await Get.toNamed('/credits');return;}
    String demand;
    if(category=='gift'){demand='encounter.giftMessage'.trParams({'gift':_s(product,'name_key').tr});}else{
-    final request=await Get.to<String>(()=>const _MediaDemandPage(),transition:Transition.cupertino);if(request==null||!mounted)return;demand=request;
+    final request=await showEncounterSheet<String>(context,const EncounterDemandSheet());if(request==null||!mounted)return;demand=request;
    }
-   final confirmed=await showDialog<bool>(context:context,builder:(dialog)=>AlertDialog(backgroundColor:_panel,title:Text('encounter.confirm'.tr,style:const TextStyle(color:Colors.white)),content:SingleChildScrollView(child:Text('${_s(product,'name_key').tr}\n$demand\n\n${product['coins']} ◈\n${'credits.balance'.tr}: ${catalog['balance']} ◈\n${'encounter.refund'.tr}',style:const TextStyle(color:Colors.white70))),actions:[TextButton(onPressed:()=>Navigator.of(dialog).pop(false),child:Text('encounter.cancel'.tr,style:const TextStyle(color:_rose))),FilledButton(style:FilledButton.styleFrom(backgroundColor:_rose,foregroundColor:_night),onPressed:()=>Navigator.of(dialog).pop(true),child:Text('encounter.confirm'.tr))]));
+   final confirmed=await showEncounterSheet<bool>(context,Builder(builder:(sheet)=>EncounterSheetContent(
+    title:'encounter.confirm'.tr,icon:icon,children:[
+     Text('${product['emoji']??''} ${_s(product,'name_key').tr}',style:const TextStyle(fontSize:18)),
+     const SizedBox(height:12),
+     Container(padding:const EdgeInsets.all(18),decoration:BoxDecoration(
+      color:const Color(0x440F0A12),borderRadius:BorderRadius.circular(18)),
+      child:Text(demand,style:const TextStyle(color:Colors.white70,height:1.6))),
+     const SizedBox(height:22),
+     Text('${product['coins']} ◈',textAlign:TextAlign.center,style:const TextStyle(color:_rose,fontSize:32,fontWeight:FontWeight.w500)),
+     Text('${'credits.balance'.tr}: ${catalog['balance']} ◈',textAlign:TextAlign.center,style:const TextStyle(color:Colors.white54)),
+     const SizedBox(height:16),
+     Text('encounter.refund'.tr,style:const TextStyle(color:Colors.white54,fontSize:12),textAlign:TextAlign.center),
+     const SizedBox(height:24),
+     FilledButton(onPressed:()=>Navigator.of(sheet).pop(true),child:Text('encounter.confirm'.tr)),
+     TextButton(onPressed:()=>Navigator.of(sheet).pop(false),child:Text('encounter.cancel'.tr)),
+    ],
+   )));
    if(confirmed==true&&mounted)_send({'content':demand,'idempotency_key':_requestKey(),'product_key':product['key'],'quoted_coins':product['coins']});
   }catch(_){_error();}
  }
@@ -166,10 +197,3 @@ class _EncounterChatPageState extends State<EncounterChatPage> with WidgetsBindi
  ]))));
 }
 
-class _MediaDemandPage extends StatefulWidget{
- const _MediaDemandPage();@override State<_MediaDemandPage> createState()=>_MediaDemandPageState();
-}
-class _MediaDemandPageState extends State<_MediaDemandPage>{
- final _text=TextEditingController();@override void dispose(){_text.dispose();super.dispose();}
- @override Widget build(BuildContext context)=>Theme(data:_encounterTheme,child:Scaffold(backgroundColor:_night,appBar:AppBar(backgroundColor:_night,title:Text('encounter.demand'.tr)),body:Padding(padding:const EdgeInsets.all(24),child:ListView(children:[TextField(controller:_text,maxLength:500,maxLines:5,decoration:InputDecoration(hintText:'encounter.demandHint'.tr)),FilledButton(onPressed:(){if(_text.text.trim().isNotEmpty)Get.back(result:_text.text.trim());},child:Text('encounter.continue'.tr))]))));
-}

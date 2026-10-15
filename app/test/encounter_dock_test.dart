@@ -33,13 +33,16 @@ void main() {
     expect(creates, 1);
     expect(tester.takeException(), isNull);
   });
-  test('dock outline follows both sides of the center circle', () {
-    const size = Size(350, 84);
+  test('dock outline rises only above the action and keeps the bottom flat', () {
+    const size = Size(350, 68);
     final outline = encounterDockOutline(size);
-    expect(outline.contains(const Offset(175, 81)), isTrue);
-    expect(outline.contains(const Offset(175, 83)), isFalse);
+    expect(outline.contains(const Offset(175, 65)), isFalse);
+    expect(outline.contains(const Offset(175, 67)), isFalse);
     expect(outline.contains(const Offset(175, 3)), isTrue);
     expect(outline.contains(const Offset(175, 1)), isFalse);
-    expect(outline.contains(const Offset(115, 75)), isFalse);
+    for (final x in [60.0, 115.0, 175.0, 235.0, 290.0]) {
+      expect(outline.contains(Offset(x, 63)), isTrue);
+      expect(outline.contains(Offset(x, 65)), isFalse);
+    }
   });
 }
