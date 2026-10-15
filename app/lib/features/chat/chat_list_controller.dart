@@ -19,6 +19,7 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
   final loading = false.obs;
   final failed = false.obs;
   final companions = <Map<String, dynamic>>[].obs;
+  final appointments = <Map<String, dynamic>>[].obs;
   final searchQuery = ''.obs;
   final currentRoute = ''.obs;
 
@@ -88,6 +89,7 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
                 }).map(_withReadState).toList());
       }
       _cursor = data['cursor'] as String?;
+      await _loadAppointments(generation);
     } on ApiException catch (error) {
       if (generation == _requestId && error.statusCode == 400) _cursor = null;
     } catch (_) {
@@ -109,6 +111,7 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
         ++_requestId;
         _cursor = null;
         companions.clear();
+        appointments.clear();
         _readThrough.clear();
         loading.value = false;
         _silent = false;
@@ -144,6 +147,7 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
     ++_requestId;
     _cursor = null;
     companions.clear();
+    appointments.clear();
     loading.value = true;
     failed.value = false;
     _silent = false;
@@ -169,6 +173,7 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
             .where((e) => e['creation_source'] != 'ai_pet')
             .map((e) => _withReadState(Map<String, dynamic>.from(e))),
       );
+      await _loadAppointments(requestId);
     } catch (_) {
       if (requestId == _requestId && !silent && companions.isEmpty) {
         failed.value = true;
@@ -178,6 +183,18 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
         loading.value = false;
         _silent = false;
       }
+    }
+  }
+
+  Future<void> _loadAppointments(int generation) async {
+    try {
+      final data = await ApiClient.instance.get('/v1/companions/appointments');
+      if (generation != _requestId || !_signedIn || !_foreground) return;
+      if (data is! Map || data['items'] is! List) return;
+      appointments.assignAll((data['items'] as List).whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item)));
+    } catch (_) {
+      // Keep chat usable when the optional date strip cannot refresh.
     }
   }
 

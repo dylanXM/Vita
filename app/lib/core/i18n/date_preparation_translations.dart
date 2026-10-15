@@ -1,5 +1,6 @@
 const datePreparationTranslations = <String, Map<String, String>>{
   'en': {
+    "chat.dateConfirm": "Open the date scene with @name?",
     'date.prep.title': 'How would you like this date to feel?',
     'date.prep.hint': 'Tell @name so they can prepare.',
     'date.prep.talk': 'Talk about today', 'date.prep.talkHint': 'Start with what is on your mind.',
@@ -8,6 +9,7 @@ const datePreparationTranslations = <String, Map<String, String>>{
     'date.prep.selected': 'Told @name: @choice', 'date.prep.modify': 'Change',
   },
   'zh_CN': {
+    "chat.dateConfirm": "要进入与 @name 的约会场景吗？",
     'date.prep.title': '这次约会，你想怎么过？', 'date.prep.hint': '告诉 @name，让 TA 提前准备。',
     'date.prep.talk': '想聊聊今天', 'date.prep.talkHint': '从你今天在意的事开始。',
     'date.prep.quiet': '想安静待一会儿', 'date.prep.quietHint': '慢慢相处，不着急回答问题。',
@@ -15,6 +17,7 @@ const datePreparationTranslations = <String, Map<String, String>>{
     'date.prep.selected': '已告诉 @name：@choice', 'date.prep.modify': '修改',
   },
   'zh_TW': {
+    "chat.dateConfirm": "要進入與 @name 的約會場景嗎？",
     'date.prep.title': '這次約會，你想怎麼過？', 'date.prep.hint': '告訴 @name，讓 TA 提前準備。',
     'date.prep.talk': '想聊聊今天', 'date.prep.talkHint': '從你今天在意的事開始。',
     'date.prep.quiet': '想安靜待一會兒', 'date.prep.quietHint': '慢慢相處，不急著回答問題。',
@@ -22,6 +25,7 @@ const datePreparationTranslations = <String, Map<String, String>>{
     'date.prep.selected': '已告訴 @name：@choice', 'date.prep.modify': '修改',
   },
   'es': {
+    "chat.dateConfirm": "¿Entrar en la escena de la cita con @name?",
     'date.prep.title': '¿Cómo quieres pasar esta cita?', 'date.prep.hint': 'Díselo a @name para que pueda prepararse.',
     'date.prep.talk': 'Hablar de hoy', 'date.prep.talkHint': 'Empieza por lo que tienes en mente.',
     'date.prep.quiet': 'Un rato tranquilo juntos', 'date.prep.quietHint': 'Sin prisas ni tantas preguntas.',
@@ -29,6 +33,7 @@ const datePreparationTranslations = <String, Map<String, String>>{
     'date.prep.selected': 'Le dijiste a @name: @choice', 'date.prep.modify': 'Cambiar',
   },
   'pt': {
+    "chat.dateConfirm": "Entrar no cenário do encontro com @name?",
     'date.prep.title': 'Como quer passar este encontro?', 'date.prep.hint': 'Conte a @name para que possa se preparar.',
     'date.prep.talk': 'Conversar sobre hoje', 'date.prep.talkHint': 'Comece pelo que está pensando.',
     'date.prep.quiet': 'Um momento tranquilo juntos', 'date.prep.quietHint': 'Sem pressa e com menos perguntas.',
@@ -36,6 +41,7 @@ const datePreparationTranslations = <String, Map<String, String>>{
     'date.prep.selected': 'Você contou a @name: @choice', 'date.prep.modify': 'Alterar',
   },
   'ja': {
+    "chat.dateConfirm": "@name とのデートシーンに入りますか？",
     'date.prep.title': '今回のデート、どう過ごしたい？', 'date.prep.hint': '@name に伝えて、準備してもらおう。',
     'date.prep.talk': '今日のことを話したい', 'date.prep.talkHint': '今日気になったことから。',
     'date.prep.quiet': '静かに一緒に過ごしたい', 'date.prep.quietHint': '質問を急がず、ゆっくり。',
@@ -43,6 +49,7 @@ const datePreparationTranslations = <String, Map<String, String>>{
     'date.prep.selected': '@name に伝えたこと：@choice', 'date.prep.modify': '変更',
   },
   'ko': {
+    "chat.dateConfirm": "@name 님과의 데이트 장면으로 이동할까요?",
     'date.prep.title': '이번 데이트는 어떻게 보낼까요?', 'date.prep.hint': '@name에게 알려주면 미리 준비할 수 있어요.',
     'date.prep.talk': '오늘 이야기를 하고 싶어', 'date.prep.talkHint': '오늘 마음에 남은 일부터 이야기해요.',
     'date.prep.quiet': '조용히 함께 있고 싶어', 'date.prep.quietHint': '질문을 서두르지 않고 천천히.',
@@ -50,6 +57,7 @@ const datePreparationTranslations = <String, Map<String, String>>{
     'date.prep.selected': '@name에게 전했어요: @choice', 'date.prep.modify': '변경',
   },
   'ar': {
+    "chat.dateConfirm": "هل تريد دخول مشهد الموعد مع @name؟",
     'date.prep.title': 'كيف تود قضاء هذا الموعد؟', 'date.prep.hint': 'أخبر @name ليتمكن من الاستعداد.',
     'date.prep.talk': 'أريد الحديث عن اليوم', 'date.prep.talkHint': 'ابدأ بما يشغل بالك اليوم.',
     'date.prep.quiet': 'أريد وقتًا هادئًا معًا', 'date.prep.quietHint': 'على مهل، مع أسئلة أقل.',

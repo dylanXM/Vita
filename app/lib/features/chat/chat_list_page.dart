@@ -5,6 +5,7 @@ import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../companion/companion_create_method_page.dart';
 import 'chat_list_controller.dart';
+import 'chat_appointment_strip.dart';
 import 'chat_list_presentation.dart';
 import 'chat_page.dart';
 
@@ -40,6 +41,8 @@ class ChatListPage extends StatelessWidget {
               ),
             ),
             _ChatSearchBox(),
+            Obx(() => ctrl.appointments.isEmpty
+                ? const SizedBox.shrink() : const ChatAppointmentStrip()),
             Expanded(child: Obx(() => _buildBody(ctrl, bottomSpacing))),
           ],
         ),

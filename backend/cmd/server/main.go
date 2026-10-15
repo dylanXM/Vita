@@ -192,6 +192,7 @@ func main() {
 			companions.GET("/:id", handler.GetCompanion)
 			companions.GET("/", handler.ListCompanions)
 			companions.GET("/updates", handler.CompanionUpdates)
+			companions.GET("/appointments", handler.ListChatAppointments)
 			companions.PUT("/:id", handler.UpdateCompanion)
 			companions.DELETE("/:id", handler.DeleteCompanion)
 			companions.POST("/:id/restore", handler.RestoreCompanion)

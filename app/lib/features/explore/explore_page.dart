@@ -10,7 +10,6 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets.dart';
 import '../../shared/media_image.dart';
-import '../ai_pets/ai_pet_avatar.dart';
 import '../ai_pets/ai_pets_page.dart';
 import '../ai_pets/ai_pet_home_page.dart';
 import '../chat/chat_page.dart';
@@ -152,69 +151,41 @@ class ExplorePage extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 126),
           children: [
             VitaTabHeader(title: 'tab.discover'.tr, showDivider: false),
-            Obx(() {
-              final ctrl = ExploreController.to;
-              final featured = ctrl.featuredPost;
-              if (featured != null) {
-                return _FeaturedMoment(
-                  post: featured,
-                  onTap: () async {
-                    AnalyticsService.to
-                        .track('discover_moment_opened', category: 'life');
-                    await _showSignal(context, featured);
-                    await ctrl.markFeaturedViewed(featured);
-                  },
-                );
-              }
-              // Once a moment has been viewed, keep this large entry closed.
-              // The compact destinations below remain available.
-              if (ctrl.viewedFeaturedIds.isNotEmpty) {
-                return const SizedBox.shrink();
-              }
-              final hasStory = ctrl.storyChapter.value != null;
-              final petName = ctrl.petName.value;
-              final leadIsPet = !hasStory && petName?.isNotEmpty == true;
-              return _DiscoveryLead(
-                icon: hasStory
-                    ? Icons.auto_stories_rounded
-                    : petName?.isNotEmpty == true
-                        ? Icons.pets_rounded
-                        : Icons.auto_stories_rounded,
-                title: hasStory
-                    ? 'storyHub.title'.tr
-                    : petName?.isNotEmpty == true
-                        ? petName!
-                        : 'storyHub.title'.tr,
-                subtitle: hasStory
-                    ? 'discover.continueStory'
-                        .trParams({'count': '${ctrl.storyChapter.value}'})
-                    : petName?.isNotEmpty == true
-                        ? 'discover.myPet'.trParams({'name': petName!})
-                        : 'discover.stories'.tr,
-                artworkUrl: hasStory
-                    ? ctrl.storyCoverUrl.value ?? ''
-                    : leadIsPet
-                        ? ctrl.petAvatarUrl.value ?? ''
-                        : '',
-                isPet: leadIsPet,
-                onTap: () async {
-                  if (!hasStory && petName?.isNotEmpty == true) {
-                    await Get.to(() => const AIPetsPage(),
-                        transition: Transition.cupertino);
-                  } else {
-                    await Get.to(() => const StoriesPage(),
-                        transition: Transition.cupertino);
-                  }
-                  ctrl.loadHighlights();
-                },
-              );
-            }),
-            Obx(() => ExploreController.to.viewedFeaturedIds.isEmpty &&
-                    ExploreController.to.featuredPost == null &&
-                    (ExploreController.to.storyChapter.value != null ||
-                        ExploreController.to.petName.value?.isNotEmpty != true)
-                ? const SizedBox.shrink()
-                : _PlaceCard(
+            _PlaceCard(
+              icon: Icons.auto_awesome_outlined,
+              title: 'encounter.title'.tr,
+              subtitle: 'encounter.welcome'.tr,
+              onTap: () => Get.to(() => const EncountersPage(),
+                  transition: Transition.cupertino),
+            ),
+            _PlaceCard(
+              icon: Icons.camera_alt_outlined,
+              title: 'explore.moments'.tr,
+              subtitle: 'discover.moments'.tr,
+              onTap: () {
+                AnalyticsService.to
+                    .track('discover_moment_opened', category: 'life');
+                Get.to(() => const MomentsPage(),
+                    transition: Transition.cupertino);
+              },
+            ),
+            Obx(() => _PlaceCard(
+                    icon: Icons.pets_outlined,
+                    title: 'aiPets.title'.tr,
+                    subtitle:
+                        ExploreController.to.petName.value?.isNotEmpty == true
+                            ? 'discover.myPet'.trParams(
+                                {'name': ExploreController.to.petName.value!})
+                            : 'discover.pets'.tr,
+                    onTap: () async {
+                      AnalyticsService.to
+                          .track('discover_pet_opened', category: 'life');
+                      await Get.to(() => const AIPetsPage(),
+                          transition: Transition.cupertino);
+                      ExploreController.to.loadHighlights();
+                    },
+                  )),
+            Obx(() => _PlaceCard(
                     icon: Icons.auto_stories_outlined,
                     title: 'storyHub.title'.tr,
                     subtitle: ExploreController.to.storyChapter.value == null
@@ -231,319 +202,11 @@ class ExplorePage extends StatelessWidget {
                       ExploreController.to.loadHighlights();
                     },
                   )),
-            Obx(() => ExploreController.to.viewedFeaturedIds.isEmpty &&
-                    ExploreController.to.featuredPost == null &&
-                    ExploreController.to.storyChapter.value == null &&
-                    ExploreController.to.petName.value?.isNotEmpty == true
-                ? const SizedBox.shrink()
-                : _PlaceCard(
-                    icon: Icons.pets_outlined,
-                    title: 'aiPets.title'.tr,
-                    subtitle:
-                        ExploreController.to.petName.value?.isNotEmpty == true
-                            ? 'discover.myPet'.trParams(
-                                {'name': ExploreController.to.petName.value!})
-                            : 'discover.pets'.tr,
-                    onTap: () async {
-                      AnalyticsService.to
-                          .track('discover_pet_opened', category: 'life');
-                      await Get.to(() => const AIPetsPage(),
-                          transition: Transition.cupertino);
-                      ExploreController.to.loadHighlights();
-                    },
-                  )),
-            _PlaceCard(
-              icon: Icons.camera_alt_outlined,
-              title: 'explore.moments'.tr,
-              subtitle: 'discover.moments'.tr,
-              onTap: () {
-                AnalyticsService.to
-                    .track('discover_moment_opened', category: 'life');
-                Get.to(() => const MomentsPage(),
-                    transition: Transition.cupertino);
-              },
-            ),
-            _PlaceCard(
-              icon: Icons.auto_awesome_outlined,
-              title: 'encounter.title'.tr,
-              subtitle: 'encounter.welcome'.tr,
-              onTap: () => Get.to(() => const EncountersPage(),
-                  transition: Transition.cupertino),
-            ),
           ],
         ),
       ),
     );
   }
-}
-
-/// A real recent moment gives Discover a reason to open today.
-class _FeaturedMoment extends StatelessWidget {
-  const _FeaturedMoment({required this.post, required this.onTap});
-
-  final Map<String, dynamic> post;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final vita = context.vita;
-    final author = Map<String, dynamic>.from(post['author'] as Map? ?? {});
-    final media = _momentMediaUrls(post);
-    final content = '${post['content'] ?? ''}'.trim();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
-      child: Material(
-        color: vita.surface,
-        borderRadius: BorderRadius.circular(22),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: SizedBox(
-            height: 280,
-            child: Stack(fit: StackFit.expand, children: [
-              _FeaturedMomentArtwork(author: author),
-              if (media.isNotEmpty)
-                VitaMediaImage(
-                  url: media.first,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox.expand(),
-                ),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: media.isEmpty
-                        ? const [Color(0x11000000), Color(0xBB000000)]
-                        : const [Color(0x33000000), Color(0xDD000000)],
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 18,
-                right: 18,
-                top: 16,
-                child: Row(children: [
-                  const Icon(Icons.blur_on_rounded,
-                      size: 19, color: Colors.white),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: Text('discover.today'.tr,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700)),
-                  ),
-                ]),
-              ),
-              Positioned(
-                left: 18,
-                right: 18,
-                bottom: 18,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('${author['name'] ?? ''}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 12)),
-                    const SizedBox(height: 5),
-                    Text(content.isEmpty ? 'discover.moments'.tr : content,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            height: 1.3,
-                            fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 12),
-                    Text('discover.enter'.tr,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              ),
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FeaturedMomentArtwork extends StatelessWidget {
-  const _FeaturedMomentArtwork({required this.author});
-
-  final Map<String, dynamic> author;
-
-  @override
-  Widget build(BuildContext context) {
-    final name = '${author['name'] ?? ''}';
-    final portrait = '${author['portrait_url'] ?? ''}';
-    final isPet = author['creation_source'] == 'ai_pet';
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF302945), Color(0xFF18171F)],
-        ),
-      ),
-      child: Stack(alignment: const Alignment(0, -.15), children: [
-        Container(
-          width: 174,
-          height: 174,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: const Color(0x30AC8BFF)),
-          ),
-        ),
-        Container(
-          width: 132,
-          height: 132,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: const Color(0x224D3A70),
-            border: Border.all(color: const Color(0x45AC8BFF)),
-            boxShadow: const [
-              BoxShadow(color: Color(0x553F2A6D), blurRadius: 55),
-            ],
-          ),
-        ),
-        if (isPet)
-          SizedBox(
-            width: 116,
-            height: 116,
-            child: AIPetAvatar(name: name, imageUrl: portrait),
-          )
-        else
-          VitaAvatar(name: name, radius: 52, imageUrl: portrait),
-      ]),
-    );
-  }
-}
-
-class _DiscoveryLead extends StatelessWidget {
-  const _DiscoveryLead(
-      {required this.icon,
-      required this.title,
-      required this.subtitle,
-      required this.artworkUrl,
-      required this.isPet,
-      required this.onTap});
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String artworkUrl;
-  final bool isPet;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
-        child: Material(
-          borderRadius: BorderRadius.circular(22),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onTap,
-            child: Ink(
-              height: 280,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF4D3D65), Color(0xFF1E1B28)],
-                ),
-              ),
-              child: LayoutBuilder(
-                builder: (context, constraints) => Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Positioned(
-                      top: 18,
-                      right: -constraints.maxWidth * .10,
-                      bottom: 8,
-                      width: constraints.maxWidth * .88,
-                      child: artworkUrl.isNotEmpty
-                          ? isPet
-                              ? AIPetAvatar(name: title, imageUrl: artworkUrl)
-                              : VitaMediaImage(
-                                  url: artworkUrl, fit: BoxFit.cover)
-                          : Center(
-                              child: Icon(icon,
-                                  size: 122,
-                                  color: Colors.white.withValues(alpha: .20))),
-                    ),
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                          colors: [Color(0xE62B2339), Color(0x002B2339)],
-                          stops: [0, .85],
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      left: 22,
-                      right: 22,
-                      top: 22,
-                      child: Text('discover.today'.tr,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600)),
-                    ),
-                    Positioned(
-                      left: 22,
-                      right: constraints.maxWidth * .30,
-                      bottom: 24,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(icon, color: Colors.white70, size: 27),
-                          const SizedBox(height: 10),
-                          Text(title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 25,
-                                  fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 6),
-                          Text(subtitle,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: Colors.white70, fontSize: 13)),
-                          const SizedBox(height: 14),
-                          Text('discover.enter'.tr,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
 }
 
 class _PlaceCard extends StatelessWidget {
