@@ -141,7 +141,9 @@ class _ShellPageState extends State<ShellPage> {
         ),
       ]),
       bottomNavigationBar: Obx(
-        () => VitaTabBar(index: ctrl.index.value, onTap: ctrl.switchTo),
+        () => VitaTabBar(index: ctrl.index.value, onTap: ctrl.switchTo,
+          unreadCount: Get.isRegistered<ChatListController>()
+              ? ChatListController.to.totalUnreadCount : 0),
       ),
     );
   }
@@ -185,10 +187,12 @@ const List<_NavItem> _kTabs = [
 
 /// The same liquid-glass dock used by ToVideo, with Vita's four destinations.
 class VitaTabBar extends StatefulWidget {
-  const VitaTabBar({super.key, required this.index, required this.onTap});
+  const VitaTabBar({super.key, required this.index, required this.onTap,
+    this.unreadCount = 0});
 
   final int index;
   final ValueChanged<int> onTap;
+  final int unreadCount;
 
   static const double pillHeight = 54;
   static const double edgeInset = 8;
@@ -353,6 +357,8 @@ class _VitaTabBarState extends State<VitaTabBar>
                                 button: true,
                                 selected: widget.index == i,
                                 label: _kTabs[i].labelKey.tr,
+                                value: i == 1 && widget.unreadCount > 0
+                                    ? '${widget.unreadCount}' : null,
                                 child: GestureDetector(
                                   behavior: HitTestBehavior.opaque,
                                   onTap: () {
@@ -372,7 +378,7 @@ class _VitaTabBarState extends State<VitaTabBar>
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(
+                                          Stack(clipBehavior: Clip.none, children: [Icon(
                                             widget.index == i
                                                 ? _kTabs[i].selectedIcon
                                                 : _kTabs[i].icon,
@@ -381,6 +387,26 @@ class _VitaTabBarState extends State<VitaTabBar>
                                                 ? vita.green
                                                 : vita.subText,
                                           ),
+                                            if (i == 1 && widget.unreadCount > 0)
+                                              Positioned(top: -5, left: 16,
+                                                child: IgnorePointer(child: ExcludeSemantics(
+                                                  child: Container(
+                                                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                                                    alignment: Alignment.center,
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFFC64F79),
+                                                      borderRadius: BorderRadius.circular(10),
+                                                      border: Border.all(color: vita.surface, width: 1.5)),
+                                                    child: Text(widget.unreadCount > 99 ? '99+' : '${widget.unreadCount}',
+                                                      textDirection: TextDirection.ltr,
+                                                      textScaler: TextScaler.noScaling,
+                                                      style: const TextStyle(color: Colors.white, fontSize: 10,
+                                                        height: 1, fontWeight: FontWeight.w700)),
+                                                  ),
+                                                )),
+                                              ),
+                                          ]),
                                           const SizedBox(height: 2),
                                           Text(
                                             _kTabs[i].labelKey.tr,

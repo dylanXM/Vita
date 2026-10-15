@@ -24,6 +24,12 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
   final searchQuery = ''.obs;
   final currentRoute = ''.obs;
 
+  int get totalUnreadCount => companions.fold<int>(0, (total, companion) {
+    if (companion['creation_source'] == 'ai_pet') return total;
+    final count = ChatListPresentation.from(companion).unreadCount;
+    return total + (count > 0 ? count : 0);
+  });
+
   final _readThrough = <String, DateTime>{};
 
   /// Keep stale list responses from resurrecting messages already displayed.
