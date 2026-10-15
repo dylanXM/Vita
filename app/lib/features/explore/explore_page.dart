@@ -275,25 +275,23 @@ class _PlaceCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: SizedBox(height: 128, child: LayoutBuilder(builder: (context, box) {
           return Stack(fit: StackFit.expand, children: [
-            PositionedDirectional(top: 0, bottom: 0, end: 0, width: box.maxWidth * .48,
+            PositionedDirectional(top: 0, bottom: 0, end: 0, width: box.maxWidth * .50,
               child: imageUrl.trim().isEmpty ? placeholder() : VitaMediaImage(
                 url: imageUrl, fit: imageFit,
                 placeholderBuilder: (_) => placeholder(),
                 errorBuilder: (_, __, ___) => placeholder(),
               )),
-            IgnorePointer(child: DecoratedBox(decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: rtl ? Alignment.centerRight : Alignment.centerLeft,
-                end: rtl ? Alignment.centerLeft : Alignment.centerRight,
-                colors: [vita.surface, vita.surface,
-                  vita.surface.withValues(alpha: .08)],
-                stops: const [0, .48, 1],
-              ),
-            ))),
+            IgnorePointer(child: PhysicalShape(
+              clipper: _PlaceCardPanelClipper(rtl: rtl),
+              color: vita.surface,
+              shadowColor: Colors.black.withValues(alpha: .14),
+              elevation: 2,
+              child: const SizedBox.expand(),
+            )),
             Material(color: Colors.transparent, child: InkWell(onTap: onTap,
               child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                 child: Align(alignment: AlignmentDirectional.centerStart,
-                  child: SizedBox(width: box.maxWidth * .55,
+                  child: SizedBox(width: math.max(0.0, box.maxWidth * .50 - 20),
                     child: Column(mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
@@ -313,6 +311,29 @@ class _PlaceCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The text panel overlaps the image, with the same slant mirrored for RTL.
+class _PlaceCardPanelClipper extends CustomClipper<Path> {
+  const _PlaceCardPanelClipper({required this.rtl});
+
+  final bool rtl;
+
+  @override
+  Path getClip(Size size) {
+    final start = rtl ? size.width : 0.0;
+    final topEdge = size.width * (rtl ? .38 : .62);
+    final bottomEdge = size.width * (rtl ? .46 : .54);
+    return Path()
+      ..moveTo(start, 0)
+      ..lineTo(topEdge, 0)
+      ..lineTo(bottomEdge, size.height)
+      ..lineTo(start, size.height)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(covariant _PlaceCardPanelClipper oldClipper) => rtl != oldClipper.rtl;
 }
 
 /// Moments second page — companions' public posts, pushed from the Explore
