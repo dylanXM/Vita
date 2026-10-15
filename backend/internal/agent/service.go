@@ -939,13 +939,13 @@ func (s *Service) ComposeInteractionReaction(ctx context.Context, userID, compan
 	recent = append(recent, ChatMessage{Role: "user", Content: instruction})
 	reactionSystem := s.companionPrompt(ctx, profile) + "\n\n" + responseLanguagePolicy("", locale) + "\n\n" + emojiMessagePolicy
 	if kind == "date_attendance" {
-		reactionSystem += "\nReturn ONLY JSON {\"message\":\"one or two short sentences\",\"affect\":null}. " + affectReplyPolicy
+		reactionSystem += "\nReturn ONLY JSON {\"message\":\"one or two short sentences, at most 80 characters\",\"affect\":null}. Limit affect.reason to 60 characters. " + affectReplyPolicy
 	}
 	response, _, err := s.generateTextWithFallback(ctx, companionID, kind+"_reaction", models, GenerateRequest{
 		System:   reactionSystem,
 		Messages: recent, Temperature: 0.85, MaxTokens: func() int {
 			if kind == "date_attendance" {
-				return 384
+				return 512
 			}
 			return 120
 		}(),

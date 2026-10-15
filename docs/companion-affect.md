@@ -21,6 +21,7 @@
 
 - 定时情绪演进不调用模型。短情绪字段与回复共用原请求；只向模型补充当前状态和最近一条人际情绪，不发送整本状态历史。
 - 生活分享在调用前检查资格，并读取最近六条普通聊天。原有分享请求可以决定不发送；不再强制另起话题。
+- 选择不分享只结束对应决策，不把事件标记为已经发给用户。
 - 每个生活事件原子认领发送决策，最多三轮，间隔至少三十分钟，避免异常结果或多 worker 导致每轮重复调用。每轮内部保留原有模型路由及供应商 fallback。
 - 无效 JSON 不发送；无效情绪字段不触发修复模型调用。约会反应调用失败时复用本地化文案，并以关系阶段/现有压力计算有限的后备影响。
 
@@ -31,3 +32,5 @@
 本次按要求不运行 test、check、构建、数据库迁移或真实供应商请求。新增纯逻辑用例及 PostgreSQL 事务用例，尚未执行。
 
 最快验证：在隔离环境准备已登录且可主动联系的普通伴侣，确认生活经历及未回应事实只记一次；检查四条主动联系路径共同降频，直接聊天保持可用；确认回复 JSON 不泄漏、已支付约会仍可进入。用现有模型调用记录核对调度没有新增情绪专用请求，并验证同一分享事件失败重试受三轮/三十分钟限制。
+
+涉及文件：`backend/internal/agent/{affect.go,affect_test.go,contact_preferences.go,conversation_turns.go,conversation_turns_test.go,date_attendance.go,moment_scene.go,service.go,spontaneous_contact.go}`、`backend/internal/handler/world_engine.go`、上述迁移及本文。
