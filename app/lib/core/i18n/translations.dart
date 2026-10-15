@@ -725,7 +725,6 @@ class VitaTranslations extends Translations {
       'aiPets.planLocked': 'Requires an eligible subscription',
       'aiPets.subscriptionRequired':
           'This breed is not included in your current subscription.',
-      'aiPets.level': 'Level @level',
       'aiPets.hunger': 'Fullness',
       'aiPets.hydration': 'Hydration',
       'aiPets.careCooldown': 'Please wait before caring for your pet again',
@@ -1597,7 +1596,6 @@ class VitaTranslations extends Translations {
       'aiPets.available': '可以领养',
       'aiPets.planLocked': '需要符合条件的订阅',
       'aiPets.subscriptionRequired': '当前订阅不包含这个宠物品种。',
-      'aiPets.level': '@level 级',
       'aiPets.hunger': '饱腹',
       'aiPets.hydration': '饮水',
       'aiPets.careCooldown': '请稍后再进行这项照护',

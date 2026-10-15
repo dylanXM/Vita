@@ -11,7 +11,6 @@ import '../../../../core/theme.dart';
 class PetActionMenu extends StatefulWidget {
   const PetActionMenu({
     super.key,
-    required this.level,
     required this.coins,
     required this.experience,
     required this.state,
@@ -27,7 +26,6 @@ class PetActionMenu extends StatefulWidget {
     this.onHint,
   });
 
-  final int level;
   final int coins;
   final int experience;
   final Map<String, dynamic> state;
@@ -133,7 +131,6 @@ class _PetActionMenuState extends State<PetActionMenu>
   Widget _buildPanel(BuildContext context) {
     final vita = context.vita;
     final state = widget.state;
-    final level = widget.level;
     return Container(
       width: 268,
       constraints: BoxConstraints(
@@ -163,9 +160,6 @@ class _PetActionMenuState extends State<PetActionMenu>
                         fontWeight: FontWeight.w700,
                         color: vita.text)),
               ),
-              Text('aiPets.level'.trParams({'level': '$level'}),
-                  style: TextStyle(fontSize: 12, color: vita.subText)),
-              const SizedBox(width: 10),
               _IconButton(
                 icon: Icons.refresh,
                 tooltip: 'aiPets.refresh',

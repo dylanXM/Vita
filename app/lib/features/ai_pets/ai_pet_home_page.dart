@@ -338,7 +338,6 @@ class _AIPetHomePageState extends State<AIPetHomePage>
   @override
   Widget build(BuildContext context) {
     final state = _state ?? const <String, dynamic>{};
-    final level = (state['level'] as num?)?.toInt() ?? 1;
     return Scaffold(
       backgroundColor: context.vita.pageBg,
       body: Stack(
@@ -363,7 +362,6 @@ class _AIPetHomePageState extends State<AIPetHomePage>
             child: Align(
               alignment: const Alignment(.92, .98),
               child: PetActionMenu(
-                level: level,
                 coins: (state['coins'] as num?)?.toInt() ?? 0,
                 experience: (state['experience'] as num?)?.toInt() ?? 0,
                 state: state,
