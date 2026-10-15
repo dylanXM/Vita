@@ -8,6 +8,7 @@ import '../../shared/media_image.dart';
 import 'encounter_media.dart';
 import 'encounter_chat_backdrop.dart';
 import 'encounter_dock.dart';
+import 'encounter_conversations.dart';
 import 'encounter_deck.dart';
 import 'encounter_purchase_sheet.dart';
 import 'encounter_portrait.dart';
@@ -25,7 +26,7 @@ class EncountersPage extends StatefulWidget {
  @override State<EncountersPage> createState() => _EncountersPageState();
 }
 class _EncountersPageState extends State<EncountersPage> {
- List<Map<String,dynamic>> _characters=[],_chats=[];
+ List<Map<String,dynamic>> _characters=[];
  bool _loading=true,_configured=false;
  String _gender='',_personality=''; int _tab=0;
  int _deckRevision=0;
@@ -35,9 +36,8 @@ class _EncountersPageState extends State<EncountersPage> {
   try {
    final chars=await ApiClient.instance.get('/v1/encounters/characters');
    final prefs=await ApiClient.instance.get('/v1/encounters/preferences');
-   final chats=await ApiClient.instance.get('/v1/encounters/conversations');
    if(!mounted)return;
-   setState((){_characters=List<Map<String,dynamic>>.from((chars['items'] as List).map((e)=>Map<String,dynamic>.from(e as Map)));_chats=List<Map<String,dynamic>>.from((chats['items'] as List).map((e)=>Map<String,dynamic>.from(e as Map)));_configured=prefs['configured']==true;_gender=_s(prefs,'gender');_personality=_s(prefs,'personality');_loading=false;});
+   setState((){_characters=List<Map<String,dynamic>>.from((chars['items'] as List).map((e)=>Map<String,dynamic>.from(e as Map)));_configured=prefs['configured']==true;_gender=_s(prefs,'gender');_personality=_s(prefs,'personality');_loading=false;});
   } catch(_){if(mounted)setState(()=>_loading=false);_error();}
  }
  Future<void> _preferences() async {
@@ -65,7 +65,10 @@ class _EncountersPageState extends State<EncountersPage> {
    body:_loading?const Center(child:CircularProgressIndicator()):!_configured?Center(child:Padding(padding:const EdgeInsets.all(28),child:Column(mainAxisSize:MainAxisSize.min,children:[const Icon(Icons.auto_awesome,color:_rose,size:40),const SizedBox(height:18),Text('encounter.welcome'.tr,textAlign:TextAlign.center,style:const TextStyle(fontSize:24,fontWeight:FontWeight.w600)),const SizedBox(height:24),FilledButton(onPressed:_preferences,child:Text('encounter.preferences'.tr))]))):_tab==0?
     filtered.isEmpty?Center(child:TextButton(onPressed:_preferences,child:Text('encounter.empty'.tr))):LayoutBuilder(builder:(context,box)=>Padding(padding:const EdgeInsets.fromLTRB(24,18,24,110),child:EncounterDeck(key:ValueKey(_deckRevision),itemCount:filtered.length,itemBuilder:(context,index)=>ClipRRect(borderRadius:BorderRadius.circular(28),child:Stack(fit:StackFit.expand,children:[EncounterPortrait(key:ValueKey(filtered[index]['id']),character:filtered[index]),const IgnorePointer(child:DecoratedBox(decoration:BoxDecoration(gradient:LinearGradient(begin:Alignment.topCenter,end:Alignment.bottomCenter,colors:[Colors.transparent,Color(0x22000000),Color(0xEE171018)],stops:[0,.45,1])))),
       Positioned(left:22,right:22,bottom:22,child:ConstrainedBox(constraints:BoxConstraints(maxHeight:max(80.0,box.maxHeight-110)),child:SingleChildScrollView(child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[InkWell(onTap:()async{await Get.to(()=>EncounterProfilePage(character:filtered[index]),transition:Transition.cupertino);if(mounted)await _load();},child:Text('${filtered[index]['name']} · ${filtered[index]['age']??25}',maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:28,fontWeight:FontWeight.w700,color:Colors.white))),Text(_s(filtered[index],'personality'),maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:_rose)),const SizedBox(height:8),Text((filtered[index]['tags'] as List? ?? []).join(' · '),maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white70)),Text('encounter.followers'.trParams({'count':'${filtered[index]['follower_count']??0}'}),style:const TextStyle(color:Colors.white70)),Text(_s(filtered[index],'description'),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white,height:1.5)),const SizedBox(height:18),Row(children:[IconButton(onPressed:()=>_open(filtered[index],gift:true),icon:const Icon(Icons.card_giftcard,color:_rose),tooltip:'encounter.gift'.tr),const SizedBox(width:12),Expanded(child:FilledButton(onPressed:()=>_open(filtered[index]),child:Text('encounter.chat'.tr)))])]))))
-     ]))))):RefreshIndicator(onRefresh:_load,child:ListView.builder(padding:const EdgeInsets.only(bottom:110),physics:const AlwaysScrollableScrollPhysics(),itemCount:_chats.length,itemBuilder:(context,index){final c=_chats[index];return SizedBox(height:80,child:ListTile(leading:ClipRRect(borderRadius:BorderRadius.circular(14),child:SizedBox(width:52,height:52,child:EncounterAvatar(url:_s(c,'avatar_url'),size:52))),title:Text(_s(c,'name'),maxLines:1,overflow:TextOverflow.ellipsis),onTap:()=>Get.to(()=>EncounterChatPage(id:_s(c,'id'),name:_s(c,'name'),cover:_s(c,'cover_url'),avatar:_s(c,'avatar_url'),characterId:_s(c,'character_id')),transition:Transition.cupertino)));})),
+     ]))))):EncounterConversations(onOpen:(c)async{
+      await Get.to(()=>EncounterChatPage(id:_s(c,'id'),name:_s(c,'name'),cover:_s(c,'cover_url'),
+        avatar:_s(c,'avatar_url'),characterId:_s(c,'character_id')),transition:Transition.cupertino);
+    }),
    bottomNavigationBar:EncounterDock(index:_tab,onTab:(index)=>setState(()=>_tab=index),onCreate:_createCharacter),
   ));
  }
@@ -108,9 +111,10 @@ class _EncounterChatPageState extends State<EncounterChatPage> with WidgetsBindi
  final _input=TextEditingController(),_scroll=ScrollController(); List<Map<String,dynamic>> _messages=[];
  bool _busy=false,_bottom=true; Map<String,dynamic>? _pending;
  Timer? _poll; int _pollCount=0; bool _loadingMessages=false,_foreground=true;
- @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);_scroll.addListener(()=>_bottom=_scroll.hasClients&&_scroll.position.extentAfter<=24);_load();if(widget.gift)WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)_purchase('gift');});}
+ bool _reading=false; String _readMessageId='';
+ @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);_scroll.addListener((){_bottom=_scroll.hasClients&&_scroll.position.extentAfter<=24;if(_bottom)_markRead();});_load();if(widget.gift)WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)_purchase('gift');});}
  @override void dispose(){_poll?.cancel();WidgetsBinding.instance.removeObserver(this);_input.dispose();_scroll.dispose();super.dispose();}
- @override void didChangeAppLifecycleState(AppLifecycleState state){_foreground=state==AppLifecycleState.resumed;}
+ @override void didChangeAppLifecycleState(AppLifecycleState state){_foreground=state==AppLifecycleState.resumed;if(_foreground)_load();}
  @override void didChangeMetrics(){if(_bottom)_follow();}
  void _follow(){WidgetsBinding.instance.addPostFrameCallback((_){if(mounted&&_scroll.hasClients)_scroll.jumpTo(_scroll.position.maxScrollExtent);});}
  void _error(){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('encounter.error'.tr)));}
@@ -120,7 +124,32 @@ class _EncounterChatPageState extends State<EncounterChatPage> with WidgetsBindi
    setState((){_messages=List<Map<String,dynamic>>.from((result['items'] as List).map((e)=>Map<String,dynamic>.from(e as Map)));if(result['processing_request'] is Map){_pending=Map<String,dynamic>.from(result['processing_request'] as Map);}else if(!_busy){_pending=null;}});
    if(result['processing_request'] is Map){_startPolling();}else{_poll?.cancel();_poll=null;}
    if(follow)_follow();
+   _markRead();
   }catch(_){if(_poll==null)_error();}finally{_loadingMessages=false;}
+ }
+ void _markRead(){
+  if(_reading)return;
+  _reading=true;
+  WidgetsBinding.instance.addPostFrameCallback((_)async{
+   var acknowledged=false;
+   try{
+    if(!mounted||!_foreground||!_bottom||ModalRoute.of(context)?.isCurrent!=true)return;
+    final replies=_messages.where((m)=>m['sender_type']=='assistant');
+    if(replies.isEmpty)return;
+    final id=_s(replies.last,'id');
+    if(id.isEmpty||id==_readMessageId)return;
+    await ApiClient.instance.put('/v1/encounters/conversations/${widget.id}/read',data:{'message_id':id});
+    if(mounted){_readMessageId=id;acknowledged=true;}
+   }catch(_){/* Retry on the next visible message update. */}
+   finally{
+    _reading=false;
+    if(acknowledged&&mounted&&_foreground&&_bottom){
+     final replies=_messages.where((m)=>m['sender_type']=='assistant');
+     if(replies.isNotEmpty&&_s(replies.last,'id')!=_readMessageId)_markRead();
+    }
+   }
+  });
+  WidgetsBinding.instance.ensureVisualUpdate();
  }
  void _startPolling(){
   if(_poll!=null)return;_pollCount=0;
@@ -196,7 +225,7 @@ class _EncounterChatPageState extends State<EncounterChatPage> with WidgetsBindi
   Positioned.fill(child:MediaQuery.removeViewInsets(context:context,removeBottom:true,
     child:EncounterChatBackdrop(cover:widget.cover))),
   Scaffold(backgroundColor:Colors.transparent,resizeToAvoidBottomInset:true,
-   appBar:AppBar(backgroundColor:Colors.transparent,surfaceTintColor:Colors.transparent,scrolledUnderElevation:0,title:Row(children:[ClipRRect(borderRadius:BorderRadius.circular(10),child:SizedBox(width:36,height:36,child:EncounterAvatar(url:widget.avatar,size:36))),const SizedBox(width:12),Expanded(child:InkWell(onTap:widget.characterId.isEmpty?null:()async{try{final role=await ApiClient.instance.get('/v1/encounters/characters/${widget.characterId}');if(mounted)await Get.to(()=>EncounterProfilePage(character:Map<String,dynamic>.from(role as Map)),transition:Transition.cupertino);}catch(_){_error();}},child:Text(widget.name,maxLines:1,overflow:TextOverflow.ellipsis))),if(_busy||_pending!=null)Text('encounter.replying'.tr,style:const TextStyle(fontSize:12,color:_rose))])),body:SafeArea(top:false,child:Column(children:[Expanded(child:RefreshIndicator(onRefresh:_load,child:ListView.builder(controller:_scroll,physics:const AlwaysScrollableScrollPhysics(),padding:const EdgeInsets.all(18),itemCount:_messages.length+(_pending==null?0:1),itemBuilder:(context,index){final m=index<_messages.length?_messages[index]:<String,dynamic>{'sender_type':'user','content':_pending!['content']},own=m['sender_type']=='user';return Align(alignment:own?AlignmentDirectional.centerEnd:AlignmentDirectional.centerStart,child:Container(constraints:BoxConstraints(maxWidth:MediaQuery.sizeOf(context).width*.8),padding:const EdgeInsets.all(14),margin:const EdgeInsets.only(bottom:12),decoration:BoxDecoration(color:own?const Color(0xFF533346):_panel,borderRadius:BorderRadius.circular(18)),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[if(_s(m,'content').isNotEmpty)Text(_s(m,'content'),style:const TextStyle(color:Colors.white,height:1.5)),if(_s(m,'media_url').isNotEmpty)SizedBox(width:240,height:240,child:EncounterMedia(url:_s(m,'media_url'),video:m['media_type']=='video'))])));}))),
+   appBar:AppBar(backgroundColor:Colors.transparent,surfaceTintColor:Colors.transparent,scrolledUnderElevation:0,title:Row(children:[Expanded(child:InkWell(onTap:widget.characterId.isEmpty?null:()async{try{final role=await ApiClient.instance.get('/v1/encounters/characters/${widget.characterId}');if(mounted)await Get.to(()=>EncounterProfilePage(character:Map<String,dynamic>.from(role as Map)),transition:Transition.cupertino);}catch(_){_error();}},child:Text(widget.name,maxLines:1,overflow:TextOverflow.ellipsis))),if(_busy||_pending!=null)Text('encounter.replying'.tr,style:const TextStyle(fontSize:12,color:_rose))])),body:SafeArea(top:false,child:Column(children:[Expanded(child:RefreshIndicator(onRefresh:_load,child:ListView.builder(controller:_scroll,physics:const AlwaysScrollableScrollPhysics(),padding:const EdgeInsets.all(18),itemCount:_messages.length+(_pending==null?0:1),itemBuilder:(context,index){final m=index<_messages.length?_messages[index]:<String,dynamic>{'sender_type':'user','content':_pending!['content']},own=m['sender_type']=='user';return Align(alignment:own?AlignmentDirectional.centerEnd:AlignmentDirectional.centerStart,child:Container(constraints:BoxConstraints(maxWidth:MediaQuery.sizeOf(context).width*.8),padding:const EdgeInsets.all(14),margin:const EdgeInsets.only(bottom:12),decoration:BoxDecoration(color:own?const Color(0xFF533346):_panel,borderRadius:BorderRadius.circular(18)),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[if(_s(m,'content').isNotEmpty)Text(_s(m,'content'),style:const TextStyle(color:Colors.white,height:1.5)),if(_s(m,'media_url').isNotEmpty)SizedBox(width:240,height:240,child:EncounterMedia(url:_s(m,'media_url'),video:m['media_type']=='video'))])));}))),
   Padding(padding:const EdgeInsets.symmetric(horizontal:12),child:Row(children:[IconButton(onPressed:_busy?null:()=>_purchase('gift'),icon:const Icon(Icons.card_giftcard,color:_rose),tooltip:'encounter.gift'.tr),IconButton(onPressed:_busy?null:()=>_purchase('photo'),icon:const Icon(Icons.image_outlined,color:_rose),tooltip:'encounter.photo'.tr),IconButton(onPressed:_busy?null:()=>_purchase('video'),icon:const Icon(Icons.movie_outlined,color:_rose),tooltip:'encounter.video'.tr),if(_pending!=null&&!_busy)TextButton(onPressed:_send,child:Text('encounter.retry'.tr))])),
   Padding(padding:const EdgeInsets.fromLTRB(16,0,16,12),child:Row(children:[Expanded(child:TextField(controller:_input,enabled:!_busy&&_pending==null,maxLength:2000,decoration:InputDecoration(hintText:'encounter.message'.tr,counterText:'',filled:true,fillColor:_panel,border:OutlineInputBorder(borderRadius:BorderRadius.circular(24),borderSide:BorderSide.none)))),IconButton(onPressed:_busy?null:_send,icon:const Icon(Icons.arrow_upward_rounded,color:_rose))]))
  ]))),

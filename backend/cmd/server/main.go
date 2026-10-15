@@ -166,6 +166,7 @@ func main() {
 	encounters.GET("/conversations", handler.ListEncounterConversations)
 	encounters.POST("/conversations", handler.StartEncounterConversation)
 	encounters.GET("/conversations/:id/messages", handler.GetEncounterMessages)
+	encounters.PUT("/conversations/:id/read", handler.ReadEncounterConversation)
 	encounters.POST("/conversations/:id/messages", middleware.RateLimit(20, time.Minute), handler.SendEncounterMessage)
 	api.POST("/feedback", middleware.RequireAuth(), middleware.RateLimit(5, time.Minute), handler.SubmitFeedback)
 	{

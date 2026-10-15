@@ -165,13 +165,6 @@ func StartEncounterConversation(c *gin.Context) {
  if err!=nil { c.JSON(404,gin.H{"error":"character unavailable"}); return }
  c.JSON(200,gin.H{"id":id})
 }
-func ListEncounterConversations(c *gin.Context) {
- rows,err:=db.Get().QueryContext(c.Request.Context(),`SELECT v.id,r.name,r.avatar_url,r.cover_url,r.id FROM encounter_conversations v JOIN encounter_characters r ON r.id=v.character_id WHERE v.user_id=$1 ORDER BY v.updated_at DESC`,c.GetString("user_id"))
- if err!=nil { c.JSON(500,gin.H{"error":"cannot load conversations"}); return }; defer rows.Close()
- items:=[]gin.H{}
- for rows.Next() { var id,name,avatar,cover,charID string; if rows.Scan(&id,&name,&avatar,&cover,&charID)!=nil { c.JSON(500,gin.H{"error":"cannot read conversations"}); return }; items=append(items,gin.H{"id":id,"name":name,"avatar_url":avatar,"cover_url":cover,"character_id":charID}) }
- if rows.Err()!=nil { c.JSON(500,gin.H{"error":"cannot read conversations"}); return }; c.JSON(200,gin.H{"items":items})
-}
 func encounterOwned(c *gin.Context) bool {
  if _,err:=uuid.Parse(c.Param("id")); err!=nil { c.JSON(404,gin.H{"error":"conversation not found"}); return false }
  var exists bool
