@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -102,8 +103,16 @@ func main() {
 		StripeWebhookSecret:        cfg.StripeWebhookSecret,
 		SubscriptionCreditsMonthly: cfg.SubscriptionCreditsMonthly,
 	})
+	paypalPlans := map[string]string{}
+	if err := json.Unmarshal([]byte(cfg.PayPalPlans), &paypalPlans); err != nil {
+		log.Fatal("VITA_PAYPAL_PLAN_IDS must be a JSON object")
+	}
+	handler.InitPayPal(handler.PayPalConfig{ClientID: cfg.PayPalClientID, Secret: cfg.PayPalSecret, WebhookID: cfg.PayPalWebhookID, Mode: cfg.PayPalMode, WebURL: cfg.PayPalWebURL, Plans: paypalPlans})
 	go handler.RunRevenueCatFulfillment(agentCtx)
 	go func() {
+		if err := handler.GrantDuePayPalAnnualCredits(agentCtx); err != nil {
+			log.Printf("PayPal annual credits: %v", err)
+		}
 		if err := handler.GrantDueAnnualSubscriptionCredits(); err != nil {
 			log.Printf("annual subscription monthly credits: %v", err)
 		}
@@ -114,6 +123,9 @@ func main() {
 			case <-agentCtx.Done():
 				return
 			case <-ticker.C:
+				if err := handler.GrantDuePayPalAnnualCredits(agentCtx); err != nil {
+					log.Printf("PayPal annual credits: %v", err)
+				}
 				if err := handler.GrantDueAnnualSubscriptionCredits(); err != nil {
 					log.Printf("annual subscription monthly credits: %v", err)
 				}
@@ -236,6 +248,11 @@ func main() {
 		api.POST("/me/billing/confirm", middleware.RequireAuth(), handler.ConfirmBillingPurchase)
 		api.GET("/subscription-plans/benefits", middleware.RequireAuth(), handler.ListSubscriptionPlanBenefits)
 		api.GET("/billing/catalog", middleware.RequireAuth(), handler.AppBillingCatalog)
+		api.GET("/paypal/catalog", middleware.RequireAuth(), handler.PayPalCatalog)
+		api.POST("/paypal/checkouts", middleware.RequireAuth(), middleware.RateLimit(10, time.Minute), handler.CreatePayPalCheckout)
+		api.POST("/paypal/checkouts/:id/confirm", middleware.RequireAuth(), handler.ConfirmPayPalCheckout)
+		api.POST("/paypal/subscriptions/:id/cancel", middleware.RequireAuth(), handler.CancelPayPalSubscription)
+		api.POST("/webhooks/paypal", handler.PayPalWebhook)
 		api.POST("/stripe/checkout", middleware.RequireAuth(), handler.CreateStripeCheckout)
 		api.POST("/webhooks/revenuecat", handler.RevenueCatWebhook)
 		api.POST("/webhooks/stripe", handler.StripeWebhook)

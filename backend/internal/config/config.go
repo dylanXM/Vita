@@ -83,6 +83,12 @@ type Config struct {
 	// dependency); WebhookSecret verifies Stripe webhook signatures.
 	StripeSecretKey     string
 	StripeWebhookSecret string
+	PayPalClientID      string
+	PayPalSecret        string
+	PayPalWebhookID     string
+	PayPalMode          string
+	PayPalWebURL        string
+	PayPalPlans         string
 
 	// SubscriptionCreditsMonthly is granted on each subscription purchase /
 	// renewal (credits model, see the monetisation plan).
@@ -134,6 +140,12 @@ func Load() *Config {
 
 		StripeSecretKey:     getEnv("VITA_STRIPE_SECRET_KEY", ""),
 		StripeWebhookSecret: getEnv("VITA_STRIPE_WEBHOOK_SECRET", ""),
+		PayPalClientID:      getEnv("VITA_PAYPAL_CLIENT_ID", ""),
+		PayPalSecret:        getEnv("VITA_PAYPAL_SECRET", ""),
+		PayPalWebhookID:     getEnv("VITA_PAYPAL_WEBHOOK_ID", ""),
+		PayPalMode:          getEnv("VITA_PAYPAL_MODE", "sandbox"),
+		PayPalWebURL:        getEnv("VITA_PAYPAL_WEB_URL", ""),
+		PayPalPlans:         getEnv("VITA_PAYPAL_PLAN_IDS", "{}"),
 
 		SubscriptionCreditsMonthly: atoiEnv(getEnv("VITA_SUBSCRIPTION_CREDITS_MONTHLY", "500"), 500),
 	}
