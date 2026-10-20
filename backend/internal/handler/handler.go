@@ -1334,8 +1334,19 @@ func UpdateCompanion(c *gin.Context) {
 		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
+	var avatarURL *string
+	if req.AvatarMediaID != nil && strings.TrimSpace(*req.AvatarMediaID) != "" {
+		mediaID := strings.TrimSpace(*req.AvatarMediaID)
+		var validated bool
+		if err := db.Get().QueryRowContext(c.Request.Context(), `SELECT character_image_validated FROM media_assets WHERE id=$1 AND user_id=$2 AND kind='image'`, mediaID, c.GetString("user_id")).Scan(&validated); err != nil || !validated {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "choose a verified character image", "code": "character_image_invalid"})
+			return
+		}
+		value := "/v1/media/" + mediaID
+		avatarURL = &value
+	}
 	tags, _ := json.Marshal(req.PersonalityTags)
-	result, err := db.Get().Exec(`UPDATE companions SET name=$3,persona=$4,appearance=$5,city=$6,occupation=$7,interests=$8,personality_tags=$9,speaking_style=$10,likes=$11,dislikes=$12,life_habits=$13,life_goal=$14,backstory=$15,portrait_id=$16,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$2`, id, c.GetString("user_id"), req.Name, req.Persona, req.Appearance, req.City, req.Occupation, req.Interests, tags, req.SpeakingStyle, req.Likes, req.Dislikes, req.LifeHabits, req.LifeGoal, req.Backstory, req.PortraitID)
+	result, err := db.Get().Exec(`UPDATE companions SET name=$3,persona=$4,appearance=$5,city=$6,occupation=$7,interests=$8,personality_tags=$9,speaking_style=$10,likes=$11,dislikes=$12,life_habits=$13,life_goal=$14,backstory=$15,avatar_url=CASE WHEN $17::text IS NOT NULL THEN $17 WHEN $16 IS NOT NULL AND portrait_id IS DISTINCT FROM $16 THEN '' ELSE avatar_url END,portrait_id=$16,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$2`, id, c.GetString("user_id"), req.Name, req.Persona, req.Appearance, req.City, req.Occupation, req.Interests, tags, req.SpeakingStyle, req.Likes, req.Dislikes, req.LifeHabits, req.LifeGoal, req.Backstory, req.PortraitID, avatarURL)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to update companion"})
 		return

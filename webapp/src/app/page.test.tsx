@@ -4,8 +4,10 @@ import { messages } from '../lib/i18n';
 import { items, safeURL } from '../lib/api';
 describe('Web application contract', () => {
     it('mounts the interactive application', () => { expect(typeof Home().type).toBe('function'); });
-    it('keeps English and Chinese translation keys aligned', () => {
-        expect(Object.keys(messages.en).sort()).toEqual(Object.keys(messages['zh-CN']).sort());
+    it('keeps all eight translation dictionaries aligned', () => {
+        expect(Object.keys(messages)).toHaveLength(8);
+        for (const locale of Object.values(messages))
+            expect(Object.keys(locale).sort()).toEqual(Object.keys(messages.en).sort());
         for (const locale of Object.values(messages))
             for (const value of Object.values(locale))
                 expect(value.trim().length).toBeGreaterThan(0);
