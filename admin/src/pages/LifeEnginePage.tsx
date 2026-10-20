@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Bot, Brain, CircleDot, CloudUpload, HeartPulse, Moon, Pause,
+  Bot, Brain, CircleDot, CloudUpload, HeartPulse, Moon, Pause, Play,
   Radio, RefreshCw, Send, Settings2, Trash2, Users,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
