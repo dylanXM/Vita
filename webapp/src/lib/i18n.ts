@@ -1,64 +1,30 @@
 import productCopy from './product-copy.json';
-export const messages = {
-    'zh-CN': {
-        ...productCopy['zh-CN'],
-        googleContinue:'使用 Google 继续',googleRetry:'重试 Google 登录',googleUnavailable:'Google 登录暂不可用，请稍后重试或使用邮箱登录。',googleLoadFailed:'无法加载 Google 登录，请检查网络后重试。',googleFailed:'Google 登录失败，请重试。',emailAlternative:'或使用邮箱',googleConsentTitle:'完成账号创建',googleConsentBody:'请阅读并同意以下协议，以创建你的 Vita 账号。',googleComplete:'同意并继续',
-        generateCompanion: '用描述或文档生成伙伴', description: '描述', document: '文档（PDF / DOCX / TXT）', generate: '生成并预览', manual: '手动创建', coinsNotice: '将使用显示的金币数量，确认后继续。', codeLogin: '验证码登录', passwordLogin: '密码登录', resetPassword: '通过验证码重设', deleteAccount: '删除账号', deleteAccountConfirm: '确认永久删除账号及其数据？此操作无法撤销。',
-        startTitle: '今天，想分享些什么？', startPlaceholder: '和伙伴说点什么', startSuggestionChat: '聊聊今天，听听伙伴的日常', startSuggestionStory: '一起决定故事的下一章', startSuggestionPet: '看看你的小伙伴在做什么',
-        homeTitle: '你的世界，从这里开始。', homeSubtitle: '对话、日常，以及只属于你们的故事。', companionship: '陪伴', heroLineOne: '陪伴，', heroLineTwo: '不止于对话。', heroDescription: 'TA 有自己的生活，也期待你的到来。\n从一次问候开始，走进彼此的每一天。', beginStory: '开启你的故事', yourOwnWorld: '一个属于你们的世界', heroFootnote: '真实的日常 · 持续的陪伴', moreToShare: '还有更多，值得一起。', smallMoments: '把平凡的日子，过成故事。', storyEntryTitle: '下一章，与你一起。', storyEntryBody: '走进一个故事，让每次选择都有回响。', discoverStories: '探索故事', petEntryTitle: '小小的陪伴，刚刚好。', petEntryBody: '照顾、玩耍，让日常多一点牵挂。', meetPets: '认识新朋友', membershipHint: '更多相处的时光', footerNote: '为每一份独特的陪伴而生。',
-        experiences: '共同体验', transfer: '心意金币', relationship: '关系', appointment: '预约时间', customRequest: '特别的想法', confirmPurchase: '确认使用金币', finish: '结束并收藏', preparation: '约会准备', artifact: '共同纪念', contact: '联系偏好', dailyLimit: '每日联系上限', minimumGap: '最短间隔（分钟）', quiet: '免打扰', quietStart: '开始时间（小时）', quietEnd: '结束时间（小时）', timezone: '时区', region: '地区代码', cancelRenewal: '取消自动续费', confirmCancel: '确认取消自动续费？当前已付费周期结束前仍可使用。', paymentConfirmed: '付款已确认', paymentPending: '等待 PayPal 确认付款，请稍后刷新', restore: '恢复伙伴', deletedCompanions: '已删除的伙伴', background: '自定义故事背景', synopsis: '故事简介', worldSetting: '世界设定', opening: '故事开场', genre: '类型', storyGoal: '故事目标', storyboard: '生成分镜',
-        world: '世界', chat: '对话', journey: '旅程', explore: '探索', stories: '故事', pets: 'AI 宠物', account: '我的',
-        welcome: '让陪伴，发生在每一天。', intro: '走进彼此的日常，收藏共同的回忆。这里，是你们的世界。',
-        enter: '进入世界', newCompanion: '创建伙伴', companions: '我的伙伴', recent: '最近的对话',
-        login: '登录', register: '创建账号', email: '邮箱', password: '密码', code: '验证码', sendCode: '发送验证码', verify: '验证并继续',
-        loginTitle: '欢迎回到 Vita', loginBody: '一个属于你和伙伴的安静空间。', registerTitle: '从相遇开始',
-        logout: '退出登录', loading: '正在加载…', retry: '重试', empty: '这里的故事，等待你来书写。',
-        save: '保存', cancel: '取消', close: '关闭', back: '返回', name: '名字', persona: '性格与背景', city: '城市', occupation: '职业',
-        search: '搜索伙伴或回忆', all: '全部伙伴', send: '发送', message: '想和你聊聊…', startChat: '开始对话',
-        chatEmpty: '从一句问候开始', chatIntro: '分享今天的小事，也听听伙伴的日常。', replying: '伙伴正在回应…', replyFailed: '回复未完成',
-        visit: '陪一会儿', ask: '问问今天', visited: '今天已来过', continueChat: '继续聊天', memories: '共同回忆',
-        worldIntro: '每个人，都有正在发生的生活。', journeyIntro: '把一起走过的日子，慢慢收藏。',
-        exploreIntro: '开启新的故事，遇见新的陪伴。', storiesIntro: '下一章，由你们一起决定。', petsIntro: '照顾一个小生命，也收获一份陪伴。',
-        read: '继续阅读', startStory: '开启故事', chooseCompanion: '选择伙伴', adopt: '领养', pet: '摸摸', drink: '喝水', walk: '散步', rest: '休息', feed: '喂食',
-        hunger: '饱腹', hydration: '水分', happiness: '快乐', energy: '精力', health: '健康', level: '等级',
-        credits: '金币', subscription: '会员', transactions: '金币记录', manage: '查看会员', subscribed: '会员生效中', notSubscribed: '尚未订阅',
-        nickname: '昵称', profile: '个人资料', security: '账号安全', currentPassword: '当前密码', newPassword: '新密码', feedback: '意见反馈', feedbackHint: '有什么想告诉我们？',
-        invitation: '邀请好友', invitationCode: '邀请码', bind: '绑定邀请', saved: '已保存', submitted: '已提交',
-        favorite: '收藏', unfavorite: '取消收藏', edit: '编辑', delete: '删除', confirmDelete: '确认删除？此操作将删除所选内容。',
-        createIntro: '让心中的那个人，有自己的故事。', portrait: '伙伴形象', upload: '上传图片', selectPortrait: '选择形象',
-        terms: '服务条款', privacy: '隐私政策', consent: '我已阅读并同意', noLegal: '暂未提供注册协议，请稍后重试。',
-        network: '无法连接服务器，请检查网络后重试。', failed: '请求失败', expired: '登录已过期，请重新登录。',
-        guest: '访客', loginRequired: '登录后，和伙伴继续你们的故事。', noCompanion: '还没有伙伴', noCompanionBody: '创建一位伙伴，开启你们共同的日常。',
-        today: '此刻', next: '接下来', details: '查看详情', more: '加载更多', about: '关于 Vita',
-        payPending: 'PayPal 支付接入中', payPendingBody: '支付配置完成后开放购买。已有会员与金币仍可使用。',
-        theme: '外观', light: '浅色', dark: '深色', language: '语言', menu: '打开导航', collapse: '收起导航',
-        readonly: '这份纪念由你们共同创造，无法编辑。', storyCost: '生成章节将按后端规则使用金币。',
-        image: '图片', audio: '语音', video: '视频', attachment: '发送语音文件', noResults: '没有找到相关内容',
-    },
-    en: {
-        ...productCopy.en,
-        googleContinue:'Continue with Google',googleRetry:'Retry Google sign-in',googleUnavailable:'Google sign-in is unavailable. Try again later or use email.',googleLoadFailed:'Could not load Google sign-in. Check your connection and try again.',googleFailed:'Google sign-in failed. Please try again.',emailAlternative:'or use email',googleConsentTitle:'Complete your account',googleConsentBody:'Read and accept these documents to create your Vita account.',googleComplete:'Agree and continue',
-        generateCompanion: 'Create from a description or document', description: 'Description', document: 'Document (PDF / DOCX / TXT)', generate: 'Generate and preview', manual: 'Create manually', coinsNotice: 'This uses the displayed number of coins. Confirm to continue.', codeLogin: 'Log in with a code', passwordLogin: 'Log in with a password', resetPassword: 'Reset with a code', deleteAccount: 'Delete account', deleteAccountConfirm: 'Permanently delete your account and its data? This cannot be undone.',
-        startTitle: 'What would you like to share today?', startPlaceholder: 'Say something to your companion', startSuggestionChat: 'Share your day, and hear about theirs', startSuggestionStory: 'Decide on your next chapter together', startSuggestionPet: 'See what your little companion is up to',
-        homeTitle: 'A world of your own.', homeSubtitle: 'Conversations. Everyday moments. A story only you can share.', companionship: 'Companionship', heroLineOne: 'A little closer.', heroLineTwo: 'Beyond words.', heroDescription: 'A life of their own. A place for you in it.\nStart with a hello, and become part of each other’s every day.', beginStory: 'Begin your story', yourOwnWorld: 'A world for the two of you', heroFootnote: 'Everyday life. Lasting company.', moreToShare: 'More to share, together.', smallMoments: 'Make a story out of the everyday.', storyEntryTitle: 'The next chapter is yours.', storyEntryBody: 'Step into a story where every choice leaves a mark.', discoverStories: 'Discover stories', petEntryTitle: 'Little paws. A little joy.', petEntryBody: 'Care, play, and find a little more to look forward to.', meetPets: 'Meet your next friend', membershipHint: 'More time together', footerNote: 'Made for a connection that is yours.',
-        experiences: 'Shared experiences', transfer: 'A kind gesture', relationship: 'Relationship', appointment: 'Appointment time', customRequest: 'A special request', confirmPurchase: 'Confirm coin purchase', finish: 'Finish and keep the memory', preparation: 'Prepare for your date', artifact: 'Shared keepsake', contact: 'Contact preferences', dailyLimit: 'Daily contact limit', minimumGap: 'Minimum gap (minutes)', quiet: 'Quiet hours', quietStart: 'Start hour', quietEnd: 'End hour', timezone: 'Time zone', region: 'Region code', cancelRenewal: 'Cancel renewal', confirmCancel: 'Cancel automatic renewal? Access continues until the paid period ends.', paymentConfirmed: 'Payment confirmed', paymentPending: 'Waiting for PayPal to confirm payment. Refresh shortly.', restore: 'Restore companion', deletedCompanions: 'Deleted companions', background: 'Custom story background', synopsis: 'Synopsis', worldSetting: 'World setting', opening: 'Opening', genre: 'Genre', storyGoal: 'Story goal', storyboard: 'Generate storyboard',
-        world: 'World', chat: 'Conversations', journey: 'Journey', explore: 'Discover', stories: 'Stories', pets: 'AI pets', account: 'You',
-        welcome: 'A little closer. Every day.', intro: 'Step into each other’s everyday lives. Keep the moments that become your story. This is your world.',
-        enter: 'Enter your world', newCompanion: 'Create a companion', companions: 'Your companions', recent: 'Recent conversations',
-        login: 'Log in', register: 'Create account', email: 'Email', password: 'Password', code: 'Verification code', sendCode: 'Send code', verify: 'Verify and continue',
-        loginTitle: 'Welcome back to Vita', loginBody: 'A quiet space for you and your companions.', registerTitle: 'Every story starts somewhere',
-        logout: 'Log out', loading: 'Loading…', retry: 'Try again', empty: 'Your next chapter is waiting to be written.', save: 'Save', cancel: 'Cancel', close: 'Close', back: 'Back', name: 'Name', persona: 'Personality and background', city: 'City', occupation: 'Occupation',
-        search: 'Search companions or memories', all: 'All companions', send: 'Send', message: 'Something on your mind?', startChat: 'Start a conversation',
-        chatEmpty: 'Start with a hello', chatIntro: 'Share the little things. Hear about their day.', replying: 'Your companion is replying…', replyFailed: 'Reply incomplete',
-        visit: 'Stay a while', ask: 'Ask about their day', visited: 'Visited today', continueChat: 'Continue chatting', memories: 'Shared memories',
-        worldIntro: 'A life is happening, even between conversations.', journeyIntro: 'Keep the days you have shared, one moment at a time.', exploreIntro: 'New stories. New kinds of company.', storiesIntro: 'Write the next chapter together.', petsIntro: 'A little life to care for. A little company in return.',
-        read: 'Continue reading', startStory: 'Start a story', chooseCompanion: 'Choose a companion', adopt: 'Adopt', pet: 'Pet', drink: 'Water', walk: 'Walk', rest: 'Rest', feed: 'Feed',
-        hunger: 'Fullness', hydration: 'Hydration', happiness: 'Happiness', energy: 'Energy', health: 'Health', level: 'Level', credits: 'Coins', subscription: 'Membership', transactions: 'Coin history', manage: 'View membership', subscribed: 'Membership active', notSubscribed: 'No active membership',
-        nickname: 'Nickname', profile: 'Profile', security: 'Account security', currentPassword: 'Current password', newPassword: 'New password', feedback: 'Feedback', feedbackHint: 'What would you like us to know?', invitation: 'Invite a friend', invitationCode: 'Invitation code', bind: 'Apply invitation', saved: 'Saved', submitted: 'Submitted',
-        favorite: 'Favorite', unfavorite: 'Unfavorite', edit: 'Edit', delete: 'Delete', confirmDelete: 'Delete this item? This will remove the selected content.', createIntro: 'Give the person in your imagination a story of their own.', portrait: 'Companion portrait', upload: 'Upload an image', selectPortrait: 'Choose a portrait',
-        terms: 'Terms of service', privacy: 'Privacy policy', consent: 'I have read and agree to the', noLegal: 'Registration documents are unavailable. Please try again later.', network: 'Cannot reach the server. Check your connection and try again.', failed: 'Request failed', expired: 'Your session expired. Please log in again.', guest: 'Guest', loginRequired: 'Log in to continue your story together.', noCompanion: 'No companions yet', noCompanionBody: 'Create a companion and begin your everyday story.', today: 'Right now', next: 'Coming up', details: 'View details', more: 'Load more', about: 'About Vita', payPending: 'PayPal integration in progress', payPendingBody: 'Purchases will open once payment is configured. Existing membership and coins remain available.', theme: 'Appearance', light: 'Light', dark: 'Dark', language: 'Language', menu: 'Open navigation', collapse: 'Close navigation', readonly: 'This shared keepsake cannot be edited.', storyCost: 'Chapter generation uses coins according to server rules.', image: 'Image', audio: 'Audio', video: 'Video', attachment: 'Send an audio file', noResults: 'No matching results',
-    },
+import webCopy from './web-copy.json';
+
+export const localeNames = {
+    'zh-CN': '简体中文', 'zh-TW': '繁體中文', en: 'English', es: 'Español',
+    pt: 'Português', ja: '日本語', ko: '한국어', ar: 'العربية',
 } as const;
-export type Locale = keyof typeof messages;
+export type Locale = keyof typeof localeNames;
+export const messages = {
+    'zh-CN': { ...productCopy['zh-CN'], ...webCopy['zh-CN'] },
+    'zh-TW': { ...productCopy['zh-TW'], ...webCopy['zh-TW'] },
+    en: { ...productCopy.en, ...webCopy.en },
+    es: { ...productCopy.es, ...webCopy.es },
+    pt: { ...productCopy.pt, ...webCopy.pt },
+    ja: { ...productCopy.ja, ...webCopy.ja },
+    ko: { ...productCopy.ko, ...webCopy.ko },
+    ar: { ...productCopy.ar, ...webCopy.ar },
+} as const;
 export type MessageKey = keyof typeof messages.en;
-export function productText(key: string, t: (key: MessageKey) => string): string { const locale = typeof window !== 'undefined' && localStorage.getItem('vita.locale') === 'en' ? 'en' : 'zh-CN'; const copy: Record<string, string> = messages[locale]; return copy[key] || key.replaceAll('_', ' ').split('.').pop() || ''; }
+export function productText(key: string, t: (key: MessageKey) => string): string {
+    return Object.hasOwn(messages.en, key) ? t(key as MessageKey) : key;
+}
+
+export function displayDate(value: string, style: 'date' | 'time' | 'datetime' = 'datetime', options?: Intl.DateTimeFormatOptions): string {
+    const date = new Date(value);
+    const locale = typeof document === 'undefined' ? 'zh-CN' : document.documentElement.lang;
+    if (style === 'date') return date.toLocaleDateString(locale, options);
+    if (style === 'time') return date.toLocaleTimeString(locale, options);
+    return date.toLocaleString(locale, options);
+}

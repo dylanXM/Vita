@@ -1,116 +1,38 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, Check, Compass, Globe2, Heart, History, LogOut, Menu, MessageCircle, Moon, MoreHorizontal, PanelLeft, PawPrint, Plus, Search, Settings2, Sparkles, Sun, UserRound, X } from 'lucide-react';
-import { api, ApiError, baseURL, items, safeURL, session, type Entity } from '../lib/api';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, Check, Compass, Globe2, Heart, History, Menu, MessageCircle, MoreHorizontal, PanelLeft, PawPrint, Plus, Search, Sparkles, UserRound, X } from 'lucide-react';
+import { api, ApiError, items, session, type Entity } from '../lib/api';
 import GoogleSignIn from './google-sign-in';
+import { Media, Modal } from './companion-ui';
+import Select from './select';
+import AccountMenu, { type Theme } from './account-menu';
+import { OverlayProvider, Toast, useConfirm } from './overlays';
+import { Form, Input, Textarea } from './form';
+import Encounters from './encounters';
+import { changed, useResource } from '../lib/companion-data';
+import PetRoom from './pet-room';
 import { exchangeGoogleCredential, type GoogleConsent } from '../lib/google-auth';
-import { messages, type Locale, type MessageKey, productText } from '../lib/i18n';
-type Section = 'world' | 'chat' | 'journey' | 'explore' | 'stories' | 'pets' | 'account';
+import { messages, localeNames, type Locale, type MessageKey, productText, displayDate } from '../lib/i18n';
+type Section = 'encounters' | 'world' | 'chat' | 'journey' | 'explore' | 'stories' | 'pets';
 type T = (key: MessageKey) => string;
 const navigation = [{ id: 'world', Icon: Globe2 }, { id: 'chat', Icon: MessageCircle }, { id: 'journey', Icon: History }, { id: 'explore', Icon: Compass }] as const;
-function useResource(path: string | null, revision = 0) {
-    const [data, setData] = useState<any>(null);
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [retry, setRetry] = useState(0);
-    useEffect(() => {
-        setData(null);
-        setError('');
-        if (!path) {
-            setLoading(false);
-            return;
-        }
-        const controller = new AbortController();
-        setLoading(true);
-        api(path, { signal: controller.signal }).then(setData).catch(e => {
-            if (!controller.signal.aborted)
-                setError(e.message);
-        }).finally(() => {
-            if (!controller.signal.aborted)
-                setLoading(false);
-        });
-        return () => controller.abort();
-    }, [path, revision, retry]);
-    return { data, error, loading, reload: () => setRetry(n => n + 1) };
-}
 function Status({ resource, t, children }: {
     resource: ReturnType<typeof useResource>;
     t: T;
     children: ReactNode;
 }) {
-    if (resource.loading)
+    if (resource.loading && resource.data == null)
         return <div className="state" role="status"><span className="spinner"/>{t('loading')}</div>;
-    if (resource.error)
+    if (resource.error && resource.data == null)
         return <div className="state" role="alert"><p>{resource.error}</p><button className="button" onClick={resource.reload}>{t('retry')}</button></div>;
-    return <>{children}</>;
+    return <>{resource.error && <div className="inline-error" role="alert">{resource.error}<button className="text-button" onClick={resource.reload}>{t('retry')}</button></div>}{children}</>;
 }
 function Empty({ t, children }: {
     t: T;
     children?: ReactNode;
 }) { return <div className="state empty"><Sparkles size={28}/><p>{t('empty')}</p>{children}</div>; }
-function Media({ src, kind = 'image', alt = '', className = '' }: {
-    src?: string;
-    kind?: string;
-    alt?: string;
-    className?: string;
-}) {
-    const [url, setURL] = useState('');
-    useEffect(() => {
-        let active = true;
-        let objectURL = '';
-        const controller = new AbortController();
-        const value = safeURL(src);
-        setURL('');
-        if (!value)
-            return;
-        const parsed = new URL(value, window.location.origin);
-        if (parsed.pathname.startsWith('/v1/media/') || parsed.pathname.startsWith('/v1/encounters/media/')) {
-            const headers: Record<string, string> = {};
-            if (parsed.origin === new URL(baseURL || window.location.origin).origin)
-                headers.Authorization = `Bearer ${localStorage.getItem('vita.token') || ''}`;
-            fetch(value, { headers, signal: controller.signal }).then(r => {
-                if (!r.ok)
-                    throw Error();
-                return r.blob();
-            }).then(blob => {
-                objectURL = URL.createObjectURL(blob);
-                if (active)
-                    setURL(objectURL);
-                else
-                    URL.revokeObjectURL(objectURL);
-            }).catch(() => { });
-        }
-        else
-            setURL(value);
-        return () => {
-            active = false;
-            controller.abort();
-            if (objectURL)
-                URL.revokeObjectURL(objectURL);
-        };
-    }, [src]);
-    if (!url)
-        return <div className={`media-placeholder ${className}`}><UserRound size={30}/></div>;
-    if (kind === 'voice' || kind === 'audio')
-        return <audio className={className} controls src={url}/>;
-    if (kind === 'video')
-        return <video className={className} controls playsInline src={url}/>;
-    return <img className={className} src={url} alt={alt} loading="lazy" onError={() => setURL('')}/>;
-}
-function Modal({ title, close, children, t }: {
-    title: string;
-    close: () => void;
-    children: ReactNode;
-    t: T;
-}) {
-    const dialog = useRef<HTMLDialogElement>(null);
-    useEffect(() => { dialog.current?.showModal(); return () => dialog.current?.close(); }, []);
-    return <dialog ref={dialog} onCancel={close} onClick={e => {
-            if (e.target === e.currentTarget)
-                close();
-        }}><div className="modal-head"><h2>{title}</h2><button className="icon-button" onClick={close} aria-label={t('close')}><X size={20}/></button></div>{children}</dialog>;
-}
-export default function VitaApp() {
+export default function VitaApp() { return <OverlayProvider><VitaWorkspace/></OverlayProvider>; }
+function VitaWorkspace() {
     const [locale, setLocale] = useState<Locale>('zh-CN');
     const t: T = useCallback((key: MessageKey) => messages[locale][key], [locale]);
     const [section, setSection] = useState<Section>('world');
@@ -120,57 +42,69 @@ export default function VitaApp() {
     const [create, setCreate] = useState(false);
     const [mobile, setMobile] = useState(false);
     const [collapsed, setCollapsed] = useState(false);
-    const [dark, setDark] = useState(false);
+    const [theme, setTheme] = useState<Theme>('system');
+    const [accountPanel, setAccountPanel] = useState<'profile' | 'feedback' | 'membership' | null>(null);
     const [selected, setSelected] = useState('');
+    const [chatContext, setChatContext] = useState<Entity | null>(null);
     const [revision, setRevision] = useState(0);
-    const [notice, setNotice] = useState('');
+    const [notice, setNotice] = useState({ message: '', id: 0 });
     const [query, setQuery] = useState('');
-    const companions = useResource(authenticated ? '/v1/companions/' : null, revision);
+    const companions = useResource(authenticated ? '/v1/companions/' : null, 0, 12000);
     const me = useResource(authenticated ? '/v1/me' : null, revision);
     const credits = useResource(authenticated ? '/v1/me/credits' : null, revision);
-    const people = items(companions.data).filter(c => c.creation_source !== 'ai_pet');
+    const people = items(companions.data).filter(c => c.creation_source !== 'ai_pet').sort((a, b) => Number(b.unread_count > 0) - Number(a.unread_count > 0) || (Date.parse(b.last_message_at) || 0) - (Date.parse(a.last_message_at) || 0));
     const current = people.find(c => c.id === selected) || people[0];
+    useEffect(() => { if (current && current.id !== selected) setSelected(current.id); }, [current?.id, selected]);
     useEffect(() => {
         setAuthenticated(session.exists());
         setReady(true);
         const saved = localStorage.getItem('vita.locale');
-        if (saved === 'en' || saved === 'zh-CN')
-            setLocale(saved);
+        if (saved && Object.hasOwn(messages, saved))
+            setLocale(saved as Locale);
         const savedTheme = localStorage.getItem('vita.theme');
-        setDark(savedTheme ? savedTheme === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (savedTheme === 'dark' || savedTheme === 'light') setTheme(savedTheme);
         const expired = () => { setAuthenticated(false); setSelected(''); setAuth(true); };
         const hash = () => {
             const value = window.location.hash.slice(1);
-            if (['world', 'chat', 'journey', 'explore', 'stories', 'pets', 'account'].includes(value))
+            if (value === 'membership' || value === 'account') { setAccountPanel(value === 'membership' || new URLSearchParams(window.location.search).has('checkout') ? 'membership' : 'profile'); setSection('world'); window.history.replaceState(null, '', '#world'); return; }
+            if (['world', 'chat', 'journey', 'explore', 'stories', 'pets', 'encounters'].includes(value))
                 setSection(value as Section);
         };
         hash();
+        if (new URLSearchParams(window.location.search).has('checkout')) setAccountPanel('membership');
         window.addEventListener('hashchange', hash);
         window.addEventListener('vita:expired', expired);
         return () => { window.removeEventListener('hashchange', hash); window.removeEventListener('vita:expired', expired); };
     }, []);
     useEffect(() => {
-        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-        if (ready)
-            localStorage.setItem('vita.theme', dark ? 'dark' : 'light');
-    }, [dark, ready]);
-    useEffect(() => { document.documentElement.lang = locale; localStorage.setItem('vita.locale', locale); }, [locale]);
+        const media = window.matchMedia('(prefers-color-scheme: dark)');
+        const apply = () => { document.documentElement.dataset.theme = (theme === 'system' ? media.matches : theme === 'dark') ? 'dark' : 'light'; };
+        apply();
+        media.addEventListener('change', apply);
+        if (ready) localStorage.setItem('vita.theme', theme);
+        return () => media.removeEventListener('change', apply);
+    }, [theme, ready]);
+    useEffect(() => { document.documentElement.lang = locale; document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr'; localStorage.setItem('vita.locale', locale); window.dispatchEvent(new Event('vita:locale')); }, [locale]);
     useEffect(() => {
-        if (!notice)
+        if (!notice.message)
             return;
-        const timer = setTimeout(() => setNotice(''), 5500);
+        const timer = setTimeout(() => setNotice(previous => ({ ...previous, message: '' })), 5500);
         return () => clearTimeout(timer);
     }, [notice]);
-    const navigate = (next: Section) => { setSection(next); setMobile(false); setQuery(''); window.location.hash = next; };
-    const refresh = () => setRevision(n => n + 1);
-    const openChat = (id: string) => { setSelected(id); navigate('chat'); };
+    const navigate = (next: Section) => { if (next !== 'chat') setChatContext(null); setSection(next); setMobile(false); setQuery(''); window.location.hash = next; };
+    const refresh = () => { setRevision(n => n + 1); changed(); };
+    const openChat = (id: string, context?: Entity) => { setChatContext(context ? { ...context, companion_id: id } : null); setSelected(id); navigate('chat'); };
     const requireAuth = (action: () => void) => {
         if (!authenticated)
             setAuth(true);
         else
             action();
     };
-    const notify = (e: unknown) => setNotice(e instanceof Error ? e.message : t('failed'));
+    const notify = (e: unknown) => {
+        if (e instanceof ApiError && (e.action === 'open_credits' || e.action === 'open_subscription' || ['insufficient_credits', 'default_chat_trial_expired', 'friendship_inactive', 'ai_pet_plan_required'].includes(e.code || '') || e.code?.includes('requires_subscription'))) setAccountPanel('membership');
+        const codeText: Record<string, string> = { character_image_invalid: 'companion.create.imageInvalid', character_image_required: 'companion.create.imageRequiredMessage', character_image_validation_unavailable: 'companion.create.imageValidationUnavailable', default_chat_trial_expired: 'accessRequired', friendship_inactive: 'accessRequired', companion_creation_requires_subscription: 'accessRequired', experience_requires_subscription: 'accessRequired', ai_pet_plan_required: 'accessRequired', date_slots_changed: 'experience.slots.changed', date_schedule_busy: 'experience.slots.changed', invalid_appointment: 'experience.slots.changed' };
+        setNotice(previous => ({ id: previous.id + 1, message: e instanceof ApiError && codeText[e.code || ''] ? productText(codeText[e.code || ''], t) : e instanceof Error ? e.message : t('failed') }));
+    };
     const logout = async () => {
         try {
             await api('/v1/auth/logout', { method: 'POST' });
@@ -182,6 +116,7 @@ export default function VitaApp() {
         session.clear();
         sessionStorage.removeItem('vita.paypal-attempt');
         setAuthenticated(false);
+        setAccountPanel(null);
         setSelected('');
         refresh();
         navigate('world');
@@ -194,24 +129,26 @@ export default function VitaApp() {
       <button className="new-companion" onClick={() => requireAuth(() => setCreate(true))}><Plus size={19}/>{t('newCompanion')}</button>
       <nav aria-label="Vita">{navigation.map(({ id, Icon }) => <a href={`#${id}`} className={`nav-item ${section === id ? 'active' : ''}`} aria-current={section === id ? 'page' : undefined} key={id} onClick={() => navigate(id)}><Icon size={20}/>{t(id)}{section === id && <span className="active-dot"/>}</a>)}</nav>
       <div className="sidebar-label">{t('companions')}<button className="icon-button" aria-label={t('newCompanion')} onClick={() => requireAuth(() => setCreate(true))}><Plus size={15}/></button></div>
-      <div className="sidebar-people">{people.map(person => <button key={person.id} className={`person-link ${section === 'chat' && current?.id === person.id ? 'selected' : ''}`} onClick={() => openChat(person.id)}><Media src={person.portrait_url} alt={person.name} className="avatar"/><span>{person.name}<small>{person.last_message || person.occupation}</small></span>{person.unread_count > 0 && <i className="unread">{person.unread_count}</i>}</button>)}{!people.length && <p className="sidebar-hint">{authenticated ? t('noCompanion') : t('loginRequired')}</p>}</div>
-      <div className="sidebar-bottom"><button className="upgrade" onClick={() => requireAuth(() => navigate('account'))}><Sparkles size={19}/><span>{t('subscription')}<small>{t('membershipHint')}</small></span><ArrowUp size={15}/></button><button className={`profile-link ${section === 'account' ? 'selected' : ''}`} onClick={() => requireAuth(() => navigate('account'))}>{authenticated ? (me.data?.avatar_url ? <Media className="avatar" src={me.data.avatar_url} alt={me.data.nickname || ''}/> : <span className="initial">{(me.data?.nickname || me.data?.email || 'V').slice(0, 1).toUpperCase()}</span>) : <span className="initial guest-initial"><UserRound size={17}/></span>}<span>{me.data?.nickname || (authenticated ? me.data?.email : t('login'))}<small>{authenticated ? `${credits.data?.balance ?? '—'} ${t('credits')}` : 'Vita'}</small></span><Settings2 size={17}/></button></div>
+      <div className="sidebar-people">{people.map(person => <button key={person.id} className={`person-link ${section === 'chat' && current?.id === person.id ? 'selected' : ''}`} onClick={() => openChat(person.id)}><Media src={person.portrait_url} alt={person.name} className="avatar"/><span>{person.name}<small>{person.last_message_type === 'voice' ? t('audio') : productText(person.last_message || person.occupation || '', t)}</small></span>{person.unread_count > 0 && <i className="unread">{person.unread_count}</i>}</button>)}{!people.length && <p className="sidebar-hint">{authenticated ? t('noCompanion') : t('loginRequired')}</p>}</div>
+      <div className="sidebar-bottom"><button className="upgrade" onClick={() => requireAuth(() => setAccountPanel('membership'))}><Sparkles size={19}/><span>{t('subscription')}<small>{t('membershipHint')}</small></span><ArrowUp size={15}/></button><AccountMenu t={t} locale={locale} setLocale={setLocale} theme={theme} setTheme={setTheme} authenticated={authenticated} me={me.data} balance={credits.data?.balance} login={() => setAuth(true)} edit={() => setAccountPanel('profile')} feedback={() => setAccountPanel('feedback')} logout={logout}/></div>
     </aside>
     <div className="workspace"><header className="topbar"><div className="header-title"><button className={`icon-button mobile-menu ${collapsed ? 'show-expand' : ''}`} aria-label={t('menu')} onClick={() => { if (window.matchMedia('(max-width: 760px)').matches)
-        setMobile(true); setCollapsed(false); }}><Menu size={21}/></button><span>{section === 'world' || section === 'chat' ? '' : t(section)}</span></div>{(section === 'world' || section === 'chat') && <div className="workspace-switch"><a href="#world" className={section === 'world' ? 'selected' : ''} onClick={() => navigate('world')}>{t('world')}</a><a href="#chat" className={section === 'chat' ? 'selected' : ''} onClick={() => navigate('chat')}>{t('chat')}</a></div>}<div className="header-actions"><button className="icon-button" onClick={() => setDark(!dark)} aria-label={t(dark ? 'light' : 'dark')}>{dark ? <Sun size={18}/> : <Moon size={18}/>}</button><select className="language-select" aria-label={t('language')} value={locale} onChange={e => setLocale(e.target.value as Locale)}><option value="zh-CN">简体中文</option><option value="en">English</option></select>{!authenticated && <button className="button small primary" onClick={() => setAuth(true)}>{t('login')}<ArrowRight size={14}/></button>}</div></header>
+        setMobile(true); setCollapsed(false); }}><Menu size={21}/></button></div><div className="header-actions">{!authenticated && <button className="button small primary" onClick={() => setAuth(true)}>{t('login')}<ArrowRight size={14}/></button>}</div></header>
       <main id="main" className={`main-content ${section === 'chat' ? 'chat-main' : section === 'world' && !authenticated ? 'start-main' : ''}`}>
-        {section === 'world' && (!authenticated ? <GuestHome t={t} login={() => setAuth(true)} navigate={navigate}/> : <><Heading title={t('world')} body={t('worldIntro')} eyebrow=""/><Status resource={companions} t={t}>{!people.length ? <Empty t={t}><button className="button primary" onClick={() => setCreate(true)}>{t('newCompanion')}</button></Empty> : <><div className="section-toolbar"><span>{t('companions')} <small>{people.length}</small></span><select aria-label={t('chooseCompanion')} value={current?.id || ''} onChange={e => setSelected(e.target.value)}>{people.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div><World companion={current} t={t} revision={revision} onChat={openChat} notify={notify}/></>}</Status></>)}
-        {section === 'chat' && (!authenticated ? <Guest t={t} login={() => setAuth(true)}/> : <Status resource={companions} t={t}>{current ? <Chat key={current.id} companion={current} t={t} notify={notify}/> : <Empty t={t}><button className="button primary" onClick={() => setCreate(true)}>{t('newCompanion')}</button></Empty>}</Status>)}
-        {section === 'journey' && <><Heading title={t('journey')} body={t('journeyIntro')} eyebrow=""/><Journey authenticated={authenticated} people={people} t={t} login={() => setAuth(true)} query={query} setQuery={setQuery} notify={notify}/></>}
+        {section === 'world' && (!authenticated ? <GuestHome t={t} login={() => setAuth(true)} navigate={navigate}/> : <><Heading title={t('world')} body={t('worldIntro')} eyebrow=""/><Status resource={companions} t={t}>{!people.length ? <Empty t={t}><button className="button primary" onClick={() => setCreate(true)}>{t('newCompanion')}</button></Empty> : <><div className="companion-switcher" aria-label={t('chooseCompanion')}>{people.map(c => <button className={`companion-tile ${current.id === c.id ? 'selected' : ''}`} aria-pressed={current.id === c.id} key={c.id} onClick={() => setSelected(c.id)}><Media src={c.portrait_url} alt={c.name}/><span><strong>{c.name}</strong><small>{productText(c.last_message || c.occupation || '', t)}</small></span>{c.unread_count > 0 && <i className="unread">{c.unread_count}</i>}</button>)}</div><World key={current.id} companion={current} t={t} revision={revision} onChat={openChat} notify={notify}/></>}</Status></>)}
+        {section === 'chat' && (!authenticated ? <Guest t={t} login={() => setAuth(true)}/> : <Status resource={companions} t={t}>{current ? <Chat key={`${current.id}:${chatContext?.journey_visit_id || ''}`} companion={current} t={t} notify={notify} journeyVisitID={chatContext?.companion_id === current.id ? chatContext.journey_visit_id : undefined}/> : <Empty t={t}><button className="button primary" onClick={() => setCreate(true)}>{t('newCompanion')}</button></Empty>}</Status>)}
+        {section === 'journey' && <><Heading title={t('journey')} body={t('journeyIntro')} eyebrow=""/><Journey authenticated={authenticated} people={people} t={t} login={() => setAuth(true)} query={query} setQuery={setQuery} notify={notify} onContinue={openChat} onWorld={id => { setSelected(id); navigate('world'); }}/></>}
         {section === 'explore' && <div className="explore-content"><Heading title={t('explore')} body={t('exploreIntro')} eyebrow=""/><div className="explore-list"><button className="explore-row" onClick={() => navigate('stories')}><span className="explore-thumbnail story-thumbnail"><BookOpen size={28} strokeWidth={1.3}/></span><span className="explore-row-copy"><strong>{t('stories')}</strong><span>{t('storiesIntro')}</span></span><ArrowRight size={18}/></button><button className="explore-row" onClick={() => navigate('pets')}><span className="explore-thumbnail"><img src="/assets/ai_pets/cat_ragdoll.png" alt=""/></span><span className="explore-row-copy"><strong>{t('pets')}</strong><span>{t('petsIntro')}</span></span><ArrowRight size={18}/></button></div><ExplorePosts authenticated={authenticated} t={t}/></div>}
+        {section === 'encounters' && (authenticated ? <Encounters t={t} notify={notify} changed={changed}/> : <Guest t={t} login={() => setAuth(true)}/>)}
         {section === 'stories' && <><Heading title={t('stories')} body={t('storiesIntro')} eyebrow=""/>{authenticated ? <Stories t={t} people={people} notify={notify} refresh={refresh}/> : <Guest t={t} login={() => setAuth(true)}/>}</>}
         {section === 'pets' && <><Heading title={t('pets')} body={t('petsIntro')} eyebrow=""/>{authenticated ? <Pets t={t} notify={notify} refresh={refresh}/> : <Guest t={t} login={() => setAuth(true)}/>}</>}
-        {section === 'account' && <><Heading title={t('account')} body={me.data?.email || ''} eyebrow=""/>{authenticated ? <Account t={t} me={me.data} revision={revision} refresh={refresh} notify={notify} logout={logout}/> : <Guest t={t} login={() => setAuth(true)}/>}</>}
+
       </main>
     </div>
-    {notice && <div className="toast" role="status">{notice}<button className="icon-button" aria-label={t('close')} onClick={() => setNotice('')}><X size={16}/></button></div>}
+    {notice.message && <Toast key={notice.id} message={notice.message} t={t} close={() => setNotice(previous => ({ ...previous, message: '' }))}/> }
     {auth && <Auth t={t} locale={locale} close={() => setAuth(false)} done={() => { setAuthenticated(true); setAuth(false); refresh(); if (sessionStorage.getItem('vita.message-draft'))
         navigate('chat'); }} notify={notify}/>}
+    {accountPanel && authenticated && <Modal title={t(accountPanel === 'profile' ? 'editProfile' : accountPanel === 'feedback' ? 'feedback' : 'subscription')} close={() => setAccountPanel(null)} t={t}><Account mode={accountPanel} t={t} me={me.data} revision={revision} refresh={refresh} notify={notify}/></Modal>}
     {create && <CreateCompanion t={t} close={() => setCreate(false)} done={id => { setCreate(false); refresh(); openChat(id); }} notify={notify}/>}
   </div>;
 }
@@ -279,16 +216,15 @@ function Auth({t,locale,close,done,notify}:{t:T;locale:Locale;close:()=>void;don
     return <Modal title={t(mode==='login'?'loginTitle':mode==='googleConsent'?'googleConsentTitle':'registerTitle')} close={close} t={t}>
         <p className="muted">{t(mode==='googleConsent'?'googleConsentBody':'loginBody')}</p>
         {(mode==='login'||mode==='register')&&<><GoogleSignIn clientId={clientId} locale={locale} disabled={busy} loadingConfig={legal.loading} t={t} onCredential={credential=>{void googleLogin(credential)}} reloadConfig={legal.reload}/><div className="auth-divider"><span>{t('emailAlternative')}</span></div></>}
-        <form className="form auth-form" onSubmit={submit}>
-            {mode!=='googleConsent'&&<label>{t('email')}<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email" readOnly={mode==='verify'} disabled={busy}/></label>}
-            {mode==='verify'?<label>{t('code')}<input name="code" required pattern="[0-9]{6}" inputMode="numeric" autoComplete="one-time-code" maxLength={6} disabled={busy}/></label>:mode!=='googleConsent'&&<label>{t('password')}<input type="password" name="password" required minLength={mode==='register'?6:1} maxLength={72} autoComplete={mode==='register'?'new-password':'current-password'} disabled={busy}/></label>}
-            {needsConsent&&<><label>{t('invitationCode')}<input value={inviteCode} onChange={e=>setInviteCode(e.target.value)} disabled={busy}/></label><Status resource={legal} t={t}>{docs?.privacy&&docs?.terms?<><details><summary>{t('privacy')}</summary><div className="legal-copy">{docs.privacy.content}</div></details><details><summary>{t('terms')}</summary><div className="legal-copy">{docs.terms.content}</div></details><label className="checkbox"><input type="checkbox" checked={accepted} onChange={e=>setAccepted(e.target.checked)} required disabled={busy}/>{t('consent')} {t('privacy')} / {t('terms')}</label></>:<p className="muted">{t('noLegal')}</p>}</Status></>}
+        <Form t={t} className="form auth-form" onSubmit={submit}>
+            {mode!=='googleConsent'&&<label>{t('email')}<Input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email" readOnly={mode==='verify'} disabled={busy}/></label>}
+            {mode==='verify'?<label>{t('code')}<Input name="code" required pattern="[0-9]{6}" inputMode="numeric" autoComplete="one-time-code" maxLength={6} disabled={busy}/></label>:mode!=='googleConsent'&&<label>{t('password')}<Input type="password" name="password" required minLength={mode==='register'?6:1} maxLength={72} autoComplete={mode==='register'?'new-password':'current-password'} disabled={busy}/></label>}
+            {needsConsent&&<><label>{t('invitationCode')}<Input value={inviteCode} onChange={e=>setInviteCode(e.target.value)} disabled={busy}/></label><Status resource={legal} t={t}>{docs?.privacy&&docs?.terms?<><details><summary>{t('privacy')}</summary><div className="legal-copy">{docs.privacy.content}</div></details><details><summary>{t('terms')}</summary><div className="legal-copy">{docs.terms.content}</div></details><label className="checkbox"><Input type="checkbox" checked={accepted} onChange={e=>setAccepted(e.target.checked)} required disabled={busy}/>{t('consent')} {t('privacy')} / {t('terms')}</label></>:<p className="muted">{t('noLegal')}</p>}</Status></>}
             <button className="button primary full" disabled={busy||(needsConsent&&(!accepted||!docs?.privacy?.version||!docs?.terms?.version))}>{busy?t('loading'):t(mode==='login'?'login':mode==='verify'?'verify':mode==='googleConsent'?'googleComplete':'sendCode')}<ArrowRight size={17}/></button>
             <button type="button" className="text-button" disabled={busy} onClick={()=>{pendingGoogle.current=null;setMode(mode==='login'?'register':'login');setAccepted(false)}}>{t(mode==='login'?'register':'login')}</button>
-        </form>
+        </Form>
     </Modal>;
 }
-function formRole(f: FormData) { return String(f.get('gender') || 'custom'); }
 function CreateCompanion({ t, close, done, notify }: {
     t: T;
     close: () => void;
@@ -297,16 +233,27 @@ function CreateCompanion({ t, close, done, notify }: {
 }) {
     const options = useResource('/v1/companion-options');
     const [portrait, setPortrait] = useState('');
+    const [role, setRole] = useState('');
+    const [stage, setStage] = useState('');
+    const [tags, setTags] = useState<string[]>([]);
+    const [step, setStep] = useState(0);
+    const creationForm = useRef<HTMLFormElement>(null);
+    function nextStep() {
+        const invalid = creationForm.current?.querySelector<HTMLInputElement | HTMLTextAreaElement>('.creation-fields:not([hidden]) :invalid');
+        if (invalid) invalid.reportValidity(); else setStep(1);
+    }
     const [busy, setBusy] = useState(false);
     const [media, setMedia] = useState('');
     const [draftMode, setDraftMode] = useState(false);
     const portraits = items(options.data, 'portraits').filter(p => p.gender !== 'pet');
     async function submit(e: FormEvent<HTMLFormElement>) {
         e.preventDefault();
+        if (busy) return;
+        if (step === 0) { nextStep(); return; }
         setBusy(true);
         const f = new FormData(e.currentTarget);
         try {
-            const data = await api('/v1/companions/', { method: 'POST', body: { name: f.get('name'), persona: f.get('persona'), city: f.get('city'), occupation: f.get('occupation'), gender: formRole(f), relationship_stage: f.get('relationship_stage') || 'stranger', creation_source: 'tags_portrait', ...(media ? { avatar_media_id: media } : { portrait_id: portrait }) } });
+            const data = await api('/v1/companions/', { method: 'POST', body: { name: f.get('name'), persona: f.get('persona'), city: f.get('city'), occupation: f.get('occupation'), interests: f.get('interests'), personality_tags: tags, gender: role || items(options.data, 'relationships')[0]?.key, relationship_stage: stage || items(options.data, 'relationships').find(r => r.key === role)?.default_stage || items(options.data, 'relationships')[0]?.default_stage, creation_source: 'tags_portrait', ...(media ? { avatar_media_id: media } : { portrait_id: portrait }) } });
             done(data.id);
         }
         catch (e) {
@@ -318,7 +265,7 @@ function CreateCompanion({ t, close, done, notify }: {
     }
     if (draftMode)
         return <DraftCompanion t={t} close={close} back={() => setDraftMode(false)} done={done} notify={notify}/>;
-    return <Modal title={t('newCompanion')} close={close} t={t}><button className="text-button" onClick={() => setDraftMode(true)}><Sparkles size={16}/>{t('generateCompanion')}</button><p className="muted">{t('createIntro')}</p><form className="form" onSubmit={submit}><label>{t('name')}<input name="name" required maxLength={100}/></label><label>{t('persona')}<textarea name="persona" rows={4} required maxLength={4000}/></label><div className="form-row"><label>{t('city')}<input name="city"/></label><label>{t('occupation')}<input name="occupation"/></label></div><label>{t('relationship')}<select name="gender">{items(options.data, 'relationships').map(r => <option value={r.key} key={r.key}>{productText('relation.' + r.key, t)}</option>)}</select></label><label>{t('portrait')}</label><Status resource={options} t={t}><div className="portrait-picker">{portraits.map(p => <button type="button" className={portrait === p.id && !media ? 'chosen' : ''} key={p.id} onClick={() => { setPortrait(p.id); setMedia(''); }} aria-label={p.name || t('selectPortrait')}><Media src={p.image_url} alt={p.name}/></button>)}</div></Status><label className="upload-label">{media ? <Check size={17}/> : <Plus size={17}/>} {t('upload')}<input type="file" accept="image/*" disabled={busy} onChange={async (e) => {
+    return <Modal title={t('newCompanion')} close={close} t={t}><button className="text-button" onClick={() => setDraftMode(true)}><Sparkles size={16}/>{t('generateCompanion')}</button><p className="muted">{t('createIntro')}</p><div className="creation-steps"><button className={step === 0 ? 'selected' : ''} onClick={() => setStep(0)}>{t('profile')}</button><button className={step === 1 ? 'selected' : ''} onClick={nextStep}>{t('relationship')}</button></div><Form t={t} ref={creationForm} className="form" onSubmit={submit}><div className="creation-fields" hidden={step !== 0}><label>{t('name')}<Input name="name" required maxLength={100}/></label><label>{t('persona')}<Textarea name="persona" rows={4} maxLength={4000}/></label><div className="form-row"><label>{t('city')}<Input name="city"/></label><label>{t('occupation')}<Input name="occupation"/></label></div><label>{t('interests')}<Input name="interests" maxLength={1000}/></label><label>{productText('companion.create.traits', t)}</label><div className="scene-choices">{(Array.isArray(options.data?.personality_tags) ? options.data.personality_tags : []).map((tag: string) => <button type="button" key={tag} className={`button ${tags.includes(tag) ? 'primary' : ''}`} aria-pressed={tags.includes(tag)} disabled={!tags.includes(tag) && tags.length >= 8} onClick={() => setTags(old => old.includes(tag) ? old.filter(value => value !== tag) : [...old, tag])}>{productText(`tag.${tag}`, t)}</button>)}</div></div><div className="creation-fields" hidden={step !== 1}><label>{t('relationship')}<Select aria-label={t('relationship')} name="gender" value={role || items(options.data, 'relationships')[0]?.key || ''} onChange={e => { setRole(e.target.value); setStage(''); }}>{items(options.data, 'relationships').map(r => <option value={r.key} key={r.key}>{productText('relation.' + r.key, t)}</option>)}</Select></label><label>{t('closeness')}<Select aria-label={t('closeness')} value={stage || (items(options.data, 'relationships').find(r => r.key === role) || items(options.data, 'relationships')[0])?.default_stage || ''} onChange={e => setStage(e.target.value)}>{((items(options.data, 'relationships').find(r => r.key === role) || items(options.data, 'relationships')[0])?.stages || []).map((key: string) => <option key={key} value={key}>{productText(`stage.${key}`, t)}</option>)}</Select></label><label>{t('portrait')}</label><Status resource={options} t={t}><div className="portrait-picker">{portraits.map(p => <button type="button" className={portrait === p.id && !media ? 'chosen' : ''} key={p.id} onClick={() => { setPortrait(p.id); setMedia(''); const selectedRole = items(options.data, 'relationships').find(r => r.key === role) || items(options.data, 'relationships')[0]; if (selectedRole?.gender_hint && p.gender && selectedRole.gender_hint !== p.gender && selectedRole.paired_role) { setRole(selectedRole.paired_role); setStage(''); } }} aria-label={p.name || t('selectPortrait')}><Media src={p.image_url} alt={p.name}/></button>)}</div></Status><label className="upload-label">{media ? <Check size={17}/> : <Plus size={17}/>} {t('upload')}<Input type="file" accept="image/*" disabled={busy} onChange={async (e) => {
             const file = e.target.files?.[0];
             if (!file)
                 return;
@@ -336,7 +283,7 @@ function CreateCompanion({ t, close, done, notify }: {
             finally {
                 setBusy(false);
             }
-        }}/></label><button className="button primary" disabled={busy || (!portrait && !media)}>{busy ? t('loading') : t('newCompanion')}<ArrowRight size={16}/></button></form></Modal>;
+        }}/></label></div>{step === 0 ? <button type="button" className="button primary" onClick={nextStep}>{t('next')}<ArrowRight size={16}/></button> : <button className="button primary" disabled={busy || options.loading || !!options.error || !items(options.data, 'relationships').length || (!portrait && !media)}>{busy ? t('loading') : t('newCompanion')}<ArrowRight size={16}/></button>}</Form></Modal>;
 }
 function World({ companion, t, revision, onChat, notify }: {
     companion: Entity;
@@ -345,170 +292,216 @@ function World({ companion, t, revision, onChat, notify }: {
     onChat: (id: string) => void;
     notify: (e: unknown) => void;
 }) {
-    const resource = useResource(`/v1/companions/${companion.id}/world/scene`, revision);
-    const [busy, setBusy] = useState(false);
-    const [reaction, setReaction] = useState('');
+    const resource = useResource(`/v1/companions/${companion.id}/world/scene`, revision, 30000);
     const [momentID, setMomentID] = useState('');
+    const [experience, setExperience] = useState(false);
     const scene = resource.data;
-    async function visit(choice: string) {
-        setBusy(true);
-        try {
-            const d = await api(`/v1/companions/${companion.id}/world/visit`, { method: 'POST', body: { choice } });
-            setReaction(d.reaction || d.message || d.today_visit?.reaction || '');
-            resource.reload();
-        }
-        catch (e) {
-            notify(e);
-        }
-        finally {
-            setBusy(false);
-        }
-    }
-    return <Status resource={resource} t={t}>{scene && <><div className="world-card"><div className="world-portrait"><Media src={companion.portrait_url} alt={companion.name}/><span className="world-tag"><span className="live-dot"/>{companion.city || productText(scene.place?.title || 'Vita', t)}</span></div><div className="world-story"><div className="eyebrow">{t('today')} · {scene.local_date}</div><h2>{companion.name}<span>{productText(scene.place?.title || '', t)}</span></h2><p className="world-description">{scene.event?.description || scene.place?.description || companion.persona}</p>{scene.event?.title && <div className="activity"><span className="live-dot"/>{productText(scene.event.title, t)}</div>}<div className="world-actions">{scene.visited_today ? <span className="visited"><Check size={16}/>{t('visited')}</span> : <><button className="button primary" disabled={busy} onClick={() => visit('stay')}><Heart size={17}/>{t('visit')}</button><button className="button" disabled={busy} onClick={() => visit('ask')}>{t('ask')}</button></>}<button className="text-button" onClick={() => onChat(companion.id)}>{t('continueChat')}<ArrowRight size={16}/></button></div></div></div>{(reaction || scene.today_visit?.reaction) && <div className="reaction"><Sparkles size={20}/><p>{reaction || scene.today_visit.reaction}</p><button className="text-button" onClick={() => onChat(companion.id)}>{t('continueChat')}<ArrowRight size={16}/></button></div>}{scene.appointment && <button className="appointment-banner" onClick={() => setMomentID(scene.appointment.id)}><BookOpen size={21}/><span>{productText(scene.appointment.title_key, t)}<small>{new Date(scene.appointment.starts_at).toLocaleString()}</small></span><ArrowRight size={18}/></button>}{momentID && <Moment companion={companion} eventID={momentID} t={t} notify={notify} close={() => setMomentID('')}/>}<div className="world-bottom"><article className="info-card"><span className="eyebrow">{t('next')}</span><h3>{scene.next_event?.title || companion.occupation || companion.name}</h3><p>{scene.next_event?.description || companion.interests || t('worldIntro')}</p></article><article className="info-card"><span className="eyebrow">{t('memories')}</span>{items(scene, 'memories').length ? items(scene, 'memories').slice(0, 2).map(m => <p key={m.id}>{m.content}</p>) : <p>{t('journeyIntro')}</p>}</article></div></>}</Status>;
+    return <Status resource={resource} t={t}>{scene && <><div className="world-card"><div className="world-portrait"><Media src={companion.portrait_url} alt={companion.name}/><span className="world-tag"><span className="live-dot"/>{companion.city || productText(scene.place?.title || 'Vita', t)}</span></div><div className="world-story"><span className="scene-badge">{productText(`stage.${companion.relationship_stage || 'stranger'}`, t)}</span><div className="eyebrow">{t('today')} · {scene.local_date}</div><h2>{companion.name}<span>{productText(scene.place?.title || '', t)}</span></h2><p className="world-description">{scene.event?.description || scene.place?.description || companion.persona}</p><span className="world-phase">{productText(`world.phase.${scene.phase || 'quiet'}`, t)}</span>{scene.event?.title && <div className="activity"><span className="live-dot"/>{productText(scene.event.title, t)}</div>}<div className="world-actions"><button className="button" onClick={() => setExperience(true)}>{t('experiences')}</button><button className="text-button" onClick={() => onChat(companion.id)}>{t('continueChat')}<ArrowRight size={16}/></button></div></div></div>{scene.today_visit?.reaction && <div className="reaction"><Sparkles size={20}/><p>{scene.today_visit.reaction}</p><button className="text-button" onClick={() => onChat(companion.id)}>{t('continueChat')}<ArrowRight size={16}/></button></div>}{scene.appointment && <button className="appointment-banner" onClick={() => setMomentID(scene.appointment.id)}><BookOpen size={21}/><span>{productText(scene.appointment.title_key, t)}<small>{displayDate(scene.appointment.starts_at)}</small></span><ArrowRight size={18}/></button>}{momentID && <Moment companion={companion} eventID={momentID} t={t} notify={notify} close={() => setMomentID('')}/>}<div className="world-bottom">{scene.recent_gift && Date.now() - Date.parse(scene.recent_gift.created_at) < 48 * 3600000 && <article className="info-card gift-card"><Sparkles size={22}/><h3>{productText(scene.recent_gift.name_key || scene.recent_gift.product_key || 'experiences', t)}</h3><p>{scene.recent_gift.emoji} · {displayDate(scene.recent_gift.created_at, 'date')}</p></article>}<article className="info-card"><span className="eyebrow">{t('next')}</span><h3>{scene.next_event?.title || companion.occupation || companion.name}</h3><p>{scene.next_event?.description || companion.interests || t('worldIntro')}</p></article><article className="info-card"><span className="eyebrow">{t('memories')}</span>{items(scene, 'memories').length ? items(scene, 'memories').slice(0, 2).map(m => <p key={m.id}>{m.content}</p>) : <p>{t('journeyIntro')}</p>}</article>{items(scene, 'connections').length > 0 && <article className="info-card"><span className="eyebrow">{productText('world.connections', t)}</span>{items(scene, 'connections').map(person => <p key={person.id}>{person.name}</p>)}</article>}</div>{experience && <Experiences companion={companion} t={t} notify={notify} close={() => setExperience(false)} onMoment={id => { setExperience(false); setMomentID(id); }}/>}</>}</Status>;
 }
-function Chat({ companion, t, notify, eventID }: {
-    companion: Entity;
-    t: T;
-    notify: (e: unknown) => void;
-    eventID?: string;
+function Chat({ companion, t, notify, eventID, readOnly = false, sceneKind = '', spendID, journeyVisitID }: {
+    companion: Entity; t: T; notify: (e: unknown) => void; eventID?: string;
+    readOnly?: boolean; sceneKind?: string; spendID?: string; journeyVisitID?: string;
 }) {
+    const appointments = useResource(!eventID && !spendID ? '/v1/companions/appointments' : null, 0, 30000);
     const [profile, setProfile] = useState(false);
     const [experiences, setExperiences] = useState(false);
+    const [transfer, setTransfer] = useState(false);
     const [momentID, setMomentID] = useState('');
-    const messageQuery = eventID ? `channel=date&event_id=${encodeURIComponent(eventID)}` : 'channel=chat';
     const [conversation, setConversation] = useState<Entity | null>(null);
     const [messages, setMessages] = useState<Entity[]>([]);
+    const [count, setCount] = useState(50);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(false);
     const [pending, setPending] = useState(false);
     const [replyFailed, setReplyFailed] = useState(false);
-    const [text, setText] = useState(() => typeof window !== 'undefined' && !eventID ? sessionStorage.getItem('vita.message-draft') || '' : '');
+    const [text, setText] = useState(() => typeof window !== 'undefined' && !eventID && !spendID ? sessionStorage.getItem('vita.message-draft') || '' : '');
     const [version, setVersion] = useState(0);
-    const end = useRef<HTMLDivElement>(null);
+    const viewport = useRef<HTMLDivElement>(null);
+    const follow = useRef(true);
+    const mutationEpoch = useRef(0);
+    const query = eventID ? `channel=date&event_id=${encodeURIComponent(eventID)}` : 'channel=chat';
     useEffect(() => {
         let active = true;
-        setLoading(true);
-        api('/v1/conversations/', { method: 'POST', body: { companion_id: companion.id, ...(eventID ? { date_event_id: eventID } : {}) } }).then(async (c) => {
-            const data = await api(`/v1/conversations/${c.conversation_id}/messages?${messageQuery}`);
-            if (active) {
-                setConversation(c);
-                setMessages(items(data));
-                setError('');
-            }
-        }).catch(e => {
-            if (active)
-                setError(e.message);
-        }).finally(() => {
-            if (active)
-                setLoading(false);
-        });
-        return () => { active = false; };
-    }, [companion.id, version]);
-    useEffect(() => {
-        if (!conversation)
-            return;
-        let active = true;
+        let running = false;
         let timer: ReturnType<typeof setTimeout>;
-        const poll = async () => {
+        let c: Entity | null = null;
+        let signature = '';
+        const controller = new AbortController();
+        const load = async () => {
+            const dialogs = document.querySelectorAll<HTMLDialogElement>('dialog[open]');
+            const top = dialogs.item(dialogs.length - 1);
+            if (!active || running) return;
+            clearTimeout(timer);
+            if (document.hidden || (top && viewport.current && !top.contains(viewport.current))) { timer = setTimeout(load, 4000); return; }
+            running = true;
             try {
-                const [data, status] = await Promise.all([api(`/v1/conversations/${conversation.conversation_id}/messages?${messageQuery}`), api(`/v1/conversations/${conversation.conversation_id}/reply-status?${messageQuery}`)]);
-                if (active) {
-                    setMessages(items(data));
-                    setPending(['pending', 'processing', 'queued'].includes(status.status));
-                    setReplyFailed(status.status === 'failed');
+                if (!c) {
+                    c = await api('/v1/conversations/', { method: 'POST', body: { companion_id: companion.id, ...(eventID ? { date_event_id: eventID } : {}) }, signal: controller.signal });
+                    if (!active) return;
+                    setConversation(c);
                 }
-            }
-            catch (e) {
-                if (active)
-                    setError(e instanceof Error ? e.message : t('failed'));
-            }
-            finally {
-                if (active)
-                    timer = setTimeout(poll, 4000);
+                const epoch = mutationEpoch.current;
+                const [data, status] = await Promise.all([
+                    api(`/v1/conversations/${c!.conversation_id}/messages?${query}`, { signal: controller.signal }),
+                    api(`/v1/conversations/${c!.conversation_id}/reply-status?${query}`, { signal: controller.signal }),
+                ]);
+                if (!active || epoch !== mutationEpoch.current) return;
+                const list = spendID ? items(data).filter(m => m.payload?.shared_experience_spend_id === spendID) : items(data);
+                setMessages(list);
+                setPending(['pending', 'processing', 'queued'].includes(status.status));
+                setReplyFailed(status.status === 'failed');
+                setError('');
+                const next = `${list.length}:${list.at(-1)?.id || ''}`;
+                if (next !== signature) {
+                    signature = next;
+                    changed();
+                }
+            } catch (e) {
+                if (active) setError(e instanceof Error ? e.message : '');
+            } finally {
+                running = false;
+                if (active) { setLoading(false); timer = setTimeout(load, 4000); }
             }
         };
-        timer = setTimeout(poll, 1000);
-        return () => { active = false; clearTimeout(timer); };
-    }, [conversation, t]);
-    useEffect(() => { end.current?.scrollIntoView({ behavior: 'instant', block: 'end' }); }, [messages.length, pending]);
-    async function send(e: FormEvent) {
-        e.preventDefault();
-        if (!text.trim() || !conversation || busy)
-            return;
+        const resume = () => { if (!document.hidden) { c = null; void load(); } };
+        const refreshMessages = () => { void load(); };
+        void load();
+        document.addEventListener('visibilitychange', resume);
+        window.addEventListener('focus', resume);
+        window.addEventListener('vita:locale', resume);
+        window.addEventListener('vita:chat-refresh', refreshMessages);
+        return () => {
+            active = false; controller.abort(); clearTimeout(timer);
+            document.removeEventListener('visibilitychange', resume);
+            window.removeEventListener('focus', resume);
+            window.removeEventListener('vita:locale', resume);
+            window.removeEventListener('vita:chat-refresh', refreshMessages);
+        };
+    }, [companion.id, eventID, spendID, query, version]);
+    useEffect(() => {
+        if (follow.current && viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight;
+    }, [messages, pending]);
+    const reloadMessages = () => window.dispatchEvent(new Event('vita:chat-refresh'));
+    async function sendContent(content: string, mediaID?: string, sceneAction?: string) {
+        if ((!content.trim() && !mediaID) || !conversation || busy || readOnly || conversation.can_send === false || companion.can_chat === false) return;
         setBusy(true);
         try {
-            const d = await api(`/v1/conversations/${conversation.conversation_id}/messages`, { method: 'POST', body: { content: text, message_type: 'text', ...(eventID ? { life_event_id: eventID } : {}) } });
-            setText('');
-            sessionStorage.removeItem('vita.message-draft');
-            setPending(['pending', 'processing', 'queued'].includes(d.reply_status));
-            setReplyFailed(!!d.agent_error);
-            setMessages(items(await api(`/v1/conversations/${conversation.conversation_id}/messages?${messageQuery}`)));
-        }
-        catch (e) {
-            notify(e);
-        }
-        finally {
-            setBusy(false);
-        }
+            const result = await api(`/v1/conversations/${conversation.conversation_id}/messages`, {
+                method: 'POST', body: { ...(mediaID ? { message_type: 'voice', media_id: mediaID } : { message_type: 'text', content }), ...(eventID ? { life_event_id: eventID } : {}), ...(spendID ? { shared_experience_spend_id: spendID } : {}), ...(sceneAction ? { scene_action: sceneAction } : {}), ...(journeyVisitID ? { journey_visit_id: journeyVisitID } : {}) },
+            });
+            mutationEpoch.current++;
+            const delivered = [result.user_message, result.companion_message].filter((m): m is Entity => !!m?.id);
+            setMessages(previous => [...previous, ...delivered.filter(m => !previous.some(old => old.id === m.id))]);
+            if (!mediaID) { setText(''); if (!eventID && !spendID) sessionStorage.removeItem('vita.message-draft'); }
+            follow.current = true;
+            setPending(['pending', 'processing', 'queued'].includes(result.reply_status));
+            setReplyFailed(!!result.agent_error);
+            reloadMessages(); changed();
+        } catch (e) { notify(e); } finally { setBusy(false); }
     }
-    return <div className="conversation"><div className="conversation-head"><Media src={companion.portrait_url} alt={companion.name} className="avatar"/><div><h2>{companion.name}</h2><small>{conversation?.companion_status?.title || companion.occupation}</small></div><span className="conversation-meta">{companion.city}</span>{!eventID && <><button className="icon-button" aria-label={t('experiences')} onClick={() => setExperiences(true)}><Sparkles size={19}/></button><button className="icon-button" aria-label={t('details')} onClick={() => setProfile(true)}><MoreHorizontal size={20}/></button></>}</div><div className="messages">{loading ? <div className="state">{t('loading')}</div> : error ? <div className="inline-error" role="alert">{error}<button className="text-button" onClick={() => setVersion(v => v + 1)}>{t('retry')}</button></div> : null}{!loading && !error && !messages.length && <div className="conversation-empty"><h1>{t('chatEmpty')}</h1><p>{t('chatIntro')}</p></div>}{messages.map(m => <article className={`message ${m.sender_type === 'user' ? 'user-message' : 'companion-message'}`} key={m.id}><span className="message-author">{m.sender_type === 'user' ? t('account') : companion.name}</span>{m.content && <p>{m.content}</p>}{m.media_url && <Media src={m.media_url} kind={m.message_type} alt={t('image')} className="message-media"/>}<time>{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></article>)}{pending && <div className="replying"><span className="spinner"/>{t('replying')}</div>}{replyFailed && <div className="inline-error">{t('replyFailed')}<button className="text-button" disabled={busy} onClick={async () => {
-                if (!conversation)
-                    return;
-                setBusy(true);
-                try {
-                    await api(`/v1/conversations/${conversation.conversation_id}/reply-status/retry`, { method: 'POST' });
-                    setReplyFailed(false);
-                    setPending(true);
-                }
-                catch (e) {
-                    notify(e);
-                }
-                finally {
-                    setBusy(false);
-                }
-            }}>{t('retry')}</button></div>}<div ref={end}/></div><div className="composer-wrap">{conversation?.can_send === false ? <p className="inline-error">{conversation.access_code || t('subscription')}</p> : <form className="composer" onSubmit={send}><textarea aria-label={t('message')} value={text} onChange={e => setText(e.target.value)} placeholder={t('message')} rows={2} onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                    e.preventDefault();
-                    e.currentTarget.form?.requestSubmit();
-                }
-            }}/><div className="composer-bottom"><label className="icon-button attachment" title={t('attachment')}><Plus size={21}/><span className="sr-only">{t('attachment')}</span><input type="file" accept="audio/*" disabled={busy || !conversation} onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file || !conversation)
-                    return;
-                setBusy(true);
-                try {
-                    const f = new FormData();
-                    f.set('file', file);
-                    f.set('kind', 'audio');
-                    const uploaded = await api('/v1/media/upload', { method: 'POST', body: f });
-                    await api(`/v1/conversations/${conversation.conversation_id}/messages`, { method: 'POST', body: { message_type: 'voice', media_id: uploaded.id, ...(eventID ? { life_event_id: eventID } : {}) } });
-                    setPending(true);
-                }
-                catch (e) {
-                    notify(e);
-                }
-                finally {
-                    setBusy(false);
-                    e.target.value = '';
-                }
-            }}/></label><span>Vita · {companion.name}</span><button className="send-button" disabled={!text.trim() || busy || !conversation} aria-label={t('send')}><ArrowUp size={20}/></button></div></form>}<p className="composer-note">{t('chatIntro')}</p></div>{profile && <CompanionProfile companion={companion} t={t} notify={notify} close={() => setProfile(false)}/>}{experiences && <Experiences companion={companion} t={t} notify={notify} close={() => setExperiences(false)} onMoment={id => { setExperiences(false); setMomentID(id); }}/>}{momentID && <Moment companion={companion} eventID={momentID} t={t} notify={notify} close={() => setMomentID('')}/>}</div>;
+    const latest = messages.filter(m => m.sender_type === 'assistant' && m.message_type !== 'scene_image').at(-1);
+    const suggestions = messages.at(-1)?.sender_type === 'assistant' && Array.isArray(latest?.payload?.scene_actions) ? latest.payload.scene_actions.filter((action: Entity) => typeof action.label === 'string' && typeof action.message === 'string').slice(0, 2) : [];
+    const choices = (sceneKind.includes('cafe') ? ['coffee', 'tea', 'toast'] : sceneKind.includes('cinema') ? ['romance', 'mystery', 'pause'] : (sceneKind.includes('dance') || sceneKind === 'ballroom') ? ['dance', 'slow_dance', 'terrace'] : sceneKind.includes('restaurant') ? ['dinner', 'dessert', 'toast'] : []).filter(choice => !messages.some(m => m.sender_type === 'user' && m.delivery_status !== 'failed' && m.payload?.scene_action === choice));
+    return <div className="conversation">
+        <div className="conversation-head"><Media src={companion.portrait_url} alt={companion.name} className="avatar"/><div><h2>{companion.name}</h2><small>{conversation?.companion_status?.title || companion.occupation}</small></div><span className="conversation-meta">{companion.city}</span>{!eventID && <><button className="icon-button" aria-label={t('transfer')} onClick={() => setTransfer(true)}><Heart size={19}/></button><button className="icon-button" aria-label={t('experiences')} onClick={() => setExperiences(true)}><Sparkles size={19}/></button><button className="icon-button" aria-label={t('details')} onClick={() => setProfile(true)}><MoreHorizontal size={20}/></button></>}</div>
+        <div className="chat-appointments">{items(appointments.data).filter(a => a.companion_id === companion.id).map(a => <button className="appointment-banner" key={a.id} onClick={() => setMomentID(a.id)}><BookOpen size={20}/><span>{productText(a.title_key, t)}<small>{displayDate(a.starts_at)}</small></span><ArrowRight size={18}/></button>)}</div>
+        <div className="messages" ref={viewport} onScroll={e => { const el = e.currentTarget; follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }} aria-busy={loading}>
+            {messages.length > count && <button className="button load-more" onClick={() => {
+                const el = viewport.current; const height = el?.scrollHeight || 0;
+                follow.current = false; setCount(n => n + 50);
+                requestAnimationFrame(() => { if (el) el.scrollTop += el.scrollHeight - height; });
+            }}>{t('more')}</button>}
+            {loading && <div className="state">{t('loading')}</div>}
+            {error && <div className="inline-error" role="alert">{error}<button className="text-button" onClick={() => setVersion(n => n + 1)}>{t('retry')}</button></div>}
+            {!loading && !error && !messages.length && <div className="conversation-empty"><h1>{t('chatEmpty')}</h1><p>{t('chatIntro')}</p></div>}
+            {messages.slice(-count).map(m => <article className={`message ${m.sender_type === 'user' ? 'user-message' : 'companion-message'}`} key={m.id}>
+                <span className="message-author">{m.sender_type === 'user' ? t('account') : companion.name}</span>
+                <MessageContent message={m} companion={companion} t={t} notify={notify} onMoment={setMomentID} canConfirm={!readOnly} outcomeSaved={messages.some(saved => saved.payload?.experience_outcome && ((m.payload?.shared_experience_spend_id && saved.payload.shared_experience_spend_id === m.payload.shared_experience_spend_id) || (m.life_event_id && saved.life_event_id === m.life_event_id)))}/>
+                <time>{displayDate(m.created_at, 'time', { hour: '2-digit', minute: '2-digit' })}</time>
+                {m.delivery_status === 'failed' && <small className="inline-error">{t('failed')}</small>}
+            </article>)}
+            {pending && <div className="replying" role="status"><span className="spinner"/>{t('replying')}</div>}
+            {replyFailed && !readOnly && <div className="inline-error">{t('replyFailed')}<button className="text-button" disabled={busy} onClick={async () => {
+                if (!conversation) return; setBusy(true);
+                try { await api(`/v1/conversations/${conversation.conversation_id}/reply-status/retry`, { method: 'POST', body: eventID ? { life_event_id: eventID } : {} }); setReplyFailed(false); setPending(true); reloadMessages(); }
+                catch (e) { notify(e); } finally { setBusy(false); }
+            }}>{t('retry')}</button></div>}
+        </div>
+        <div className="composer-wrap">{readOnly ? <p className="composer-note">{t('momentEnded')}</p> : (conversation?.can_send === false || companion.can_chat === false) ? <div className="access-banner"><p>{t('accessRequired')}</p><a className="button primary" href="#membership">{t('manage')}</a></div> : <>
+            {(eventID || spendID) && latest?.payload?.scene_situation && <p className="scene-narration">{latest.payload.scene_situation}</p>}{suggestions.length > 0 && <div className="scene-choices">{suggestions.map((action: Entity) => <button className="button" key={action.label} disabled={busy || pending} onClick={() => void sendContent(action.message)}>{action.label}</button>)}</div>}{eventID && <div className="scene-choices">{choices.map(choice => <button className="button" key={choice} disabled={busy || pending || !conversation} onClick={() => void sendContent(productText(`date.scene.action.${choice}`, t), undefined, choice)}>{productText(`date.scene.${choice}`, t)}</button>)}</div>}
+            <Form t={t} className="composer" onSubmit={e => { e.preventDefault(); void sendContent(text); }}><Textarea aria-label={t('message')} value={text} maxLength={4000} onChange={e => { setText(e.target.value); if (!eventID && !spendID) sessionStorage.setItem('vita.message-draft', e.target.value); }} placeholder={t('message')} rows={2} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}/>
+                <div className="composer-bottom"><label className="icon-button attachment" title={t('attachment')}><Plus size={21}/><span className="sr-only">{t('attachment')}</span><Input type="file" accept="audio/*" disabled={busy || !conversation} onChange={async e => {
+                    const input = e.currentTarget; const file = input.files?.[0]; if (!file) return;
+                    setBusy(true);
+                    let mediaID = '';
+                    try { const form = new FormData(); form.set('file', file); form.set('kind', 'audio'); const uploaded = await api('/v1/media/upload', { method: 'POST', body: form }); mediaID = uploaded.id; }
+                    catch (error) { notify(error); } finally { setBusy(false); input.value = ''; }
+                    if (mediaID) await sendContent('', mediaID);
+                }}/></label><span>Vita · {companion.name}</span><button className="send-button" disabled={!text.trim() || busy || !conversation} aria-label={t('send')}><ArrowUp size={20}/></button></div>
+            </Form></>}<p className="composer-note">{t('chatIntro')}</p></div>
+        {profile && <CompanionProfile companion={companion} t={t} notify={notify} close={() => setProfile(false)}/>}
+        {transfer && <Transfer companion={companion} t={t} notify={notify} close={() => setTransfer(false)} done={reloadMessages}/>}
+        {experiences && <Experiences companion={companion} t={t} notify={notify} close={() => setExperiences(false)} onMoment={id => { setExperiences(false); setMomentID(id); }}/>}
+        {momentID && <Moment companion={companion} eventID={momentID} t={t} notify={notify} close={() => setMomentID('')}/>}
+    </div>;
 }
-function Journey({ authenticated, people, t, login, query, setQuery, notify }: {
+function MessageContent({ message: m, companion, t, notify, onMoment, outcomeSaved, canConfirm }: { message: Entity; companion: Entity; t: T; notify: (e: unknown) => void; onMoment: (id: string) => void; outcomeSaved: boolean; canConfirm: boolean }) {
+    const payload = m.payload || {};
+    const [busy, setBusy] = useState(false);
+    const [confirmed, setConfirmed] = useState(false);
+    const proposal = payload.experience_proposal;
+    const outcome = payload.experience_outcome;
+    return <>
+        {m.message_type === 'transfer' ? <div className="gesture-card"><Heart size={25}/><strong>{payload.coins ?? m.content} {t('credits')}</strong><span>{t('transfer')}</span></div> : m.message_type === 'gift' || m.source === 'paid_gift' ? <div className="gift-card"><Sparkles size={30}/><strong>{productText(payload.name_key || m.content || 'experiences', t)}</strong><span>{t('giftReceived')}</span></div> : m.content && <p>{m.source?.startsWith('paid_') ? productText(m.content, t) : m.content}</p>}
+        {m.media_url && <Media src={m.media_url} kind={m.message_type} alt={t('image')} className="message-media"/>}
+        {m.life_event_id && m.source?.startsWith('paid_date') && <button className="button" onClick={() => onMoment(m.life_event_id)}>{t('viewMoment')}<ArrowRight size={16}/></button>}
+        {(proposal || outcome) && <div className="keepsake-card"><span className="eyebrow">{t(outcome || confirmed || outcomeSaved ? 'artifact' : 'jointDecision')}</span><h3>{(outcome || proposal).title}</h3><p>{(outcome || proposal).challenge}</p><p>{(outcome || proposal).decision}</p><p>{(outcome || proposal).note}</p>{proposal && canConfirm && !confirmed && !outcome && !outcomeSaved && <Form t={t} className="form" onSubmit={async e => {
+            e.preventDefault(); setBusy(true);
+            try { await api(`/v1/companions/${companion.id}/experience-outcome`, { method: 'POST', body: { ...(payload.shared_experience_spend_id ? { spend_id: payload.shared_experience_spend_id } : { event_id: m.life_event_id }), proposal_message_id: m.id, title: new FormData(e.currentTarget).get('title') } }); setConfirmed(true); window.dispatchEvent(new Event('vita:chat-refresh')); changed(); }
+            catch (error) { notify(error); } finally { setBusy(false); }
+        }}><label>{t('nameMoment')}<Input name="title" required maxLength={80} defaultValue={proposal.title}/></label><button className="button primary" disabled={busy}>{t('confirmDecision')}</button></Form>}</div>}
+    </>;
+}
+function Transfer({ companion, t, close, done, notify }: { companion: Entity; t: T; close: () => void; done: () => void; notify: (e: unknown) => void }) {
+    const credits = useResource('/v1/me/credits');
+    const storageKey = `vita.transfer.${companion.id}`;
+    const [attempt, setAttempt] = useState<Entity | null>(() => {
+        try { return JSON.parse(sessionStorage.getItem(storageKey) || 'null'); } catch { return null; }
+    });
+    const [amount, setAmount] = useState(() => attempt?.coins || 10);
+    const [busy, setBusy] = useState(false);
+    return <Modal title={t('transfer')} close={() => { if (!busy) close(); }} t={t}><p className="muted">{companion.name} · {credits.data?.balance ?? '—'} {t('credits')}</p>{attempt && <p className="access-banner">{t('requestUnconfirmed')}</p>}<div className="scene-choices">{[10, 30, 100].map(value => <button className={`button ${amount === value ? 'primary' : ''}`} key={value} disabled={busy || !!attempt} onClick={() => setAmount(value)}>{value} {t('credits')}</button>)}</div><button className="button primary full" disabled={busy} onClick={async () => {
+        if (busy) return;
+        const request = attempt || { coins: amount, request_key: crypto.randomUUID() };
+        setAttempt(request); sessionStorage.setItem(storageKey, JSON.stringify(request)); setBusy(true);
+        try { await api(`/v1/companions/${companion.id}/transfers`, { method: 'POST', body: request }); sessionStorage.removeItem(storageKey); changed(); done(); close(); }
+        catch (error) {
+            if (error instanceof ApiError && error.status < 500 && error.code !== 'transfer_duplicate') { setAttempt(null); sessionStorage.removeItem(storageKey); }
+            notify(error);
+        } finally { setBusy(false); }
+    }}>{t(busy ? 'loading' : attempt ? 'retry' : 'confirmPurchase')}</button></Modal>;
+}
+function Journey({ authenticated, people, t, login, query, setQuery, notify, onWorld, onContinue }: {
     authenticated: boolean;
     people: Entity[];
     t: T;
     login: () => void;
+    onWorld: (id: string) => void;
+    onContinue: (id: string, context?: Entity) => void;
     query: string;
     setQuery: (s: string) => void;
     notify: (e: unknown) => void;
 }) {
+    const confirm = useConfirm(t);
     const [selected, setSelected] = useState('');
     const [offset, setOffset] = useState(0);
     const [all, setAll] = useState<Entity[]>([]);
     const [detail, setDetail] = useState<Entity | null>(null);
     const [busy, setBusy] = useState(false);
     const [search, setSearch] = useState('');
+    const [moment, setMoment] = useState<Entity | null>(null);
+    const [experience, setExperience] = useState<Entity | null>(null);
     useEffect(() => { const timer = setTimeout(() => { setSearch(query); setOffset(0); setAll([]); }, 300); return () => clearTimeout(timer); }, [query]);
     const resource = useResource(authenticated ? `/v1/journey?limit=30&offset=${offset}&companion_id=${encodeURIComponent(selected)}&q=${encodeURIComponent(search)}` : null);
     useEffect(() => {
@@ -525,6 +518,7 @@ function Journey({ authenticated, people, t, login, query, setQuery, notify }: {
             await api(`/v1/companions/${detail.companion?.id || detail.companion_id}/memories/${detail.id}`, { method, body });
             setDetail(null);
             setOffset(0);
+            setAll([]);
             resource.reload();
         }
         catch (e) {
@@ -534,10 +528,10 @@ function Journey({ authenticated, people, t, login, query, setQuery, notify }: {
             setBusy(false);
         }
     }
-    return <><div className="section-toolbar"><label className="search-field"><Search size={17}/><input aria-label={t('search')} placeholder={t('search')} value={query} onChange={e => setQuery(e.target.value)}/></label><select aria-label={t('chooseCompanion')} value={selected} onChange={e => { setSelected(e.target.value); setOffset(0); setAll([]); }}><option value="">{t('all')}</option>{people.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div><Status resource={resource} t={t}>{all.length ? <div className="memory-grid">{all.map(m => <button className="memory-card" key={m.id} onClick={() => setDetail(m)}><span className="memory-date">{new Date(m.event_time).toLocaleDateString()}</span><h3>{m.title || m.companion?.name}</h3><p>{m.content}</p><span className="memory-author"><Heart size={14}/>{m.companion?.name}<ArrowRight size={15}/></span></button>)}</div> : <Empty t={t}/>}</Status>{items(resource.data).length === 30 && <button className="button load-more" onClick={() => setOffset(v => v + 30)}>{t('more')}<ArrowDown size={15}/></button>}{detail && <Modal title={detail.title || detail.companion?.name || t('memories')} close={() => setDetail(null)} t={t}>{detail.readonly ? <><p className="prose">{detail.content}</p><small className="muted">{t('readonly')}</small></> : <form className="form" onSubmit={e => { e.preventDefault(); void modify('PUT', { content: new FormData(e.currentTarget).get('content') }); }}><textarea name="content" defaultValue={detail.content} required maxLength={500} rows={8}/><MemoryFavorite companionID={detail.companion?.id || detail.companion_id} memoryID={detail.id} t={t} notify={notify}/><div className="form-row"><button className="button primary" disabled={busy}>{t('save')}</button><button type="button" className="button" disabled={busy} onClick={() => {
-                    if (window.confirm(t('confirmDelete')))
+    return <><div className="section-toolbar"><label className="search-field"><Search size={17}/><Input aria-label={t('search')} placeholder={t('search')} value={query} onChange={e => setQuery(e.target.value)}/></label><Select aria-label={t('chooseCompanion')} value={selected} onChange={e => { setSelected(e.target.value); setOffset(0); setAll([]); }}><option value="">{t('all')}</option>{people.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></div><Status resource={resource} t={t}>{all.length ? <div className="memory-grid">{all.map(m => <button className="memory-card" key={m.id} onClick={() => m.metadata?.event_id && ['experience_appointment', 'shared_experience'].includes(m.type) ? setMoment(m) : m.metadata?.spend_id ? setExperience(m) : setDetail(m)}><span className="memory-date">{displayDate(m.event_time, 'date')}</span><h3>{productText(m.title || '', t) || m.companion?.name}</h3><p>{m.content}</p><span className="memory-author"><Heart size={14}/>{m.companion?.name}<ArrowRight size={15}/></span></button>)}</div> : <Empty t={t}/>}</Status>{resource.data?.has_more && <button className="button load-more" onClick={() => setOffset(resource.data.next_offset)}>{t('more')}<ArrowDown size={15}/></button>}{detail && <Modal title={detail.title || detail.companion?.name || t('memories')} close={() => setDetail(null)} t={t}>{detail.readonly ? <>{detail.type === 'world_visit' && detail.metadata?.portrait_url && <Media src={detail.metadata.portrait_url} alt={detail.companion?.name} className="visit-portrait"/>}<p className="prose">{detail.content}</p><p className="prose">{detail.metadata?.reaction}</p><p className="prose">{detail.metadata?.follow_up}</p><small className="muted">{t('readonly')}</small>{detail.type === 'world_visit' && <button className="button primary" onClick={() => { sessionStorage.setItem('vita.message-draft', productText(detail.metadata?.choice === 'ask' ? 'journey.continueAskDraft' : 'journey.continueStayDraft', t)); setDetail(null); onContinue(detail.companion.id, { journey_visit_id: detail.id }); }}>{productText('journey.continueThatDay', t)}</button>}{detail.type === 'world_visit' && <button className="button" onClick={() => { setDetail(null); onWorld(detail.companion.id); }}>{t('enter')}<ArrowRight size={16}/></button>}</> : <Form t={t} className="form" onSubmit={e => { e.preventDefault(); void modify('PUT', { content: new FormData(e.currentTarget).get('content') }); }}><Textarea name="content" defaultValue={detail.content} required maxLength={500} rows={8}/><MemoryFavorite companionID={detail.companion?.id || detail.companion_id} memoryID={detail.id} t={t} notify={notify}/><div className="form-row"><button className="button primary" disabled={busy}>{t('save')}</button><button type="button" className="button" disabled={busy} onClick={async () => {
+                    if ((await confirm(t('confirmDelete'))))
                         void modify('DELETE');
-                }}>{t('delete')}</button></div></form>}</Modal>}</>;
+                }}>{t('delete')}</button></div></Form>}</Modal>}{moment && <Moment companion={people.find(p => p.id === moment.companion.id) || moment.companion} eventID={moment.metadata.event_id} t={t} notify={notify} close={() => setMoment(null)}/>} {experience && <Modal wide title={productText(experience.title || 'experiences', t)} close={() => setExperience(null)} t={t}>{experience.metadata?.media_url && <Media src={experience.metadata.media_url} alt={experience.companion.name} className="result-media"/>}<p className="prose">{experience.metadata?.outcome?.decision || experience.content}</p><div className="moment-chat"><Chat companion={people.find(p => p.id === experience.companion.id) || experience.companion} t={t} notify={notify} spendID={experience.metadata.spend_id}/></div></Modal>}</>;
 }
 function ExplorePosts({ authenticated, t }: {
     authenticated: boolean;
@@ -563,6 +557,19 @@ function Stories({ t, people, notify, refresh }: {
     const [selected, setSelected] = useState('');
     const [detail, setDetail] = useState<Entity | null>(null);
     const [busy, setBusy] = useState(false);
+    const generatingStoryboard = !!detail && items(detail, 'storyboards').some(board => ['pending', 'processing', 'generating'].includes(board.status));
+    useEffect(() => {
+        if (!generatingStoryboard || !detail?.id) return;
+        const id = detail.id;
+        let active = true;
+        let running = false;
+        const timer = setInterval(async () => {
+            if (document.hidden || running) return;
+            running = true;
+            try { const story = await api(`/v1/stories/${id}`); if (active) setDetail(story); } catch { /* Keep the current story; retry on the next tick. */ } finally { running = false; }
+        }, 5000);
+        return () => { active = false; clearInterval(timer); };
+    }, [detail?.id, generatingStoryboard]);
     async function start(background: string) {
         setBusy(true);
         if (!storyAttempt.current || storyAttempt.current.action !== background)
@@ -613,7 +620,7 @@ function Stories({ t, people, notify, refresh }: {
                     finally {
                         setBusy(false);
                     }
-                }}><BookOpen size={22}/><h3>{s.title}</h3><p>{s.companion?.name}</p><span className="memory-author">{t('read')}<ArrowRight size={16}/></span></button>)}</div></>}</Status><div className="section-toolbar"><h2>{t('startStory')}</h2><button className="text-button" onClick={() => setCustomBackground(true)}><Plus size={15}/>{t('background')}</button><select value={selected} onChange={e => setSelected(e.target.value)} aria-label={t('chooseCompanion')}><option value="">{t('chooseCompanion')}</option>{people.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></div><Status resource={catalog} t={t}><div className="catalog-grid">{items(catalog.data, 'backgrounds').map(b => <article className="catalog-card" key={b.id}><Media src={b.cover_url} alt={b.title}/><div><span className="eyebrow">{b.genre}</span><h3>{b.title}</h3><p>{b.synopsis}</p><button className="button" disabled={busy} onClick={() => start(b.id)}>{t('startStory')}<ArrowRight size={15}/></button></div></article>)}</div>{!items(catalog.data, 'backgrounds').length && <Empty t={t}/>}</Status>{customBackground && <StoryBackground t={t} close={() => setCustomBackground(false)} done={() => { setCustomBackground(false); catalog.reload(); }} notify={notify}/>}</>;
+                }}><BookOpen size={22}/><h3>{s.title}</h3><p>{s.companion?.name}</p><span className="memory-author">{t('read')}<ArrowRight size={16}/></span></button>)}</div></>}</Status><div className="section-toolbar"><h2>{t('startStory')}</h2><button className="text-button" onClick={() => setCustomBackground(true)}><Plus size={15}/>{t('background')}</button><Select value={selected} onChange={e => setSelected(e.target.value)} aria-label={t('chooseCompanion')}><option value="">{t('chooseCompanion')}</option>{people.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</Select></div><Status resource={catalog} t={t}><div className="catalog-grid">{items(catalog.data, 'backgrounds').map(b => <article className="catalog-card" key={b.id}><Media src={b.cover_url} alt={b.title}/><div><span className="eyebrow">{b.genre}</span><h3>{b.title}</h3><p>{b.synopsis}</p><button className="button" disabled={busy} onClick={() => start(b.id)}>{t('startStory')}<ArrowRight size={15}/></button></div></article>)}</div>{!items(catalog.data, 'backgrounds').length && <Empty t={t}/>}</Status>{customBackground && <StoryBackground t={t} close={() => setCustomBackground(false)} done={() => { setCustomBackground(false); catalog.reload(); }} notify={notify}/>}</>;
 }
 function Pets({ t, notify, refresh }: {
     t: T;
@@ -622,19 +629,29 @@ function Pets({ t, notify, refresh }: {
 }) {
     const breeds = useResource('/v1/ai-pets/breeds');
     const [pet, setPet] = useState<Entity | null>(null);
-    const state = useResource(pet ? `/v1/ai-pets/${pet.adopted_companion_id}/state` : null);
+    const state = useResource(pet ? `/v1/ai-pets/${pet.adopted_companion_id}/state` : null, 0, 30000);
     const [adopting, setAdopting] = useState<Entity | null>(null);
+    const [petAction, setPetAction] = useState('idle');
+    const [careAttempt, setCareAttempt] = useState<Entity | null>(null);
+    useEffect(() => {
+        try { setCareAttempt(pet ? JSON.parse(sessionStorage.getItem(`vita.pet-care.${pet.adopted_companion_id}`) || 'null') : null); } catch { setCareAttempt(null); }
+    }, [pet?.adopted_companion_id]);
     const [busy, setBusy] = useState(false);
     async function care(kind: string) {
-        if (!pet)
-            return;
+        if (!pet || busy) return;
+        const storageKey = `vita.pet-care.${pet.adopted_companion_id}`;
+        const request = careAttempt || { kind, idempotency_key: crypto.randomUUID() };
+        setCareAttempt(request); sessionStorage.setItem(storageKey, JSON.stringify(request));
         setBusy(true);
         try {
-            await api(`/v1/ai-pets/${pet.adopted_companion_id}/${kind === 'feed' ? 'feed' : 'care'}`, { method: 'POST', body: { kind, idempotency_key: crypto.randomUUID() } });
+            await api(`/v1/ai-pets/${pet.adopted_companion_id}/${request.kind === 'feed' ? 'feed' : 'care'}`, { method: 'POST', body: request });
+            setPetAction(`${request.kind}:${Date.now()}`);
+            setCareAttempt(null); sessionStorage.removeItem(storageKey);
             state.reload();
             refresh();
         }
         catch (e) {
+            if (e instanceof ApiError && e.status < 500 && !['settlement_pending', 'refund_unconfirmed', 'spend_in_progress'].includes(e.code || '')) { setCareAttempt(null); sessionStorage.removeItem(storageKey); }
             notify(e);
         }
         finally {
@@ -642,8 +659,8 @@ function Pets({ t, notify, refresh }: {
         }
     }
     if (pet)
-        return <><button className="text-button" onClick={() => setPet(null)}><ArrowLeft size={16}/>{t('back')}</button><Status resource={state} t={t}>{state.data && <div className="pet-home"><div className="pet-stage"><Media src={state.data.avatar_url || pet.avatar_url} alt={pet.name}/><span className="pet-shadow"/></div><h2>{pet.adopted_companion_name || pet.name}</h2><span className="muted">{t('level')} {state.data.level}</span><div className="pet-stats">{(['hunger', 'hydration', 'happiness', 'energy', 'health'] as const).map(key => <label key={key}>{t(key)}<span>{state.data[key]} / 100</span><progress max={100} value={state.data[key]}/></label>)}</div><div className="pet-actions">{(['pet', 'drink', 'walk', 'rest', 'feed'] as const).map(k => <button className={`button ${k === 'feed' ? 'primary' : ''}`} disabled={busy} key={k} onClick={() => care(k)}>{t(k)}{k === 'feed' ? ` · ${state.data.feed_coin_cost} ${t('credits')}` : ''}</button>)}</div></div>}</Status></>;
-    return <><Status resource={breeds} t={t}><div className="catalog-grid">{items(breeds.data).map(b => <article className="catalog-card pet-catalog" key={b.id}><Media src={b.avatar_url} alt={b.name}/><div><span className="eyebrow">{b.species}</span><h3>{b.name}</h3><p>{b.description}</p><button className="button" disabled={!b.adopted_companion_id && !b.can_adopt} onClick={() => b.adopted_companion_id ? setPet(b) : setAdopting(b)}>{t(b.adopted_companion_id ? 'enter' : 'adopt')}<ArrowRight size={16}/></button>{!b.adopted_companion_id && !b.can_adopt && <small>{t('subscription')}</small>}</div></article>)}</div>{!items(breeds.data).length && <Empty t={t}/>}</Status>{adopting && <Modal title={`${t('adopt')} · ${adopting.name}`} close={() => setAdopting(null)} t={t}><form className="form" onSubmit={async (e) => {
+        return <><button className="text-button" onClick={() => setPet(null)}><ArrowLeft size={16}/>{t('back')}</button><Status resource={state} t={t}>{state.data && <div className="pet-home"><PetRoom pet={{ ...pet, ...state.data }} action={petAction} t={t} onPet={() => { if (!careAttempt) void care('pet'); }}/><h2>{pet.adopted_companion_name || pet.name}</h2><div className="pet-stats">{(['hunger', 'hydration', 'happiness', 'energy', 'health'] as const).map(key => <label key={key}>{t(key)}<span>{state.data[key]} / 100</span><progress max={100} value={state.data[key]}/></label>)}</div><div className="pet-actions">{(['pet', 'drink', 'walk', 'rest', 'feed'] as const).map(k => <button className={`button ${k === 'feed' ? 'primary' : ''}`} disabled={busy || !!careAttempt} key={k} onClick={() => care(k)}>{t(k)}{k === 'feed' ? ` · ${state.data.feed_coin_cost} ${t('credits')}` : ''}</button>)}</div>{careAttempt && <div className="access-banner"><p>{t('requestUnconfirmed')}</p><button className="button primary" disabled={busy} onClick={() => void care(careAttempt.kind)}>{t('retry')}</button></div>}</div>}</Status></>;
+    return <><Status resource={breeds} t={t}><div className="catalog-grid">{items(breeds.data).map(b => <article className="catalog-card pet-catalog" key={b.id}><Media src={b.avatar_url} alt={b.name}/><div><span className="eyebrow">{b.species}</span><h3>{b.name}</h3><p>{b.description}</p><button className="button" disabled={!b.adopted_companion_id && !b.can_adopt} onClick={() => b.adopted_companion_id ? setPet(b) : setAdopting(b)}>{b.adopted_companion_id ? productText('aiPets.openHome', t) : t('adopt')}<ArrowRight size={16}/></button>{!b.adopted_companion_id && !b.can_adopt && <small><a href="#membership">{t('manage')}</a></small>}</div></article>)}</div>{!items(breeds.data).length && <Empty t={t}/>}</Status>{adopting && <Modal title={`${t('adopt')} · ${adopting.name}`} close={() => setAdopting(null)} t={t}><Form t={t} className="form" onSubmit={async (e) => {
                 e.preventDefault();
                 const name = new FormData(e.currentTarget).get('name');
                 setBusy(true);
@@ -660,18 +677,19 @@ function Pets({ t, notify, refresh }: {
                 finally {
                     setBusy(false);
                 }
-            }}><label>{t('name')}<input name="name" required maxLength={40} defaultValue={adopting.name}/></label><button className="button primary" disabled={busy}>{t('adopt')}</button></form></Modal>}</>;
+            }}><label>{t('name')}<Input name="name" required maxLength={40} defaultValue={adopting.name}/></label><button className="button primary" disabled={busy}>{t('adopt')}</button></Form></Modal>}</>;
 }
-function Account({ t, me, revision, refresh, notify, logout }: {
+function Account({ t, me, revision, refresh, notify, mode }: {
+    mode: 'profile' | 'feedback' | 'membership';
     t: T;
     me: Entity | null;
     revision: number;
     refresh: () => void;
     notify: (e: unknown) => void;
-    logout: () => void;
 }) {
-    const subscription = useResource('/v1/me/subscription', revision);
-    const credits = useResource('/v1/me/credits', revision);
+    const confirm = useConfirm(t);
+    const subscription = useResource(mode === 'membership' ? '/v1/me/subscription' : null, revision);
+    const credits = useResource(mode === 'membership' ? '/v1/me/credits' : null, revision);
     const [busy, setBusy] = useState(false);
     async function submit(e: FormEvent<HTMLFormElement>, path: string, method = 'PUT') {
         e.preventDefault();
@@ -692,8 +710,8 @@ function Account({ t, me, revision, refresh, notify, logout }: {
             setBusy(false);
         }
     }
-    return <div className="account-layout"><div><section className="account-panel"><h2>{t('profile')}</h2><form className="form" onSubmit={e => submit(e, '/v1/me/profile')}><label>{t('nickname')}<input name="nickname" defaultValue={me?.nickname || ''} maxLength={30}/></label><button className="button" disabled={busy}>{t('save')}</button></form></section><section className="account-panel"><h2>{t('security')}</h2><form className="form" onSubmit={e => submit(e, '/v1/me/password')}><label>{t('currentPassword')}<input name="current_password" type="password" autoComplete="current-password" required/></label><label>{t('newPassword')}<input name="new_password" type="password" minLength={6} maxLength={72} autoComplete="new-password" required/></label><button className="button" disabled={busy}>{t('save')}</button></form></section><section className="account-panel"><h2>{t('feedback')}</h2><form className="form" onSubmit={e => submit(e, '/v1/feedback', 'POST')}><textarea name="content" rows={4} placeholder={t('feedbackHint')} required maxLength={2000}/><button className="button" disabled={busy}>{t('send')}</button></form></section><Preferences t={t} notify={notify}/><button className="text-button logout" onClick={logout}><LogOut size={17}/>{t('logout')}</button></div><div><section className="membership-panel"><Sparkles size={25}/><h2>{t('subscription')}</h2><Status resource={subscription} t={t}><p>{t(subscription.data?.is_subscribed ? 'subscribed' : 'notSubscribed')}</p>{subscription.data?.subscription?.current_period_end && <small>{new Date(subscription.data.subscription.current_period_end).toLocaleDateString()}</small>}</Status>{subscription.data?.subscription?.provider === 'paypal' && subscription.data.subscription.will_renew && <button className="button" disabled={busy} onClick={async () => {
-                if (!window.confirm(t('confirmCancel')))
+    return <div className="account-dialog"><div>{mode === 'profile' && <><section className="account-panel"><h2>{t('profile')}</h2><Form t={t} className="form" onSubmit={e => submit(e, '/v1/me/profile')}><label>{t('nickname')}<Input name="nickname" defaultValue={me?.nickname || ''} maxLength={30}/></label><button className="button" disabled={busy}>{t('save')}</button></Form></section><section className="account-panel"><h2>{t('security')}</h2><Form t={t} className="form" onSubmit={e => submit(e, '/v1/me/password')}><label>{t('currentPassword')}<Input name="current_password" type="password" autoComplete="current-password" required/></label><label>{t('newPassword')}<Input name="new_password" type="password" minLength={6} maxLength={72} autoComplete="new-password" required/></label><button className="button" disabled={busy}>{t('save')}</button></Form></section></>}{mode === 'feedback' && <section className="account-panel"><h2>{t('feedback')}</h2><Form t={t} className="form" onSubmit={e => submit(e, '/v1/feedback', 'POST')}><Textarea name="content" rows={4} placeholder={t('feedbackHint')} required maxLength={2000}/><button className="button" disabled={busy}>{t('send')}</button></Form></section>}</div>{mode === 'membership' && <div><section className="membership-panel"><Sparkles size={25}/><h2>{t('subscription')}</h2><Status resource={subscription} t={t}><p>{t(subscription.data?.is_subscribed ? 'subscribed' : 'notSubscribed')}</p>{subscription.data?.subscription?.current_period_end && <small>{displayDate(subscription.data.subscription.current_period_end, 'date')}</small>}</Status>{subscription.data?.subscription?.provider === 'paypal' && subscription.data.subscription.will_renew && <button className="button" disabled={busy} onClick={async () => {
+                if (!(await confirm(t('confirmCancel'))))
                     return;
                 setBusy(true);
                 try {
@@ -706,7 +724,7 @@ function Account({ t, me, revision, refresh, notify, logout }: {
                 finally {
                     setBusy(false);
                 }
-            }}>{t('cancelRenewal')}</button>}<Billing t={t} notify={notify} refresh={refresh}/></section><section className="account-panel"><span className="eyebrow">{t('credits')}</span><Status resource={credits} t={t}><div className="balance">{credits.data?.balance ?? '—'}<span>{t('credits')}</span></div><h3>{t('transactions')}</h3><div className="transactions">{items(credits.data, 'transactions').map(tx => <div className="transaction" key={tx.id}><span>{tx.description || tx.kind}<small>{new Date(tx.created_at).toLocaleDateString()}</small></span><strong>{tx.amount > 0 ? '+' : ''}{tx.amount}</strong></div>)}{!items(credits.data, 'transactions').length && <p className="muted">{t('empty')}</p>}</div></Status></section><section className="account-panel"><h2>{t('invitation')}</h2>{me?.invite_code && <div className="invite-code">{me.invite_code}</div>}<form className="form" onSubmit={e => submit(e, '/v1/me/invitation', 'POST')}><label>{t('invitationCode')}<input name="invite_code" required/></label><button className="button" disabled={busy}>{t('bind')}</button></form></section></div></div>;
+            }}>{t('cancelRenewal')}</button>}<Billing t={t} notify={notify} refresh={refresh}/></section><section className="account-panel"><span className="eyebrow">{t('credits')}</span><Status resource={credits} t={t}><div className="balance">{credits.data?.balance ?? '—'}<span>{t('credits')}</span></div><h3>{t('transactions')}</h3><div className="transactions">{items(credits.data, 'transactions').map(tx => <div className="transaction" key={tx.id}><span>{tx.description || tx.kind}<small>{displayDate(tx.created_at, 'date')}</small></span><strong>{tx.amount > 0 ? '+' : ''}{tx.amount}</strong></div>)}{!items(credits.data, 'transactions').length && <p className="muted">{t('empty')}</p>}</div></Status></section></div>}{mode === 'profile' && <div><Preferences t={t} notify={notify}/><section className="account-panel"><h2>{t('invitation')}</h2>{me?.invite_code && <div className="invite-code">{me.invite_code}</div>}<Form t={t} className="form" onSubmit={e => submit(e, '/v1/me/invitation', 'POST')}><label>{t('invitationCode')}<Input name="invite_code" required/></label><button className="button" disabled={busy}>{t('bind')}</button></Form></section></div>}</div>;
 }
 function Billing({ t, notify, refresh }: {
     t: T;
@@ -733,7 +751,7 @@ function Billing({ t, notify, refresh }: {
                     setStatus(t('paymentConfirmed'));
                     refresh();
                     sessionStorage.removeItem('vita.paypal-attempt');
-                    window.history.replaceState(null, '', window.location.pathname + '#account');
+                    window.history.replaceState(null, '', window.location.pathname + '#membership');
                     setBusy(false);
                 }
                 else {
@@ -776,17 +794,21 @@ function CompanionProfile({ companion, t, close, notify }: {
     close: () => void;
     notify: (e: unknown) => void;
 }) {
+    const confirm = useConfirm(t);
     const resource = useResource(`/v1/companions/${companion.id}`);
     const [busy, setBusy] = useState(false);
-    return <Modal title={companion.name} close={close} t={t}><Status resource={resource} t={t}>{resource.data && <form className="form" onSubmit={async (e) => {
+    const [avatar, setAvatar] = useState('');
+    const [portraitSelection, setPortraitSelection] = useState<string | null>(null);
+    const options = useResource('/v1/companion-options');
+    return <Modal title={companion.name} close={close} t={t}><Status resource={resource} t={t}>{resource.data && <Form t={t} className="form" onSubmit={async (e) => {
                 e.preventDefault();
                 setBusy(true);
                 const f = new FormData(e.currentTarget);
                 try {
-                    await api(`/v1/companions/${companion.id}`, { method: 'PUT', body: { ...resource.data, ...Object.fromEntries(f) } });
+                    await api(`/v1/companions/${companion.id}`, { method: 'PUT', body: { ...resource.data, ...Object.fromEntries(f), portrait_id: f.get('portrait_id') || null, personality_tags: String(f.get('personality_tags') || '').split(/[,，]/).map(tag => tag.trim()).filter(Boolean), ...(avatar ? { avatar_media_id: avatar } : {}) } });
                     notify(new Error(t('saved')));
                     close();
-                    window.location.reload();
+                    changed();
                 }
                 catch (e) {
                     notify(e);
@@ -794,88 +816,116 @@ function CompanionProfile({ companion, t, close, notify }: {
                 finally {
                     setBusy(false);
                 }
-            }}><Media src={resource.data.portrait_url} alt={companion.name} className="profile-portrait"/>{(['name', 'persona', 'city', 'occupation'] as const).map(k => <label key={k}>{t(k)}{k === 'persona' ? <textarea name={k} defaultValue={resource.data[k]} rows={5}/> : <input name={k} defaultValue={resource.data[k]} required={k === 'name'}/>}</label>)}<button className="button primary" disabled={busy}>{t('save')}</button>{!resource.data.is_default && <button type="button" className="text-button" disabled={busy} onClick={async () => {
-                    if (!window.confirm(t('confirmDelete')))
+            }}><Media src={avatar ? `/v1/media/${avatar}` : portraitSelection ? items(options.data, 'portraits').find(p => p.id === portraitSelection)?.image_url : resource.data.portrait_url} alt={companion.name} className="profile-portrait"/>{(['name', 'persona', 'city', 'occupation', 'interests', 'appearance', 'speaking_style', 'likes', 'dislikes', 'life_habits', 'life_goal', 'backstory'] as const).map(k => <label key={k}>{productText(({ speaking_style: 'companion.create.speakingStyle', life_habits: 'companion.create.lifeHabits', life_goal: 'companion.create.lifeGoal' } as Record<string, string>)[k] || ({ appearance: 'appearance', backstory: 'backstory', interests: 'interests', likes: 'likes', dislikes: 'dislikes' } as Record<string, string>)[k] || k, t)}{['persona', 'backstory', 'likes', 'dislikes', 'life_habits'].includes(k) ? <Textarea name={k} maxLength={4000} defaultValue={resource.data[k]} rows={5}/> : <Input name={k} maxLength={k === 'name' ? 100 : 4000} defaultValue={resource.data[k]} required={k === 'name'}/>}</label>)}<label>{productText('companion.create.traitsEditable', t)}<Input name="personality_tags" defaultValue={(resource.data.personality_tags || []).join(', ')}/></label><label>{t('selectPortrait')}<Select aria-label={t('selectPortrait')} name="portrait_id" value={portraitSelection ?? resource.data.portrait_id ?? ''} onChange={e => { setPortraitSelection(e.target.value); setAvatar(''); }}><option value="" disabled>{t('portrait')}</option>{resource.data.portrait_id && !items(options.data, 'portraits').some(p => p.id === resource.data.portrait_id) && <option value={resource.data.portrait_id}>{t('portrait')}</option>}{items(options.data, 'portraits').filter(p => p.gender !== 'pet').map(p => <option key={p.id} value={p.id}>{p.name || p.id}</option>)}</Select></label><label className="upload-label">{t('upload')}<Input type="file" accept="image/*" disabled={busy} onChange={async e => {
+                    const input = e.currentTarget; const file = input.files?.[0]; if (!file) return; setBusy(true);
+                    try { const form = new FormData(); form.set('file', file); form.set('kind', 'image'); const uploaded = await api('/v1/companions/image', { method: 'POST', body: form }); setAvatar(uploaded.id); }
+                    catch (error) { notify(error); } finally { setBusy(false); input.value = ''; }
+                }}/></label><button className="button primary" disabled={busy}>{t('save')}</button>{!resource.data.is_default && <button type="button" className="text-button" disabled={busy} onClick={async () => {
+                    if (!(await confirm(t('confirmDelete'))))
                         return;
                     setBusy(true);
                     try {
                         await api(`/v1/companions/${companion.id}`, { method: 'DELETE' });
-                        window.location.reload();
+                        changed(); close();
                     }
                     catch (e) {
                         notify(e);
                         setBusy(false);
                     }
-                }}>{t('delete')}</button>}</form>}</Status></Modal>;
+                }}>{t('delete')}</button>}</Form>}</Status></Modal>;
 }
 function Experiences({ companion, t, close, notify, onMoment }: {
-    companion: Entity;
-    t: T;
-    close: () => void;
-    notify: (e: unknown) => void;
-    onMoment: (id: string) => void;
+    companion: Entity; t: T; close: () => void; notify: (e: unknown) => void; onMoment: (id: string) => void;
 }) {
     const catalog = useResource(`/v1/companions/${companion.id}/experiences`);
-    const [product, setProduct] = useState<Entity | null>(null);
+    const storageKey = `vita.experience.${companion.id}`;
+    const [attempt, setAttempt] = useState<{ product: Entity; body: Entity } | null>(() => {
+        try { return JSON.parse(sessionStorage.getItem(storageKey) || 'null'); } catch { return null; }
+    });
+    const [product, setProduct] = useState<Entity | null>(() => attempt?.product || null);
     const slots = useResource(product?.category === 'date' ? `/v1/companions/${companion.id}/experiences/${product.key}/slots` : null);
     const [busy, setBusy] = useState(false);
     const [result, setResult] = useState<Entity | null>(null);
-    const attempt = useRef<{
-        key: string;
-        body: Entity;
-    } | null>(null);
+    const [opened, setOpened] = useState(false);
+    const [continueTogether, setContinueTogether] = useState(false);
     async function buy(e: FormEvent<HTMLFormElement>) {
         e.preventDefault();
-        if (!product)
-            return;
-        setBusy(true);
-        const f = new FormData(e.currentTarget);
-        if (!attempt.current)
-            attempt.current = { key: product.key, body: { idempotency_key: crypto.randomUUID(), input: { quoted_coins: product.coins, custom_request: f.get('custom_request') || '', ...(f.get('scheduled_at') ? { scheduled_at: f.get('scheduled_at') } : {}) } } };
+        if (!product || busy) return;
+        const form = new FormData(e.currentTarget);
+        const request = attempt || { product, body: { idempotency_key: crypto.randomUUID(), input: { quoted_coins: product.coins, custom_request: form.get('custom_request') || '', ...(form.get('scheduled_at') ? { scheduled_at: form.get('scheduled_at') } : {}) } } };
+        setAttempt(request); sessionStorage.setItem(storageKey, JSON.stringify(request)); setBusy(true);
         try {
-            const d = await api(`/v1/companions/${companion.id}/experiences/${attempt.current.key}`, { method: 'POST', body: attempt.current.body });
-            setResult(d.result);
-            attempt.current = null;
-            catalog.reload();
-        }
-        catch (e) {
-            notify(e);
-        }
-        finally {
-            setBusy(false);
-        }
+            const data = await api(`/v1/companions/${companion.id}/experiences/${request.product.key}`, { method: 'POST', body: request.body });
+            setResult(data.result); setAttempt(null); sessionStorage.removeItem(storageKey); changed();
+        } catch (error) {
+            const uncertainCodes = ['spend_in_progress', 'spend_pending', 'settlement_pending', 'refund_unconfirmed', 'date_request_pending'];
+            const definiteCodes = ['experience_failed', 'spend_refunded', 'date_decision_failed', 'date_declined', 'date_slots_changed', 'date_schedule_busy', 'invalid_appointment', 'experience_price_changed'];
+            const uncertain = error instanceof ApiError ? uncertainCodes.includes(error.code || '') || (error.status >= 500 && !definiteCodes.includes(error.code || '')) : true;
+            if (!uncertain) {
+                setAttempt(null); sessionStorage.removeItem(storageKey); catalog.reload();
+                if (['date_slots_changed', 'date_schedule_busy', 'invalid_appointment'].includes((error as ApiError).code || '')) slots.reload();
+                if ((error as ApiError).code === 'experience_price_changed') setProduct(null);
+            }
+            notify(error);
+        } finally { setBusy(false); }
     }
-    return <Modal title={t('experiences')} close={close} t={t}>{result ? <div className="experience-result">{(result.media_url || result.message?.media_url) && <Media src={result.media_url || result.message.media_url} kind={result.media_type || result.message?.message_type || result.type} alt={companion.name} className="result-media"/>}<p className="prose">{result.reaction || result.content || (typeof result.message === 'string' ? result.message : result.message?.content) || result.invitation || result.description}</p>{result.event_id && <button className="button primary" onClick={() => onMoment(result.event_id)}>{t('appointment')}<ArrowRight size={16}/></button>}<button className="text-button" onClick={() => { close(); }}>{t('continueChat')}<ArrowRight size={16}/></button></div> : product ? <form className="form" onSubmit={buy}><button className="text-button" type="button" disabled={busy || !!attempt.current} onClick={() => setProduct(null)}><ArrowLeft size={16}/>{t('back')}</button><h3>{productText(product.name_key, t)}</h3><p className="muted">{productText(product.description_key, t)}</p><label>{t('customRequest')}<textarea name="custom_request" rows={3} maxLength={500} disabled={!!attempt.current}/></label>{product.category === 'date' && <Status resource={slots} t={t}><label>{t('appointment')}<select name="scheduled_at" required disabled={!!attempt.current}><option value="">{t('appointment')}</option>{items(slots.data, 'slots').map(s => <option key={s.starts_at} value={s.starts_at}>{new Date(s.starts_at).toLocaleString()}</option>)}</select></label></Status>}<p>{product.coins} {t('credits')}</p><button className="button primary" disabled={busy}>{busy ? t('loading') : attempt.current ? t('retry') : t('confirmPurchase')}</button></form> : <Status resource={catalog} t={t}><p className="muted">{catalog.data?.balance ?? '—'} {t('credits')}</p><div className="experience-list">{items(catalog.data, 'products').filter(p => p.is_launched).map(p => <button className="experience-product" key={p.key} onClick={() => { setProduct(p); attempt.current = null; }}><span>{p.emoji}</span><span><strong>{productText(p.name_key, t)}</strong><small>{productText(p.description_key, t)}</small></span><span>{p.coins}<small>{t('credits')}</small></span></button>)}</div></Status>}</Modal>;
+    return <Modal wide={!!result} title={t('experiences')} close={() => { if (!busy) close(); }} t={t}>
+        {result ? <div className="experience-result">
+            {product?.category === 'gift' && !opened ? <button className="gift-unwrapping" onClick={() => setOpened(true)}><Sparkles size={55}/><span>{productText('experience.flow.openGift', t)}</span></button> : <>
+                <div className="experience-delivery"><Media src={result.media_url || result.message?.media_url || companion.portrait_url} kind={result.media_type || result.message?.message_type || result.type} alt={companion.name} className="result-media"/><div><span className="eyebrow">{companion.name}</span><h2>{productText(product?.name_key || 'experiences', t)}</h2><p className="prose">{result.reaction || result.content || (typeof result.message === 'string' ? result.message : result.message?.content) || result.invitation || result.description}</p></div></div>
+                {result.event_id ? <button className="button primary" onClick={() => onMoment(result.event_id)}>{t('viewMoment')}<ArrowRight size={16}/></button> : result.spend_id && <button className="button primary" onClick={() => setContinueTogether(true)}>{t('continueChat')}<ArrowRight size={16}/></button>}
+                {continueTogether && <div className="moment-chat"><Chat companion={companion} t={t} notify={notify} spendID={result.spend_id}/></div>}
+                <button className="text-button" onClick={close}>{t('back')}</button>
+            </>}
+        </div> : product ? <Form t={t} className="form" onSubmit={buy}>
+            <button className="text-button" type="button" disabled={busy || !!attempt} onClick={() => setProduct(null)}><ArrowLeft size={17}/>{t('back')}</button>
+            <span className="experience-emoji">{product.emoji}</span><h2>{productText(product.name_key, t)}</h2><p className="muted">{productText(product.description_key, t)}</p>
+            {attempt && <p className="access-banner">{t('requestUnconfirmed')}</p>}
+            <label>{t('customRequest')}<Textarea name="custom_request" rows={3} maxLength={500} disabled={!!attempt} defaultValue={attempt?.body.input.custom_request || ''}/></label>
+            {product.category === 'date' && <Status resource={slots} t={t}><label>{t('appointment')}<Select aria-label={t('appointment')} name="scheduled_at" required disabled={!!attempt} defaultValue={attempt?.body.input.scheduled_at || ''}><option value="">{t('appointment')}</option>{items(slots.data, 'slots').map(slot => <option key={slot.starts_at} value={slot.starts_at}>{displayDate(slot.starts_at)}</option>)}</Select></label>{!slots.loading && !items(slots.data, 'slots').length && <p className="muted">{productText('experience.slots.empty', t)}</p>}<button className="text-button" type="button" disabled={!!attempt || busy} onClick={slots.reload}>{t('retry')}</button></Status>}
+            <p>{product.coins} {t('credits')} · {catalog.data?.balance ?? '—'} {t('credits')}</p>
+            <button className="button primary" disabled={busy || (!attempt && product.category === 'date' && (slots.loading || !!slots.error || !items(slots.data, 'slots').length))}>{t(busy ? 'loading' : attempt ? 'retry' : 'confirmPurchase')}</button>
+        </Form> : <Status resource={catalog} t={t}><p className="muted">{catalog.data?.balance ?? '—'} {t('credits')}</p>{['gift', 'date', 'photo', 'voice', 'outfit', 'keepsake', 'call'].map(category => {
+            const products = items(catalog.data, 'products').filter(p => p.is_launched && p.category === category);
+            return products.length ? <section className="experience-group" key={category}><h3>{productText(category === 'gift' ? 'experience.flow.group.gift' : category === 'date' ? 'experience.flow.group.date' : 'experience.flow.group.other', t)}</h3><div className="experience-list">{products.map(p => <button className="experience-product" key={p.key} onClick={() => setProduct(p)}><span>{p.emoji}</span><span><strong>{productText(p.name_key, t)}</strong><small>{productText(p.description_key, t)}</small></span><span>{p.coins}<small>{t('credits')}</small></span></button>)}</div></section> : null;
+        })}{!items(catalog.data, 'products').some(p => p.is_launched) && <Empty t={t}/>}</Status>}
+    </Modal>;
 }
 function Moment({ companion, eventID, t, notify, close }: {
-    companion: Entity;
-    eventID: string;
-    t: T;
-    notify: (e: unknown) => void;
-    close: () => void;
+    companion: Entity; eventID: string; t: T; notify: (e: unknown) => void; close: () => void;
 }) {
     const path = `/v1/companions/${companion.id}/moments/${eventID}`;
-    const resource = useResource(path);
+    const resource = useResource(path, 0, 15000);
     const [busy, setBusy] = useState(false);
-    const [started, setStarted] = useState(false);
+    const [now, setNow] = useState(() => Date.now());
     const moment = resource.data;
+    useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
+    const upcoming = moment && now < Date.parse(moment.starts_at);
+    const ended = moment && now >= Date.parse(moment.ends_at);
     async function action(name: string, body?: Entity, method = 'POST') {
+        if (busy) return;
         setBusy(true);
-        try {
-            const d = await api(path + '/' + name, { method, body });
-            if (name === 'start')
-                setStarted(true);
-            resource.reload();
-            return d;
-        }
-        catch (e) {
-            notify(e);
-        }
-        finally {
-            setBusy(false);
-        }
+        try { await api(path + '/' + name, { method, body }); changed(); }
+        catch (e) { notify(e); } finally { setBusy(false); }
     }
-    return <Modal title={moment ? productText(moment.title_key, t) : t('appointment')} close={close} t={t}><Status resource={resource} t={t}>{moment && <><p className="muted">{new Date(moment.starts_at).toLocaleString()} — {new Date(moment.ends_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>{moment.scene_image_url && <Media src={moment.scene_image_url} alt={companion.name} className="result-media"/>}{moment.scene_audio_url && <Media src={moment.scene_audio_url} kind="audio"/>}<p className="prose">{moment.scene_situation || moment.opening || moment.invitation}</p>{!moment.opening && !started ? <><div className="preparation-actions">{(['talk', 'quiet', 'story', 'surprise'] as const).map(choice => <button className={`button ${moment.preparation === choice ? 'primary' : ''}`} disabled={busy} key={choice} onClick={() => action('prepare', { choice })}>{productText('date.prep.' + choice, t)}</button>)}</div><p className="prose">{moment.preparation_reaction}</p><button className="button primary" disabled={busy} onClick={() => action('start')}>{t('enter')}<ArrowRight size={16}/></button></> : <><div className="moment-chat"><Chat key={eventID} companion={companion} t={t} notify={notify} eventID={eventID}/></div><form className="form" onSubmit={async (e) => { e.preventDefault(); await action('artifact', { text: new FormData(e.currentTarget).get('text') }, 'PUT'); }}><label>{t('artifact')}<textarea name="text" required maxLength={500} rows={3} defaultValue={moment.user_text}/></label><button className="button" disabled={busy}>{t('save')}</button></form><p className="prose">{moment.artifact}</p><button className="text-button" disabled={busy} onClick={() => action('finish')}>{t('finish')}<Heart size={17}/></button><p className="prose">{moment.closing}</p></>}</>}</Status></Modal>;
+    return <Modal wide title={moment ? productText(moment.title_key, t) : t('appointment')} close={close} t={t}><Status resource={resource} t={t}>{moment && <div className="moment-experience">
+        <div className="moment-stage">
+            <Media src={moment.scene_image_url || moment.scene_background_url || `/assets/scenes/${moment.location === 'restaurant' ? 'dinner' : ['cafe', 'cinema', 'ballroom'].includes(moment.location) ? moment.location : 'cafe'}.png`} alt={companion.name} className="moment-backdrop"/>
+            <div className="moment-scene-copy">{!moment.scene_image_url && <Media src={companion.portrait_url} alt={companion.name} className="moment-companion"/>}<span className="scene-badge">{t(moment.closing ? 'momentFinished' : upcoming ? 'momentUpcoming' : ended ? 'momentEnded' : 'momentActive')}</span><h2>{companion.name}</h2><p>{moment.scene_situation || moment.opening || moment.invitation}</p><small>{displayDate(moment.starts_at)} — {displayDate(moment.ends_at, 'time', { hour: '2-digit', minute: '2-digit' })}</small></div>
+        </div>
+        <div className="moment-body">
+            {moment.scene_audio_url && <details><summary>{t('ambience')}</summary><Media src={moment.scene_audio_url} kind="audio"/></details>}
+            {!moment.opening && upcoming && <section className="preparation-panel"><h3>{t('preparation')}</h3><div className="scene-choices">{(['talk', 'quiet', 'story', 'surprise'] as const).map(choice => <button className={`button ${moment.preparation === choice ? 'primary' : ''}`} disabled={busy} key={choice} onClick={() => void action('prepare', { choice })}>{productText('date.prep.' + choice, t)}</button>)}</div><p className="prose">{moment.preparation_reaction}</p><p className="muted">{t('momentWait')}</p></section>}
+            {!moment.opening && !upcoming && !ended && <button className="button primary" disabled={busy} onClick={() => void action('start')}>{t('enterDate')}<ArrowRight size={16}/></button>}
+            {!moment.opening && ended && <p className="access-banner">{t('momentMissed')}</p>}
+            {moment.opening && <>
+                <div className="moment-chat"><Chat companion={companion} t={t} notify={notify} eventID={eventID} readOnly={!!ended || !!moment.closing} sceneKind={moment.location || moment.product_key}/></div>
+                <section className="keepsake-card"><h3>{t('artifact')}</h3>{!moment.closing && <Form t={t} className="form" onSubmit={e => { e.preventDefault(); void action('artifact', { text: new FormData(e.currentTarget).get('text') }, 'PUT'); }}><label>{t('artifact')}<Textarea name="text" required maxLength={500} rows={3} defaultValue={moment.user_text}/></label><button className="button" disabled={busy}>{t('save')}</button></Form>}<p className="prose">{moment.artifact}</p><p className="prose">{moment.companion_text}</p></section>
+                {ended && !moment.closing && <button className="button primary" disabled={busy} onClick={() => void action('finish')}>{t('finish')}<Heart size={17}/></button>}
+                {moment.closing && <section className="reaction"><Heart size={22}/><div><p className="prose">{moment.closing}</p><p className="muted">{moment.next_topic}</p></div><a href="#journey" className="button" onClick={close}>{t('journey')}</a></section>}
+            </>}
+        </div>
+    </div>}</Status></Modal>;
 }
 function Preferences({ t, notify }: {
     t: T;
@@ -885,7 +935,7 @@ function Preferences({ t, notify }: {
     const world = useResource('/v1/me/world-preferences');
     const deleted = useResource('/v1/companions-deleted');
     const [busy, setBusy] = useState(false);
-    return <><section className="account-panel"><h2>{t('contact')}</h2><Status resource={contact} t={t}>{contact.data && <form className="form" onSubmit={async (e) => {
+    return <><section className="account-panel"><h2>{t('contact')}</h2><Status resource={contact} t={t}>{contact.data && <Form t={t} className="form" onSubmit={async (e) => {
                 e.preventDefault();
                 const f = new FormData(e.currentTarget);
                 setBusy(true);
@@ -900,7 +950,7 @@ function Preferences({ t, notify }: {
                 finally {
                     setBusy(false);
                 }
-            }}>{(['daily_limit', 'minimum_gap_minutes', 'quiet_start', 'quiet_end'] as const).map((key, i) => <label key={key}>{t((['dailyLimit', 'minimumGap', 'quietStart', 'quietEnd'] as const)[i])}<input type="number" min={i === 1 ? 30 : 0} max={i > 1 ? 23 : i === 0 ? 8 : 1440} name={key} required defaultValue={contact.data.preferences[key]}/></label>)}<label className="checkbox"><input type="checkbox" name="quiet_enabled" defaultChecked={contact.data.preferences.quiet_enabled}/>{t('quiet')}</label><button className="button" disabled={busy}>{t('save')}</button></form>}</Status></section><section className="account-panel"><h2>{t('world')}</h2><Status resource={world} t={t}>{world.data && <form className="form" onSubmit={async (e) => {
+            }}>{(['daily_limit', 'minimum_gap_minutes', 'quiet_start', 'quiet_end'] as const).map((key, i) => <label key={key}>{t((['dailyLimit', 'minimumGap', 'quietStart', 'quietEnd'] as const)[i])}<Input type="number" min={i === 1 ? 30 : 0} max={i > 1 ? 23 : i === 0 ? 8 : 1440} name={key} required defaultValue={contact.data.preferences[key]}/></label>)}<label className="checkbox"><Input type="checkbox" name="quiet_enabled" defaultChecked={contact.data.preferences.quiet_enabled}/>{t('quiet')}</label><button className="button" disabled={busy}>{t('save')}</button></Form>}</Status></section><section className="account-panel"><h2>{t('world')}</h2><Status resource={world} t={t}>{world.data && <Form t={t} className="form" onSubmit={async (e) => {
                 e.preventDefault();
                 setBusy(true);
                 try {
@@ -913,11 +963,11 @@ function Preferences({ t, notify }: {
                 finally {
                     setBusy(false);
                 }
-            }}><label>{t('timezone')}<input name="timezone" defaultValue={world.data.timezone} required/></label><label>{t('region')}<input name="region_code" defaultValue={world.data.region_code} required maxLength={6}/></label><button className="button" disabled={busy}>{t('save')}</button></form>}</Status></section><Status resource={deleted} t={t}>{items(deleted.data).length > 0 && <section className="account-panel"><h2>{t('deletedCompanions')}</h2>{items(deleted.data).map(c => <div className="transaction" key={c.id}><span>{c.name}</span><button className="button" disabled={busy} onClick={async () => {
+            }}><label>{t('timezone')}<Input name="timezone" defaultValue={world.data.timezone} required/></label><label>{t('region')}<Input name="region_code" defaultValue={world.data.region_code} required maxLength={6}/></label><button className="button" disabled={busy}>{t('save')}</button></Form>}</Status></section><Status resource={deleted} t={t}>{items(deleted.data).length > 0 && <section className="account-panel"><h2>{t('deletedCompanions')}</h2>{items(deleted.data).map(c => <div className="transaction" key={c.id}><span>{c.name}</span><button className="button" disabled={busy} onClick={async () => {
                     setBusy(true);
                     try {
                         await api(`/v1/companions/${c.id}/restore`, { method: 'POST' });
-                        window.location.reload();
+                        changed(); close();
                     }
                     catch (e) {
                         notify(e);
@@ -935,7 +985,7 @@ function GuestHome({ t, login, navigate }: {
     const [draft, setDraft] = useState('');
     function begin(e: FormEvent) { e.preventDefault(); if (draft.trim())
         sessionStorage.setItem('vita.message-draft', draft); login(); }
-    return <div className="workspace-start"><div className="start-center"><h1>{t('startTitle')}</h1><form className="start-composer" onSubmit={begin}><button type="button" className="icon-button" onClick={login} aria-label={t('attachment')}><Plus size={23} strokeWidth={1.5}/></button><input value={draft} onChange={e => setDraft(e.target.value)} placeholder={t('startPlaceholder')} aria-label={t('message')}/><div className="start-composer-tools"><span>Vita</span><button className="start-send" aria-label={t('send')}><ArrowUp size={20}/></button></div></form><div className="start-suggestions"><button onClick={login}><MessageCircle size={18}/><span>{t('startSuggestionChat')}</span></button><button onClick={() => navigate('stories')}><BookOpen size={18}/><span>{t('startSuggestionStory')}</span></button><button onClick={() => navigate('pets')}><PawPrint size={18}/><span>{t('startSuggestionPet')}</span></button></div></div></div>;
+    return <div className="workspace-start"><div className="start-center"><h1>{t('startTitle')}</h1><Form t={t} className="start-composer" onSubmit={begin}><button type="button" className="icon-button" onClick={login} aria-label={t('attachment')}><Plus size={23} strokeWidth={1.5}/></button><Input value={draft} onChange={e => setDraft(e.target.value)} placeholder={t('startPlaceholder')} aria-label={t('message')}/><div className="start-composer-tools"><span>Vita</span><button className="start-send" aria-label={t('send')}><ArrowUp size={20}/></button></div></Form><div className="start-suggestions"><button onClick={login}><MessageCircle size={18}/><span>{t('startSuggestionChat')}</span></button><button onClick={() => navigate('stories')}><BookOpen size={18}/><span>{t('startSuggestionStory')}</span></button><button onClick={() => navigate('pets')}><PawPrint size={18}/><span>{t('startSuggestionPet')}</span></button></div></div></div>;
 }
 function checkoutAttempt(product: Entity) {
     const prior = sessionStorage.getItem('vita.paypal-attempt');
@@ -961,10 +1011,13 @@ function DraftCompanion({ t, close, back, done, notify }: {
 }) {
     const [busy, setBusy] = useState(false);
     const [draft, setDraft] = useState<Entity | null>(null);
-    return <Modal title={t('generateCompanion')} close={close} t={t}><button className="text-button" onClick={back}><ArrowLeft size={16}/>{t('manual')}</button>{!draft ? <form className="form" onSubmit={async (e) => {
+    const options = useResource('/v1/companion-options');
+    const [role, setRole] = useState('');
+    return <Modal title={t('generateCompanion')} close={close} t={t}><button className="text-button" onClick={back}><ArrowLeft size={16}/>{t('manual')}</button>{!draft ? <Form t={t} className="form" onSubmit={async (e) => {
                 e.preventDefault();
                 setBusy(true);
                 const f = new FormData(e.currentTarget);
+                if (!(f.get('document') as File)?.size && !String(f.get('description') || '').trim()) { setBusy(false); notify(new Error(t('descriptionRequired'))); return; }
                 f.set('mode', (f.get('document') as File)?.size ? 'meet_file' : 'user_description');
                 try {
                     setDraft(await api('/v1/companion-drafts', { method: 'POST', body: f }));
@@ -975,11 +1028,11 @@ function DraftCompanion({ t, close, back, done, notify }: {
                 finally {
                     setBusy(false);
                 }
-            }}><label>{t('name')}<input name="character_name" required maxLength={100}/></label><label>{t('description')}<textarea name="description" rows={5} maxLength={4000}/></label><label>{t('document')}<input name="document" type="file" accept=".pdf,.docx,.txt"/></label><label>{t('upload')}<input name="image" type="file" accept="image/*" required/></label><button className="button primary" disabled={busy}>{busy ? t('loading') : t('generate')}</button></form> : <form className="form" onSubmit={async (e) => {
+            }}><label>{t('name')}<Input name="character_name" required maxLength={100}/></label><label>{t('description')}<Textarea name="description" rows={5} maxLength={4000}/></label><label>{t('document')}<Input name="document" type="file" accept=".pdf,.docx,.txt"/></label><label>{t('upload')}<Input name="image" type="file" accept="image/*" required/></label><button className="button primary" disabled={busy}>{busy ? t('loading') : t('generate')}</button></Form> : <Form t={t} className="form" onSubmit={async (e) => {
                 e.preventDefault();
                 setBusy(true);
                 try {
-                    const result = await api('/v1/companions/', { method: 'POST', body: { ...draft.profile, ...Object.fromEntries(new FormData(e.currentTarget)), avatar_media_id: draft.avatar_media_id, creation_source: draft.creation_source } });
+                    const result = await api('/v1/companions/', { method: 'POST', body: { ...draft.profile, ...Object.fromEntries(new FormData(e.currentTarget)), personality_tags: String(new FormData(e.currentTarget).get('personality_tags') || '').split(/[,，]/).map(tag => tag.trim()).filter(Boolean), avatar_media_id: draft.avatar_media_id, creation_source: draft.creation_source } });
                     done(result.id);
                 }
                 catch (e) {
@@ -988,7 +1041,7 @@ function DraftCompanion({ t, close, back, done, notify }: {
                 finally {
                     setBusy(false);
                 }
-            }}><Media src={draft.portrait_url} className="profile-portrait" alt={draft.profile.name}/><label>{t('name')}<input name="name" defaultValue={draft.profile.name} required/></label><label>{t('persona')}<textarea name="persona" rows={7} defaultValue={draft.profile.persona}/></label><button className="button primary" disabled={busy}>{t('newCompanion')}</button></form>}</Modal>;
+            }}><Media src={draft.portrait_url} className="profile-portrait" alt={draft.profile.name}/><label>{t('name')}<Input name="name" defaultValue={draft.profile.name} required/></label><label>{t('persona')}<Textarea name="persona" rows={7} defaultValue={draft.profile.persona}/></label>{(['city', 'occupation', 'interests', 'appearance', 'speaking_style', 'likes', 'dislikes', 'life_habits', 'life_goal', 'backstory'] as const).map(key => <label key={key}>{productText(({ speaking_style: 'companion.create.speakingStyle', life_habits: 'companion.create.lifeHabits', life_goal: 'companion.create.lifeGoal' } as Record<string, string>)[key] || key, t)}<Textarea name={key} rows={2} maxLength={4000} defaultValue={draft.profile[key] || ''}/></label>)}<label>{productText('companion.create.traitsEditable', t)}<Input name="personality_tags" defaultValue={(draft.profile.personality_tags || []).join(', ')}/></label><label>{t('relationship')}<Select aria-label={t('relationship')} name="gender" value={role || draft.profile.gender || 'custom'} onChange={e => setRole(e.target.value)}>{items(options.data, 'relationships').map(option => <option key={option.key} value={option.key}>{productText(`relation.${option.key}`, t)}</option>)}</Select></label><label>{t('closeness')}<Select aria-label={t('closeness')} name="relationship_stage" key={role} defaultValue={role ? items(options.data, 'relationships').find(option => option.key === role)?.default_stage : draft.profile.relationship_stage}>{(items(options.data, 'relationships').find(option => option.key === (role || draft.profile.gender || 'custom'))?.stages || []).map((stage: string) => <option key={stage} value={stage}>{productText(`stage.${stage}`, t)}</option>)}</Select></label><button className="button primary" disabled={busy || options.loading || !!options.error}>{t('newCompanion')}</button></Form>}</Modal>;
 }
 function MemoryFavorite({ companionID, memoryID, t, notify }: {
     companionID: string;
@@ -1022,7 +1075,7 @@ function StoryBackground({ t, close, done, notify }: {
     notify: (e: unknown) => void;
 }) {
     const [busy, setBusy] = useState(false);
-    return <Modal title={t('background')} close={close} t={t}><form className="form" onSubmit={async (e) => {
+    return <Modal title={t('background')} close={close} t={t}><Form t={t} className="form" onSubmit={async (e) => {
             e.preventDefault();
             setBusy(true);
             try {
@@ -1035,7 +1088,7 @@ function StoryBackground({ t, close, done, notify }: {
             finally {
                 setBusy(false);
             }
-        }}>{([{ key: 'title', label: 'name' }, { key: 'synopsis', label: 'synopsis' }, { key: 'world_setting', label: 'worldSetting' }, { key: 'opening', label: 'opening' }, { key: 'genre', label: 'genre' }, { key: 'story_goal', label: 'storyGoal' }] as const).map(field => <label key={field.key}>{t(field.label)}<textarea name={field.key} required maxLength={field.key === 'title' ? 80 : 4000} rows={field.key === 'title' || field.key === 'genre' ? 1 : 3}/></label>)}<button className="button primary" disabled={busy}>{t('save')}</button></form></Modal>;
+        }}>{([{ key: 'title', label: 'name' }, { key: 'synopsis', label: 'synopsis' }, { key: 'world_setting', label: 'worldSetting' }, { key: 'opening', label: 'opening' }, { key: 'genre', label: 'genre' }, { key: 'story_goal', label: 'storyGoal' }] as const).map(field => <label key={field.key}>{t(field.label)}<Textarea name={field.key} required maxLength={field.key === 'title' ? 80 : 4000} rows={field.key === 'title' || field.key === 'genre' ? 1 : 3}/></label>)}<button className="button primary" disabled={busy}>{t('save')}</button></Form></Modal>;
 }
 function StoryBoardAction({ story, t, notify, changed }: {
     story: Entity;
@@ -1043,13 +1096,14 @@ function StoryBoardAction({ story, t, notify, changed }: {
     notify: (e: unknown) => void;
     changed: () => Promise<void>;
 }) {
+    const confirm = useConfirm(t);
     const [busy, setBusy] = useState(false);
     const requestKey = useRef<string | null>(null);
     const [panelCount, setPanelCount] = useState(4);
     if (!story.storyboard_unlocked)
         return null;
-    return <div className="form"><p className="muted">{story.config?.storyboard_coins} {t('credits')}</p><select value={panelCount} aria-label={t('storyboard')} onChange={e => setPanelCount(Number(e.target.value))} disabled={!!requestKey.current}><option value={4}>4</option><option value={6}>6</option><option value={9}>9</option></select><button className="button" disabled={busy} onClick={async () => {
-            if (!requestKey.current && !window.confirm(`${t('storyboard')} · ${story.config?.storyboard_coins} ${t('credits')}?`))
+    return <div className="form"><p className="muted">{story.config?.storyboard_coins} {t('credits')}</p><Select value={panelCount} aria-label={t('storyboard')} onChange={e => setPanelCount(Number(e.target.value))} disabled={!!requestKey.current}><option value={4}>4</option><option value={6}>6</option><option value={9}>9</option></Select><button className="button" disabled={busy} onClick={async () => {
+            if (!requestKey.current && !(await confirm(`${t('storyboard')} · ${story.config?.storyboard_coins} ${t('credits')}?`)))
                 return;
             setBusy(true);
             requestKey.current ||= crypto.randomUUID();

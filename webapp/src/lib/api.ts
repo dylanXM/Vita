@@ -62,8 +62,11 @@ export function items(data: any, key = 'items'): Entity[] { return Array.isArray
 export function safeURL(value: unknown): string {
     if (typeof value !== 'string')
         return '';
-    if (value.startsWith('asset://assets/ai_pets/') && ['cat_orange.png', 'cat_ragdoll.png', 'cat_tuxedo.png', 'dog_corgi.png', 'dog_retriever.png', 'dog_shiba.png'].includes(value.slice('asset://assets/ai_pets/'.length)))
+    if (/^asset:\/\/assets\/companions\/(mia|nora|leo|kai)\.png$/.test(value))
         return value.replace('asset://', '/');
+    if (value.startsWith('asset://assets/ai_pets/') && /^(cat_orange|cat_ragdoll|cat_tuxedo|dog_corgi|dog_retriever|dog_shiba)(_(poses|actions))?\.png$/.test(value.slice('asset://assets/ai_pets/'.length)))
+        return value.replace('asset://', '/');
+    if (/^\/assets\/scenes\/(cafe|cinema|dinner|ballroom|coffee|tea|meal|dessert)\.png$/.test(value)) return value;
     if (value.startsWith('/v1/'))
         return `${baseURL}${value}`;
     try {
