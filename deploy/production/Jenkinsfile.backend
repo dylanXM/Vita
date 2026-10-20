@@ -1,0 +1,78 @@
+pipeline {
+  agent any
+  options { disableConcurrentBuilds() }
+  parameters {
+    choice(name: 'BUILD_SOURCE', choices: ['uploaded', 'github'], description: 'uploaded: 导入本地上传镜像；github: 拉取源码并在服务器构建（无资源限制）')
+    string(name: 'BRANCH', defaultValue: 'dev', description: 'Git branch，仅 github 模式使用')
+  }
+  stages {
+    stage('Validate') { steps { script {
+      def source = params.BUILD_SOURCE ?: 'uploaded'
+      if (!(source in ['uploaded', 'github'])) error('Invalid BUILD_SOURCE')
+      if (source == 'github') {
+        if (!(params.BRANCH ==~ /^[A-Za-z0-9][A-Za-z0-9._\/-]*$/)) error('Invalid branch')
+      }
+    } } }
+    stage('Checkout') {
+      when { expression { params.BUILD_SOURCE == 'github' } }
+      steps { script {
+        checkout([$class: 'GitSCM', branches: [[name: "*/${params.BRANCH}"]], userRemoteConfigs: [[url: 'https://github.com/dylanXM/Vita.git']]])
+      } }
+    }
+    stage('Prepare image') { steps { sh '''set -eu
+      test -s /opt/vita/production.env
+      docker network inspect vita-prod >/dev/null
+      if [ "${BUILD_SOURCE:-uploaded}" = github ]; then
+        # Older branches also contain Go limits. Remove them in a temporary
+        # Dockerfile, leaving the checked-out source intact.
+        sed -e '/^ENV GOMAXPROCS=/d' -e 's/GOMAXPROCS=[0-9][0-9]* //g' -e 's/GOMEMLIMIT=[^ ]* //g' -e 's/go build -p=1 /go build /g' backend/Dockerfile > backend/Dockerfile.ci
+        trap 'rm -f backend/Dockerfile.ci' EXIT
+        docker build -t "vita/backend:$BUILD_NUMBER" -f backend/Dockerfile.ci backend
+      else
+        archive=/opt/vita/incoming/backend.tar.gz
+        test -s "$archive"
+        # Require the transport tag to be loaded by this archive, rather than
+        # accidentally deploying a tag left over from an earlier upload.
+        loaded=$(docker load --input "$archive")
+        printf '%s\\n' "$loaded"
+        printf '%s\\n' "$loaded" | grep -Fx 'Loaded image: vita/backend:uploaded' >/dev/null
+        image=vita/backend:uploaded
+        test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image")" = linux/amd64
+        docker tag "$image" "vita/backend:$BUILD_NUMBER"
+      fi
+      docker image inspect "vita/backend:$BUILD_NUMBER" >/dev/null
+    ''' } }
+    stage('Backup and migrate') { steps { sh '''set -eu
+      mkdir -p /opt/vita/backups
+      docker exec vita-prod-infra-postgres-1 pg_dump -U vita -d vita -Fc > /opt/vita/backups/pre-backend-$BUILD_NUMBER.dump
+      docker run --rm --network vita-prod --env-file /opt/vita/production.env --entrypoint /app/migrate vita/backend:$BUILD_NUMBER
+    ''' } }
+    stage('Deploy') { steps { sh '''set -eu
+      previous=$(docker inspect --format '{{.Config.Image}}' vita-api 2>/dev/null || true)
+      docker rm -f vita-api >/dev/null 2>&1 || true
+      run_api() { docker run -d --name vita-api --restart unless-stopped --network vita-prod --network-alias api -p 127.0.0.1:8270:8080 --env-file /opt/vita/production.env "$1"; }
+      if ! run_api vita/backend:$BUILD_NUMBER; then
+        if [ -n "$previous" ]; then run_api "$previous"; fi
+        exit 1
+      fi
+      for attempt in $(seq 1 40); do
+        state=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' vita-api)
+        if [ "$state" = healthy ]; then docker exec vita-admin nginx -s reload >/dev/null 2>&1 || true; exit 0; fi
+        if [ "$state" = unhealthy ] || [ "$state" = exited ]; then break; fi
+        sleep 3
+      done
+      docker logs --tail 80 vita-api
+      docker rm -f vita-api >/dev/null 2>&1 || true
+      if [ -n "$previous" ]; then run_api "$previous"; fi
+      exit 1
+    ''' } }
+    stage('Cleanup upload') {
+      when { expression { (params.BUILD_SOURCE ?: 'uploaded') == 'uploaded' } }
+      steps { sh '''set -eu
+        # Reached only after deployment and health checks succeeded.
+        # docker load imports directly; no extracted directory is created.
+        rm -f -- /opt/vita/incoming/backend.tar.gz
+      ''' }
+    }
+  }
+}

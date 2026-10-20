@@ -1,0 +1,553 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../../core/notice.dart';
+import '../../core/api_client.dart';
+import '../../core/analytics_service.dart';
+import '../../core/theme.dart';
+import '../../core/config_sync_controller.dart';
+import '../../shared/widgets.dart';
+import '../chat/chat_list_controller.dart';
+import 'companion_relation_rules.dart';
+
+/// Companion creation — a single scrollable form grouped into sections.
+class CompanionCreatePage extends StatefulWidget {
+  const CompanionCreatePage({super.key});
+
+  @override
+  State<CompanionCreatePage> createState() => _CompanionCreatePageState();
+}
+
+class _CompanionCreatePageState extends State<CompanionCreatePage> {
+  final _name = TextEditingController();
+  final _city = TextEditingController();
+  final _occupation = TextEditingController();
+  final _interests = TextEditingController();
+  String _gender = 'custom';
+  String _relationship = 'stranger';
+  CompanionRelationshipOptions _relations =
+      const CompanionRelationshipOptions([]);
+  bool _roleEdited = false;
+  bool _busy = false;
+  bool _loadingOptions = true;
+  final Set<String> _personalityTags = {};
+  List<String> _availableTags = const [
+    'warm',
+    'independent',
+    'witty',
+    'gentle',
+    'curious',
+    'calm',
+    'outgoing',
+    'thoughtful',
+    'ambitious',
+    'playful',
+  ];
+  List<Map<String, dynamic>> _portraits = const [];
+  String? _portraitId;
+  String? _avatarMediaId;
+  String? _avatarUrl;
+  bool _uploadingAvatar = false;
+
+  String? get _portraitGender {
+    for (final portrait in _portraits) {
+      if (portrait['id'] == _portraitId) return '${portrait['gender'] ?? ''}';
+    }
+    return null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService.to.track('companion_create_viewed', category: 'companion');
+    if (Get.isRegistered<ConfigSyncController>()) {
+      final sync = ConfigSyncController.to;
+      _seenConfigVersion = sync.revisions['companion'];
+      _configWorker = ever(sync.revisions, (_) {
+        final version = sync.revisions['companion'];
+        if (version == _seenConfigVersion) return;
+        _seenConfigVersion = version;
+        if (!mounted) return;
+        if (_busy || _uploadingAvatar || _configLoadFlight != null) {
+          _needsConfigReload = true;
+        } else {
+          _loadOptions();
+        }
+      });
+      sync.refresh();
+    }
+    _loadOptions();
+  }
+
+  bool _needsConfigReload = false;
+  Worker? _configWorker;
+  String? _seenConfigVersion;
+  Future<void>? _configLoadFlight;
+
+  Future<void> _loadOptions() {
+    if (_configLoadFlight != null) return _configLoadFlight!;
+    final next = _loadOptionsNow();
+    _configLoadFlight = next;
+    return next.whenComplete(() {
+      _configLoadFlight = null;
+      if (mounted && _needsConfigReload && !(_busy || _uploadingAvatar))
+        _loadOptions();
+    });
+  }
+
+  Future<void> _loadOptionsNow() async {
+    _needsConfigReload = false;
+    try {
+      final data = await ApiClient.instance.get('/v1/companion-options');
+      if (!mounted || data is! Map) return;
+      final tags = data['personality_tags'];
+      final portraits = data['portraits'];
+      final relations =
+          CompanionRelationshipOptions.from(data['relationships']);
+      if (relations.options.isEmpty)
+        throw ApiException('companion.create.optionsUnavailable'.tr);
+      setState(() {
+        _relations = relations;
+        _relationship = _relations.compatibleStage(_relationship, _gender);
+        if (tags is List) _availableTags = tags.whereType<String>().toList();
+        if (portraits is List) {
+          _portraits = portraits
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
+        }
+      });
+    } catch (error) {
+      if (mounted && Get.isRegistered<ConfigSyncController>())
+        ConfigSyncController.to.invalidate('companion');
+      if (mounted)
+        VitaNotice.error('companion.create.title'.tr,
+            'companion.create.optionsUnavailable'.tr);
+    } finally {
+      if (mounted) setState(() => _loadingOptions = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _configWorker?.dispose();
+    _name.dispose();
+    _city.dispose();
+    _occupation.dispose();
+    _interests.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickAvatar() async {
+    if (_busy || _uploadingAvatar) return;
+    setState(() => _uploadingAvatar = true);
+    try {
+      final image = await ImagePicker().pickImage(
+          source: ImageSource.gallery, imageQuality: 90, maxWidth: 1024);
+      if (image == null || !mounted) return;
+      final result = await ApiClient.instance
+          .upload('/v1/companions/image', image.path, kind: 'image');
+      final id = result is Map ? result['id'] : null;
+      if (id is! String || id.isEmpty) {
+        throw ApiException('profile.uploadFailed'.tr);
+      }
+      if (!mounted) return;
+      setState(() {
+        _avatarMediaId = id;
+        _avatarUrl = '/v1/media/$id';
+        _portraitId = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      VitaNotice.error(
+          'companion.create.chooseImage'.tr,
+          e is ApiException
+              ? (e.code == 'character_image_invalid'
+                  ? 'companion.create.imageInvalid'.tr
+                  : e.code == 'character_image_validation_unavailable'
+                      ? 'companion.create.imageValidationUnavailable'.tr
+                      : e.message)
+              : 'profile.uploadFailed'.tr);
+    } finally {
+      if (mounted) {
+        setState(() => _uploadingAvatar = false);
+        if (_needsConfigReload) _loadOptions();
+      }
+    }
+  }
+
+  Widget _uploadAvatarTile() {
+    final selected = _avatarMediaId != null && _portraitId == null;
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _busy || _uploadingAvatar
+            ? null
+            : () {
+                if (_avatarMediaId != null && !selected) {
+                  setState(() => _portraitId = null);
+                } else {
+                  _pickAvatar();
+                }
+              },
+        child: Container(
+          width: 92,
+          height: 110,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: selected ? context.vita.greenTint : context.vita.pageBg,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+                color: selected ? context.vita.green : Colors.transparent,
+                width: 2),
+          ),
+          child: Column(children: [
+            SizedBox(
+              height: 76,
+              width: 76,
+              child: _uploadingAvatar
+                  ? const Center(child: CircularProgressIndicator())
+                  : _avatarUrl != null
+                      ? VitaAvatar(
+                          name: _name.text, radius: 38, imageUrl: _avatarUrl)
+                      : Icon(Icons.add_photo_alternate_outlined,
+                          size: 32, color: context.vita.green),
+            ),
+            const SizedBox(height: 6),
+            Flexible(
+                child: Text('companion.create.chooseImage'.tr,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: context.vita.text))),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    if (_busy || _uploadingAvatar) return;
+    if (_portraitId == null && _avatarMediaId == null) {
+      VitaNotice.warning('companion.create.imageRequired'.tr,
+          'companion.create.imageRequiredMessage'.tr);
+      return;
+    }
+    if (_name.text.trim().isEmpty) {
+      VitaNotice.warning('companion.create.nameRequired'.tr,
+          'companion.create.nameRequiredMessage'.tr);
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final result = await ApiClient.instance.post('/v1/companions/', data: {
+        'name': _name.text.trim(),
+        'gender': _gender,
+        'relationship_stage': _relationship,
+        'city': _city.text.trim(),
+        'occupation': _occupation.text.trim(),
+        'interests': _interests.text.trim(),
+        'personality_tags': _personalityTags.toList(),
+        'portrait_id': _portraitId,
+        if (_portraitId == null && _avatarMediaId != null)
+          'avatar_media_id': _avatarMediaId,
+      });
+      AnalyticsService.to
+          .track('companion_created', category: 'companion', properties: {
+        'companion_id': result is Map ? '${result['id'] ?? ''}' : '',
+        'relationship_stage': _relationship,
+        'personality_tag_count': _personalityTags.length,
+        'has_portrait': _portraitId != null || _avatarMediaId != null,
+      });
+      Get.back();
+      ChatListController.to.load();
+      VitaNotice.success(
+          'companion.create.success'.tr, 'companion.create.successMessage'.tr);
+    } on ApiException catch (e) {
+      AnalyticsService.to.track('companion_create_failed',
+          category: 'companion', properties: {'reason': e.code ?? e.message});
+      if (e.action == 'open_subscription') {
+        VitaNotice.warning('subscription.required.title'.tr,
+            'subscription.required.create'.tr);
+        Get.offNamed('/subscription');
+      } else {
+        VitaNotice.error('companion.create.failed'.tr, e.message);
+      }
+    } catch (e) {
+      AnalyticsService.to.track('companion_create_failed',
+          category: 'companion', properties: {'reason': 'unexpected'});
+      VitaNotice.error('companion.create.failed'.tr, '$e');
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+        if (_needsConfigReload) _loadOptions();
+      }
+    }
+  }
+
+  Widget _field(
+      {required TextEditingController controller, required String hint}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: controller,
+        style: TextStyle(fontSize: 15, color: context.vita.text),
+        decoration: InputDecoration(
+          labelText: hint,
+          labelStyle: TextStyle(color: context.vita.subText),
+          filled: true,
+          fillColor: context.vita.surface,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: context.vita.divider)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: context.vita.divider)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: context.vita.green, width: 1.5)),
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String key) => Padding(
+        padding: const EdgeInsets.fromLTRB(0, 22, 0, 12),
+        child: Text(key.tr,
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: context.vita.text)),
+      );
+
+  Widget _chipRow(
+      List<String> options, String selected, ValueChanged<String> onSelected) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: options.map((o) {
+        final isSelected = selected == o;
+        return ChoiceChip(
+          label: Text(
+              (_relations.roles.contains(o) ? 'relation.$o' : 'stage.$o').tr),
+          selected: isSelected,
+          onSelected: (_) => onSelected(o),
+          labelStyle: TextStyle(
+            fontSize: 14,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            color: isSelected ? context.vita.green : context.vita.text,
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: context.vita.pageBg,
+      appBar: AppBar(
+          leading: const VitaBackButton(),
+          title: Text('companion.create.title'.tr)),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _sectionTitle('companion.create.basics'),
+              Column(
+                children: [
+                  _field(controller: _name, hint: 'companion.create.name'.tr),
+                  _field(controller: _city, hint: 'companion.create.city'.tr),
+                  _field(
+                      controller: _occupation,
+                      hint: 'companion.create.occupation'.tr),
+                  _field(
+                      controller: _interests,
+                      hint: 'companion.create.interests'.tr),
+                ],
+              ),
+              _sectionTitle('companion.create.personality'),
+              VitaCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('companion.create.traits'.tr,
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: context.vita.text)),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _availableTags.map((tag) {
+                        final selected = _personalityTags.contains(tag);
+                        return FilterChip(
+                          label: Text('tag.$tag'.tr),
+                          selected: selected,
+                          onSelected: (value) => setState(() {
+                            if (value && _personalityTags.length < 8) {
+                              _personalityTags.add(tag);
+                            } else if (!value) {
+                              _personalityTags.remove(tag);
+                            }
+                          }),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              _sectionTitle('companion.create.appearance'),
+              VitaCard(
+                child: _loadingOptions
+                    ? const Center(
+                        child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: CircularProgressIndicator()))
+                    : Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          ..._portraits.map((portrait) {
+                            final id = portrait['id'] as String? ?? '';
+                            final selected = _portraitId == id;
+                            final imageUrl = portrait['image_url'] as String?;
+                            return GestureDetector(
+                              onTap: _busy || _uploadingAvatar
+                                  ? null
+                                  : () => setState(() {
+                                        _portraitId = id;
+                                        final portraitGender =
+                                            '${portrait['gender'] ?? ''}';
+                                        final knownGender =
+                                            companionKnownGender(
+                                                portraitGender);
+                                        _gender =
+                                            !_roleEdited && knownGender != null
+                                                ? knownGender == 'male'
+                                                    ? 'boyfriend'
+                                                    : 'girlfriend'
+                                                : _relations.compatibleRole(
+                                                    _gender, portraitGender);
+                                        _relationship =
+                                            _relations.compatibleStage(
+                                                _relationship, _gender);
+                                        final suggested =
+                                            portrait['personality_tags'];
+                                        if (_personalityTags.isEmpty &&
+                                            suggested is List) {
+                                          _personalityTags.addAll(suggested
+                                              .whereType<String>()
+                                              .take(8));
+                                        }
+                                      }),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                width: 92,
+                                height: 110,
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(18),
+                                  color: selected
+                                      ? context.vita.greenTint
+                                      : context.vita.pageBg,
+                                  border: Border.all(
+                                      color: selected
+                                          ? context.vita.green
+                                          : Colors.transparent,
+                                      width: 2),
+                                ),
+                                child: Column(
+                                  children: [
+                                    VitaAvatar(
+                                        name: portrait['name'] as String? ?? '',
+                                        radius: 38,
+                                        imageUrl: imageUrl),
+                                    const SizedBox(height: 6),
+                                    Flexible(
+                                        child: Text(
+                                            portrait['name'] as String? ?? '',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: selected
+                                                    ? FontWeight.w700
+                                                    : FontWeight.w500,
+                                                color: selected
+                                                    ? context.vita.green
+                                                    : context.vita.text))),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+                          _uploadAvatarTile(),
+                        ],
+                      ),
+              ),
+              _sectionTitle('companion.create.relationship'),
+              VitaCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('companion.create.who'.tr,
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: context.vita.text)),
+                    const SizedBox(height: 10),
+                    _chipRow(
+                        _relations.rolesForGender(_portraitGender),
+                        _gender,
+                        (g) => setState(() {
+                              _roleEdited = true;
+                              _gender = g;
+                              _relationship =
+                                  _relations.compatibleStage(_relationship, g);
+                            })),
+                    const SizedBox(height: 18),
+                    Text('companion.create.closeness'.tr,
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: context.vita.text)),
+                    const SizedBox(height: 10),
+                    _chipRow(_relations.stagesForRole(_gender), _relationship,
+                        (s) => setState(() => _relationship = s)),
+                  ],
+                ),
+              ),
+              if (_relations.options.isEmpty && !_loadingOptions)
+                TextButton(
+                    onPressed: _loadOptions,
+                    child: Text('companion.create.retryOptions'.tr)),
+              const SizedBox(height: 28),
+              ElevatedButton(
+                onPressed:
+                    _busy || _uploadingAvatar || _relations.options.isEmpty
+                        ? null
+                        : _submit,
+                child: _busy
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text('companion.create.submit'.tr),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

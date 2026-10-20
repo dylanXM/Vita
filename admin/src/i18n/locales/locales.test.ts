@@ -1,0 +1,44 @@
+import { describe, expect, it } from "vitest";
+
+import en from "./en";
+import zhHans from "./zh-Hans";
+
+function leafKeys(value: unknown, prefix = ""): string[] {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return [prefix];
+  return Object.entries(value).flatMap(([key, child]) => leafKeys(child, prefix ? prefix + "." + key : key));
+}
+
+describe("admin translations", () => {
+  it("keeps every locale aligned with the English key set", () => {
+    const expected = leafKeys(en).sort();
+    for (const [locale, translations] of Object.entries({ "zh-Hans": zhHans })) {
+      expect(leafKeys(translations).sort(), locale + " translation keys").toEqual(expected);
+    }
+  });
+
+  it("exposes contact preference labels at the paths used by the UI", () => {
+    for (const translations of [en, zhHans]) {
+      expect(translations.contact.title).not.toBe("");
+      expect(translations.contact.dailyLimit).not.toBe("");
+    }
+  });
+
+  it("contains labels for every media route", () => {
+    for (const key of [
+      "route.text_memory",
+      "route.text_character_profile",
+      "route.text_story_chapter",
+      "route.text_storyboard",
+      "route.image_life_photo",
+      "route.image_requested_photo",
+      "route.image_storyboard_sheet",
+      "route.audio_transcription",
+      "route.audio_speech",
+      "route.video_life_clip",
+      "route.video_realtime_avatar",
+    ] as const) {
+      expect(en.mediaModels[key]).not.toBe("");
+      expect(zhHans.mediaModels[key]).not.toBe("");
+    }
+  });
+});

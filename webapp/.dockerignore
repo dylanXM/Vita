@@ -1,0 +1,11 @@
+node_modules/
+.next/
+src/lib/api-generated/
+.env*
+env.*
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+.git
+.gitignore
+Dockerfile

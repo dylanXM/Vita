@@ -1,0 +1,383 @@
+import { http } from "./client";
+import type {
+  ContactPreferences,
+  ContactPreferencesResponse,
+  AdminLoginResult,
+  AdminStats,
+  AdminUser,
+  AdminUserDetail,
+  AdminUserInput,
+  AdminUserList,
+  AdminUserListParams,
+  AdminGrantOperation,
+  AdminGrantResult,
+  InvitationSettings,
+  AdmobSettings,
+  HealthResponse,
+  Profile,
+  AgentConfig,
+  AgentSettings,
+  AIModel,
+  ModelRates,
+  ModelUsage,
+  AIModelCreateInput,
+  AIModelInput,
+  AIModelTestInput,
+  AIModelTestResponse,
+  AIProvider,
+  AIProviderInput,
+  AdminCompanion,
+  AdminCompanionInput,
+  CompanionPortrait,
+  BillingPlatform,
+  BillingCatalogPlatform,
+  BillingProduct,
+  BillingPurchase,
+  CreditLedgerEntry,
+  BillingList,
+  BillingPagedList,
+  Environment,
+  ManagedCompanionDetail,
+  ManagedCompanionList,
+  AdminConversation,
+  AdminMessage,
+  UserBehaviorCategory,
+  UserBehaviorTimeline,
+  OnboardingConfig,
+  WhatsNewCampaign,
+  MobilePlatform,
+  SocialMediaLinksConfig,
+  CreditProduct,
+  MediaModelRoute,
+  MediaModelRoutesResponse,
+  LegalDocument,
+  LegalDocumentInput,
+  LegalDocumentType,
+  AIPetBreed,
+  AIPetBreedInput,
+  StoryConfig,
+  StoryBackground,
+  StoryBackgroundInput,
+  StorageConfig,
+  StorageConfigInput,
+  StorageProvider,
+  ProductMetrics,
+} from "./types";
+
+/** Admin sign-in. The API also accepts a 6-digit code for the same accounts. */
+export const authApi = {
+  login: (email: string, password: string) =>
+    http.post<AdminLoginResult>("/auth/admin/login", { email, password }),
+  me: (signal?: AbortSignal) => http.get<Profile>("/me", { signal }),
+};
+
+/** Live counts behind the dashboard tiles. */
+export const statsApi = {
+  get: (signal?: AbortSignal) => http.get<AdminStats>("/admin/stats", { signal }),
+  product: (days: 7 | 30, signal?: AbortSignal) =>
+    http.get<ProductMetrics>("/admin/product-metrics", { params: { days }, signal }),
+};
+
+/** Admin user management — every call is admin-only on the server. */
+export const usersApi = {
+  contactPreferences: (id: string, signal?: AbortSignal) => http.get<ContactPreferencesResponse>(`/admin/users/${id}/contact-preferences`, { signal }),
+  saveContactPreferences: (id: string, body: ContactPreferences) => http.put<ContactPreferencesResponse>(`/admin/users/${id}/contact-preferences`, body),
+  list: (params: AdminUserListParams, signal?: AbortSignal) =>
+    http.get<AdminUserList>("/admin/users", { params, signal }),
+  get: (id: string, signal?: AbortSignal) =>
+    http.get<AdminUserDetail>(`/admin/users/${id}`, { signal }),
+  create: (body: AdminUserInput) => http.post<AdminUser>("/admin/users", body),
+  update: (id: string, body: AdminUserInput) => http.put<AdminUser>(`/admin/users/${id}`, body),
+  remove: (id: string) => http.del<{ message: string }>(`/admin/users/${id}`),
+  ban: (id: string) => http.post<AdminUser>(`/admin/users/${id}/ban`),
+  unban: (id: string) => http.post<AdminUser>(`/admin/users/${id}/unban`),
+  grantOperations: (id: string, signal?: AbortSignal) =>
+    http.get<BillingList<AdminGrantOperation>>(`/admin/users/${id}/grant-operations`, { signal }),
+  grantCoins: (id: string, body: { coins: number; note: string }) =>
+    http.post<AdminGrantResult>(`/admin/users/${id}/grant-coins`, body),
+  grantSubscription: (id: string, body: { plan_id: string; ends_at: string; note: string }) =>
+    http.post<AdminGrantResult>(`/admin/users/${id}/grant-subscription`, body),
+  timeline: (id: string, params: { category?: UserBehaviorCategory; limit?: number; offset?: number }, signal?: AbortSignal) =>
+    http.get<UserBehaviorTimeline>(`/admin/users/${id}/timeline`, { params, signal }),
+};
+
+export const storageApi = {
+  get: (environment: Environment, signal?: AbortSignal) =>
+    http.get<StorageConfig>("/admin/storage-config", { params: { environment }, signal }),
+  save: (environment: Environment, body: StorageConfigInput) =>
+    http.put<StorageConfig>("/admin/storage-config", body, { params: { environment } }),
+  test: (environment: Environment, provider: Exclude<StorageProvider, "postgres">) =>
+    http.post<{ provider: string; success: boolean }>("/admin/storage-config/test", undefined, { params: { environment, provider } }),
+};
+
+export const healthApi = {
+  get: (signal?: AbortSignal) => http.get<HealthResponse>("/health", { signal }),
+};
+
+export interface BillingFilters {
+  environment: Environment;
+  platform?: BillingPlatform | BillingCatalogPlatform | "system";
+  page?: number;
+  page_size?: number;
+}
+
+export const subscriptionPlansApi = {
+  list: (params: Pick<BillingFilters, "environment" | "platform">, signal?: AbortSignal) =>
+    http.get<BillingList<BillingProduct>>("/admin/subscription-plans", { params, signal }),
+  create: (body: Omit<BillingProduct, "id">) =>
+    http.post<BillingProduct>("/admin/subscription-plans", body),
+  update: (id: string, body: Omit<BillingProduct, "id">) =>
+    http.put<BillingProduct>(`/admin/subscription-plans/${id}`, body),
+  remove: (id: string) => http.del<{ message: string }>(`/admin/subscription-plans/${id}`),
+};
+
+export const coinPacksApi = {
+  list: (params: Pick<BillingFilters, "environment" | "platform">, signal?: AbortSignal) =>
+    http.get<BillingList<BillingProduct>>("/admin/coin-packs", { params, signal }),
+  create: (body: Omit<BillingProduct, "id">) => http.post<BillingProduct>("/admin/coin-packs", body),
+  update: (id: string, body: Omit<BillingProduct, "id">) =>
+    http.put<BillingProduct>(`/admin/coin-packs/${id}`, body),
+  remove: (id: string) => http.del<{ message: string }>(`/admin/coin-packs/${id}`),
+};
+
+export const purchasesApi = {
+  list: (params: BillingFilters, signal?: AbortSignal) =>
+    http.get<BillingPagedList<BillingPurchase>>("/admin/purchases", { params, signal }),
+};
+
+export const creditLedgerApi = {
+  list: (params: BillingFilters, signal?: AbortSignal) =>
+    http.get<BillingPagedList<CreditLedgerEntry>>("/admin/credit-ledger", { params, signal }),
+};
+
+export const creditProductsApi = {
+  list: (environment: Environment, signal?: AbortSignal) =>
+    http.get<BillingList<CreditProduct>>("/admin/credit-products", { params: { environment }, signal }),
+  update: (environment: Environment, key: string, body: Pick<CreditProduct, "coins" | "enabled" | "sort_order"> & Partial<Pick<CreditProduct, "subscription_only" | "is_launched" | "scene_background_url" | "scene_audio_url">>) =>
+    http.put<BillingList<CreditProduct>>(`/admin/credit-products/${key}`, body, { params: { environment } }),
+};
+
+export const invitationApi = {
+  settings: (signal?: AbortSignal) =>
+    http.get<InvitationSettings>("/admin/invitation-settings", { signal }),
+  saveSettings: (rewardPercent: number) =>
+    http.put<InvitationSettings>("/admin/invitation-settings", { reward_percent: rewardPercent }),
+};
+
+export const admobApi = {
+  settings: (signal?: AbortSignal) =>
+    http.get<AdmobSettings>("/admin/admob-settings", { signal }),
+  saveSettings: (body: AdmobSettings) =>
+    http.put<AdmobSettings>("/admin/admob-settings", body),
+};
+
+export const onboardingApi = {
+  get: (environment: Environment, platform: MobilePlatform, signal?: AbortSignal) =>
+    http.get<OnboardingConfig>("/admin/onboarding", { params: { environment, platform }, signal }),
+  save: (environment: Environment, platform: MobilePlatform, body: Pick<OnboardingConfig, "enabled" | "revision" | "pages">) =>
+    http.put<OnboardingConfig>("/admin/onboarding", body, { params: { environment, platform } }),
+};
+
+export const whatsNewApi = {
+  list: (environment: Environment, platform: MobilePlatform, signal?: AbortSignal) =>
+    http.get<{ items: WhatsNewCampaign[] }>("/admin/whats-new", { params: { environment, platform }, signal }),
+  create: (body: Omit<WhatsNewCampaign, "id" | "updated_by" | "created_at" | "updated_at">) =>
+    http.post<WhatsNewCampaign>("/admin/whats-new", body),
+  update: (id: string, body: Omit<WhatsNewCampaign, "id" | "updated_by" | "created_at" | "updated_at">) =>
+    http.put<WhatsNewCampaign>(`/admin/whats-new/${id}`, body),
+  remove: (id: string) => http.del<{ message: string }>(`/admin/whats-new/${id}`),
+};
+
+export const socialLinksApi = {
+  get: (environment: Environment, signal?: AbortSignal) =>
+    http.get<SocialMediaLinksConfig>("/admin/social-links", { params: { environment }, signal }),
+  save: (environment: Environment, body: Pick<SocialMediaLinksConfig,
+    "social_instagram_url" | "social_tiktok_url" | "social_x_url" | "social_discord_url">) =>
+    http.put<SocialMediaLinksConfig>("/admin/social-links", body, { params: { environment } }),
+};
+
+export const aiPetBreedsApi = {
+  list: (environment: Environment, signal?: AbortSignal) =>
+    http.get<BillingList<AIPetBreed>>("/admin/ai-pet-breeds", { params: { environment }, signal }),
+  create: (body: AIPetBreedInput) => http.post<AIPetBreed>("/admin/ai-pet-breeds", body),
+  update: (id: string, body: AIPetBreedInput) =>
+    http.put<AIPetBreed>(`/admin/ai-pet-breeds/${id}`, body),
+  remove: (id: string) => http.del<{ message: string }>(`/admin/ai-pet-breeds/${id}`),
+};
+
+export const adminImagesApi = {
+  upload: async (file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return http.post<{ url: string }>("/admin/images", body);
+  },
+};
+
+export const storiesApi = {
+  config: (environment: Environment, signal?: AbortSignal) =>
+    http.get<StoryConfig>("/admin/story-config", { params: { environment }, signal }),
+  saveConfig: (body: StoryConfig) => http.put<StoryConfig>("/admin/story-config", body),
+  backgrounds: (environment: Environment, signal?: AbortSignal) =>
+    http.get<{ items: StoryBackground[] }>("/admin/story-backgrounds", { params: { environment }, signal }),
+  createBackground: (body: StoryBackgroundInput) => http.post<{ id: string }>("/admin/story-backgrounds", body),
+  updateBackground: (id: string, body: StoryBackgroundInput) => http.put<{ id: string }>(`/admin/story-backgrounds/${id}`, body),
+  removeBackground: (id: string) => http.del<{ message: string }>(`/admin/story-backgrounds/${id}`),
+};
+
+export const legalDocumentsApi = {
+  list: (environment: Environment, documentType: LegalDocumentType, signal?: AbortSignal) =>
+    http.get<{ items: LegalDocument[] }>("/admin/legal-documents", {
+      params: { environment, document_type: documentType }, signal,
+    }),
+  create: (body: LegalDocumentInput) =>
+    http.post<LegalDocument>("/admin/legal-documents", body),
+  update: (id: string, body: LegalDocumentInput) =>
+    http.put<LegalDocument>(`/admin/legal-documents/${id}`, body),
+  activate: (id: string) =>
+    http.post<LegalDocument>(`/admin/legal-documents/${id}/activate`),
+  remove: (id: string) =>
+    http.del<{ message: string }>(`/admin/legal-documents/${id}`),
+};
+
+export const agentApi = {
+  config: (env?: string, signal?: AbortSignal, includeUsage = false) =>
+    http.get<AgentConfig>("/admin/agent/config", { signal, params: { ...(env ? { environment: env } : {}), ...(includeUsage ? { include_usage: true } : {}) } }),
+  saveSettings: (body: AgentSettings) => http.put<AgentSettings>("/admin/agent/settings", body),
+  createProvider: (body: AIProviderInput) => http.post<AIProvider>("/admin/agent/providers", body),
+  updateProvider: (id: string, body: AIProviderInput) =>
+    http.put<AIProvider>(`/admin/agent/providers/${id}`, body),
+  removeProvider: (id: string) => http.del<{ message: string }>(`/admin/agent/providers/${id}`),
+  modelUsage: (id: string, page: number, signal?: AbortSignal) =>
+    http.get<ModelUsage>(`/admin/agent/models/${id}/usage`, { signal, params: { page } }),
+  saveModelRates: (id: string, body: ModelRates) =>
+    http.put<ModelRates>(`/admin/agent/models/${id}/rates`, body),
+  createModel: (body: AIModelCreateInput) => http.post<AIModel>("/admin/agent/models", body),
+  testModel: (body: AIModelTestInput) => {
+    const form = new FormData();
+    if (body.provider_id) form.set("provider_id", body.provider_id);
+    form.set("model_name", body.model_name);
+    form.set("scenarios", JSON.stringify(body.scenarios));
+    if (body.kind) form.set("kind", body.kind);
+    if (body.base_url) form.set("base_url", body.base_url);
+    if (body.api_key) form.set("api_key", body.api_key);
+    if (body.transcription_file) form.set("transcription_file", body.transcription_file);
+    return http.post<AIModelTestResponse>("/admin/agent/models/test", form, { timeout: 360_000 });
+  },
+  updateModel: (id: string, body: AIModelInput) =>
+    http.put<AIModel>(`/admin/agent/models/${id}`, body),
+  removeModel: (id: string) => http.del<{ message: string }>(`/admin/agent/models/${id}`),
+  testProviderConnection: (body: { kind: string; base_url: string; api_key?: string; provider_id?: string }) =>
+    http.post<{ success: boolean; message: string; models?: string[]; raw?: string }>("/admin/agent/providers/test-connection", body, { timeout: 60_000 }),
+  mediaRoutes: (signal?: AbortSignal) =>
+    http.get<MediaModelRoutesResponse>("/admin/agent/media-routes", { signal }),
+  saveMediaRoutes: (routes: MediaModelRoute[]) =>
+    http.put<MediaModelRoutesResponse>("/admin/agent/media-routes", { routes }),
+  createPortrait: (body: Omit<CompanionPortrait, "id">) =>
+    http.post<CompanionPortrait>("/admin/agent/portraits", body),
+  updatePortrait: (id: string, body: Omit<CompanionPortrait, "id">) =>
+    http.put<CompanionPortrait>(`/admin/agent/portraits/${id}`, body),
+  companions: (env?: string, signal?: AbortSignal) =>
+    http.get<{ items: AdminCompanion[] }>("/admin/agent/companions", { signal, params: env ? { environment: env } : undefined }),
+  createCompanion: (body: AdminCompanionInput) =>
+    http.post<{ id: string }>("/admin/agent/companions", body),
+  updateCompanion: (id: string, body: AdminCompanionInput) =>
+    http.put<{ id: string }>(`/admin/agent/companions/${id}`, body),
+};
+
+
+export interface CompanionFilters {
+  page?: number;
+  page_size?: number;
+  q?: string;
+  user_id?: string;
+  status?: "active" | "inactive";
+  environment?: Environment;
+}
+
+export const companionsApi = {
+  list: (params: CompanionFilters, signal?: AbortSignal) =>
+    http.get<ManagedCompanionList>("/admin/companions", { params, signal }),
+  get: (id: string, signal?: AbortSignal) =>
+    http.get<ManagedCompanionDetail>(`/admin/companions/${id}`, { signal }),
+  update: (id: string, body: AdminCompanionInput) =>
+    http.put<{ id: string }>(`/admin/companions/${id}`, body),
+  remove: (id: string) => http.del<{ message: string }>(`/admin/companions/${id}`),
+  conversations: (id: string, signal?: AbortSignal) =>
+    http.get<{ items: AdminConversation[] }>(`/admin/companions/${id}/conversations`, { signal }),
+  messages: (id: string, conversationID: string, page = 1, signal?: AbortSignal) =>
+    http.get<BillingPagedList<AdminMessage>>(
+      `/admin/companions/${id}/conversations/${conversationID}/messages`,
+      { params: { page, page_size: 50 }, signal },
+    ),
+};
+
+import type {
+  LifeEngineCompanion,
+  LifeEngineEvent,
+  LifeEngineEventInput,
+  LifeEngineOverview,
+} from "./types";
+
+export const lifeEngineApi = {
+  overview: (signal?: AbortSignal) =>
+    http.get<LifeEngineOverview>("/admin/life-engine/overview", { signal }),
+  companions: (signal?: AbortSignal) =>
+    http.get<{ items: LifeEngineCompanion[] }>("/admin/life-engine/companions", { signal }),
+  events: (companionID: string, signal?: AbortSignal) =>
+    http.get<{ items: LifeEngineEvent[] }>(`/admin/life-engine/companions/${companionID}/events`, { signal }),
+  createEvent: (companionID: string, body: LifeEngineEventInput) =>
+    http.post<{ id: string }>(`/admin/life-engine/companions/${companionID}/events`, body),
+  updateEvent: (eventID: string, body: LifeEngineEventInput) =>
+    http.put<{ message: string }>(`/admin/life-engine/events/${eventID}`, body),
+  deleteEvent: (eventID: string) =>
+    http.del<{ message: string }>(`/admin/life-engine/events/${eventID}`),
+  enterTakeover: (companionID: string) =>
+    http.post<{ message: string }>(`/admin/life-engine/companions/${companionID}/takeover`),
+  exitTakeover: (companionID: string) =>
+    http.del<{ message: string }>(`/admin/life-engine/companions/${companionID}/takeover`),
+  triggerPlan: (force = false) =>
+    http.post<{ message: string; scanned: number; newly_completed: number; failed_after: number; diagnostics: Array<{ name: string; active: boolean; life_enabled: boolean; admin_takeover: boolean; active_subscription: boolean; today_status: string; last_error: string }> }>(
+      "/admin/life-engine/trigger-plan", undefined, { params: force ? { force: "true" } : undefined, timeout: 660_000 }),
+  triggerProactive: () =>
+    http.post<{ message: string; due_before: number; dispatched: number; shared_after: number }>(
+      "/admin/life-engine/trigger-proactive", undefined, { timeout: 150_000 }),
+  resendOutbox: (companionID: string) =>
+    http.post<{ message: string; reset: number }>(`/admin/life-engine/companions/${companionID}/resend-outbox`),
+  broadcast: (companionID: string, body: { content: string; conversation_id?: string }) =>
+    http.post<{ message: string; message_id: string; conversation_id: string }>(
+      `/admin/life-engine/companions/${companionID}/broadcast`, body),
+};
+
+export interface WorldPlace {
+  scene_kind: string;
+  title: string;
+  description: string;
+  enabled: boolean;
+  updated_at: string;
+}
+
+export interface WorldCampaign {
+  id: string;
+  region_code: string;
+  title: string;
+  description: string;
+  scene_kind: string;
+  ambience: "clear" | "rain" | "snow";
+  starts_on: string;
+  ends_on: string;
+  priority: number;
+  enabled: boolean;
+  updated_at: string;
+}
+
+export type WorldCampaignInput = Omit<WorldCampaign, "id" | "updated_at">;
+
+export const worldEngineApi = {
+  places: (signal?: AbortSignal) => http.get<{ items: WorldPlace[] }>("/admin/life-engine/places", { signal }),
+  savePlace: (kind: string, body: Pick<WorldPlace, "title" | "description" | "enabled">) =>
+    http.put<{ message: string }>(`/admin/life-engine/places/${kind}`, body),
+  campaigns: (signal?: AbortSignal) => http.get<{ items: WorldCampaign[] }>("/admin/life-engine/campaigns", { signal }),
+  createCampaign: (body: WorldCampaignInput) => http.post<{ id: string }>("/admin/life-engine/campaigns", body),
+  updateCampaign: (id: string, body: WorldCampaignInput) => http.put<{ id: string }>(`/admin/life-engine/campaigns/${id}`, body),
+  deleteCampaign: (id: string) => http.del<{ message: string }>(`/admin/life-engine/campaigns/${id}`),
+};

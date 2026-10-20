@@ -1,0 +1,113 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../../core/theme.dart';
+import '../../core/token_storage.dart';
+import '../../core/app_content_controller.dart';
+import '../../core/config_sync_controller.dart';
+import 'auth_controller.dart';
+
+/// Startup gate: restores the stored session and routes to the shell or login.
+class SplashPage extends StatefulWidget {
+  const SplashPage({super.key});
+
+  @override
+  State<SplashPage> createState() => _SplashPageState();
+}
+
+class _SplashPageState extends State<SplashPage> {
+  @override
+  void initState() {
+    super.initState();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    String? token;
+    try {
+      token = await TokenStorage.read();
+    } catch (_) {
+      // Secure storage unavailable (e.g. fresh install) — treat as signed out.
+    }
+    if (!mounted) return;
+    await ConfigSyncController.to
+        .refresh()
+        .timeout(const Duration(seconds: 3), onTimeout: () {});
+    // Compatible with a backend rollout that has not exposed versions yet.
+    if (ConfigSyncController.to.versionsUnavailable &&
+        !ConfigSyncController.to.revisions.containsKey('content'))
+      await AppContentController.to
+          .load()
+          .timeout(const Duration(seconds: 3), onTimeout: () {});
+    if (!mounted) return;
+    // Existing signed-in installs must not be pushed through a newly added
+    // first-run flow after an app upgrade.
+    if ((token == null || token.isEmpty) &&
+        await AppContentController.to.shouldShowOnboarding()) {
+      Get.offAllNamed('/onboarding');
+      return;
+    }
+    if (token != null && token.isNotEmpty) {
+      try {
+        await AuthController.to.fetchProfile();
+      } catch (_) {
+        await TokenStorage.clear();
+        if (mounted) Get.offAllNamed('/login');
+        return;
+      }
+      if (mounted) Get.offAllNamed('/shell');
+    } else {
+      Get.offAllNamed('/login');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FBFF),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFEFFBFF),
+              Color(0xFFFBFCFF),
+              Color(0xFFF6F1FF),
+            ],
+            stops: [0, 0.52, 1],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.asset(
+                'assets/branding/vita_brand_mark.png',
+                width: 128,
+                height: 128,
+                fit: BoxFit.contain,
+              ),
+              SizedBox(height: 20),
+              Text(
+                'Vita',
+                style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: context.vita.text,
+                    letterSpacing: 0.5),
+              ),
+              SizedBox(height: 6),
+              Text(
+                'auth.tagline'.tr,
+                style: TextStyle(fontSize: 13, color: context.vita.subText),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

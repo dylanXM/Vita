@@ -1,0 +1,13 @@
+**
+!cmd/
+!internal/
+!ent/
+!migrations/
+!openapi/
+!go.mod
+!go.sum
+!Dockerfile
+!*.go
+node_modules/
+dist/
+.env*

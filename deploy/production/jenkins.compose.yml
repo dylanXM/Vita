@@ -1,0 +1,23 @@
+name: vita-jenkins
+services:
+  jenkins:
+    image: jenkins/jenkins:lts-jdk21
+    user: "0:0"
+    restart: unless-stopped
+    cpus: 1
+    mem_limit: 512m
+    environment:
+      JAVA_OPTS: "-Xms128m -Xmx256m"
+    ports:
+      - "127.0.0.1:14808:8080"
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /usr/bin/docker:/usr/bin/docker:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  jenkins_data:

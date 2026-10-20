@@ -1,0 +1,325 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../../core/notice.dart';
+import '../../core/analytics_service.dart';
+import '../../core/api_client.dart';
+import '../../core/theme.dart';
+import '../../shared/widgets.dart';
+import '../billing/subscription_page.dart';
+import 'ai_pet_avatar.dart';
+import 'ai_pet_desktop_controller.dart';
+import 'ai_pet_home_page.dart';
+
+class AIPetsPage extends StatefulWidget {
+  const AIPetsPage({super.key});
+
+  @override
+  State<AIPetsPage> createState() => _AIPetsPageState();
+}
+
+class _AIPetsPageState extends State<AIPetsPage> {
+  bool _loading = true;
+  bool _loadFailed = false;
+  List<Map<String, dynamic>> _breeds = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService.to.track('ai_pets_viewed', category: 'companion');
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (mounted) setState(() => _loading = true);
+    try {
+      final data = await ApiClient.instance.get('/v1/ai-pets/breeds');
+      final items = data is Map ? data['items'] : null;
+      if (mounted && items is List) {
+        final breeds = items
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+        setState(() {
+          _breeds = breeds;
+          _loadFailed = false;
+        });
+      } else if (mounted) {
+        setState(() => _loadFailed = true);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadFailed = true);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _openBreed(Map<String, dynamic> breed) async {
+    final adoptedId = '${breed['adopted_companion_id'] ?? ''}';
+    if (adoptedId.isNotEmpty) {
+      await Get.to(() => AIPetHomePage(
+            companionId: adoptedId,
+            name: '${breed['adopted_companion_name'] ?? breed['name'] ?? ''}',
+            avatarUrl: '${breed['avatar_url'] ?? ''}',
+            species: '${breed['species'] ?? ''}',
+          ));
+      await _load();
+      return;
+    }
+    if (breed['can_adopt'] != true) {
+      await showSubscriptionPrompt(context, 'aiPets.subscriptionRequired'.tr);
+      return;
+    }
+    final nameController =
+        TextEditingController(text: '${breed['name'] ?? ''}');
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: Text('aiPets.adoptTitle'.tr),
+        content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${breed['description'] ?? ''}'),
+              const SizedBox(height: 16),
+              CupertinoTextField(
+                  controller: nameController,
+                  autofocus: true,
+                  maxLength: 40,
+                  placeholder: 'aiPets.petName'.tr,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+            ]),
+        actions: [
+          CupertinoDialogAction(
+              onPressed: () => Get.back(result: false),
+              child: Text('common.cancel'.tr,
+                  style: const TextStyle(color: CupertinoColors.systemGrey))),
+          CupertinoDialogAction(
+              onPressed: () => Get.back(result: true),
+              child: Text('aiPets.adopt'.tr)),
+        ],
+      ),
+    );
+    if (confirmed != true || nameController.text.trim().isEmpty) {
+      nameController.dispose();
+      return;
+    }
+    try {
+      final result = await ApiClient.instance.post('/v1/ai-pets/adopt', data: {
+        'breed_id': breed['id'],
+        'name': nameController.text.trim(),
+      });
+      final companionId =
+          result is Map ? '${result['companion_id'] ?? ''}' : '';
+      AnalyticsService.to.track('ai_pet_adopted',
+          category: 'companion',
+          properties: {
+            'breed_id': '${breed['id'] ?? ''}',
+            'companion_id': companionId
+          });
+      await Future.wait([
+        if (Get.isRegistered<AIPetDesktopController>())
+          AIPetDesktopController.to.refreshPet(),
+      ]);
+      if (mounted && companionId.isNotEmpty) {
+        await Get.to(() => AIPetHomePage(
+              companionId: companionId,
+              name: nameController.text.trim(),
+              avatarUrl: '${breed['avatar_url'] ?? ''}',
+              species: '${breed['species'] ?? ''}',
+            ));
+      }
+      await _load();
+    } on ApiException catch (error) {
+      if (error.action == 'open_subscription') {
+        if (mounted) await showSubscriptionPrompt(context, 'aiPets.subscriptionRequired'.tr);
+      } else {
+        VitaNotice.error('aiPets.error'.tr, error.message);
+      }
+    } finally {
+      nameController.dispose();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: context.vita.pageBg,
+      appBar: AppBar(
+          leading: const VitaBackButton(), title: Text('aiPets.title'.tr)),
+      body: _loading
+          ? ListView.builder(
+              itemCount: 4,
+              itemBuilder: (_, __) => const VitaSkeletonCard(withAvatar: true))
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: _loadFailed && _breeds.isEmpty
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.sizeOf(context).height * .6,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              VitaEmpty(
+                                icon: Icons.wifi_off_outlined,
+                                title: 'common.loadFailed'.tr,
+                                subtitle: 'common.pullToRetry'.tr,
+                              ),
+                              TextButton(
+                                onPressed: _load,
+                                child: Text('common.retry'.tr),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  : _breeds.isEmpty
+                      ? ListView(children: [
+                          SizedBox(
+                              height: MediaQuery.sizeOf(context).height * .6,
+                              child: VitaEmpty(
+                                  icon: Icons.pets_outlined,
+                                  title: 'aiPets.empty'.tr,
+                                  subtitle: 'aiPets.emptySub'.tr))
+                        ])
+                      : ListView(
+                          padding: const EdgeInsets.only(bottom: 28),
+                          children: [
+                            if (_loadFailed)
+                              Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: TextButton.icon(
+                                  onPressed: _load,
+                                  icon: const Icon(Icons.refresh),
+                                  label: Text('common.retry'.tr),
+                                ),
+                              ),
+                            if (_breeds.any((breed) =>
+                                '${breed['adopted_companion_id'] ?? ''}'
+                                    .isNotEmpty))
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                                child: Text('aiPets.myPets'.tr,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium),
+                              ),
+                            for (final breed in _breeds.where((breed) =>
+                                '${breed['adopted_companion_id'] ?? ''}'
+                                    .isNotEmpty))
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                                child: _BreedCard(
+                                  breed: breed,
+                                  onTap: () => _openBreed(breed),
+                                ),
+                              ),
+                            if (_breeds.any((breed) =>
+                                '${breed['adopted_companion_id'] ?? ''}'
+                                    .isEmpty))
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                                child: Text('aiPets.discoverPets'.tr,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium),
+                              ),
+                            for (final breed in _breeds.where((breed) =>
+                                '${breed['adopted_companion_id'] ?? ''}'
+                                    .isEmpty))
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                                child: _BreedCard(
+                                  breed: breed,
+                                  onTap: () => _openBreed(breed),
+                                ),
+                              ),
+                          ],
+                        ),
+            ),
+    );
+  }
+}
+
+class _BreedCard extends StatelessWidget {
+  const _BreedCard({required this.breed, required this.onTap});
+  final Map<String, dynamic> breed;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final adopted = '${breed['adopted_companion_id'] ?? ''}'.isNotEmpty;
+    final allowed = breed['can_adopt'] == true;
+    return VitaCard(
+      radius: 24,
+      margin: EdgeInsets.zero,
+      padding: EdgeInsets.zero,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(children: [
+            ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: SizedBox(
+                    width: 76,
+                    height: 76,
+                    child: AIPetAvatar(
+                        name: '${breed['name'] ?? ''}',
+                        imageUrl: '${breed['avatar_url'] ?? ''}'))),
+            const SizedBox(width: 14),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text('${breed['name'] ?? ''}',
+                      style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: context.vita.text)),
+                  const SizedBox(height: 2),
+                  Text(
+                      '${breed['species'] ?? ''} · ${breed['personality'] ?? ''}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 12.5, color: context.vita.subText)),
+                  const SizedBox(height: 7),
+                  Text('${breed['description'] ?? ''}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 13.5,
+                          height: 1.35,
+                          color: context.vita.text)),
+                  const SizedBox(height: 8),
+                  Text(
+                      adopted
+                          ? 'aiPets.adopted'.tr
+                          : allowed
+                              ? 'aiPets.available'.tr
+                              : 'aiPets.planLocked'.tr,
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: adopted || allowed
+                              ? context.vita.green
+                              : context.vita.subText)),
+                ])),
+            Icon(Icons.chevron_right, color: context.vita.chevron),
+          ]),
+        ),
+      ),
+    );
+  }
+}

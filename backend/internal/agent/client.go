@@ -1,0 +1,825 @@
+package agent
+
+import (
+	"bytes"
+	"context"
+	"database/sql"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+	"sync"
+	"time"
+)
+
+// Life plans return a full day as one JSON response; they need a longer
+// deadline than short chat replies. The caller context still bounds retries.
+const lifePlanRequestTimeout = 120 * time.Second
+
+var errTextTokenLimit = errors.New("provider text was truncated by token limit")
+
+const maxProviderResponseBytes = 4 << 20
+const maxImageProviderResponseBytes = 16 << 20
+
+type ChatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type Model struct {
+	ID        string
+	Kind      string
+	BaseURL   string
+	APIKey    string
+	ModelName string
+}
+
+type GenerateRequest struct {
+	Image       *ImageReference `json:",omitempty"`
+	System      string
+	Messages    []ChatMessage
+	Temperature float64
+	MaxTokens   int
+	Timeout     time.Duration `json:"-"`
+}
+
+type GenerateImageRequest struct {
+	Prompt    string
+	Size      string
+	Reference *ImageReference `json:",omitempty"`
+}
+
+type ImageReference struct {
+	Source string
+	MIME   string
+	Data   []byte `json:"-"`
+}
+
+func (c *Client) transcribeAudio(ctx context.Context, model Model, filename, mimeType string, audio []byte) (string, error) {
+	if model.Kind != "openai" {
+		return "", fmt.Errorf("audio transcription is unsupported for provider kind %q", model.Kind)
+	}
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	_ = writer.WriteField("model", model.ModelName)
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return "", err
+	}
+	if _, err := part.Write(audio); err != nil {
+		return "", err
+	}
+	if err := writer.Close(); err != nil {
+		return "", err
+	}
+	endpoint := providerEndpoint(defaultBaseURL(model.Kind, model.BaseURL), "/audio/transcriptions")
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, &body)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+model.APIKey)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("provider request: %w", err)
+	}
+	defer resp.Body.Close()
+	reader := io.LimitReader(resp.Body, maxProviderResponseBytes)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		raw, _ := io.ReadAll(reader)
+		return "", fmt.Errorf("provider returned %s: %s", resp.Status, strings.TrimSpace(string(raw)))
+	}
+	var output struct {
+		Text string `json:"text"`
+	}
+	raw, err := io.ReadAll(reader)
+	if err != nil {
+		return "", fmt.Errorf("read transcription response: %w", err)
+	}
+	if trace, ok := ctx.Value(callTraceKey{}).(*callTrace); ok {
+		trace.readUsage(raw)
+	}
+	if err := json.Unmarshal(raw, &output); err != nil {
+		return "", fmt.Errorf("decode transcription response: %w", err)
+	}
+	if strings.TrimSpace(output.Text) == "" {
+		return "", fmt.Errorf("provider returned an empty transcription")
+	}
+	return strings.TrimSpace(output.Text), nil
+}
+
+func (c *Client) generateSpeech(ctx context.Context, model Model, text, voice string) ([]byte, string, error) {
+	if model.Kind == "kie" {
+		return c.kieGenerateSpeech(ctx, model, text, voice)
+	}
+	if model.Kind != "openai" {
+		return nil, "", fmt.Errorf("speech generation is unsupported for provider kind %q", model.Kind)
+	}
+	if strings.TrimSpace(voice) == "" {
+		voice = "alloy"
+	}
+	body, _ := json.Marshal(map[string]any{"model": model.ModelName, "voice": voice, "input": text, "response_format": "mp3"})
+	endpoint := providerEndpoint(defaultBaseURL(model.Kind, model.BaseURL), "/audio/speech")
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+model.APIKey)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("provider request: %w", err)
+	}
+	defer resp.Body.Close()
+	reader := io.LimitReader(resp.Body, 10<<20)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		raw, _ := io.ReadAll(reader)
+		return nil, "", fmt.Errorf("provider returned %s: %s", resp.Status, strings.TrimSpace(string(raw)))
+	}
+	audio, err := io.ReadAll(reader)
+	if err != nil || len(audio) == 0 {
+		return nil, "", fmt.Errorf("provider returned empty speech audio")
+	}
+	if detected := http.DetectContentType(audio); strings.HasPrefix(detected, "text/") || detected == "application/json" {
+		return nil, "", fmt.Errorf("provider returned non-audio content")
+	}
+	mimeType := resp.Header.Get("Content-Type")
+	if mimeType == "" {
+		mimeType = "audio/mpeg"
+	}
+	return audio, mimeType, nil
+}
+
+type Client struct {
+	httpClient   *http.Client
+	kieUploadURL string
+	recorder     *sql.DB
+}
+
+func NewClient() *Client {
+	return &Client{httpClient: &http.Client{Timeout: 45 * time.Second}}
+}
+
+func (c *Client) generateText(ctx context.Context, model Model, input GenerateRequest) (string, error) {
+	if input.Timeout > 0 {
+		copyClient := *c
+		httpClient := *c.httpClient
+		httpClient.Timeout = input.Timeout
+		copyClient.httpClient = &httpClient
+		c = &copyClient
+	}
+	if input.Image != nil && model.Kind != "openai" {
+		return "", fmt.Errorf("image validation requires an OpenAI-compatible vision model")
+	}
+	switch model.Kind {
+	case "openai":
+		return c.openAI(ctx, model, input)
+	case "anthropic":
+		return c.anthropic(ctx, model, input)
+	default:
+		return "", fmt.Errorf("unsupported provider kind %q", model.Kind)
+	}
+}
+
+func (c *Client) generateImage(ctx context.Context, model Model, input GenerateImageRequest) (string, error) {
+	if input.Reference != nil && (len(input.Reference.Data) == 0 || !strings.HasPrefix(input.Reference.MIME, "image/")) {
+		return "", fmt.Errorf("portrait reference is unavailable")
+	}
+	if input.Reference != nil && model.Kind == "openai" {
+		return c.editImage(ctx, model, input)
+	}
+	if model.Kind == "kie" {
+		return c.kieGenerateImage(ctx, model, input)
+	}
+	if model.Kind != "openai" {
+		return "", fmt.Errorf("image generation is unsupported for provider kind %q", model.Kind)
+	}
+	size := strings.TrimSpace(input.Size)
+	if size == "" {
+		size = "1024x1024"
+	}
+	body := map[string]any{"model": model.ModelName, "prompt": input.Prompt, "size": size, "n": 1}
+	var response struct {
+		Data []struct {
+			URL     string `json:"url"`
+			B64JSON string `json:"b64_json"`
+		} `json:"data"`
+	}
+	endpoint := providerEndpoint(defaultBaseURL(model.Kind, model.BaseURL), "/images/generations")
+	if err := c.doJSONWithLimit(ctx, endpoint, model.APIKey, "", body, &response, maxImageProviderResponseBytes); err != nil {
+		return "", err
+	}
+	if len(response.Data) == 0 {
+		return "", fmt.Errorf("openai-compatible provider returned no image")
+	}
+	if imageURL := strings.TrimSpace(response.Data[0].URL); imageURL != "" {
+		return imageURL, nil
+	}
+	if encoded := strings.TrimSpace(response.Data[0].B64JSON); encoded != "" {
+		return "data:image/png;base64," + encoded, nil
+	}
+	return "", fmt.Errorf("openai-compatible provider returned an empty image")
+}
+
+func (c *Client) openAI(ctx context.Context, model Model, input GenerateRequest) (string, error) {
+	messages := make([]ChatMessage, 0, len(input.Messages)+1)
+	if input.System != "" {
+		messages = append(messages, ChatMessage{Role: "system", Content: input.System})
+	}
+	messages = append(messages, input.Messages...)
+	body := map[string]any{
+		"model":       model.ModelName,
+		"messages":    messages,
+		"temperature": input.Temperature,
+		"max_tokens":  input.MaxTokens,
+	}
+	if input.Image != nil {
+		body["messages"] = []any{
+			map[string]any{"role": "system", "content": input.System},
+			map[string]any{"role": "user", "content": []any{
+				map[string]any{"type": "text", "text": "Assess this image against the required single-person criteria."},
+				map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:" + input.Image.MIME + ";base64," + base64.StdEncoding.EncodeToString(input.Image.Data)}},
+			}},
+		}
+	}
+	var response struct {
+		Choices []struct {
+			FinishReason string `json:"finish_reason"`
+			Message      struct {
+				Content          json.RawMessage `json:"content"`
+				ReasoningContent string          `json:"reasoning_content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	endpoint := providerEndpoint(defaultBaseURL(model.Kind, model.BaseURL), "/chat/completions")
+	if err := c.doJSON(ctx, endpoint, model.APIKey, "", body, &response); err != nil {
+		return "", err
+	}
+	if len(response.Choices) == 0 {
+		return "", fmt.Errorf("openai-compatible provider returned no choices")
+	}
+	if response.Choices[0].FinishReason == "length" {
+		return "", errTextTokenLimit
+	}
+	msg := response.Choices[0].Message
+	if text := extractOpenAIText(msg.Content); text != "" {
+		return text, nil
+	}
+	// Reasoning models (e.g. Claude through an OpenAI-compatible gateway) may
+	// put the visible reply in reasoning_content while message.content is empty.
+	if text := strings.TrimSpace(msg.ReasoningContent); text != "" {
+		return text, nil
+	}
+	raw := strings.TrimSpace(string(msg.Content))
+	if len(raw) > 500 {
+		raw = raw[:500] + "…"
+	}
+	return "", fmt.Errorf("openai-compatible provider returned no text (content=%s)", raw)
+}
+
+// extractOpenAIText reads the text out of an OpenAI chat message content
+// field, which may be either a plain string or an array of content blocks.
+func extractOpenAIText(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		return strings.TrimSpace(s)
+	}
+	var blocks []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(raw, &blocks); err == nil {
+		var b strings.Builder
+		for _, blk := range blocks {
+			if blk.Type == "text" {
+				b.WriteString(blk.Text)
+			}
+		}
+		return strings.TrimSpace(b.String())
+	}
+	return ""
+}
+
+func (c *Client) anthropic(ctx context.Context, model Model, input GenerateRequest) (string, error) {
+	body := map[string]any{
+		"model":       model.ModelName,
+		"system":      input.System,
+		"messages":    input.Messages,
+		"temperature": input.Temperature,
+		"max_tokens":  input.MaxTokens,
+		// claude-sonnet-5 is a reasoning model: without an explicit
+		// "thinking: disabled" some proxies let thinking consume the whole
+		// max_tokens budget and return a content array with no text block
+		// (surfaced as "anthropic provider returned no text").
+		"thinking": map[string]any{"type": "disabled"},
+	}
+	endpoint := providerEndpoint(defaultBaseURL(model.Kind, model.BaseURL), "/messages")
+	var raw json.RawMessage
+	if err := c.doJSON(ctx, endpoint, model.APIKey, "2023-06-01", body, &raw); err != nil {
+		return "", err
+	}
+	// Anthropic format: content blocks, text inside type=="text" blocks.
+	var anthro struct {
+		StopReason string `json:"stop_reason"`
+		Content    []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	_ = json.Unmarshal(raw, &anthro)
+	if anthro.StopReason == "max_tokens" {
+		return "", errTextTokenLimit
+	}
+	for _, block := range anthro.Content {
+		if block.Type == "text" && strings.TrimSpace(block.Text) != "" {
+			return strings.TrimSpace(block.Text), nil
+		}
+	}
+	// OpenAI-compatible format: choices[].message.content. Some "anthropic"
+	// proxies (e.g. api.sweetai.work) answer /messages with this shape even
+	// though the request was anthropic-flavoured.
+	var oai struct {
+		Choices []struct {
+			FinishReason string `json:"finish_reason"`
+			Message      struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	_ = json.Unmarshal(raw, &oai)
+	for _, choice := range oai.Choices {
+		if choice.FinishReason == "length" {
+			return "", errTextTokenLimit
+		}
+		if strings.TrimSpace(choice.Message.Content) != "" {
+			return strings.TrimSpace(choice.Message.Content), nil
+		}
+	}
+	types := make([]string, 0, len(anthro.Content))
+	for _, blk := range anthro.Content {
+		types = append(types, blk.Type)
+	}
+	if len(types) == 0 {
+		types = append(types, "(empty content)")
+	}
+	snippet := strings.TrimSpace(string(raw))
+	if len(snippet) > 400 {
+		snippet = snippet[:400]
+	}
+	return "", fmt.Errorf("anthropic provider returned no text (content blocks: %s; raw: %s)", strings.Join(types, ", "), snippet)
+}
+
+func (c *Client) doJSON(ctx context.Context, endpoint, apiKey, anthropicVersion string, body any, output any) error {
+	return c.doJSONWithLimit(ctx, endpoint, apiKey, anthropicVersion, body, output, maxProviderResponseBytes)
+}
+
+func (c *Client) doJSONWithLimit(ctx context.Context, endpoint, apiKey, anthropicVersion string, body any, output any, responseLimit int64) error {
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("encode provider request: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(encoded))
+	if err != nil {
+		return fmt.Errorf("create provider request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if anthropicVersion != "" {
+		req.Header.Set("x-api-key", apiKey)
+		req.Header.Set("anthropic-version", anthropicVersion)
+	} else {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("provider request: %w", err)
+	}
+	defer resp.Body.Close()
+	reader := io.LimitReader(resp.Body, responseLimit)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		raw, _ := io.ReadAll(reader)
+		return fmt.Errorf("provider returned %s: %s", resp.Status, strings.TrimSpace(string(raw)))
+	}
+	raw, err := io.ReadAll(reader)
+	if err != nil {
+		return fmt.Errorf("read provider response: %w", err)
+	}
+	if trace, ok := ctx.Value(callTraceKey{}).(*callTrace); ok {
+		trace.readUsage(raw)
+	}
+	if err := json.Unmarshal(raw, output); err != nil {
+		return fmt.Errorf("decode provider response: %w", err)
+	}
+	return nil
+}
+
+// TestConnection verifies that the provider endpoint is reachable and the API
+// key is accepted. It only calls the lightweight models listing endpoint and
+// does not invoke the configured model, so it validates the service connection
+// itself rather than end-to-end model behavior.
+// TestConnection lists the provider's models endpoint and returns the model
+// IDs the API key is allowed to use. It validates the service connection and
+// surfaces the actually available model names so the admin console can tell a
+// mis-typed remote model ID from an upstream outage.
+// TestConnection pings the provider's models endpoint and returns both the
+// parsed model IDs and the raw response body. The raw body is always surfaced
+// (truncated) so the admin console can see exactly which model names the key
+// is allowed to use, even when the upstream uses a non-standard schema.
+func (c *Client) TestConnection(ctx context.Context, model Model) ([]string, string, error) {
+	if model.Kind == "kie" {
+		return c.kieTestConnection(ctx, model)
+	}
+	endpoint := providerEndpoint(defaultBaseURL(model.Kind, model.BaseURL), "/models")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("create provider request: %w", err)
+	}
+	if model.Kind == "anthropic" {
+		req.Header.Set("x-api-key", model.APIKey)
+		req.Header.Set("anthropic-version", "2023-06-01")
+	} else {
+		req.Header.Set("Authorization", "Bearer "+model.APIKey)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("provider request: %w", err)
+	}
+	defer resp.Body.Close()
+	reader := io.LimitReader(resp.Body, maxProviderResponseBytes)
+	raw, _ := io.ReadAll(reader)
+	rawText := strings.TrimSpace(string(raw))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, rawText, fmt.Errorf("provider returned %s on GET %s: %s", resp.Status, endpoint, rawText)
+	}
+	var listing struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	models := []string{}
+	if err := json.Unmarshal(raw, &listing); err == nil {
+		for _, item := range listing.Data {
+			if item.ID != "" {
+				models = append(models, item.ID)
+			}
+		}
+	}
+	if len(rawText) > 2000 {
+		rawText = rawText[:2000] + "…"
+	}
+	return models, rawText, nil
+}
+
+// providerEndpoint joins a configured base URL with an API path that starts
+// with a slash. It avoids double-prefixing /v1: operators often paste the full
+// OpenAI-compatible base URL (e.g. https://gateway.example.com/v1) into the
+// service address, and naively appending /v1 again produces /v1/v1/... which
+// the upstream rejects on chat calls even when a bare GET /v1/models passes.
+func providerEndpoint(base, path string) string {
+	b := strings.TrimRight(strings.TrimSpace(base), "/")
+	if b == "" {
+		b = "https://api.openai.com"
+	}
+	if strings.HasSuffix(b, "/v1") {
+		return b + path
+	}
+	return b + "/v1" + path
+}
+
+func defaultBaseURL(kind, configured string) string {
+	if strings.TrimSpace(configured) != "" {
+		return strings.TrimSpace(configured)
+	}
+	if kind == "anthropic" {
+		return "https://api.anthropic.com"
+	}
+	return "https://api.openai.com"
+}
+
+// ===== KIE (kie.ai) async task provider =====
+//
+// KIE exposes image/video/audio models through a two-step async flow:
+//   1. POST /api/v1/jobs/createTask  -> returns taskId
+//   2. GET  /api/v1/jobs/recordInfo?taskId=... -> poll until state=success/fail
+// Success returns resultJson, a JSON string like {"resultUrls":["https://..."]}.
+// This does not follow the OpenAI sync protocol; it is wired into GenerateImage
+// and GenerateSpeech so existing image/TTS routes and admin scenario tests work.
+
+func kieBase(model Model) string {
+	b := strings.TrimRight(strings.TrimSpace(model.BaseURL), "/")
+	if b == "" {
+		return "https://api.kie.ai"
+	}
+	for _, suffix := range []string{"/api/v1/chat/credit", "/api/v1/jobs/createTask", "/api/v1/jobs/recordInfo", "/api/v1/jobs", "/api/v1"} {
+		b = strings.TrimSuffix(b, suffix)
+	}
+	return b
+}
+
+// kieCreateTask submits a generation task and returns its taskId.
+func (c *Client) kieCreateTask(ctx context.Context, model Model, input map[string]any) (string, error) {
+	bodyData := map[string]any{"model": model.ModelName, "input": input}
+	if callback := kieCallbackURL(); callback != "" {
+		bodyData["callBackUrl"] = callback
+	}
+	body, _ := json.Marshal(bodyData)
+	endpoint := kieBase(model) + "/api/v1/jobs/createTask"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("kie createTask request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+model.APIKey)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("kie createTask: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("kie createTask HTTP status %d", resp.StatusCode)
+	}
+	reader := io.LimitReader(resp.Body, maxProviderResponseBytes)
+	var out struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+		Data struct {
+			TaskID string `json:"taskId"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(reader).Decode(&out); err != nil {
+		raw, _ := io.ReadAll(reader)
+		return "", fmt.Errorf("kie createTask decode: %s", strings.TrimSpace(string(raw)))
+	}
+	if out.Code != 200 || out.Data.TaskID == "" {
+		return "", fmt.Errorf("kie createTask failed: code=%d msg=%s", out.Code, out.Msg)
+	}
+	return out.Data.TaskID, nil
+}
+
+// kiePollResult waits for a task to reach success/fail and returns its resultJson.
+func (c *Client) kiePollResult(ctx context.Context, model Model, taskID string, waitLimit ...time.Duration) (string, error) {
+	signal := make(chan struct{}, 1)
+	kiePendingTasks.Store(taskID, signal)
+	defer kiePendingTasks.Delete(taskID)
+	endpoint := kieBase(model) + "/api/v1/jobs/recordInfo?taskId=" + url.QueryEscape(taskID)
+	wait := 90 * time.Second
+	if len(waitLimit) > 0 && waitLimit[0] > 0 { wait = waitLimit[0] }
+	deadline := time.Now().Add(wait)
+	for {
+		if time.Now().After(deadline) {
+			return "", fmt.Errorf("kie task %s timed out", taskID)
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+		if err != nil {
+			return "", fmt.Errorf("kie recordInfo request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+model.APIKey)
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return "", fmt.Errorf("kie recordInfo: %w", err)
+		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			resp.Body.Close()
+			return "", fmt.Errorf("kie recordInfo HTTP status %d", resp.StatusCode)
+		}
+		reader := io.LimitReader(resp.Body, maxProviderResponseBytes)
+		var out struct {
+			Code int    `json:"code"`
+			Msg  string `json:"msg"`
+			Data struct {
+				State      string `json:"state"`
+				ResultJSON string `json:"resultJson"`
+				FailMsg    string `json:"failMsg"`
+			} `json:"data"`
+		}
+		decodeErr := json.NewDecoder(reader).Decode(&out)
+		resp.Body.Close()
+		if decodeErr != nil {
+			return "", fmt.Errorf("kie recordInfo decode: %w", decodeErr)
+		}
+		if out.Code != 200 {
+			return "", fmt.Errorf("kie recordInfo failed: code=%d msg=%s", out.Code, out.Msg)
+		}
+		switch out.Data.State {
+		case "success":
+			if strings.TrimSpace(out.Data.ResultJSON) == "" {
+				return "", fmt.Errorf("kie task %s returned an empty result", taskID)
+			}
+			return out.Data.ResultJSON, nil
+		case "fail":
+			return "", fmt.Errorf("kie task %s failed: %s", taskID, strings.TrimSpace(out.Data.FailMsg))
+		}
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-signal:
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
+// kieResultURL extracts the first result URL from a KIE resultJson payload.
+func kieResultURL(resultJSON string) (string, error) {
+	var out struct {
+		ResultUrls []string `json:"resultUrls"`
+	}
+	if err := json.Unmarshal([]byte(resultJSON), &out); err != nil {
+		return "", fmt.Errorf("decode kie result: %w", err)
+	}
+	if len(out.ResultUrls) == 0 || strings.TrimSpace(out.ResultUrls[0]) == "" {
+		return "", fmt.Errorf("kie returned no result URL")
+	}
+	return out.ResultUrls[0], nil
+}
+
+// kieGenerateImage runs the async KIE flow for text-to-image and returns the image URL.
+func (c *Client) kieGenerateImage(ctx context.Context, model Model, input GenerateImageRequest) (string, error) {
+	var referenceURL string
+	if input.Reference != nil {
+		switch model.ModelName {
+		case "gpt-image-2-5-sunburst-text-to-image":
+			model.ModelName = "gpt-image-2-5-sunburst-image-to-image"
+		case "gpt-image-2-5-sunburst-image-to-image", "google/nano-banana-edit":
+		default:
+			return "", fmt.Errorf("KIE model %q does not have a supported portrait-reference adapter", model.ModelName)
+		}
+		var err error
+		referenceURL, err = c.uploadKieReference(ctx, model, input.Reference)
+		if err != nil {
+			return "", err
+		}
+	}
+	params, err := kieImageInput(model, input)
+	if err != nil {
+		return "", err
+	}
+	if referenceURL != "" {
+		if model.ModelName == "google/nano-banana-edit" {
+			params["image_urls"] = []string{referenceURL}
+			params["output_format"] = "png"
+			params["aspect_ratio"] = "1:1"
+		} else {
+			params["input_urls"] = []string{referenceURL}
+		}
+	}
+	taskID, err := c.kieCreateTask(ctx, model, params)
+	if err != nil {
+		return "", err
+	}
+	resultJSON, err := c.kiePollResult(ctx, model, taskID)
+	if err != nil {
+		return "", err
+	}
+	return kieResultURL(resultJSON)
+}
+
+// kieGenerateSpeech runs the async KIE flow for text-to-speech and returns the audio bytes.
+func (c *Client) kieGenerateSpeech(ctx context.Context, model Model, text, voice string) ([]byte, string, error) {
+	input := map[string]any{"text": text}
+	if strings.TrimSpace(voice) != "" {
+		input["voice"] = voice
+	}
+	taskID, err := c.kieCreateTask(ctx, model, input)
+	if err != nil {
+		return nil, "", err
+	}
+	resultJSON, err := c.kiePollResult(ctx, model, taskID)
+	if err != nil {
+		return nil, "", err
+	}
+	url, err := kieResultURL(resultJSON)
+	if err != nil {
+		return nil, "", err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("kie audio download: %w", err)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("kie audio download: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, "", fmt.Errorf("kie audio download failed: %s", resp.Status)
+	}
+	audio, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
+	if err != nil || len(audio) == 0 {
+		return nil, "", fmt.Errorf("kie audio download returned empty content")
+	}
+	if detected := http.DetectContentType(audio); strings.HasPrefix(detected, "text/") || detected == "application/json" {
+		return nil, "", fmt.Errorf("provider returned non-audio content")
+	}
+	mimeType := resp.Header.Get("Content-Type")
+	if mimeType == "" {
+		mimeType = "audio/mpeg"
+	}
+	return audio, mimeType, nil
+}
+
+// kieTestConnection uses the authenticated, non-billable account credit API.
+// KIE can return HTTP 200 with an error code in the JSON body.
+func (c *Client) kieTestConnection(ctx context.Context, model Model) ([]string, string, error) {
+	endpoint := kieBase(model) + "/api/v1/chat/credit"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("kie test connection request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+model.APIKey)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("kie test connection: %w", err)
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxProviderResponseBytes))
+	rawText := strings.TrimSpace(string(raw))
+	if err != nil {
+		return nil, rawText, fmt.Errorf("read kie response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, rawText, fmt.Errorf("kie returned HTTP %d", resp.StatusCode)
+	}
+	var result struct {
+		Code    int      `json:"code"`
+		Message string   `json:"msg"`
+		Data    *float64 `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return nil, rawText, fmt.Errorf("decode kie credit response: %w", err)
+	}
+	if result.Code != 200 {
+		return nil, rawText, fmt.Errorf("kie rejected connection (code %d): %s", result.Code, result.Message)
+	}
+	if result.Data == nil {
+		return nil, rawText, fmt.Errorf("kie credit response is missing balance")
+	}
+	return nil, rawText, nil
+}
+
+// kieImageInput keeps model-specific parameters out of other providers' requests.
+func kieImageInput(model Model, input GenerateImageRequest) (map[string]any, error) {
+	params := map[string]any{"prompt": input.Prompt}
+	if model.ModelName != "gpt-image-2-5-sunburst-text-to-image" && model.ModelName != "gpt-image-2-5-sunburst-image-to-image" {
+		return params, nil
+	}
+	ratio, resolution := "1:1", "1K"
+	switch input.Size {
+	case "", "1024x1024":
+	case "1536x1024":
+		ratio = "3:2"
+	case "1024x1536":
+		ratio = "2:3"
+	case "2048x2048":
+		resolution = "2K"
+	case "4096x4096":
+		resolution = "4K"
+	default:
+		return nil, fmt.Errorf("unsupported Kie Sunburst image size %q", input.Size)
+	}
+	params["aspect_ratio"] = ratio
+	params["resolution"] = resolution
+	params["background"] = "opaque"
+	return params, nil
+}
+
+var kiePendingTasks sync.Map
+
+// Callbacks are wake-up hints only. Provider queries remain authoritative so
+// untrusted callback bodies cannot fulfill jobs or change billing state.
+func NotifyKieTask(taskID string) {
+	if pending, ok := kiePendingTasks.Load(taskID); ok {
+		select {
+		case pending.(chan struct{}) <- struct{}{}:
+		default:
+		}
+	}
+}
+
+func kieCallbackURL() string {
+	base := strings.TrimRight(strings.TrimSpace(os.Getenv("VITA_PUBLIC_API_BASE_URL")), "/")
+	if base == "" {
+		return ""
+	}
+	return base + "/v1/providers/kie/callback"
+}
+
+// Only full-day structured output gets a larger-budget retry. Never expose
+// truncated JSON as a successful plan or retry unrelated provider failures.
+func (c *Client) generateLifePlanText(ctx context.Context, model Model, request GenerateRequest) (string, error) {
+	text, err := c.GenerateText(ctx, model, request)
+	if !errors.Is(err, errTextTokenLimit) || ctx.Err() != nil {
+		return text, err
+	}
+	request.MaxTokens = 16384
+	request.Messages = append(append([]ChatMessage(nil), request.Messages...), ChatMessage{Role: "user", Content: "The previous output hit the token limit. Generate the complete JSON array again from the beginning. Keep descriptions to one short sentence and moment_text concise; no explanations or markdown."})
+	return c.GenerateText(ctx, model, request)
+}

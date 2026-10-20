@@ -1,0 +1,236 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../../core/theme.dart';
+import '../../shared/widgets.dart';
+import '../companion/companion_create_method_page.dart';
+import 'chat_list_controller.dart';
+import 'chat_appointment_strip.dart';
+import 'chat_list_presentation.dart';
+import 'chat_page.dart';
+
+/// Companion contacts with the latest message and unread state.
+class ChatListPage extends StatelessWidget {
+  const ChatListPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final ctrl = ChatListController.to;
+    // Shell already includes the floating dock in this bottom inset.
+    final bottomSpacing = MediaQuery.paddingOf(context).bottom + 36;
+    return Scaffold(
+      backgroundColor: context.vita.pageBg,
+      // Bottom is open so the list scrolls behind the floating glass tab bar.
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            VitaTabHeader(
+              title: 'tab.contacts'.tr,
+              showDivider: false,
+              actions: IconButton.filledTonal(
+                tooltip: 'world.create'.tr,
+                onPressed: () {
+                  Get.to(
+                    () => const CompanionCreateMethodPage(),
+                    transition: Transition.cupertino,
+                    duration: const Duration(milliseconds: 300),
+                  );
+                },
+                icon: const Icon(Icons.add),
+              ),
+            ),
+            _ChatSearchBox(),
+            Obx(() => ctrl.appointments.isEmpty
+                ? const SizedBox.shrink() : const ChatAppointmentStrip()),
+            Expanded(child: Obx(() => _buildBody(ctrl, bottomSpacing))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody(ChatListController ctrl, double bottomSpacing) {
+    final list = ctrl.filtered;
+    if (ctrl.loading.value && ctrl.companions.isEmpty) {
+      return ListView.builder(
+        padding: EdgeInsets.only(bottom: bottomSpacing),
+        itemCount: 4,
+        itemBuilder: (_, __) => const VitaSkeletonCard(),
+      );
+    }
+    if (ctrl.companions.isEmpty) {
+      return VitaEmpty(
+        icon: Icons.favorite_border,
+        title: 'chat.empty.title'.tr,
+        subtitle: 'chat.empty.sub'.tr,
+      );
+    }
+    if (list.isEmpty) {
+      return VitaEmpty(
+        icon: Icons.search,
+        title: 'contacts.noResults'.tr,
+        subtitle: 'contacts.noResultsSub'.tr,
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: () => ctrl.load(),
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(6, 8, 6, bottomSpacing),
+        itemCount: list.length,
+        separatorBuilder: (context, _) => const SizedBox(height: 2),
+        itemBuilder: (context, i) {
+          final c = list[i];
+          final id = c['id'] as String? ?? '';
+          final name = c['name'] as String? ?? 'chat.companion'.tr;
+          final profileSubtitle = [
+            c['city'] as String?,
+            c['occupation'] as String?,
+          ].where((e) => e != null && e.isNotEmpty).join(' · ');
+          final friendshipActive = c['friendship_active'] != false;
+          final presentation = ChatListPresentation.from(c);
+          final subtitle = !friendshipActive
+              ? 'chat.notFriends'.tr
+              : presentation.preview(
+                  fallback: profileSubtitle.isEmpty
+                      ? 'chat.distant'.tr
+                      : profileSubtitle,
+                  voiceLabel: 'chat.voiceMessage'.tr,
+                  photoLabel: 'chat.photoMessage'.tr,
+                );
+          final time =
+              presentation.timeLabel(DateTime.now(), 'common.yesterday'.tr);
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () async {
+              await Get.to(
+                () => ChatPage(companionId: id, name: name, companion: c),
+                transition: Transition.cupertino,
+                duration: const Duration(milliseconds: 300),
+              );
+              await ctrl.load();
+            },
+            child: Container(
+              color: context.vita.pageBg,
+              height: 72,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  VitaAvatar(
+                      name: name,
+                      radius: 22,
+                      imageUrl: c['portrait_url'] as String?,
+                      borderRadius: BorderRadius.circular(22)),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: context.vita.text)),
+                        const SizedBox(height: 4),
+                        Flexible(
+                            child: Text(
+                          subtitle,
+                          style: TextStyle(
+                              fontSize: 12.5, color: context.vita.subText),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        )),
+                      ],
+                    ),
+                  ),
+                  if (time.isNotEmpty || presentation.unreadCount > 0) ...[
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (time.isNotEmpty)
+                          Text(time,
+                              style: TextStyle(
+                                  fontSize: 11, color: context.vita.subText)),
+                        if (presentation.unreadCount > 0) ...[
+                          const SizedBox(height: 4),
+                          Container(
+                            constraints: const BoxConstraints(
+                                minWidth: 18, minHeight: 18),
+                            padding: const EdgeInsets.symmetric(horizontal: 5),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: context.vita.green,
+                              borderRadius: BorderRadius.circular(9),
+                            ),
+                            child: Text(
+                              presentation.unreadCount > 99
+                                  ? '99+'
+                                  : '${presentation.unreadCount}',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  height: 1.1),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ChatSearchBox extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final ctrl = ChatListController.to;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 4, 18, 4),
+      child: TextField(
+        onChanged: (v) => ctrl.searchQuery.value = v,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: 'contacts.search'.tr,
+          hintStyle: TextStyle(color: context.vita.hint, fontSize: 14),
+          prefixIcon: const SizedBox(
+            height: 40,
+            width: 38,
+            child: Center(
+              child: Icon(Icons.search, size: 18, color: Color(0xFFBBBBBB)),
+            ),
+          ),
+          filled: true,
+          fillColor: context.vita.surface,
+          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+          isDense: true,
+          prefixIconConstraints:
+              const BoxConstraints(minWidth: 38, minHeight: 40),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
+    );
+  }
+}
