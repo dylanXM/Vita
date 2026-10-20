@@ -1,5 +1,10 @@
 {
   "en": {
+    "menuFeedback": "Report a problem",
+    "editProfile": "Edit information",
+    "signedIn": "Signed in",
+    "switchTheme": "Switch theme",
+    "followSystem": "Follow system",
     "googleContinue": "Continue with Google",
     "googleRetry": "Retry Google sign-in",
     "googleUnavailable": "Google sign-in is unavailable. Try again later or use email.",
@@ -237,7 +242,6 @@
     "closeness": "How close are you?",
     "descriptionRequired": "Describe the character first",
     "confirm": "Confirm",
-    "validationSummary": "Check the highlighted fields below.",
     "validationRequired": "Fill in this field.",
     "validationSelection": "Choose an option.",
     "validationCheckbox": "Select this checkbox to continue.",
@@ -251,6 +255,11 @@
     "validationFormat": "Check the format of this value."
   },
   "zh-CN": {
+    "menuFeedback": "问题反馈",
+    "editProfile": "修改信息",
+    "signedIn": "已登录",
+    "switchTheme": "切换主题",
+    "followSystem": "跟随系统",
     "googleContinue": "使用 Google 继续",
     "googleRetry": "重试 Google 登录",
     "googleUnavailable": "Google 登录暂不可用，请稍后重试或使用邮箱登录。",
@@ -488,7 +497,6 @@
     "closeness": "你们现在有多熟悉？",
     "descriptionRequired": "请先描述人物",
     "confirm": "确认",
-    "validationSummary": "请检查下方标出的字段。",
     "validationRequired": "请填写此字段。",
     "validationSelection": "请选择一个选项。",
     "validationCheckbox": "请勾选此项后继续。",
@@ -502,6 +510,11 @@
     "validationFormat": "请检查输入格式。"
   },
   "zh-TW": {
+    "menuFeedback": "問題回報",
+    "editProfile": "修改資訊",
+    "signedIn": "已登入",
+    "switchTheme": "切換主題",
+    "followSystem": "跟隨系統",
     "googleContinue": "使用 Google 繼續",
     "googleRetry": "重試 Google 登入",
     "googleUnavailable": "Google 登入暫不可用，請稍後重試或使用電子郵件。",
@@ -739,7 +752,6 @@
     "closeness": "你們現在有多熟悉？",
     "descriptionRequired": "請先描述人物",
     "confirm": "確認",
-    "validationSummary": "請檢查下方標示的欄位。",
     "validationRequired": "請填寫此欄位。",
     "validationSelection": "請選擇一個選項。",
     "validationCheckbox": "請勾選此項後繼續。",
@@ -753,6 +765,11 @@
     "validationFormat": "請檢查輸入格式。"
   },
   "es": {
+    "menuFeedback": "Informar de un problema",
+    "editProfile": "Editar información",
+    "signedIn": "Sesión iniciada",
+    "switchTheme": "Cambiar tema",
+    "followSystem": "Seguir el sistema",
     "googleContinue": "Continuar con Google",
     "googleRetry": "Reintentar con Google",
     "googleUnavailable": "Google no está disponible. Inténtalo más tarde o usa el correo.",
@@ -990,7 +1007,6 @@
     "closeness": "¿Qué tan cercanos son?",
     "descriptionRequired": "Describe primero al personaje",
     "confirm": "Confirmar",
-    "validationSummary": "Revisa los campos indicados.",
     "validationRequired": "Completa este campo.",
     "validationSelection": "Elige una opción.",
     "validationCheckbox": "Marca esta casilla para continuar.",
@@ -1004,6 +1020,11 @@
     "validationFormat": "Comprueba el formato del valor."
   },
   "pt": {
+    "menuFeedback": "Relatar um problema",
+    "editProfile": "Editar informações",
+    "signedIn": "Sessão iniciada",
+    "switchTheme": "Alterar tema",
+    "followSystem": "Seguir o sistema",
     "googleContinue": "Continuar com o Google",
     "googleRetry": "Tentar Google novamente",
     "googleUnavailable": "O Google está indisponível. Tente mais tarde ou use e-mail.",
@@ -1241,7 +1262,6 @@
     "closeness": "Quão próximos vocês são?",
     "descriptionRequired": "Descreva o personagem primeiro",
     "confirm": "Confirmar",
-    "validationSummary": "Verifique os campos indicados.",
     "validationRequired": "Preencha este campo.",
     "validationSelection": "Escolha uma opção.",
     "validationCheckbox": "Marque esta opção para continuar.",
@@ -1255,6 +1275,11 @@
     "validationFormat": "Verifique o formato do valor."
   },
   "ja": {
+    "menuFeedback": "問題を報告",
+    "editProfile": "情報を編集",
+    "signedIn": "ログイン済み",
+    "switchTheme": "テーマを切り替え",
+    "followSystem": "システムに合わせる",
     "googleContinue": "Googleで続ける",
     "googleRetry": "Google ログインを再試行",
     "googleUnavailable": "Google ログインを利用できません。後でもう一度試すか、メールをご利用ください。",
@@ -1492,7 +1517,6 @@
     "closeness": "今の親しさは？",
     "descriptionRequired": "人物を説明してください",
     "confirm": "確認",
-    "validationSummary": "以下の項目をご確認ください。",
     "validationRequired": "この項目を入力してください。",
     "validationSelection": "選択してください。",
     "validationCheckbox": "この項目にチェックを入れてください。",
@@ -1506,6 +1530,11 @@
     "validationFormat": "入力形式をご確認ください。"
   },
   "ko": {
+    "menuFeedback": "문제 신고",
+    "editProfile": "정보 수정",
+    "signedIn": "로그인됨",
+    "switchTheme": "테마 변경",
+    "followSystem": "시스템 설정 따르기",
     "googleContinue": "Google로 계속",
     "googleRetry": "Google 로그인 재시도",
     "googleUnavailable": "Google 로그인을 사용할 수 없습니다. 나중에 다시 시도하거나 이메일을 이용하세요.",
@@ -1743,7 +1772,6 @@
     "closeness": "현재 얼마나 가까운가요?",
     "descriptionRequired": "먼저 캐릭터를 설명하세요",
     "confirm": "확인",
-    "validationSummary": "아래 표시된 항목을 확인하세요.",
     "validationRequired": "이 항목을 입력하세요.",
     "validationSelection": "옵션을 선택하세요.",
     "validationCheckbox": "계속하려면 이 항목에 체크하세요.",
@@ -1757,6 +1785,11 @@
     "validationFormat": "입력 형식을 확인하세요."
   },
   "ar": {
+    "menuFeedback": "الإبلاغ عن مشكلة",
+    "editProfile": "تعديل المعلومات",
+    "signedIn": "تم تسجيل الدخول",
+    "switchTheme": "تغيير المظهر",
+    "followSystem": "اتباع النظام",
     "googleContinue": "المتابعة عبر Google",
     "googleRetry": "إعادة محاولة تسجيل الدخول بحساب Google",
     "googleUnavailable": "تسجيل الدخول بحساب Google غير متاح. حاول لاحقًا أو استخدم البريد الإلكتروني.",
@@ -1994,7 +2027,6 @@
     "closeness": "ما مدى قربكما؟",
     "descriptionRequired": "صف الشخصية أولا",
     "confirm": "تأكيد",
-    "validationSummary": "تحقق من الحقول المحددة أدناه.",
     "validationRequired": "املأ هذا الحقل.",
     "validationSelection": "اختر أحد الخيارات.",
     "validationCheckbox": "حدد هذا الخيار للمتابعة.",

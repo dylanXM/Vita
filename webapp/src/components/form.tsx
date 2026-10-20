@@ -32,7 +32,7 @@ export function FieldError({ id }: { id: string }) {
     const message = useFieldError(id);
     return message ? <span className="field-error" id={`${id}-error`}><CircleAlert size={14} aria-hidden="true"/><span>{message}</span></span> : null;
 }
-export function Form({ t, children, onSubmit, onInputCapture, onChangeCapture, onInvalidCapture, onReset, ...props }: ComponentPropsWithRef<'form'> & { t: T }) {
+export function Form({ t, children, onSubmit, onChange, onInvalidCapture, onReset, ...props }: ComponentPropsWithRef<'form'> & { t: T }) {
     const [errors, setErrors] = useState<Record<string, Reason>>({});
     function update(event: FormEvent<HTMLFormElement>) {
         const control = event.target;
@@ -64,8 +64,8 @@ export function Form({ t, children, onSubmit, onInputCapture, onChangeCapture, o
         event.preventDefault();
         if (isControl(event.target)) { const control = event.target; const error = reason(control); if (error) setErrors(previous => ({ ...previous, [control.id]: error })); }
         onInvalidCapture?.(event);
-    }} onInputCapture={event => { update(event); onInputCapture?.(event); }} onChangeCapture={event => { update(event); onChangeCapture?.(event); }} onReset={event => { setErrors({}); onReset?.(event); }}>
-        {Object.keys(errors).length > 0 && <div className="form-error-summary" role="alert"><CircleAlert size={17} aria-hidden="true"/><span>{t('validationSummary')}</span></div>}{children}
+    }} onChange={event => { update(event); onChange?.(event); }} onReset={event => { setErrors({}); onReset?.(event); }}>
+        {children}
     </form></FormContext.Provider>;
 }
 export function Input({ id, ...props }: InputHTMLAttributes<HTMLInputElement>) {

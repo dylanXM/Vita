@@ -4,4 +4,21 @@ const nextConfig = {
   devIndicators: false,
 }
 
-export default nextConfig
+export default function config(phase) {
+  if (phase === PHASE_DEVELOPMENT_SERVER) {
+    return {
+      ...nextConfig,
+      skipTrailingSlashRedirect: true,
+      async rewrites() {
+        const backend = (process.env.NEXT_PUBLIC_VITA_API_URL || 'http://127.0.0.1:8260').replace(/\/$/, '')
+        return [
+          { source: '/v1/:path*/', destination: `${backend}/v1/:path*/` },
+          { source: '/v1/:path*', destination: `${backend}/v1/:path*` },
+        ]
+      },
+    }
+  }
+  return nextConfig
+}
+import { PHASE_DEVELOPMENT_SERVER } from 'next/constants.js'
+

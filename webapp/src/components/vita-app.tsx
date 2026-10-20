@@ -1,10 +1,11 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, Check, Compass, Globe2, Heart, History, LogOut, Menu, MessageCircle, Moon, MoreHorizontal, PanelLeft, PawPrint, Plus, Search, Settings2, Sparkles, Sun, UserRound } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, Check, Compass, Globe2, Heart, History, Menu, MessageCircle, MoreHorizontal, PanelLeft, PawPrint, Plus, Search, Sparkles, UserRound, X } from 'lucide-react';
 import { api, ApiError, items, session, type Entity } from '../lib/api';
 import GoogleSignIn from './google-sign-in';
 import { Media, Modal } from './companion-ui';
 import Select from './select';
+import AccountMenu, { type Theme } from './account-menu';
 import { OverlayProvider, Toast, useConfirm } from './overlays';
 import { Form, Input, Textarea } from './form';
 import Encounters from './encounters';
@@ -12,7 +13,7 @@ import { changed, useResource } from '../lib/companion-data';
 import PetRoom from './pet-room';
 import { exchangeGoogleCredential, type GoogleConsent } from '../lib/google-auth';
 import { messages, localeNames, type Locale, type MessageKey, productText, displayDate } from '../lib/i18n';
-type Section = 'encounters' | 'world' | 'chat' | 'journey' | 'explore' | 'stories' | 'pets' | 'account';
+type Section = 'encounters' | 'world' | 'chat' | 'journey' | 'explore' | 'stories' | 'pets';
 type T = (key: MessageKey) => string;
 const navigation = [{ id: 'world', Icon: Globe2 }, { id: 'chat', Icon: MessageCircle }, { id: 'journey', Icon: History }, { id: 'explore', Icon: Compass }] as const;
 function Status({ resource, t, children }: {
@@ -41,7 +42,8 @@ function VitaWorkspace() {
     const [create, setCreate] = useState(false);
     const [mobile, setMobile] = useState(false);
     const [collapsed, setCollapsed] = useState(false);
-    const [dark, setDark] = useState(false);
+    const [theme, setTheme] = useState<Theme>('system');
+    const [accountPanel, setAccountPanel] = useState<'profile' | 'feedback' | 'membership' | null>(null);
     const [selected, setSelected] = useState('');
     const [chatContext, setChatContext] = useState<Entity | null>(null);
     const [revision, setRevision] = useState(0);
@@ -60,23 +62,28 @@ function VitaWorkspace() {
         if (saved && Object.hasOwn(messages, saved))
             setLocale(saved as Locale);
         const savedTheme = localStorage.getItem('vita.theme');
-        setDark(savedTheme ? savedTheme === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (savedTheme === 'dark' || savedTheme === 'light') setTheme(savedTheme);
         const expired = () => { setAuthenticated(false); setSelected(''); setAuth(true); };
         const hash = () => {
             const value = window.location.hash.slice(1);
-            if (['world', 'chat', 'journey', 'explore', 'stories', 'pets', 'account', 'encounters'].includes(value))
+            if (value === 'membership' || value === 'account') { setAccountPanel(value === 'membership' || new URLSearchParams(window.location.search).has('checkout') ? 'membership' : 'profile'); setSection('world'); window.history.replaceState(null, '', '#world'); return; }
+            if (['world', 'chat', 'journey', 'explore', 'stories', 'pets', 'encounters'].includes(value))
                 setSection(value as Section);
         };
         hash();
+        if (new URLSearchParams(window.location.search).has('checkout')) setAccountPanel('membership');
         window.addEventListener('hashchange', hash);
         window.addEventListener('vita:expired', expired);
         return () => { window.removeEventListener('hashchange', hash); window.removeEventListener('vita:expired', expired); };
     }, []);
     useEffect(() => {
-        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-        if (ready)
-            localStorage.setItem('vita.theme', dark ? 'dark' : 'light');
-    }, [dark, ready]);
+        const media = window.matchMedia('(prefers-color-scheme: dark)');
+        const apply = () => { document.documentElement.dataset.theme = (theme === 'system' ? media.matches : theme === 'dark') ? 'dark' : 'light'; };
+        apply();
+        media.addEventListener('change', apply);
+        if (ready) localStorage.setItem('vita.theme', theme);
+        return () => media.removeEventListener('change', apply);
+    }, [theme, ready]);
     useEffect(() => { document.documentElement.lang = locale; document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr'; localStorage.setItem('vita.locale', locale); window.dispatchEvent(new Event('vita:locale')); }, [locale]);
     useEffect(() => {
         if (!notice.message)
@@ -94,7 +101,7 @@ function VitaWorkspace() {
             action();
     };
     const notify = (e: unknown) => {
-        if (e instanceof ApiError && (e.action === 'open_credits' || e.action === 'open_subscription' || ['insufficient_credits', 'default_chat_trial_expired', 'friendship_inactive', 'ai_pet_plan_required'].includes(e.code || '') || e.code?.includes('requires_subscription'))) navigate('account');
+        if (e instanceof ApiError && (e.action === 'open_credits' || e.action === 'open_subscription' || ['insufficient_credits', 'default_chat_trial_expired', 'friendship_inactive', 'ai_pet_plan_required'].includes(e.code || '') || e.code?.includes('requires_subscription'))) setAccountPanel('membership');
         const codeText: Record<string, string> = { character_image_invalid: 'companion.create.imageInvalid', character_image_required: 'companion.create.imageRequiredMessage', character_image_validation_unavailable: 'companion.create.imageValidationUnavailable', default_chat_trial_expired: 'accessRequired', friendship_inactive: 'accessRequired', companion_creation_requires_subscription: 'accessRequired', experience_requires_subscription: 'accessRequired', ai_pet_plan_required: 'accessRequired', date_slots_changed: 'experience.slots.changed', date_schedule_busy: 'experience.slots.changed', invalid_appointment: 'experience.slots.changed' };
         setNotice(previous => ({ id: previous.id + 1, message: e instanceof ApiError && codeText[e.code || ''] ? productText(codeText[e.code || ''], t) : e instanceof Error ? e.message : t('failed') }));
     };
@@ -109,6 +116,7 @@ function VitaWorkspace() {
         session.clear();
         sessionStorage.removeItem('vita.paypal-attempt');
         setAuthenticated(false);
+        setAccountPanel(null);
         setSelected('');
         refresh();
         navigate('world');
@@ -122,10 +130,10 @@ function VitaWorkspace() {
       <nav aria-label="Vita">{navigation.map(({ id, Icon }) => <a href={`#${id}`} className={`nav-item ${section === id ? 'active' : ''}`} aria-current={section === id ? 'page' : undefined} key={id} onClick={() => navigate(id)}><Icon size={20}/>{t(id)}{section === id && <span className="active-dot"/>}</a>)}</nav>
       <div className="sidebar-label">{t('companions')}<button className="icon-button" aria-label={t('newCompanion')} onClick={() => requireAuth(() => setCreate(true))}><Plus size={15}/></button></div>
       <div className="sidebar-people">{people.map(person => <button key={person.id} className={`person-link ${section === 'chat' && current?.id === person.id ? 'selected' : ''}`} onClick={() => openChat(person.id)}><Media src={person.portrait_url} alt={person.name} className="avatar"/><span>{person.name}<small>{person.last_message_type === 'voice' ? t('audio') : productText(person.last_message || person.occupation || '', t)}</small></span>{person.unread_count > 0 && <i className="unread">{person.unread_count}</i>}</button>)}{!people.length && <p className="sidebar-hint">{authenticated ? t('noCompanion') : t('loginRequired')}</p>}</div>
-      <div className="sidebar-bottom"><button className="upgrade" onClick={() => requireAuth(() => navigate('account'))}><Sparkles size={19}/><span>{t('subscription')}<small>{t('membershipHint')}</small></span><ArrowUp size={15}/></button><button className={`profile-link ${section === 'account' ? 'selected' : ''}`} onClick={() => requireAuth(() => navigate('account'))}>{authenticated ? (me.data?.avatar_url ? <Media className="avatar" src={me.data.avatar_url} alt={me.data.nickname || ''}/> : <span className="initial">{(me.data?.nickname || me.data?.email || 'V').slice(0, 1).toUpperCase()}</span>) : <span className="initial guest-initial"><UserRound size={17}/></span>}<span>{me.data?.nickname || (authenticated ? me.data?.email : t('login'))}<small>{authenticated ? `${credits.data?.balance ?? '—'} ${t('credits')}` : 'Vita'}</small></span><Settings2 size={17}/></button></div>
+      <div className="sidebar-bottom"><button className="upgrade" onClick={() => requireAuth(() => setAccountPanel('membership'))}><Sparkles size={19}/><span>{t('subscription')}<small>{t('membershipHint')}</small></span><ArrowUp size={15}/></button><AccountMenu t={t} locale={locale} setLocale={setLocale} theme={theme} setTheme={setTheme} authenticated={authenticated} me={me.data} balance={credits.data?.balance} login={() => setAuth(true)} edit={() => setAccountPanel('profile')} feedback={() => setAccountPanel('feedback')} logout={logout}/></div>
     </aside>
     <div className="workspace"><header className="topbar"><div className="header-title"><button className={`icon-button mobile-menu ${collapsed ? 'show-expand' : ''}`} aria-label={t('menu')} onClick={() => { if (window.matchMedia('(max-width: 760px)').matches)
-        setMobile(true); setCollapsed(false); }}><Menu size={21}/></button><span>{section === 'world' || section === 'chat' ? '' : t(section)}</span></div><div className="header-actions"><button className="icon-button" onClick={() => setDark(!dark)} aria-label={t(dark ? 'light' : 'dark')}>{dark ? <Sun size={18}/> : <Moon size={18}/>}</button><Select className="language-select" aria-label={t('language')} value={locale} onChange={e => setLocale(e.target.value as Locale)}>{Object.entries(localeNames).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</Select>{!authenticated && <button className="button small primary" onClick={() => setAuth(true)}>{t('login')}<ArrowRight size={14}/></button>}</div></header>
+        setMobile(true); setCollapsed(false); }}><Menu size={21}/></button></div><div className="header-actions">{!authenticated && <button className="button small primary" onClick={() => setAuth(true)}>{t('login')}<ArrowRight size={14}/></button>}</div></header>
       <main id="main" className={`main-content ${section === 'chat' ? 'chat-main' : section === 'world' && !authenticated ? 'start-main' : ''}`}>
         {section === 'world' && (!authenticated ? <GuestHome t={t} login={() => setAuth(true)} navigate={navigate}/> : <><Heading title={t('world')} body={t('worldIntro')} eyebrow=""/><Status resource={companions} t={t}>{!people.length ? <Empty t={t}><button className="button primary" onClick={() => setCreate(true)}>{t('newCompanion')}</button></Empty> : <><div className="companion-switcher" aria-label={t('chooseCompanion')}>{people.map(c => <button className={`companion-tile ${current.id === c.id ? 'selected' : ''}`} aria-pressed={current.id === c.id} key={c.id} onClick={() => setSelected(c.id)}><Media src={c.portrait_url} alt={c.name}/><span><strong>{c.name}</strong><small>{productText(c.last_message || c.occupation || '', t)}</small></span>{c.unread_count > 0 && <i className="unread">{c.unread_count}</i>}</button>)}</div><World key={current.id} companion={current} t={t} revision={revision} onChat={openChat} notify={notify}/></>}</Status></>)}
         {section === 'chat' && (!authenticated ? <Guest t={t} login={() => setAuth(true)}/> : <Status resource={companions} t={t}>{current ? <Chat key={`${current.id}:${chatContext?.journey_visit_id || ''}`} companion={current} t={t} notify={notify} journeyVisitID={chatContext?.companion_id === current.id ? chatContext.journey_visit_id : undefined}/> : <Empty t={t}><button className="button primary" onClick={() => setCreate(true)}>{t('newCompanion')}</button></Empty>}</Status>)}
@@ -134,12 +142,13 @@ function VitaWorkspace() {
         {section === 'encounters' && (authenticated ? <Encounters t={t} notify={notify} changed={changed}/> : <Guest t={t} login={() => setAuth(true)}/>)}
         {section === 'stories' && <><Heading title={t('stories')} body={t('storiesIntro')} eyebrow=""/>{authenticated ? <Stories t={t} people={people} notify={notify} refresh={refresh}/> : <Guest t={t} login={() => setAuth(true)}/>}</>}
         {section === 'pets' && <><Heading title={t('pets')} body={t('petsIntro')} eyebrow=""/>{authenticated ? <Pets t={t} notify={notify} refresh={refresh}/> : <Guest t={t} login={() => setAuth(true)}/>}</>}
-        {section === 'account' && <><Heading title={t('account')} body={me.data?.email || ''} eyebrow=""/>{authenticated ? <Account t={t} me={me.data} revision={revision} refresh={refresh} notify={notify} logout={logout}/> : <Guest t={t} login={() => setAuth(true)}/>}</>}
+
       </main>
     </div>
     {notice.message && <Toast key={notice.id} message={notice.message} t={t} close={() => setNotice(previous => ({ ...previous, message: '' }))}/> }
     {auth && <Auth t={t} locale={locale} close={() => setAuth(false)} done={() => { setAuthenticated(true); setAuth(false); refresh(); if (sessionStorage.getItem('vita.message-draft'))
         navigate('chat'); }} notify={notify}/>}
+    {accountPanel && authenticated && <Modal title={t(accountPanel === 'profile' ? 'editProfile' : accountPanel === 'feedback' ? 'feedback' : 'subscription')} close={() => setAccountPanel(null)} t={t}><Account mode={accountPanel} t={t} me={me.data} revision={revision} refresh={refresh} notify={notify}/></Modal>}
     {create && <CreateCompanion t={t} close={() => setCreate(false)} done={id => { setCreate(false); refresh(); openChat(id); }} notify={notify}/>}
   </div>;
 }
@@ -284,29 +293,10 @@ function World({ companion, t, revision, onChat, notify }: {
     notify: (e: unknown) => void;
 }) {
     const resource = useResource(`/v1/companions/${companion.id}/world/scene`, revision, 30000);
-    const [busy, setBusy] = useState(false);
-    const [reaction, setReaction] = useState('');
     const [momentID, setMomentID] = useState('');
     const [experience, setExperience] = useState(false);
-    const [note, setNote] = useState(false);
-    const [noteReply, setNoteReply] = useState('');
     const scene = resource.data;
-    async function visit(choice: string) {
-        setBusy(true);
-        try {
-            const d = await api(`/v1/companions/${companion.id}/world/visit`, { method: 'POST', body: { choice } });
-            changed();
-            setReaction(d.reaction || d.message || d.today_visit?.reaction || '');
-            resource.reload();
-        }
-        catch (e) {
-            notify(e);
-        }
-        finally {
-            setBusy(false);
-        }
-    }
-    return <Status resource={resource} t={t}>{scene && <><div className="world-card"><div className="world-portrait"><Media src={companion.portrait_url} alt={companion.name}/><span className="world-tag"><span className="live-dot"/>{companion.city || productText(scene.place?.title || 'Vita', t)}</span></div><div className="world-story"><span className="scene-badge">{productText(`stage.${companion.relationship_stage || 'stranger'}`, t)}</span><div className="eyebrow">{t('today')} · {scene.local_date}</div><h2>{companion.name}<span>{productText(scene.place?.title || '', t)}</span></h2><p className="world-description">{scene.event?.description || scene.place?.description || companion.persona}</p><span className="world-phase">{productText(`world.phase.${scene.phase || 'quiet'}`, t)}</span>{scene.event?.title && <div className="activity"><span className="live-dot"/>{productText(scene.event.title, t)}</div>}<div className="world-actions">{scene.visited_today ? <span className="visited"><Check size={16}/>{t('visited')}</span> : <><button className="button primary" disabled={busy} onClick={() => visit('stay')}><Heart size={17}/>{t('visit')}</button><button className="button" disabled={busy} onClick={() => visit('ask')}>{t('ask')}</button></>}<button className="button" onClick={() => { setNoteReply(''); setNote(true); }}>{productText('world.leaveNote', t)}</button><button className="button" onClick={() => setExperience(true)}>{t('experiences')}</button><button className="text-button" onClick={() => onChat(companion.id)}>{t('continueChat')}<ArrowRight size={16}/></button></div></div></div>{(reaction || scene.today_visit?.reaction) && <div className="reaction"><Sparkles size={20}/><p>{reaction || scene.today_visit.reaction}</p><button className="text-button" onClick={() => onChat(companion.id)}>{t('continueChat')}<ArrowRight size={16}/></button></div>}{scene.appointment && <button className="appointment-banner" onClick={() => setMomentID(scene.appointment.id)}><BookOpen size={21}/><span>{productText(scene.appointment.title_key, t)}<small>{displayDate(scene.appointment.starts_at)}</small></span><ArrowRight size={18}/></button>}{momentID && <Moment companion={companion} eventID={momentID} t={t} notify={notify} close={() => setMomentID('')}/>}<div className="world-bottom">{scene.recent_gift && Date.now() - Date.parse(scene.recent_gift.created_at) < 48 * 3600000 && <article className="info-card gift-card"><Sparkles size={22}/><h3>{productText(scene.recent_gift.name_key || scene.recent_gift.product_key || 'experiences', t)}</h3><p>{scene.recent_gift.emoji} · {displayDate(scene.recent_gift.created_at, 'date')}</p></article>}<article className="info-card"><span className="eyebrow">{t('next')}</span><h3>{scene.next_event?.title || companion.occupation || companion.name}</h3><p>{scene.next_event?.description || companion.interests || t('worldIntro')}</p></article><article className="info-card"><span className="eyebrow">{t('memories')}</span>{items(scene, 'memories').length ? items(scene, 'memories').slice(0, 2).map(m => <p key={m.id}>{m.content}</p>) : <p>{t('journeyIntro')}</p>}</article>{items(scene, 'connections').length > 0 && <article className="info-card"><span className="eyebrow">{productText('world.connections', t)}</span>{items(scene, 'connections').map(person => <p key={person.id}>{person.name}</p>)}</article>}</div>{experience && <Experiences companion={companion} t={t} notify={notify} close={() => setExperience(false)} onMoment={id => { setExperience(false); setMomentID(id); }}/>} {note && <Modal title={productText('world.leaveNote', t)} t={t} close={() => setNote(false)}>{noteReply ? <div className="reaction"><p>{noteReply}</p><button className="button primary" onClick={() => onChat(companion.id)}>{t('continueChat')}</button></div> : <Form t={t} className="form" onSubmit={async e => { e.preventDefault(); const text = String(new FormData(e.currentTarget).get('note') || '').trim(); if (!text || busy) return; setBusy(true); try { const conversation = await api('/v1/conversations/', { method: 'POST', body: { companion_id: companion.id } }); const result = await api(`/v1/conversations/${conversation.conversation_id}/messages`, { method: 'POST', body: { message_type: 'text', content: text } }); setNoteReply(result.companion_message?.content || productText('world.notePending', t)); changed(); } catch (error) { notify(error); } finally { setBusy(false); } }}><label>{productText('world.noteHint', t)}<Textarea name="note" required maxLength={4000} rows={4}/></label><button className="button primary" disabled={busy}>{t('send')}</button></Form>}</Modal>}</>}</Status>;
+    return <Status resource={resource} t={t}>{scene && <><div className="world-card"><div className="world-portrait"><Media src={companion.portrait_url} alt={companion.name}/><span className="world-tag"><span className="live-dot"/>{companion.city || productText(scene.place?.title || 'Vita', t)}</span></div><div className="world-story"><span className="scene-badge">{productText(`stage.${companion.relationship_stage || 'stranger'}`, t)}</span><div className="eyebrow">{t('today')} · {scene.local_date}</div><h2>{companion.name}<span>{productText(scene.place?.title || '', t)}</span></h2><p className="world-description">{scene.event?.description || scene.place?.description || companion.persona}</p><span className="world-phase">{productText(`world.phase.${scene.phase || 'quiet'}`, t)}</span>{scene.event?.title && <div className="activity"><span className="live-dot"/>{productText(scene.event.title, t)}</div>}<div className="world-actions"><button className="button" onClick={() => setExperience(true)}>{t('experiences')}</button><button className="text-button" onClick={() => onChat(companion.id)}>{t('continueChat')}<ArrowRight size={16}/></button></div></div></div>{scene.today_visit?.reaction && <div className="reaction"><Sparkles size={20}/><p>{scene.today_visit.reaction}</p><button className="text-button" onClick={() => onChat(companion.id)}>{t('continueChat')}<ArrowRight size={16}/></button></div>}{scene.appointment && <button className="appointment-banner" onClick={() => setMomentID(scene.appointment.id)}><BookOpen size={21}/><span>{productText(scene.appointment.title_key, t)}<small>{displayDate(scene.appointment.starts_at)}</small></span><ArrowRight size={18}/></button>}{momentID && <Moment companion={companion} eventID={momentID} t={t} notify={notify} close={() => setMomentID('')}/>}<div className="world-bottom">{scene.recent_gift && Date.now() - Date.parse(scene.recent_gift.created_at) < 48 * 3600000 && <article className="info-card gift-card"><Sparkles size={22}/><h3>{productText(scene.recent_gift.name_key || scene.recent_gift.product_key || 'experiences', t)}</h3><p>{scene.recent_gift.emoji} · {displayDate(scene.recent_gift.created_at, 'date')}</p></article>}<article className="info-card"><span className="eyebrow">{t('next')}</span><h3>{scene.next_event?.title || companion.occupation || companion.name}</h3><p>{scene.next_event?.description || companion.interests || t('worldIntro')}</p></article><article className="info-card"><span className="eyebrow">{t('memories')}</span>{items(scene, 'memories').length ? items(scene, 'memories').slice(0, 2).map(m => <p key={m.id}>{m.content}</p>) : <p>{t('journeyIntro')}</p>}</article>{items(scene, 'connections').length > 0 && <article className="info-card"><span className="eyebrow">{productText('world.connections', t)}</span>{items(scene, 'connections').map(person => <p key={person.id}>{person.name}</p>)}</article>}</div>{experience && <Experiences companion={companion} t={t} notify={notify} close={() => setExperience(false)} onMoment={id => { setExperience(false); setMomentID(id); }}/>}</>}</Status>;
 }
 function Chat({ companion, t, notify, eventID, readOnly = false, sceneKind = '', spendID, journeyVisitID }: {
     companion: Entity; t: T; notify: (e: unknown) => void; eventID?: string;
@@ -438,7 +428,7 @@ function Chat({ companion, t, notify, eventID, readOnly = false, sceneKind = '',
                 catch (e) { notify(e); } finally { setBusy(false); }
             }}>{t('retry')}</button></div>}
         </div>
-        <div className="composer-wrap">{readOnly ? <p className="composer-note">{t('momentEnded')}</p> : (conversation?.can_send === false || companion.can_chat === false) ? <div className="access-banner"><p>{t('accessRequired')}</p><a className="button primary" href="#account">{t('manage')}</a></div> : <>
+        <div className="composer-wrap">{readOnly ? <p className="composer-note">{t('momentEnded')}</p> : (conversation?.can_send === false || companion.can_chat === false) ? <div className="access-banner"><p>{t('accessRequired')}</p><a className="button primary" href="#membership">{t('manage')}</a></div> : <>
             {(eventID || spendID) && latest?.payload?.scene_situation && <p className="scene-narration">{latest.payload.scene_situation}</p>}{suggestions.length > 0 && <div className="scene-choices">{suggestions.map((action: Entity) => <button className="button" key={action.label} disabled={busy || pending} onClick={() => void sendContent(action.message)}>{action.label}</button>)}</div>}{eventID && <div className="scene-choices">{choices.map(choice => <button className="button" key={choice} disabled={busy || pending || !conversation} onClick={() => void sendContent(productText(`date.scene.action.${choice}`, t), undefined, choice)}>{productText(`date.scene.${choice}`, t)}</button>)}</div>}
             <Form t={t} className="composer" onSubmit={e => { e.preventDefault(); void sendContent(text); }}><Textarea aria-label={t('message')} value={text} maxLength={4000} onChange={e => { setText(e.target.value); if (!eventID && !spendID) sessionStorage.setItem('vita.message-draft', e.target.value); }} placeholder={t('message')} rows={2} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}/>
                 <div className="composer-bottom"><label className="icon-button attachment" title={t('attachment')}><Plus size={21}/><span className="sr-only">{t('attachment')}</span><Input type="file" accept="audio/*" disabled={busy || !conversation} onChange={async e => {
@@ -670,7 +660,7 @@ function Pets({ t, notify, refresh }: {
     }
     if (pet)
         return <><button className="text-button" onClick={() => setPet(null)}><ArrowLeft size={16}/>{t('back')}</button><Status resource={state} t={t}>{state.data && <div className="pet-home"><PetRoom pet={{ ...pet, ...state.data }} action={petAction} t={t} onPet={() => { if (!careAttempt) void care('pet'); }}/><h2>{pet.adopted_companion_name || pet.name}</h2><div className="pet-stats">{(['hunger', 'hydration', 'happiness', 'energy', 'health'] as const).map(key => <label key={key}>{t(key)}<span>{state.data[key]} / 100</span><progress max={100} value={state.data[key]}/></label>)}</div><div className="pet-actions">{(['pet', 'drink', 'walk', 'rest', 'feed'] as const).map(k => <button className={`button ${k === 'feed' ? 'primary' : ''}`} disabled={busy || !!careAttempt} key={k} onClick={() => care(k)}>{t(k)}{k === 'feed' ? ` · ${state.data.feed_coin_cost} ${t('credits')}` : ''}</button>)}</div>{careAttempt && <div className="access-banner"><p>{t('requestUnconfirmed')}</p><button className="button primary" disabled={busy} onClick={() => void care(careAttempt.kind)}>{t('retry')}</button></div>}</div>}</Status></>;
-    return <><Status resource={breeds} t={t}><div className="catalog-grid">{items(breeds.data).map(b => <article className="catalog-card pet-catalog" key={b.id}><Media src={b.avatar_url} alt={b.name}/><div><span className="eyebrow">{b.species}</span><h3>{b.name}</h3><p>{b.description}</p><button className="button" disabled={!b.adopted_companion_id && !b.can_adopt} onClick={() => b.adopted_companion_id ? setPet(b) : setAdopting(b)}>{b.adopted_companion_id ? productText('aiPets.openHome', t) : t('adopt')}<ArrowRight size={16}/></button>{!b.adopted_companion_id && !b.can_adopt && <small><a href="#account">{t('manage')}</a></small>}</div></article>)}</div>{!items(breeds.data).length && <Empty t={t}/>}</Status>{adopting && <Modal title={`${t('adopt')} · ${adopting.name}`} close={() => setAdopting(null)} t={t}><Form t={t} className="form" onSubmit={async (e) => {
+    return <><Status resource={breeds} t={t}><div className="catalog-grid">{items(breeds.data).map(b => <article className="catalog-card pet-catalog" key={b.id}><Media src={b.avatar_url} alt={b.name}/><div><span className="eyebrow">{b.species}</span><h3>{b.name}</h3><p>{b.description}</p><button className="button" disabled={!b.adopted_companion_id && !b.can_adopt} onClick={() => b.adopted_companion_id ? setPet(b) : setAdopting(b)}>{b.adopted_companion_id ? productText('aiPets.openHome', t) : t('adopt')}<ArrowRight size={16}/></button>{!b.adopted_companion_id && !b.can_adopt && <small><a href="#membership">{t('manage')}</a></small>}</div></article>)}</div>{!items(breeds.data).length && <Empty t={t}/>}</Status>{adopting && <Modal title={`${t('adopt')} · ${adopting.name}`} close={() => setAdopting(null)} t={t}><Form t={t} className="form" onSubmit={async (e) => {
                 e.preventDefault();
                 const name = new FormData(e.currentTarget).get('name');
                 setBusy(true);
@@ -689,17 +679,17 @@ function Pets({ t, notify, refresh }: {
                 }
             }}><label>{t('name')}<Input name="name" required maxLength={40} defaultValue={adopting.name}/></label><button className="button primary" disabled={busy}>{t('adopt')}</button></Form></Modal>}</>;
 }
-function Account({ t, me, revision, refresh, notify, logout }: {
+function Account({ t, me, revision, refresh, notify, mode }: {
+    mode: 'profile' | 'feedback' | 'membership';
     t: T;
     me: Entity | null;
     revision: number;
     refresh: () => void;
     notify: (e: unknown) => void;
-    logout: () => void;
 }) {
     const confirm = useConfirm(t);
-    const subscription = useResource('/v1/me/subscription', revision);
-    const credits = useResource('/v1/me/credits', revision);
+    const subscription = useResource(mode === 'membership' ? '/v1/me/subscription' : null, revision);
+    const credits = useResource(mode === 'membership' ? '/v1/me/credits' : null, revision);
     const [busy, setBusy] = useState(false);
     async function submit(e: FormEvent<HTMLFormElement>, path: string, method = 'PUT') {
         e.preventDefault();
@@ -720,7 +710,7 @@ function Account({ t, me, revision, refresh, notify, logout }: {
             setBusy(false);
         }
     }
-    return <div className="account-layout"><div><section className="account-panel"><h2>{t('profile')}</h2><Form t={t} className="form" onSubmit={e => submit(e, '/v1/me/profile')}><label>{t('nickname')}<Input name="nickname" defaultValue={me?.nickname || ''} maxLength={30}/></label><button className="button" disabled={busy}>{t('save')}</button></Form></section><section className="account-panel"><h2>{t('security')}</h2><Form t={t} className="form" onSubmit={e => submit(e, '/v1/me/password')}><label>{t('currentPassword')}<Input name="current_password" type="password" autoComplete="current-password" required/></label><label>{t('newPassword')}<Input name="new_password" type="password" minLength={6} maxLength={72} autoComplete="new-password" required/></label><button className="button" disabled={busy}>{t('save')}</button></Form></section><section className="account-panel"><h2>{t('feedback')}</h2><Form t={t} className="form" onSubmit={e => submit(e, '/v1/feedback', 'POST')}><Textarea name="content" rows={4} placeholder={t('feedbackHint')} required maxLength={2000}/><button className="button" disabled={busy}>{t('send')}</button></Form></section><Preferences t={t} notify={notify}/><button className="text-button logout" onClick={logout}><LogOut size={17}/>{t('logout')}</button></div><div><section className="membership-panel"><Sparkles size={25}/><h2>{t('subscription')}</h2><Status resource={subscription} t={t}><p>{t(subscription.data?.is_subscribed ? 'subscribed' : 'notSubscribed')}</p>{subscription.data?.subscription?.current_period_end && <small>{displayDate(subscription.data.subscription.current_period_end, 'date')}</small>}</Status>{subscription.data?.subscription?.provider === 'paypal' && subscription.data.subscription.will_renew && <button className="button" disabled={busy} onClick={async () => {
+    return <div className="account-dialog"><div>{mode === 'profile' && <><section className="account-panel"><h2>{t('profile')}</h2><Form t={t} className="form" onSubmit={e => submit(e, '/v1/me/profile')}><label>{t('nickname')}<Input name="nickname" defaultValue={me?.nickname || ''} maxLength={30}/></label><button className="button" disabled={busy}>{t('save')}</button></Form></section><section className="account-panel"><h2>{t('security')}</h2><Form t={t} className="form" onSubmit={e => submit(e, '/v1/me/password')}><label>{t('currentPassword')}<Input name="current_password" type="password" autoComplete="current-password" required/></label><label>{t('newPassword')}<Input name="new_password" type="password" minLength={6} maxLength={72} autoComplete="new-password" required/></label><button className="button" disabled={busy}>{t('save')}</button></Form></section></>}{mode === 'feedback' && <section className="account-panel"><h2>{t('feedback')}</h2><Form t={t} className="form" onSubmit={e => submit(e, '/v1/feedback', 'POST')}><Textarea name="content" rows={4} placeholder={t('feedbackHint')} required maxLength={2000}/><button className="button" disabled={busy}>{t('send')}</button></Form></section>}</div>{mode === 'membership' && <div><section className="membership-panel"><Sparkles size={25}/><h2>{t('subscription')}</h2><Status resource={subscription} t={t}><p>{t(subscription.data?.is_subscribed ? 'subscribed' : 'notSubscribed')}</p>{subscription.data?.subscription?.current_period_end && <small>{displayDate(subscription.data.subscription.current_period_end, 'date')}</small>}</Status>{subscription.data?.subscription?.provider === 'paypal' && subscription.data.subscription.will_renew && <button className="button" disabled={busy} onClick={async () => {
                 if (!(await confirm(t('confirmCancel'))))
                     return;
                 setBusy(true);
@@ -734,7 +724,7 @@ function Account({ t, me, revision, refresh, notify, logout }: {
                 finally {
                     setBusy(false);
                 }
-            }}>{t('cancelRenewal')}</button>}<Billing t={t} notify={notify} refresh={refresh}/></section><section className="account-panel"><span className="eyebrow">{t('credits')}</span><Status resource={credits} t={t}><div className="balance">{credits.data?.balance ?? '—'}<span>{t('credits')}</span></div><h3>{t('transactions')}</h3><div className="transactions">{items(credits.data, 'transactions').map(tx => <div className="transaction" key={tx.id}><span>{tx.description || tx.kind}<small>{displayDate(tx.created_at, 'date')}</small></span><strong>{tx.amount > 0 ? '+' : ''}{tx.amount}</strong></div>)}{!items(credits.data, 'transactions').length && <p className="muted">{t('empty')}</p>}</div></Status></section><section className="account-panel"><h2>{t('invitation')}</h2>{me?.invite_code && <div className="invite-code">{me.invite_code}</div>}<Form t={t} className="form" onSubmit={e => submit(e, '/v1/me/invitation', 'POST')}><label>{t('invitationCode')}<Input name="invite_code" required/></label><button className="button" disabled={busy}>{t('bind')}</button></Form></section></div></div>;
+            }}>{t('cancelRenewal')}</button>}<Billing t={t} notify={notify} refresh={refresh}/></section><section className="account-panel"><span className="eyebrow">{t('credits')}</span><Status resource={credits} t={t}><div className="balance">{credits.data?.balance ?? '—'}<span>{t('credits')}</span></div><h3>{t('transactions')}</h3><div className="transactions">{items(credits.data, 'transactions').map(tx => <div className="transaction" key={tx.id}><span>{tx.description || tx.kind}<small>{displayDate(tx.created_at, 'date')}</small></span><strong>{tx.amount > 0 ? '+' : ''}{tx.amount}</strong></div>)}{!items(credits.data, 'transactions').length && <p className="muted">{t('empty')}</p>}</div></Status></section></div>}{mode === 'profile' && <div><Preferences t={t} notify={notify}/><section className="account-panel"><h2>{t('invitation')}</h2>{me?.invite_code && <div className="invite-code">{me.invite_code}</div>}<Form t={t} className="form" onSubmit={e => submit(e, '/v1/me/invitation', 'POST')}><label>{t('invitationCode')}<Input name="invite_code" required/></label><button className="button" disabled={busy}>{t('bind')}</button></Form></section></div>}</div>;
 }
 function Billing({ t, notify, refresh }: {
     t: T;
@@ -761,7 +751,7 @@ function Billing({ t, notify, refresh }: {
                     setStatus(t('paymentConfirmed'));
                     refresh();
                     sessionStorage.removeItem('vita.paypal-attempt');
-                    window.history.replaceState(null, '', window.location.pathname + '#account');
+                    window.history.replaceState(null, '', window.location.pathname + '#membership');
                     setBusy(false);
                 }
                 else {

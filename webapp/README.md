@@ -7,10 +7,10 @@ Next.js Web 客户端。界面使用黑白灰；人物、头像、宠物、媒�
 ```sh
 cd webapp
 pnpm install --frozen-lockfile
-NEXT_PUBLIC_VITA_API_URL=http://127.0.0.1:8080 pnpm dev
+pnpm dev
 ```
 
-打开 http://127.0.0.1:5176。API 地址需要在构建前配置；生产环境使用 HTTPS，后端允许来源需包含 Web 域名。
+打开 http://127.0.0.1:5176。本地开发默认将 `/v1/*` 转发到 `http://127.0.0.1:8260`，请先启动后端；修改配置后需重启 Web 开发服务。使用其他后端时可设置 `NEXT_PUBLIC_VITA_API_URL`。生产环境不启用本地转发，API 地址需要在构建前配置；生产环境使用 HTTPS，后端允许来源需包含 Web 域名。
 
 ## 页面与接口
 
