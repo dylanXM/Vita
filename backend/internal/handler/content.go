@@ -239,6 +239,7 @@ func AppContent(c *gin.Context) {
 		"whats_new":       campaign,
 		"social_links":    socialLinks,
 		"legal_documents": legalDocumentsForApp(legalDocuments),
+		"auth":            gin.H{"google_client_id": googleClientID},
 	})
 }
 
