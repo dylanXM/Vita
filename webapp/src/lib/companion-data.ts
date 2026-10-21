@@ -5,7 +5,8 @@ export function changed() { window.dispatchEvent(new Event('vita:changed')); }
 export function useResource(path: string | null, revision = 0, interval = 0) {
     const [data, setData] = useState<any>(null);
     const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(!!path);
+    const [dataPath, setDataPath] = useState(path);
     const [retry, setRetry] = useState(0);
     const [languageVersion, setLanguageVersion] = useState(0);
     const previousPath = useRef<string | null>(null);
@@ -13,8 +14,10 @@ export function useResource(path: string | null, revision = 0, interval = 0) {
     useEffect(() => { const update = () => setLanguageVersion(n => n + 1); window.addEventListener('vita:locale', update); return () => window.removeEventListener('vita:locale', update); }, []);
     useEffect(() => {
         if (previousPath.current !== path) { setData(null); hasData.current = false; previousPath.current = path; }
+        setDataPath(path);
         setError('');
         if (!path) { setData(null); hasData.current = false; setLoading(false); return; }
+        if (!hasData.current) setLoading(true);
         let active = true;
         let running = false;
         let queued = false;
@@ -50,5 +53,6 @@ export function useResource(path: string | null, revision = 0, interval = 0) {
             document.removeEventListener('visibilitychange', fetchData);
         };
     }, [path, revision, retry, interval, languageVersion]);
-    return { data, error, loading, reload: () => setRetry(n => n + 1) };
+    const samePath = dataPath === path;
+    return { data: samePath ? data : null, error: samePath ? error : '', loading: !!path && (!samePath || loading), reload: () => setRetry(n => n + 1) };
 }
