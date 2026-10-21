@@ -11,7 +11,7 @@ import { OverlayProvider, Toast, useConfirm } from './overlays';
 import { Form, Input, Textarea } from './form';
 import Encounters from './encounters';
 import { changed, useResource } from '../lib/companion-data';
-import PetRoom from './pet-room';
+import { PetCatalog, PetHome } from './pet-ui';
 import { exchangeGoogleCredential, type GoogleConsent } from '../lib/google-auth';
 import { messages, localeNames, type Locale, type MessageKey, productText, displayDate } from '../lib/i18n';
 type Section = 'encounters' | 'world' | 'chat' | 'journey' | 'explore' | 'stories' | 'pets';
@@ -683,8 +683,8 @@ function Pets({ t, notify, refresh }: {
         }
     }
     if (pet)
-        return <><button className="text-button" onClick={() => setPet(null)}><ArrowLeft size={16}/>{t('back')}</button><Status resource={state} t={t}>{state.data && <div className="pet-home"><PetRoom pet={{ ...pet, ...state.data }} action={petAction} t={t} onPet={() => { if (!careAttempt) void care('pet'); }}/><h2>{pet.adopted_companion_name || pet.name}</h2><div className="pet-stats">{(['hunger', 'hydration', 'happiness', 'energy', 'health'] as const).map(key => <label key={key}>{t(key)}<span>{state.data[key]} / 100</span><progress max={100} value={state.data[key]}/></label>)}</div><div className="pet-actions">{(['pet', 'drink', 'walk', 'rest', 'feed'] as const).map(k => <button className={`button ${k === 'feed' ? 'primary' : ''}`} disabled={busy || !!careAttempt} key={k} onClick={() => care(k)}>{t(k)}{k === 'feed' ? ` · ${state.data.feed_coin_cost} ${t('credits')}` : ''}</button>)}</div>{careAttempt && <div className="access-banner"><p>{t('requestUnconfirmed')}</p><button className="button primary" disabled={busy} onClick={() => void care(careAttempt.kind)}>{t('retry')}</button></div>}</div>}</Status></>;
-    return <><Status resource={breeds} t={t}><div className="catalog-grid">{items(breeds.data).map(b => <article className="catalog-card pet-catalog" key={b.id}><Media src={b.avatar_url} alt={b.name}/><div><span className="eyebrow">{b.species}</span><h3>{b.name}</h3><p>{b.description}</p><button className="button" disabled={!b.adopted_companion_id && !b.can_adopt} onClick={() => b.adopted_companion_id ? setPet(b) : setAdopting(b)}>{b.adopted_companion_id ? productText('aiPets.openHome', t) : t('adopt')}<ArrowRight size={16}/></button>{!b.adopted_companion_id && !b.can_adopt && <small><a href="#membership">{t('manage')}</a></small>}</div></article>)}</div>{!items(breeds.data).length && <Empty t={t}/>}</Status>{adopting && <Modal title={`${t('adopt')} · ${adopting.name}`} close={() => setAdopting(null)} t={t}><Form t={t} className="form" onSubmit={async (e) => {
+        return <><button className="text-button" onClick={() => setPet(null)}><ArrowLeft size={16}/>{t('back')}</button><Status resource={state} t={t}>{state.data && <PetHome key={pet.adopted_companion_id} pet={pet} state={state.data} action={petAction} busy={busy} pending={careAttempt} t={t} care={care}/>}</Status></>;
+    return <><Status resource={breeds} t={t}><PetCatalog breeds={items(breeds.data)} t={t} open={setPet} adopt={setAdopting}/>{!items(breeds.data).length && <Empty t={t}/>}</Status>{adopting && <Modal title={`${t('adopt')} · ${adopting.name}`} close={() => setAdopting(null)} t={t}><Form t={t} className="form" onSubmit={async (e) => {
                 e.preventDefault();
                 const name = new FormData(e.currentTarget).get('name');
                 setBusy(true);
