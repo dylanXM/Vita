@@ -15,6 +15,10 @@ directory.
 
 ## Repository-wide rules
 
+- All Webapp and Admin changes must remain compatible with their Vercel
+  deployment configuration. Preserve build and type checks; do not bypass
+  failures by disabling validation. Report Vercel verification as pending
+  until the affected revision has a successful deployment.
 - Keep Backend, Admin, Webapp and App aligned to the current pre-release API
   contract.
 - Do not duplicate shared business rules across clients; enforce authoritative
